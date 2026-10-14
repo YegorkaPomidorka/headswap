@@ -1,7 +1,6 @@
 package com.yegorkapomidorka.headswap
 
 import android.os.Build
-import android.os.ParcelFileDescriptor
 import android.os.SystemClock
 import com.yegorkapomidorka.headswap.aa.AaBridgeCore
 import com.yegorkapomidorka.headswap.aa.CarlifeAudio
@@ -19,8 +18,8 @@ import com.yegorkapomidorka.headswap.aa.TranscodeOutput
 import com.yegorkapomidorka.headswap.aa.VideoMode
 import com.yegorkapomidorka.headswap.aa.VideoQueueLimit
 import com.yegorkapomidorka.headswap.aa.VideoTranscoder
-import java.io.FileInputStream
-import java.io.FileOutputStream
+import java.io.EOFException
+import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.Executors
 import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.ScheduledExecutorService
@@ -45,13 +44,13 @@ class SessionConfig(
 )
 
 /**
- * Одна сессия с ГУ поверх открытого аксессуара: читает поток, отвечает как MD, отдаёт мосту видео/звук/тач, пишет всё в лог.
- * Потоки: reader (чтение + диспетчер), writer (единственный писатель), enc-drain/render (VideoSource заглушки),
+ * Одна сессия с ГУ поверх открытого транспорта (AOA-аксессуар или ADB-сокеты): читает поток, отвечает как MD, отдаёт мосту видео/звук/тач, пишет всё в лог.
+ * Потоки: reader (чтение + диспетчер; в ADB по нити на канал, диспетчер под dispatchLock), writer (единственный писатель), enc-drain/render (VideoSource заглушки),
  * scheduler (статистика, watchdog тишины, отложенный MODULE_STATUS).
  * Протокол CarLife 2.0 по поведению MD Baidu CarLife 8.6.7, см. docs/carlife-v2-handshake.md.
  */
 class CarLifeSession(
-    private val pfd: ParcelFileDescriptor,
+    private val io: CarLifeIo,
     private val cfg: SessionConfig,
     private val bridge: AaBridgeCore,
     private val onClosed: (String) -> Unit,
@@ -62,8 +61,6 @@ class CarLifeSession(
     /** Видео-режим хоста, снятый при подключении: одинаков для INIT_DONE, энкодера и тача в течение всей сессии. */
     private val mode: VideoMode = bridge.videoMode
 
-    private val input = FileInputStream(pfd.fileDescriptor)
-    private val output = FileOutputStream(pfd.fileDescriptor)
     private val queue = LinkedBlockingQueue<Out>()
 
     // видео-очередь: считаем только видео (в queue ещё звук и команды); слив измеряет writeLoop
@@ -84,8 +81,10 @@ class CarLifeSession(
     private var lastArtJpeg = ByteArray(0)
     private val turnIcons = HashMap<Int, ByteArray>()
     @Volatile private var metaMusicOffLogged = false
-    private var reader: Thread? = null
+    private val readers = CopyOnWriteArrayList<Thread>()
     private var writer: Thread? = null
+    /** ADB: шесть нитей чтения вызывают dispatch, а он рассчитан на одну нить. */
+    private val dispatchLock = Any()
 
     private val t0 = SystemClock.elapsedRealtime()
     @Volatile private var lastRx = 0L
@@ -146,13 +145,19 @@ class CarLifeSession(
     fun start() {
         bridge.attach(this)
         AppLog.i("сессия: старт")
+        AppLog.i("сессия: транспорт ${io.label}")
         CarLifeState.resetSession()
         CarLifeState.videoMode = mode
         AppLog.i(mode.describe())
         CarLifeState.status = "соединено, жду HU_PROTOCOL_VERSION"
         lastRx = SystemClock.elapsedRealtime()
         writer = Thread({ writeLoop() }, "cl-writer").also { it.start() }
-        reader = Thread({ readLoop() }, "cl-reader").also { it.start() }
+        when (val t = io) {
+            is AoaIo -> readers.add(Thread({ readLoop(t) }, "cl-reader").also { it.start() })
+            is TcpIo -> for (chan in t.input.keys.sorted()) {
+                readers.add(Thread({ tcpReadLoop(t, chan) }, "cl-rx-${Ch.name(chan)}").also { it.start() })
+            }
+        }
         sched.scheduleWithFixedDelay({ tick() }, 1, 1, TimeUnit.SECONDS)
         sched.scheduleWithFixedDelay({ adaptBitrate() }, 1000, BITRATE_POLL_MS, TimeUnit.MILLISECONDS)
     }
@@ -174,31 +179,20 @@ class CarLifeSession(
             AppLog.e("остановка видео", e)
         }
         source = null
-        try {
-            pfd.close()
-        } catch (_: Exception) {
-        }
+        io.close()      // для сокетов только это будит заблокированный read
         writer?.interrupt()
-        reader?.interrupt()
-        try {
-            input.close()
-        } catch (_: Exception) {
-        }
-        try {
-            output.close()
-        } catch (_: Exception) {
-        }
+        for (r in readers) r.interrupt()
         AppLog.i("сессия: закрыта")
         onClosed(reason)
     }
 
     // ---------------- чтение ----------------
 
-    private fun readLoop() {
+    private fun readLoop(aoa: AoaIo) {
         val buf = ByteArray(Wire.CHUNK)
         try {
             while (!closed.get()) {
-                val n = input.read(buf)
+                val n = aoa.input.read(buf)
                 if (n < 0) {
                     close("EOF чтения (ГУ отключилось)")
                     return
@@ -219,6 +213,47 @@ class CarLifeSession(
             if (!closed.get()) {
                 AppLog.e("ошибка чтения", e)
                 close("ошибка чтения: ${e.message}")
+            }
+        }
+    }
+
+    /** ADB: одна нить на сокет канала, читает «голые» inner-сообщения (без внешнего заголовка), см. TcpFraming. */
+    private fun tcpReadLoop(tcp: TcpIo, chan: Int) {
+        val name = Ch.name(chan)
+        val input = tcp.input.getValue(chan)
+        var count = 0
+        try {
+            while (!closed.get()) {
+                // первые 3 заголовка канала в лог до чтения тела: если тело не придёт, это единственный след
+                val inner = TcpFraming.readInner(input, chan) { hdr, declared ->
+                    if (count < 3) AppLog.detail("RAW rx $name заголовок #${count + 1} declared=$declared: ${Hex.compact(hdr, 12)}")
+                }
+                if (inner == null) {
+                    close("EOF чтения $name (ГУ отключилось)")
+                    return
+                }
+                count++
+                if (count <= 3) AppLog.detail("RAW rx $name #$count ${inner.size} bytes: ${Hex.compact(inner, 32)}")
+                synchronized(dispatchLock) {
+                    lastRx = SystemClock.elapsedRealtime()
+                    rxBytes += inner.size
+                    dispatch(chan, inner)
+                }
+            }
+        } catch (e: ProtocolDesync) {
+            if (!closed.get()) {
+                AppLog.e("РАССИНХРОН TCP $name: ${e.message}")
+                close("рассинхрон TCP $name")
+            }
+        } catch (e: EOFException) {
+            if (!closed.get()) {
+                AppLog.i("EOF посреди сообщения $name: ${e.message}")
+                close("EOF чтения $name (ГУ отключилось)")
+            }
+        } catch (e: Exception) {
+            if (!closed.get()) {
+                AppLog.e("ошибка чтения $name", e)
+                close("ошибка чтения $name: ${e.message}")
             }
         }
     }
@@ -835,8 +870,22 @@ class CarLifeSession(
                 }
                 // заголовок отдельным write, тело следом кусками <= 16384 (спека §1.4)
                 val t0 = System.nanoTime()
-                for (part in Wire.writeSequence(o.chan, o.inner)) output.write(part)
-                output.flush()
+                when (val t = io) {
+                    is AoaIo -> {
+                        for (part in Wire.writeSequence(o.chan, o.inner)) t.output.write(part)
+                        t.output.flush()
+                    }
+                    is TcpIo -> {
+                        // ADB: голое inner в сокет своего канала, внешнего заголовка нет
+                        val out = t.output[o.chan]
+                        if (out == null) {
+                            AppLog.i("TX неизвестный канал ${o.chan}, ${o.inner.size} байт пропущено")
+                            continue
+                        }
+                        out.write(o.inner)
+                        out.flush()
+                    }
+                }
                 drain.onWrite(SystemClock.elapsedRealtime(), video, o.inner.size, System.nanoTime() - t0)
                 logTx(o)
             }

@@ -25,6 +25,7 @@
     </queries>
 
     <application
+        android:name=".HeadswapApp"
         android:allowBackup="false"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
@@ -48,10 +49,31 @@
                 android:resource="@xml/accessory_filter" />
         </activity>
 
+        <!-- ADB-режим CarLife (сборка -PcarlifePackage): старое ГУ ищет пакет com.baidu.carlife и запускает его по имени
+             activity или по action; LAUNCHER нет, второй иконки не будет. В обычной сборке alias выключен -->
+        <activity-alias
+            android:name="com.baidu.carlife.CarlifeActivity"
+            android:targetActivity=".MainActivity"
+            android:exported="true"
+            android:enabled="${carlifeAdb}">
+            <intent-filter>
+                <action android:name="com.baidu.carlife.Action.CarlifePlatform" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="com.vivo.car.action.adb.view" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </activity-alias>
+
         <!-- раздача логов и отчётов через «Поделиться» (только чтение, без AndroidX FileProvider) -->
         <provider
             android:name=".ui.LogProvider"
-            android:authorities="com.yegorkapomidorka.headswap.logs"
+            android:authorities="${applicationId}.logs"
             android:exported="false"
             android:grantUriPermissions="true" />
 

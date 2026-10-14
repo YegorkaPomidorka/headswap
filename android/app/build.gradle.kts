@@ -10,6 +10,10 @@ val releaseProps = Properties().apply {
     if (f.exists()) f.inputStream().use { load(it) }
 }
 
+// ./gradlew assembleDebug -PcarlifePackage: сборка под пакет настоящего CarLife для старых ГУ с запуском по ADB
+// (только наличие свойства, значение не важно: -PcarlifePackage без значения даёт пустую строку)
+val carlifeAdb = project.hasProperty("carlifePackage")
+
 android {
     namespace = "com.yegorkapomidorka.headswap"
     compileSdk = 36
@@ -20,6 +24,14 @@ android {
         targetSdk = 36
         versionCode = 31
         versionName = "1.1.6"
+        if (carlifeAdb) {
+            // как у настоящего CarLife 8.6.7: ГУ может смотреть версию пакета
+            applicationId = "com.baidu.carlife"
+            versionCode = 259
+            versionName = "8.6.7"
+        }
+        buildConfigField("boolean", "CARLIFE_ADB", carlifeAdb.toString())
+        manifestPlaceholders["carlifeAdb"] = carlifeAdb.toString()
     }
 
     signingConfigs {
@@ -38,6 +50,10 @@ android {
             isMinifyEnabled = false
             signingConfig = signingConfigs.findByName("release")
         }
+    }
+
+    buildFeatures {
+        buildConfig = true
     }
 
     compileOptions {

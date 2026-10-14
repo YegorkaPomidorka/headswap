@@ -37,7 +37,7 @@ import java.util.concurrent.Executors
 import java.util.concurrent.ScheduledExecutorService
 
 /**
- * Foreground-сервис (connectedDevice): держит ParcelFileDescriptor аксессуара и сессию с ГУ.
+ * Foreground-сервис (connectedDevice): держит транспорт (ParcelFileDescriptor аксессуара или ADB-сокеты) и сессию с ГУ.
  * AA-сторона моста (BridgeHost) живёт на время сервиса, а не одной USB-сессии: обрыв USB закрывает
  * CarLife-сессию, AA остаётся живой BridgeHost.GRACE_MS и подхватывается следующей USB-сессией.
  * Всё состояние сервиса (session, host, stopRequested) трогает только главная нить.
@@ -92,6 +92,24 @@ class BridgeService : Service() {
             }
             return START_NOT_STICKY
         }
+        if (intent?.action == ACTION_ADB) {
+            val io = AdbLink.take()
+            if (io == null) {
+                AppLog.i("сервис: ADB-набор сокетов уже забран или сброшен, останавливаюсь")
+                CarLifeState.status = "ADB: набор сокетов не найден"
+                failStart()
+                return START_NOT_STICKY
+            }
+            val old = session
+            if (old != null) {
+                // ГУ переподключилось: старая сессия умирает от EOF сама, но ждать её не будем.
+                // onSessionClosed старой проигнорируется (session !== s), AA-хост переиспользует новая сессия
+                AppLog.i("сервис: новое ADB-подключение, закрываю прежнюю сессию")
+                old.close("новое ADB-подключение")
+            }
+            CarLifeState.accessory = "ADB (TCP 127.0.0.1)"
+            return startSession(io)
+        }
         if (session != null) {
             AppLog.i("сервис: сессия уже идёт, повторный старт игнорирую")
             return START_NOT_STICKY
@@ -125,7 +143,11 @@ class BridgeService : Service() {
         }
         AppLog.i("сервис: аксессуар открыт: ${MainActivity.describe(acc)}")
         CarLifeState.accessory = MainActivity.describe(acc)
+        return startSession(AoaIo(pfd))
+    }
 
+    /** Общая часть старта для AOA и ADB: настройки, AA-хост, wakelock, сессия поверх открытого транспорта. */
+    private fun startSession(io: CarLifeIo): Int {
         val aaPrefs = AaPrefs(this)
         val screenOn = getSystemService(PowerManager::class.java).isInteractive
         val cfg = SessionConfig(
@@ -147,10 +169,7 @@ class BridgeService : Service() {
             host = h
             if (h == null) {
                 // нет сертификата head unit или мост не собрался: причина уже в AaState.setupError, USB-сессию не открываем
-                try {
-                    pfd.close()
-                } catch (_: Exception) {
-                }
+                io.close()
                 CarLifeState.status = AaState.setupError ?: "мост не стартовал"
                 failStart()
                 return START_NOT_STICKY
@@ -167,7 +186,7 @@ class BridgeService : Service() {
         stopRequested = false
 
         val sref = arrayOfNulls<CarLifeSession>(1)
-        val s = CarLifeSession(pfd, cfg, h.core) { reason -> main.post { onSessionClosed(sref[0]!!, reason) } }
+        val s = CarLifeSession(io, cfg, h.core) { reason -> main.post { onSessionClosed(sref[0]!!, reason) } }
         sref[0] = s
         session = s
         s.start()
@@ -329,6 +348,8 @@ class BridgeService : Service() {
 
     companion object {
         const val ACTION_STOP = "com.yegorkapomidorka.headswap.STOP"
+        /** ADB-режим: AdbLink собрал шесть сокетов от ГУ и просит начать сессию. */
+        const val ACTION_ADB = "com.yegorkapomidorka.headswap.ADB"
         private const val CHANNEL = "bridge"
         private const val NOTIF_ID = 1
         /** Сколько автозапуск ждёт подключения включённой службы спецвозможностей. */
