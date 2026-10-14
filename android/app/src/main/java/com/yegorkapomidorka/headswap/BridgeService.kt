@@ -65,7 +65,7 @@ import java.util.concurrent.Executors
 import java.util.concurrent.ScheduledExecutorService
 
 /**
- * Foreground-сервис (connectedDevice): держит транспорт (USB-аксессуар или debug-TCP) и сессию с ГУ.
+ * Foreground-сервис (connectedDevice): держит транспорт (USB-аксессуар, debug-TCP или ADB-сокеты) и сессию с ГУ.
  * AA-сторона моста (BridgeHost) живёт на время сервиса, а не одной USB-сессии: обрыв USB закрывает
  * CarLife-сессию, AA остаётся живой BridgeHost.GRACE_MS и подхватывается следующей USB-сессией.
  * Всё состояние сервиса (session, host, stopRequested) трогает только главная нить.
@@ -203,6 +203,24 @@ class BridgeService : Service() {
         }
         if (intent?.action == ACTION_WIFI_B_AUTO_OFF) {
             onCarAutoOff()
+            return START_NOT_STICKY
+        }
+        if (intent?.action == ACTION_ADB) {
+            val transport = AdbLink.take()
+            if (transport == null) {
+                AppLog.i("сервис: ADB-набор сокетов уже забран или сброшен, останавливаюсь")
+                CarLifeState.status = "ADB: набор сокетов не найден"
+                failStart()
+                return START_NOT_STICKY
+            }
+            val old = session
+            if (old != null) {
+                // ГУ переподключилось: старая сессия умирает от EOF сама, но ждать её не будем.
+                // onSessionClosed старой проигнорируется (session !== s), AA-хост переиспользует новая сессия
+                AppLog.i("сервис: новое ADB-подключение, закрываю прежнюю сессию")
+                old.close("новое ADB-подключение")
+            }
+            startSession(transport)
             return START_NOT_STICKY
         }
         if (session != null) {
@@ -1023,6 +1041,8 @@ class BridgeService : Service() {
         const val ACTION_WIFI_B_AUTO = "com.yegorkapomidorka.headswap.WIFI_B_AUTO"
         /** Машина отключилась по Bluetooth (ACL_DISCONNECTED): через debounce снять ожидание. */
         const val ACTION_WIFI_B_AUTO_OFF = "com.yegorkapomidorka.headswap.WIFI_B_AUTO_OFF"
+        /** ADB-режим: AdbLink собрал шесть сокетов от ГУ и просит начать сессию. */
+        const val ACTION_ADB = "com.yegorkapomidorka.headswap.ADB"
         private const val CHANNEL = "bridge"
         private const val NOTIF_ID = 1
         private const val HINT_NOTIF_ID = 2

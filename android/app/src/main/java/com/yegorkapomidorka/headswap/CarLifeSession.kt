@@ -45,7 +45,7 @@ class SessionConfig(
 )
 
 /**
- * Одна сессия с ГУ поверх транспорта (USB-поток или 6 сокетов): отвечает как MD, отдаёт мосту видео/звук/тач, пишет всё в лог.
+ * Одна сессия с ГУ поверх транспорта (USB-поток, 6 сокетов по воздуху или ADB-сокеты): отвечает как MD, отдаёт мосту видео/звук/тач, пишет всё в лог.
  * Потоки: чтение и запись в транспорте (sink и onWritten сериализованы), enc-drain/render (VideoSource заглушки),
  * scheduler (статистика, watchdog тишины, отложенный MODULE_STATUS).
  * Протокол CarLife 2.0 по поведению MD Baidu CarLife 8.6.7, см. docs/carlife-v2-handshake.md.
@@ -62,7 +62,7 @@ class CarLifeSession(
     /** Видео-режим хоста, снятый при подключении: одинаков для INIT_DONE, энкодера и тача в течение всей сессии. */
     private val mode: VideoMode = bridge.videoMode
 
-    /** Транспорт сессии: usb-aoa, tcp-debug или tcp6. */
+    /** Транспорт сессии: usb-aoa, tcp-debug, tcp6 или tcp-adb. */
     val transportKind: String get() = transport.caps.kind
 
     /** Воздух (6 сокетов): своя лесенка битрейта, PAUSE-keepalive чаще, WL-строки видео. USB и tcp-debug - как было. */

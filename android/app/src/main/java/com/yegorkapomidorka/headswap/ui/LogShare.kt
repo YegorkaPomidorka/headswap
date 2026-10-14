@@ -14,6 +14,7 @@ import android.os.SystemClock
 import android.provider.MediaStore
 import android.provider.OpenableColumns
 import android.widget.Toast
+import com.yegorkapomidorka.headswap.AdbLink
 import com.yegorkapomidorka.headswap.AppLog
 import com.yegorkapomidorka.headswap.BuildConfig
 import com.yegorkapomidorka.headswap.CarLifeState
@@ -73,7 +74,6 @@ class LogProvider : ContentProvider() {
 }
 
 object LogShare {
-    const val AUTHORITY = "com.yegorkapomidorka.headswap.logs"
     private const val MAX_FILE_BYTES = 4L * 1024 * 1024
     private const val MAX_LOGS = 5
     private const val WL_MARK = " WL "
@@ -89,10 +89,13 @@ object LogShare {
         logDir(ctx).listFiles { f -> f.name.startsWith("headswap-") && f.name.endsWith(".log") }
             ?.sortedByDescending { it.name } ?: emptyList()
 
-    fun uriFor(f: File): Uri = Uri.parse("content://$AUTHORITY/${Uri.encode(f.name)}")
+    /** Authority провайдера в манифесте: ${applicationId}.logs (пакет зависит от сборки). */
+    fun authority(ctx: Context): String = ctx.packageName + ".logs"
+
+    fun uriFor(ctx: Context, f: File): Uri = Uri.parse("content://${authority(ctx)}/${Uri.encode(f.name)}")
 
     private fun shareFile(ctx: Context, f: File, mime: String, subject: String) {
-        val uri = uriFor(f)
+        val uri = uriFor(ctx, f)
         val send = Intent(Intent.ACTION_SEND).apply {
             type = mime
             putExtra(Intent.EXTRA_STREAM, uri)
@@ -224,6 +227,7 @@ object LogShare {
         }
         return buildString {
             appendLine("Headswap $ver")
+            appendLine("пакет: ${ctx.packageName} $ver")
             appendLine("Время: ${SimpleDateFormat("yyyy-MM-dd HH:mm:ss Z", Locale.US).format(Date())}")
             appendLine("Устройство: ${Build.MANUFACTURER} ${Build.MODEL}, Android ${Build.VERSION.RELEASE} (SDK ${Build.VERSION.SDK_INT}), ${Build.DISPLAY}")
             appendLine("Аптайм: ${SystemClock.elapsedRealtime() / 1000} с")
@@ -244,6 +248,7 @@ object LogShare {
             appendLine()
             appendLine("Данные ГУ и состояние")
             appendLine(CarLifeState.summary())
+            if (BuildConfig.CARLIFE_ADB) appendLine("ADB: ${AdbLink.describe()}")
             appendLine(AaState.summary())
             appendLine(AutoServer.summary(ctx))
             appendLine()
