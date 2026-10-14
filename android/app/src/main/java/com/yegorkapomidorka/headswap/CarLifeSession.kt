@@ -938,17 +938,38 @@ class CarLifeSession(
 
     private var lastStatsAt = 0L
     private var lastStatsFrames = 0L
+    private var fgStall = false
+    private var fgStallFrames = 0L
 
     private fun tick() {
         if (closed.get()) return
         val now = SystemClock.elapsedRealtime()
-        // Пустых keepalive 0x20001 len=0 при идущем видео НЕТ: кадры обеспечивает энкодер (repeat-previous-frame-after
-        // 100 мс). На PAUSE (ГУ на своём источнике) канал иначе молчит: Desay G6S (Mazda CX-5) через ~22 с тишины
-        // рвёт USB (EIO, лог Ивана 2026-10-12), поэтому шлём пустой VIDEO_DATA, как Baidu sendEmptyPacketBackground.
+        // Пока видео идёт, кадры обеспечивает энкодер (repeat-previous-frame-after 100 мс). На PAUSE (ГУ на своём
+        // источнике) канал иначе молчит: Desay G6S (Mazda CX-5) через ~22 с тишины рвёт USB (EIO, лог Ивана
+        // 2026-10-12), поэтому шлём пустой VIDEO_DATA, как Baidu sendEmptyPacketBackground.
         if (paused && PAUSE_KEEPALIVE_ENABLED && now - lastVideoTx >= PAUSE_KEEPALIVE_MS) {
             if (vBeats == 0L) AppLog.i("видео: PAUSE, шлю пустой VIDEO_DATA раз в ${PAUSE_KEEPALIVE_MS} мс, чтобы канал не молчал")
             lastVideoTx = now
             send(Ch.VIDEO, Wire.dataInner(Msg.VIDEO_DATA, unixSeconds(), ByteArray(0)))
+        }
+        // В проекции энкодер тоже может замолчать: камера телефона забирает аппаратный кодер, и G6S через 6–7 с
+        // тишины рвёт USB (h67, лог 2026-10-14). Шлём пустой VIDEO_DATA, как Baidu sendEmptyPacketForeground.
+        if (!paused && carlifeStarted && FG_KEEPALIVE_ENABLED) {
+            synchronized(videoLock) {
+                val silent = now - lastVideoTx
+                if (silent >= FG_KEEPALIVE_MS) {
+                    if (!fgStall) {
+                        fgStall = true
+                        AppLog.i("видео: кадров нет $silent мс, шлю пустой VIDEO_DATA, пока энкодер молчит")
+                    }
+                    lastVideoTx = now
+                    send(Ch.VIDEO, Wire.dataInner(Msg.VIDEO_DATA, unixSeconds(), ByteArray(0)))
+                } else if (fgStall && vFrames > fgStallFrames) {
+                    fgStall = false
+                    AppLog.i("видео: кадры снова идут")
+                }
+                if (!fgStall) fgStallFrames = vFrames
+            }
         }
         if (rxBytes == 0L && now - t0 > SILENCE_MS && (now - t0) % 10_000 < 1000) {
             AppLog.i("ГУ не прислало ни одного байта за ${(now - t0) / 1000} с (ждём HU_PROTOCOL_VERSION)")
@@ -1019,6 +1040,10 @@ class CarLifeSession(
 
         /** Пустой VIDEO_DATA раз в 2 с, пока ГУ держит PAUSE. */
         @Volatile @JvmStatic var PAUSE_KEEPALIVE_ENABLED = true
+        private const val FG_KEEPALIVE_MS = 1_000L
+
+        /** Пустой VIDEO_DATA в проекции, если видео не уходило дольше FG_KEEPALIVE_MS (энкодер занят камерой). */
+        @Volatile @JvmStatic var FG_KEEPALIVE_ENABLED = true
         private const val FEATURE_CONTENT_ENCRYPTION = "CONTENT_ENCRYPTION"
 
         /** moduleID подписки CARLIFE_DATA_SUBSCRIBE на навигацию (CarlifeDataSubscribe: 0 навигация, 2 музыка). */
