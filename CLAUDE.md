@@ -19,3 +19,7 @@
 Релиз, кроме сайта, выкладывается в GitHub Releases: оттуда приложение обновляется само (`update/UpdateLogic.kt`). Тег `vX.Y.Z`, файл `headswap-X.Y.Z.apk` (имя как на сайте), описание релиза приложение показывает перед установкой:
 `gh release create vX.Y.Z headswap-X.Y.Z.apk --repo YegorkaPomidorka/headswap --title "Headswap X.Y.Z" --notes-file <что нового>`
 Тестовые сборки на GitHub выкладывать только с `--prerelease`: последним релизом GitHub их не считает, приложение их не предложит.
+
+## Карточки юзеров hNN
+
+«Забери h86», «разбери h12» и т.п. — это id карточки в трекере проблем юзеров Headswap Chat (`C:\Users\pomidorka\Documents\lily\tracking\headswap-issues.json`, поле `id`). Карточку, её логи и вложения запросить у сессии Telegram-дежурного (скилл `telegram-duty`): найти её через `ListAgents` и спросить через `SendMessage`. Файлы на диске по «h86» не искать.
