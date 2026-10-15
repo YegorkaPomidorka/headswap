@@ -34,7 +34,14 @@ class AaTranscoder(
     private val srcWidth: Int = width,
     private val srcHeight: Int = height,
     private val crop: VideoCrop = VideoCrop.NONE,
+    /** Период естественных IDR энкодера, с. По запросу (ГУ, переполнение очереди, START) IDR идёт сразу, независимо от периода. */
+    private val iFrameIntervalS: Int = 1,
+    /** Нижняя граница QP для I-кадров (0 = как решит кодек): ограничивает размер IDR на статичной картинке. Android 12+. */
+    private val qpIMin: Int = 0,
+    /** Потолок IDR, байт (0 = нет): IDR больше - поднимаем QP I на лету шагом [QP_I_STEP] до [QP_I_MAX]. Нужен [qpIMin] > 0. */
+    private val idrCapBytes: Int = 0,
 ) : VideoTranscoder {
+    @Volatile private var curQpIMin = qpIMin
     private var encoder: MediaCodec? = null
     private var surface: Surface? = null
     private var relay: GlRelay? = null
@@ -123,7 +130,7 @@ class AaTranscoder(
         if (relay == null && !crop.isNone) log("транскодер: !!!!!! без GL-реле кроп невозможен, кадр AA будет сжат целиком")
         running = true
         encThread = Thread({ encodeLoop(c) }, "aa-trans-enc").also { it.start() }
-        log("транскодер: энкодер $encoderName ${width}x$height (вход AA ${srcWidth}x$srcHeight${if (crop.isNone) "" else ", кроп $crop"}) ${fps}fps ${bitrate / 1000}kbps ($encoderNote)")
+        log("транскодер: энкодер $encoderName ${width}x$height (вход AA ${srcWidth}x$srcHeight${if (crop.isNone) "" else ", кроп $crop"}) ${fps}fps ${bitrate / 1000}kbps ($encoderNote), IDR раз в $iFrameIntervalS с${if (qpIMin > 0) ", QP I >= $qpIMin" else ""}")
     }
 
     override val targetFps: Int get() = target
@@ -162,7 +169,7 @@ class AaTranscoder(
         f.setInteger(MediaFormat.KEY_COLOR_FORMAT, MediaCodecInfo.CodecCapabilities.COLOR_FormatSurface)
         f.setInteger(MediaFormat.KEY_BIT_RATE, bitrate)
         f.setInteger(MediaFormat.KEY_FRAME_RATE, fps)
-        f.setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, 1)
+        f.setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, iFrameIntervalS)
         // как у Baidu (Recorder.java:1364, MediaFormatUtils.java:48): на статичном экране кадр повторяется раз в 100 мс
         val repeat = Regex("""repeat=(\d+)""").find(tuning)?.groupValues?.get(1)?.toLong() ?: REPEAT_AFTER_US
         f.setLong(MediaFormat.KEY_REPEAT_PREVIOUS_FRAME_AFTER, repeat)
@@ -175,6 +182,7 @@ class AaTranscoder(
                 if (tuning.contains("cbr")) MediaCodecInfo.EncoderCapabilities.BITRATE_MODE_CBR else MediaCodecInfo.EncoderCapabilities.BITRATE_MODE_VBR
             )
             f.setInteger(MediaFormat.KEY_MAX_B_FRAMES, 0)
+            if (qpIMin > 0 && Build.VERSION.SDK_INT >= 31) f.setInteger(MediaFormat.KEY_VIDEO_QP_I_MIN, qpIMin)
         }
         if (level == 0) {
             if (!tuning.contains("norealtime")) f.setInteger(MediaFormat.KEY_PRIORITY, 0)   // realtime
@@ -376,7 +384,9 @@ class AaTranscoder(
                             }
                             winOut.incrementAndGet()
                             totalOut.incrementAndGet()
-                            out.onEncoderFrame(data, info.flags and MediaCodec.BUFFER_FLAG_KEY_FRAME != 0)
+                            val key = info.flags and MediaCodec.BUFFER_FLAG_KEY_FRAME != 0
+                            if (key && idrCapBytes > 0 && data.size > idrCapBytes) raiseQpI(c, data.size)
+                            out.onEncoderFrame(data, key)
                         }
                     }
                     c.releaseOutputBuffer(idx, false)
@@ -384,6 +394,24 @@ class AaTranscoder(
             }
         } catch (e: Exception) {
             if (running) out.onTranscodeError("цикл энкодера: ${e.javaClass.simpleName}: ${e.message}")
+        }
+    }
+
+    /** IDR вышел больше потолка: поднять нижнюю границу QP I-кадров, следующий IDR будет меньше. */
+    private fun raiseQpI(c: MediaCodec, size: Int) {
+        val old = curQpIMin
+        if (old <= 0 || old >= QP_I_MAX || Build.VERSION.SDK_INT < 31) {
+            log("транскодер: IDR $size Б больше потолка $idrCapBytes Б, QP I не поднять (сейчас $old)")
+            return
+        }
+        val q = minOf(old + QP_I_STEP, QP_I_MAX)
+        try {
+            c.setParameters(Bundle().apply { putInt(MediaFormat.KEY_VIDEO_QP_I_MIN, q) })
+            curQpIMin = q
+            log("транскодер: IDR $size Б больше потолка $idrCapBytes Б, QP I $old -> $q")
+        } catch (e: Exception) {
+            curQpIMin = QP_I_MAX
+            log("транскодер: setParameters(QP I=$q) не прошёл: ${e.javaClass.simpleName}: ${e.message}")
         }
     }
 
@@ -456,6 +484,8 @@ class AaTranscoder(
     companion object {
         const val MIME = "video/avc"
         const val REPEAT_AFTER_US = 100_000L
+        const val QP_I_STEP = 3
+        const val QP_I_MAX = 42
 
         /** Реле перерисовывает последний кадр, если новых нет столько мс (как repeat-previous-frame-after у Baidu). */
         const val REDRAW_IDLE_MS = 100L

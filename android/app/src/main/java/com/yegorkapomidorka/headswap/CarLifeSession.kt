@@ -745,9 +745,15 @@ class CarLifeSession(
 
     /** Транскодер моста: декодер AA (кадр режима) -> кроп -> Surface энкодера (выход режима). null, если MediaCodec не поднялся. */
     override fun createTranscoder(out: TranscodeOutput): VideoTranscoder? = try {
+        // Desay G6S (Mazda CX-5) переставала читать USB посреди поездки при IDR 234-631 КБ каждую секунду
+        // (h112, логи Zakharoff123 15.10.2026): редкие IDR, остальные - по запросу ГУ/очереди, и потолок их размера
+        val g6s = bridge.huDesayG6S
         AaTranscoder(
             mode.outW, mode.outH, targetFps, bitratePolicy.current, out, { AppLog.i(it, false) },
             srcWidth = mode.aaW, srcHeight = mode.aaH, crop = mode.crop,
+            iFrameIntervalS = if (g6s) G6S_IDR_INTERVAL_S else 1,
+            qpIMin = if (g6s) G6S_QP_I_MIN else 0,
+            idrCapBytes = if (g6s) G6S_IDR_CAP_BYTES else 0,
         ).also { it.start() }
     } catch (e: Exception) {
         AppLog.e("BRIDGE транскодер не создан", e)
@@ -1027,6 +1033,9 @@ class CarLifeSession(
         private const val NEVER_MS = Long.MIN_VALUE
         private const val SILENCE_MS = 10_000L
         private const val PAUSE_KEEPALIVE_MS = 2_000L
+        private const val G6S_IDR_INTERVAL_S = 8
+        private const val G6S_QP_I_MIN = 28
+        private const val G6S_IDR_CAP_BYTES = 120 * 1024
 
         /** Пустой VIDEO_DATA раз в 2 с, пока ГУ держит PAUSE. */
         @Volatile @JvmStatic var PAUSE_KEEPALIVE_ENABLED = true
