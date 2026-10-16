@@ -11,6 +11,9 @@ class HeadswapApp : Application() {
     override fun onCreate() {
         super.onCreate()
         AppLog.init(this)       // повторный init безопасен: BridgeService и MainActivity зовут его же
-        if (BuildConfig.CARLIFE_ADB) AdbLink.start(this)
+        if (BuildConfig.CARLIFE_ADB) {
+            AdbLink.start(this)
+            AdbDiag.start(this)
+        }
     }
 }
