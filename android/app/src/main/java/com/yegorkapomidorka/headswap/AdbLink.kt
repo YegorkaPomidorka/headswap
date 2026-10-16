@@ -2,7 +2,6 @@ package com.yegorkapomidorka.headswap
 
 import android.content.Context
 import android.content.Intent
-import java.net.InetAddress
 import java.net.InetSocketAddress
 import java.net.ServerSocket
 import java.net.Socket
@@ -10,7 +9,8 @@ import java.net.Socket
 /**
  * ADB-режим CarLife 3.0 (старые Android-ГУ, 2017): ГУ делает `adb forward tcp:7200 tcp:7240` (и так для остальных
  * портов) и подключается клиентом к портам телефона, по одному сокету на канал. Как в настоящем CarLife 8.6.7
- * (core/connect/ConnectManager.java, AcceptThread): шесть ServerSocket живут с запуска процесса, «подключено» =
+ * (core/connect/ConnectManager.java, AcceptThread): шесть ServerSocket на всех интерфейсах (`new ServerSocket(port)`)
+ * живут с запуска процесса, «подключено» =
  * шесть принятых сокетов, повторный accept на уже занятый порт сбрасывает ВСЕ сокеты. Первым пишет ГУ, MD при accept молчит.
  * Собранный набор отдаётся BridgeService (ACTION_ADB) через take().
  */
@@ -19,7 +19,6 @@ object AdbLink {
     private val PORTS = linkedMapOf(
         Ch.CMD to 7240, Ch.VIDEO to 8240, Ch.MEDIA to 9240, Ch.TTS to 9241, Ch.VR to 9242, Ch.TOUCH to 9340,
     )
-    private val LOOPBACK = byteArrayOf(127, 0, 0, 1)
     private const val ACCEPT_RETRY_MS = 500L
 
     /** Все изменения слотов (pending, ready, active, статистика) только под этим замком. */
@@ -45,7 +44,7 @@ object AdbLink {
             started = true
             appCtx = ctx.applicationContext
         }
-        if (!CarLifeState.running) CarLifeState.status = "ADB: жду ГУ на 127.0.0.1:${PORTS.getValue(Ch.CMD)}…"
+        if (!CarLifeState.running) CarLifeState.status = "ADB: жду ГУ на :${PORTS.getValue(Ch.CMD)}…"
         AppLog.i("ADB: старт, порты ${PORTS.entries.joinToString(" ") { "${Ch.name(it.key)}:${it.value}" }}")
         for ((chan, port) in PORTS) {
             Thread({ acceptLoop(chan, port) }, "adb-accept-${Ch.name(chan)}").also { it.isDaemon = true }.start()
@@ -70,7 +69,7 @@ object AdbLink {
             "${Ch.name(chan)}:$port $state"
         }
         val a = active
-        "порты 127.0.0.1: $ports; сокетов в наборе: ${pending.size}/${PORTS.size}" +
+        "порты (все интерфейсы): $ports; сокетов в наборе: ${pending.size}/${PORTS.size}" +
             (if (pending.isNotEmpty()) " (${names(pending.keys)})" else "") +
             "; готов к сессии: ${if (ready != null) "да" else "нет"}; сессия: ${if (a != null && !a.isClosed) "идёт" else "нет"}" +
             "; полных подключений за процесс: $connections"
@@ -84,7 +83,7 @@ object AdbLink {
             ServerSocket().also {
                 try {
                     it.reuseAddress = true
-                    it.bind(InetSocketAddress(InetAddress.getByAddress(LOOPBACK), port))
+                    it.bind(InetSocketAddress(port))        // все интерфейсы, как `new ServerSocket(port)` в оригинале
                 } catch (e: Exception) {
                     try {
                         it.close()
@@ -94,12 +93,12 @@ object AdbLink {
                 }
             }
         } catch (e: Exception) {
-            AppLog.e("ADB: bind $name 127.0.0.1:$port", e)
+            AppLog.e("ADB: bind $name :$port", e)
             synchronized(lock) { bindErrors[chan] = "${e.javaClass.simpleName}: ${e.message}" }
             return
         }
         synchronized(lock) { listening.add(chan) }
-        AppLog.i("ADB: слушаю $name 127.0.0.1:$port")
+        AppLog.i("ADB: слушаю $name :$port (все интерфейсы)")
         while (true) {
             val sock = try {
                 server.accept()

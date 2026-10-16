@@ -14,6 +14,7 @@ import android.os.SystemClock
 import android.provider.MediaStore
 import android.provider.OpenableColumns
 import android.widget.Toast
+import com.yegorkapomidorka.headswap.AdbDiag
 import com.yegorkapomidorka.headswap.AdbLink
 import com.yegorkapomidorka.headswap.AppLog
 import com.yegorkapomidorka.headswap.BuildConfig
@@ -213,7 +214,10 @@ object LogShare {
             appendLine()
             appendLine("Данные ГУ и состояние")
             appendLine(CarLifeState.summary())
-            if (BuildConfig.CARLIFE_ADB) appendLine("ADB: ${AdbLink.describe()}")
+            if (BuildConfig.CARLIFE_ADB) {
+                appendLine("ADB: ${AdbLink.describe()}")
+                appendLine("ADB-диаг: ${AdbDiag.describe()}")
+            }
             appendLine(AaState.summary())
             appendLine(AutoServer.summary(ctx))
         }
