@@ -546,11 +546,22 @@ object Msgs {
     }
 
     /**
-     * CarlifeModuleStatusList для MODULE_STATUS (ModuleStatusManage.sendCarlifeModuleListStatus, :158-221):
-     * модули 1,2,3,4,6 всегда, 8 и 9 только если у ГУ major >= 2; статус у всех 0.
+     * Слать ли модули 8 и 9 при major >= 2, как Baidu 8.6.7. Выключено для эксперимента h177: гипотеза, что ГУ Mazda
+     * (Desay G6S) на ходу блокирует тач из-за модуля 8 или 9 со статусом 0. Что они значат, неизвестно (в исходниках HU
+     * только 1-6); LifeAuto 0.1.6, у которого тач на ходу работает, шлёт только 1,2,3,4,6.
      */
-    fun moduleStatusList(huMajor: Int): ByteArray {
-        val ids = if (huMajor >= 2) intArrayOf(1, 2, 3, 4, 6, 8, 9) else intArrayOf(1, 2, 3, 4, 6)
+    const val SEND_MODULES_8_9 = false
+
+    /** Модули для MODULE_STATUS: 1,2,3,4,6 всегда, 8 и 9 при [with89] и major >= 2. */
+    fun moduleIds(huMajor: Int, with89: Boolean = SEND_MODULES_8_9): IntArray =
+        if (with89 && huMajor >= 2) intArrayOf(1, 2, 3, 4, 6, 8, 9) else intArrayOf(1, 2, 3, 4, 6)
+
+    /**
+     * CarlifeModuleStatusList для MODULE_STATUS (ModuleStatusManage.sendCarlifeModuleListStatus, :158-221):
+     * модули из [moduleIds]; статус у всех 0.
+     */
+    fun moduleStatusList(huMajor: Int, with89: Boolean = SEND_MODULES_8_9): ByteArray {
+        val ids = moduleIds(huMajor, with89)
         val w = PbWriter().int32(1, ids.size)
         for (id in ids) w.bytes(2, PbWriter().int32(1, id).int32(2, 0).toByteArray())
         return w.toByteArray()
