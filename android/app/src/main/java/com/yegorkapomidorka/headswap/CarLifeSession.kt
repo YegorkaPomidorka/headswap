@@ -107,6 +107,8 @@ class CarLifeSession(
     private var touchCount = 0
     private var maxFingers = 0
     private var lastMoveFingers = 0
+    /** Висит ли в AA DOWN без UP: клики ГУ разворачиваются в тапы по этому флагу. Новая сессия - чистый флаг. */
+    private val touchClicks = TouchClicks()
     private val rxByType = java.util.TreeMap<Int, Int>()
     private var huInfo: String? = null
     private var huStatistic: String? = null
@@ -137,6 +139,7 @@ class CarLifeSession(
 
     fun start() {
         bridge.attach(this)
+        touchClicks.reset()
         AppLog.i("сессия: старт")
         CarLifeState.resetSession()
         CarLifeState.videoMode = mode
@@ -788,7 +791,13 @@ class CarLifeSession(
             AppLog.i("TOUCH action=${t.action} пальцев=$n тело=${m.body.size} байт", false)
             lastMoveFingers = if (t.masked == 2) n else 0
         }
-        if (t.masked in TOUCH_TO_AA) bridge.onCarlifeTouch(t.action, t.x, t.y, t.px, t.py)
+        val wasDown = touchClicks.fingerDown
+        val out = touchClicks.expand(t)
+        if (t.click != CarlifeTouch.CLICK_NONE) {
+            val sent = when (out.size) { 0 -> "ничего"; 1 -> "UP"; else -> "DOWN+UP" }
+            AppLog.i("TOUCH клик ${CarlifeTouch.clickName(t.click)} палец опущен=${if (wasDown) "да" else "нет"} -> AA $sent", false)
+        }
+        for (e in out) if (e.masked in TOUCH_TO_AA) bridge.onCarlifeTouch(e.action, e.x, e.y, e.px, e.py)
         CarLifeState.touch = "$touchMode; событий=$touchCount; пальцев макс=$maxFingers; последний act=${t.action} x=${t.x} y=${t.y}" +
             (if (n > 1) " px=${t.px} py=${t.py}" else "")
     }

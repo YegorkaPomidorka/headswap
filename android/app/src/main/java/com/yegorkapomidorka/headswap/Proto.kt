@@ -295,15 +295,31 @@ object PbText {
 /**
  * Тач ГУ в виде CarlifeTouchAction: action как у MotionEvent (action&255 - код, action>>8 - индекс пальца),
  * второй палец в px/py (0,0 = нет). Жестовые коды сводятся к тем же action, как у Baidu CarlifeTouchManager.
+ * Клики/долгое нажатие - action 3 с ненулевым [click]; в тапы для AA их разворачивает [TouchClicks].
  */
-data class CarlifeTouch(val action: Int, val x: Int, val y: Int, val px: Int = 0, val py: Int = 0) {
+data class CarlifeTouch(
+    val action: Int, val x: Int, val y: Int, val px: Int = 0, val py: Int = 0,
+    val click: Int = CLICK_NONE,
+) {
     val masked: Int get() = action and 0xFF
 
     /** Пальцев в событии: 2, если есть координаты второго или это POINTER_DOWN/UP. */
     val fingers: Int get() = if (px != 0 || py != 0 || masked == 5 || masked == 6) 2 else 1
 
     companion object {
-        /** null - не тач (кнопки руля и пр.) или тело не разобралось. Клики/долгое нажатие -> action 3 (в AA не уходят). */
+        const val CLICK_NONE = 0
+        const val CLICK_SINGLE = 1
+        const val CLICK_DOUBLE = 2
+        const val CLICK_LONG = 3
+
+        fun clickName(click: Int): String = when (click) {
+            CLICK_SINGLE -> "SINGLE_CLICK"
+            CLICK_DOUBLE -> "DOUBLE_CLICK"
+            CLICK_LONG -> "LONG_PRESS"
+            else -> "-"
+        }
+
+        /** null - не тач (кнопки руля и пр.) или тело не разобралось. Клики/долгое нажатие -> action 3 + click. */
         fun parse(type: Int, body: ByteArray): CarlifeTouch? {
             val f = PbReader.parse(body) ?: return null
             if (type == Msg.TOUCH_ACTION) {
@@ -322,10 +338,50 @@ data class CarlifeTouch(val action: Int, val x: Int, val y: Int, val px: Int = 0
                 Msg.TOUCH_ACTION_OTHERPOINTER_UP -> 6 or (1 shl 8)
                 else -> return null
             }
+            val click = when (type) {
+                Msg.TOUCH_SINGLE_CLICK -> CLICK_SINGLE
+                Msg.TOUCH_DOUBLE_CLICK -> CLICK_DOUBLE
+                Msg.TOUCH_LONG_PRESS -> CLICK_LONG
+                else -> CLICK_NONE
+            }
             return CarlifeTouch(
                 action, PbReader.int(f, 1) ?: -1, PbReader.int(f, 2) ?: -1,
-                PbReader.int(f, 3) ?: 0, PbReader.int(f, 4) ?: 0,
+                PbReader.int(f, 3) ?: 0, PbReader.int(f, 4) ?: 0, click,
             )
         }
+    }
+}
+
+/**
+ * Клики ГУ -> тапы для AA. Мазда на ходу шлёт только клики; в жестовом режиме тап приходит как BEGIN (DOWN) + SINGLE_CLICK
+ * без UP. Помним, висит ли в AA DOWN первичного пальца: тогда клик только отпускает, иначе даёт DOWN+UP.
+ * Не потокобезопасно: зовётся из одного потока чтения сессии.
+ */
+class TouchClicks {
+    /** В AA ушёл DOWN первичного пальца без UP. */
+    var fingerDown = false
+        private set
+
+    fun reset() {
+        fingerDown = false
+    }
+
+    /** События для AA: обычные - как есть (с учётом флага), клик - развёрнутый в UP или DOWN+UP, долгое нажатие при опущенном пальце - пусто. */
+    fun expand(t: CarlifeTouch): List<CarlifeTouch> {
+        if (t.click == CarlifeTouch.CLICK_NONE) {
+            // POINTER_* индекс 0 не трогаем: флаг только про первичный палец
+            when (t.masked) {
+                0 -> fingerDown = true
+                1 -> fingerDown = false
+            }
+            return listOf(t)
+        }
+        val down = CarlifeTouch(0, t.x, t.y)
+        val up = CarlifeTouch(1, t.x, t.y)
+        if (!fingerDown) return listOf(down, up)
+        // долгое нажатие при опущенном пальце: UP придёт сам
+        if (t.click == CarlifeTouch.CLICK_LONG) return emptyList()
+        fingerDown = false
+        return listOf(up)
     }
 }
