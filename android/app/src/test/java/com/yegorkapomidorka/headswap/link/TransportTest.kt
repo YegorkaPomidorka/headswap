@@ -6,6 +6,7 @@ import com.yegorkapomidorka.headswap.Wire
 import com.yegorkapomidorka.headswap.link.diag.WLog
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
@@ -292,6 +293,28 @@ class TransportTest {
             t.send(Ch.VIDEO, frame)
             assertArrayEquals("CMD-сокет: голый inner", match, hu.readExactly(Ch.CMD, match.size))
             assertArrayEquals("VIDEO-сокет: голый inner", frame, hu.readExactly(Ch.VIDEO, frame.size))
+        } finally {
+            t.close()
+            hu.close()
+        }
+    }
+
+    @Test
+    fun tcp6SilenceWatchdogClosesAfterHeartbeatsStop() {
+        val (_, t, hu) = up()
+        val reasons = Collections.synchronizedList(ArrayList<String>())
+        t.start({ _, _ -> }, { _, _ -> }, { reasons += it })
+        try {
+            val far = clock() + MultiSocketTransport.HB_SILENCE_MS + 1000
+            assertFalse("без heartbeat сторож не взведён", t.checkSilence(far))
+            repeat(MultiSocketTransport.HB_ARM_COUNT.toInt()) { hu.send(Ch.VIDEO, Wire.dataInner(Msg.VIDEO_HEARTBEAT, 0, null)) }
+            val deadline = System.currentTimeMillis() + 3000
+            while (t.heartbeats < MultiSocketTransport.HB_ARM_COUNT && System.currentTimeMillis() < deadline) Thread.sleep(10)
+            assertFalse("heartbeat только что был", t.checkSilence(clock()))
+            assertTrue(t.checkSilence(clock() + MultiSocketTransport.HB_SILENCE_MS + 1000))
+            assertEquals(1, reasons.size)
+            assertTrue(reasons[0], reasons[0].startsWith("tcp6 VIDEO") && "молчит" in reasons[0])
+            assertFalse("закрыт один раз", t.checkSilence(far + 60_000))
         } finally {
             t.close()
             hu.close()

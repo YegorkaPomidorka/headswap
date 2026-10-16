@@ -314,8 +314,10 @@ class MultiSocketTransport internal constructor(
     @Volatile private var hbCount = 0L
     @Volatile private var hbCmd = 0L
     private var hbFirstMs = 0L
-    private var hbLastMs = 0L
+    @Volatile private var hbLastMs = 0L
     @Volatile private var hbMaxGapMs = 0L
+    @Volatile private var hbChan = Ch.VIDEO
+    @Volatile private var lastRxMs = t0
 
     override val rxBytes: Long get() = rx.get()
     override val queuedVideoBytes: Long get() = videoBytes.get()
@@ -336,8 +338,35 @@ class MultiSocketTransport internal constructor(
             threads += Thread({ writeLoop(chan, s, onWritten) }, "cl-w-$n")
             threads += Thread({ readLoop(chan, s, sink) }, "cl-r-$n")
         }
+        threads += Thread({ silenceLoop() }, "cl-hb-watch")
         for (t in threads) t.start()
         WLog.ev(WLog.TCP, "start", "sockets" to sockets.size)
+    }
+
+    /**
+     * Сторож молчания ГУ. Wi-Fi пропал (заглушили машину, ГУ ушла из сети): сокеты не рвутся, запись видео встаёт в
+     * SO_SNDBUF, и сессия висит до таймаута TCP. h72 (CR-V, 15.10): heartbeat ГУ встал в 18:55:50, закрылись только
+     * в 18:57:50 по «No route to host», две минуты стоп-кадра. Взводится, когда ГУ прислала HB_ARM_COUNT heartbeat
+     * (не шлёт их вовсе: сторож молчит); рвём, если от ГУ HB_SILENCE_MS нет ни heartbeat, ни других данных.
+     */
+    private fun silenceLoop() {
+        try {
+            while (!closed.get()) {
+                Thread.sleep(HB_POLL_MS)
+                checkSilence(clock())
+            }
+        } catch (_: InterruptedException) {
+        }
+    }
+
+    /** true: ГУ молчит дольше HB_SILENCE_MS, транспорт закрыт. */
+    internal fun checkSilence(now: Long): Boolean {
+        if (closed.get() || hbCount < HB_ARM_COUNT) return false
+        val quietMs = now - maxOf(hbLastMs, lastRxMs)
+        if (quietMs < HB_SILENCE_MS) return false
+        WLog.ev(WLog.TCP, "hb-silence", "quietMs" to quietMs, "chan" to Ch.name(hbChan))
+        fail(hbChan, "ГУ молчит $quietMs мс (нет heartbeat)")
+        return true
     }
 
     override fun send(chan: Int, inner: ByteArray) {
@@ -386,6 +415,7 @@ class MultiSocketTransport internal constructor(
                     return
                 }
                 rx.addAndGet(inner.size.toLong())
+                lastRxMs = clock()
                 if ((chan == Ch.VIDEO || chan == Ch.CMD) && Wire.u32(inner, InnerCodec.hdrLen(chan) - 4) == Msg.VIDEO_HEARTBEAT) {
                     onHeartbeat(chan)
                     continue
@@ -405,6 +435,7 @@ class MultiSocketTransport internal constructor(
     private fun onHeartbeat(chan: Int) {
         val now = clock()
         if (chan == Ch.CMD) hbCmd++
+        hbChan = chan
         if (hbCount == 0L) {
             hbFirstMs = now
             WLog.ev(WLog.TCP, "hb-first", "afterMs" to now - t0, "chan" to Ch.name(chan))
@@ -441,6 +472,11 @@ class MultiSocketTransport internal constructor(
 
     companion object {
         private const val READ_BUF = 64 * 1024
+
+        /** Обычный интервал heartbeat ГУ ~1 с (h72: максимум 1,1 с за 3 минуты). */
+        const val HB_SILENCE_MS = 6_000L
+        const val HB_ARM_COUNT = 3L
+        private const val HB_POLL_MS = 500L
     }
 }
 
