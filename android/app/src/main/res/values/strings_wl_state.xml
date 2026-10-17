@@ -14,5 +14,7 @@
     <string name="wl_state_wifi_off">turn on Wi-Fi on the phone (no need to join a network) and turn off the hotspot</string>
     <string name="wl_wifi_off_title">Turn on Wi-Fi on the phone</string>
     <string name="wl_wifi_off_text">The car connects over Wi-Fi Direct: turn on Wi-Fi (no need to join a network) and turn off the hotspot. Tap to open Wi-Fi.</string>
+    <string name="wl_usb_to_air_title">Cable disconnected</string>
+    <string name="wl_usb_to_air_text">The car is near over Bluetooth, connecting wirelessly.</string>
     <string name="wl_state_gave_up">the car did not connect within %1$d min</string>
 </resources>

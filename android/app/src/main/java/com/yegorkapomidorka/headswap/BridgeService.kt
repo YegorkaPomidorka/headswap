@@ -96,6 +96,9 @@ class BridgeService : Service() {
         }
     /** Ожидание запущено/принято авторежимом: после ухода машины его не возобновляем. Только главная нить. */
     private var autoStarted = false
+    /** USB-сессия кончилась при машине рядом: через [USB_TO_AIR_MS] начнём ждать по воздуху. Только главная нить. */
+    private var usbToAirPending = false
+    private val usbToAirTick = Runnable { usbToAir() }
     private val autoOff = AutoOffDebounce(AUTO_OFF_DEBOUNCE_MS) { SystemClock.elapsedRealtime() }
     private val autoOffTick = Runnable { if (autoOff.fire()) applyAutoOff() }
     /** Подсказка «подключи телефон к Wi-Fi машины» уже показана (один раз на заход авторежима). */
@@ -278,7 +281,8 @@ class BridgeService : Service() {
         }
         AppLog.i("сервис: аксессуар открыт: ${MainActivity.describe(acc)}")
         if (wifiBMode || pendingTcp6 != null) {
-            // кабель побеждает воздух: ожидание машины по Wi-Fi отменяем, после USB-сессии беспровод не возобновляем
+            // кабель побеждает воздух: ожидание машины по Wi-Fi отменяем; после USB-сессии возобновим, только если
+            // машина рядом по Bluetooth и кабеля нет (usbToAir)
             AppLog.i("сервис: кабель подключён, ожидание по Wi-Fi отменяю (USB побеждает)")
             WLog.ev(WLog.LINK, "usb-wins")
             wifiBMode = false
@@ -501,6 +505,39 @@ class BridgeService : Service() {
         }
     }
 
+    /**
+     * Через [USB_TO_AIR_MS] после конца USB-сессии: кабеля нет (на G6S EIO часто тут же переподключает аксессуар),
+     * машина рядом по Bluetooth - уведомление «пробую по воздуху» и ожидание, как по ACL_CONNECTED.
+     */
+    private fun usbToAir() {
+        usbToAirPending = false
+        if (session != null || wifiBMode || !autoMode || stopRequested) {
+            if (session == null && host == null && !linkWaiting && !wifiBMode) finish()
+            return
+        }
+        if (getSystemService(UsbManager::class.java).accessoryList?.isNotEmpty() == true) {
+            WLog.ev(WLog.LINK, "usb-to-air", "skip" to "кабель на месте")
+            if (session == null && host == null) finish()
+            return
+        }
+        WLog.ev(WLog.LINK, "usb-to-air")
+        AppLog.i("сервис: кабель отключён, машина рядом по Bluetooth - жду её по воздуху")
+        val open = PendingIntent.getActivity(
+            this, 5, Intent(this, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+        )
+        val n = Notification.Builder(this, CHANNEL)
+            .setSmallIcon(R.drawable.ic_stat_headswap)
+            .setContentTitle(getString(R.string.wl_usb_to_air_title))
+            .setContentText(getString(R.string.wl_usb_to_air_text))
+            .setContentIntent(open)
+            .setAutoCancel(true)
+            .setTimeoutAfter(USB_TO_AIR_NOTIF_MS)
+            .build()
+        getSystemService(NotificationManager::class.java).notify(USB_TO_AIR_NOTIF_ID, n)
+        onCarAuto()
+    }
+
     /** Снять обе подсказки ожидания (про Wi-Fi и про Bluetooth) и их таймеры. */
     private fun cancelHint() {
         main.removeCallbacks(hintTick)
@@ -689,6 +726,9 @@ class BridgeService : Service() {
     }
 
     private fun startSession(transport: CarTransport) {
+        main.removeCallbacks(usbToAirTick)
+        usbToAirPending = false
+        getSystemService(NotificationManager::class.java).cancel(USB_TO_AIR_NOTIF_ID)
         main.removeCallbacks(carNetTick)      // сессия идёт: новых запросов сети машины нет (сам запрос держим, CarNetEvent.SESSION_START)
         cancelBtHint()
         CarLifeState.accessory = transport.label
@@ -784,7 +824,7 @@ class BridgeService : Service() {
                 main.post {
                     if (host === ref[0]) host = null
                     AppLog.i("BRIDGE: AA закрыта полностью")
-                    if (session == null && host == null && !linkWaiting && !wifiBMode) finish()
+                    if (session == null && host == null && !linkWaiting && !wifiBMode && !usbToAirPending) finish()
                 }
             })
             ref[0] = h
@@ -884,9 +924,16 @@ class BridgeService : Service() {
             stopCarNet(CarNetEvent.AUTO_OFF, "auto-off")
             WLog.ev(WLog.TRIGGER, "auto-off", "after" to "session")
         }
+        if (!wifiBMode && autoMode && !stopRequested && BuildConfig.WIRELESS_BETA && s.transportKind == TransportCaps.USB_AOA.kind) {
+            // кабель выдернули, а машина рядом по Bluetooth: новый ACL не придёт, ждать по воздуху начнём сами (h214)
+            usbToAirPending = true
+            main.removeCallbacks(usbToAirTick)
+            main.postDelayed(usbToAirTick, USB_TO_AIR_MS)
+            WLog.ev(WLog.LINK, "usb-to-air-armed", "ms" to USB_TO_AIR_MS)
+        }
         val h = host
         if (h == null) {
-            if (!wifiBMode || stopRequested) finish()
+            if ((!wifiBMode && !usbToAirPending) || stopRequested) finish()
         } else {
             // обрыв USB: CarLife закрыт, AA держим graceMs (или закрываем сразу, если Стоп)
             h.onUsbSessionClosed(immediate = stopRequested)
@@ -945,6 +992,10 @@ class BridgeService : Service() {
         private const val CHANNEL = "bridge"
         private const val NOTIF_ID = 1
         private const val HINT_NOTIF_ID = 2
+        private const val USB_TO_AIR_NOTIF_ID = 5
+        /** Пауза после конца USB-сессии перед ожиданием по воздуху: успеть увидеть переподключение аксессуара. */
+        private const val USB_TO_AIR_MS = 3_000L
+        private const val USB_TO_AIR_NOTIF_MS = 60_000L
         private const val BT_HINT_NOTIF_ID = 3
         private const val WIFI_OFF_NOTIF_ID = 4
 

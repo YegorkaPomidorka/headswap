@@ -14,5 +14,7 @@
     <string name="wl_state_wifi_off">включите Wi-Fi на телефоне (подключаться к сети не нужно) и выключите точку доступа</string>
     <string name="wl_wifi_off_title">Включите Wi-Fi на телефоне</string>
     <string name="wl_wifi_off_text">Машина подключается через Wi-Fi Direct: включите Wi-Fi (подключаться к сети не нужно) и выключите точку доступа. Нажмите, чтобы открыть Wi-Fi.</string>
+    <string name="wl_usb_to_air_title">Кабель отключён</string>
+    <string name="wl_usb_to_air_text">Машина рядом по Bluetooth, подключаюсь по воздуху.</string>
     <string name="wl_state_gave_up">машина не подключилась за %1$d мин</string>
 </resources>
