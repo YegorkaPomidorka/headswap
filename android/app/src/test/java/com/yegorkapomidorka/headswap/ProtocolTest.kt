@@ -12,6 +12,14 @@ import org.junit.Test
 /** Байтовые примеры взяты из docs/carlife-protocol.md §9.2. */
 class ProtocolTest {
 
+    @Test
+    fun btIdentifyResultBody() {
+        val f = PbReader.parse(Msgs.btIdentifyResult(0, "40:D5:21:DD:D0:4C"))!!
+        assertEquals(0, PbReader.int(f, 1))
+        assertEquals("40:D5:21:DD:D0:4C", PbReader.str(f, 2))
+        assertEquals(1, f.count { it.number == 1 }) // proto2 required: status=0 пишется явно
+    }
+
     private fun hex(s: String): ByteArray {
         val t = s.replace(" ", "")
         return ByteArray(t.length / 2) { t.substring(it * 2, it * 2 + 2).toInt(16).toByte() }

@@ -129,6 +129,8 @@ object Schemas {
     val authenRequest = schema("CarlifeAuthenRequest", 1 to str("randomValue"))
     val authenResponse = schema("CarlifeAuthenResponse", 1 to str("encryptValue"))
     val authenResult = schema("CarlifeAuthenResult", 1 to bool("authenResult"))
+    val btStartIdentifyReq = schema("CarlifeBTStartIdentifyReq", 1 to str("address"))
+    val btIdentifyResultInd = schema("CarlifeBTIdentifyResultInd", 1 to int("status"), 2 to str("address"))
     val moduleStatus = schema("CarlifeModuleStatus", 1 to int("moduleID"), 2 to int("statusID"))
     val moduleStatusList = schema(
         "CarlifeModuleStatusList",
@@ -222,6 +224,8 @@ object Schemas {
         Msg.HU_AUTHEN_REQUEST to authenRequest,
         Msg.MD_AUTHEN_RESPONSE to authenResponse,
         Msg.HU_AUTHEN_RESULT to authenResult,
+        Msg.BT_START_IDENTIFY_REQ to btStartIdentifyReq,
+        Msg.BT_IDENTIFY_RESULT_IND to btIdentifyResultInd,
         Msg.MD_AUTHEN_RESULT to authenResult,
         Msg.HU_FEATURE_CONFIG_RESPONSE to featureConfigList,
         Msg.ERROR_CODE to errorCode,

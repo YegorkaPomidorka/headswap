@@ -298,14 +298,20 @@ class CarLifeSession(
                 CarLifeState.auth = "HU_AUTHEN_REQUEST пришёл, ${if (v2) "2.0;" else "не 2.0;"}"
                 // как Baidu 8.6.7 (PrivateKeyManager.encryptContentProcess): сразу по запросу подпись приватным ключом Baidu,
                 // для "2.0;" md5-код от MD_INFO; MD_AUTHEN_RESULT{true} по-прежнему уходит после STATISTIC_INFO
-                val enc = if (rndStr == null) null else try {
+                // Mobis NX4C (h242) шлёт "1": у Baidu versionVerify падает на substring(-1), ответа нет вовсе - делаем так же
+                val baiduSilent = bridge.huMobisNx4c && rndStr != null && !HuAuth.isV2Branch(rndStr) && !rndStr.contains('_')
+                val enc = if (rndStr == null || baiduSilent) null else try {
                     HuAuth.encryptValue(rndStr, mdInfoKey)
                 } catch (e: Exception) {
                     AppLog.e("подпись HU_AUTHEN_REQUEST", e)
                     null
                 }
                 if (enc == null) {
-                    AppLog.i("на HU_AUTHEN_REQUEST не отвечаю (${if (rndStr == null) "нет randomValue" else "подпись не вышла"})")
+                    AppLog.i("на HU_AUTHEN_REQUEST не отвечаю (${when {
+                        rndStr == null -> "нет randomValue"
+                        baiduSilent -> "NX4C: randomValue без \"_\", Baidu тут молчит"
+                        else -> "подпись не вышла"
+                    }})")
                 } else {
                     if (rndStr != null && HuAuth.isV2Branch(rndStr)) AppLog.i("== AUTHEN 2.0: md5 от \"CARLIFE\" + \"$mdInfoKey\" + дата")
                     AppLog.i("== отвечаю MD_AUTHEN_RESPONSE encryptValue=$enc")
@@ -314,6 +320,15 @@ class CarLifeSession(
                 }
             }
             Msg.HU_FEATURE_CONFIG_RESPONSE -> onFeatureConfig(m)
+            Msg.BT_START_IDENTIFY_REQ -> {
+                // Baidu BtDeviceManager :436-457: без HFP с ГУ и BLUETOOTH_AUTO_CONNECT - status=0 с адресом ГУ.
+                // Остальным ГУ не отвечаем, как раньше (живут и без ответа)
+                val addr = PbReader.parse(m.body)?.let { PbReader.str(it, 1) }
+                if (bridge.huMobisNx4c && !addr.isNullOrEmpty()) {
+                    AppLog.i("== BT_START_IDENTIFY_REQ $addr: NX4C, отвечаю BT_IDENTIFY_RESULT_IND status=0")
+                    sendCmd(Msg.BT_IDENTIFY_RESULT_IND, Msgs.btIdentifyResult(0, addr))
+                }
+            }
             Msg.CARLIFE_DATA_SUBSCRIBE -> {
                 val done = Msgs.subscribeDone(m.body)
                 if (done == null) {

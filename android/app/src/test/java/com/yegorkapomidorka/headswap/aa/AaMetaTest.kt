@@ -644,6 +644,20 @@ class AaMetaTest {
         assertFalse("новая сессия - флаг заново по HU_INFO", r.core.huHyundaiCn7)
     }
 
+    @Test
+    fun mobisNx4cFlagByManufacturerAndProduct() {
+        val r = Rig()
+        r.core.onHuInfo("Mobis", "CCNC", "other")
+        assertFalse("чужой product - нет", r.core.huMobisNx4c)
+        r.core.onHuInfo("QTI", "CCNC", "NX4C")
+        assertFalse("чужой производитель - нет", r.core.huMobisNx4c)
+        r.core.onHuInfo("Mobis", "CCNC", "NX4C")
+        assertTrue(r.core.huMobisNx4c)
+        r.core.onCarlifeClosed()
+        r.core.attach(MetaLink())
+        assertFalse("новая сессия - флаг заново по HU_INFO", r.core.huMobisNx4c)
+    }
+
     /** Ссылка, запоминающая INIT и данные MEDIA. */
     private class CapLink(private val d: MetaLink = MetaLink()) : CarlifeLink by d {
         val inits = ArrayList<ByteArray>()
