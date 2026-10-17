@@ -334,7 +334,7 @@ class AaMetaTest {
         r.core.onNavDistance(AaMeta.parseNavPosition(navPosition(900, 60))!!)
         assertEquals(3, r.link.turns.size)
         with(r.link.turns[2]) {
-            assertEquals(2, action)
+            assertEquals("новый манёвр - SHOW", 1, action)
             assertEquals(7, nextTurn)
             assertEquals(900, totalDistance)
         }
@@ -392,6 +392,7 @@ class AaMetaTest {
         r.now += 100
         r.core.onNavDistance(AaMeta.parseNavPosition(navPosition(50, 12))!!)
         with(r.link.turns.last()) {
+            assertEquals("новый поворот - SHOW", 1, action)
             assertEquals(50, remainDistance)
             assertEquals("total с нового поворота", 50, totalDistance)
         }

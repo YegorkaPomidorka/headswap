@@ -680,7 +680,8 @@ class MetaRelay(
         // h137 (Honda Civic, пустой HU_INFO): после ~40 с без пакетов приборка гасит подсказку и на UPDATE не оживает
         val reshow = shown && idle >= NAVI_RESHOW_MS
         val info = NaviTurnInfo(
-            if (shown && !reshow) ACTION_UPDATE else ACTION_SHOW, t.nextTurn, t.road, maxOf(total, d.meters), d.meters, d.timeSeconds ?: 0
+            // h137: погасшая подсказка возвращается только по SHOW, поэтому первый пакет каждого манёвра - SHOW
+            if (shown && !reshow && !turnDirty) ACTION_UPDATE else ACTION_SHOW, t.nextTurn, t.road, maxOf(total, d.meters), d.meters, d.timeSeconds ?: 0
         )
         val sig = "${info.action}|${info.nextTurn}|${info.roadName}|${info.totalDistance}|${info.remainDistance}|${info.timeSeconds}"
         // на стоянке AA шлёт одно и то же: повторяем раз в NAVI_KEEPALIVE_MS, чтобы ГУ не решила, что маршрута нет
