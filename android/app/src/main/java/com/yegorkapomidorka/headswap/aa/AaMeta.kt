@@ -443,6 +443,7 @@ class MetaRelay(
     private var shown = false
     private var turnDirty = false
     private var lastTurnAt = NEVER
+    private var lastShowAt = NEVER
     private var lastSent: String? = null
     private var routeEndedAt = NEVER
     private var navNewSeen = false             // в этой AA-сессии были 0x8006/0x8007
@@ -679,9 +680,12 @@ class MetaRelay(
         if (!force && !turnDirty && idle < TURN_MIN_MS) return
         // h137 (Honda Civic, пустой HU_INFO): после ~40 с без пакетов приборка гасит подсказку и на UPDATE не оживает
         val reshow = shown && idle >= NAVI_RESHOW_MS
+        // h243: служебное сообщение машины или смена режима табло гасят подсказку, ГУ об этом не сообщает -
+        // периодический SHOW возвращает её в пределах NAVI_SHOW_EVERY_MS
+        val periodic = shown && now - lastShowAt >= NAVI_SHOW_EVERY_MS
         val info = NaviTurnInfo(
             // h137: погасшая подсказка возвращается только по SHOW, поэтому первый пакет каждого манёвра - SHOW
-            if (shown && !reshow && !turnDirty) ACTION_UPDATE else ACTION_SHOW, t.nextTurn, t.road, maxOf(total, d.meters), d.meters, d.timeSeconds ?: 0
+            if (shown && !reshow && !turnDirty && !periodic) ACTION_UPDATE else ACTION_SHOW, t.nextTurn, t.road, maxOf(total, d.meters), d.meters, d.timeSeconds ?: 0
         )
         val sig = "${info.action}|${info.nextTurn}|${info.roadName}|${info.totalDistance}|${info.remainDistance}|${info.timeSeconds}"
         // на стоянке AA шлёт одно и то же: повторяем раз в NAVI_KEEPALIVE_MS, чтобы ГУ не решила, что маршрута нет
@@ -689,7 +693,11 @@ class MetaRelay(
         if (keepalive && idle < NAVI_KEEPALIVE_MS) return
         if (link().sendNaviTurn(info)) {
             val loud = !shown || turnDirty || reshow
-            val tag = if (reshow) "$why, повторный показ после ${idle / 1000} с" else if (keepalive) "$why, keepalive" else why
+            val tag = if (reshow) "$why, повторный показ после ${idle / 1000} с"
+                else if (keepalive) "$why, keepalive"
+                else if (periodic && !turnDirty) "$why, периодический SHOW"
+                else why
+            if (info.action == ACTION_SHOW) lastShowAt = now
             shown = true
             turnDirty = false
             lastTurnAt = now
@@ -738,6 +746,8 @@ class MetaRelay(
         const val NAVI_RESHOW_MS = 10_000L
         /** Рост дистанции при том же ключе манёвра: это уже следующий такой же поворот (шаг AA - 10 м). */
         const val NEW_TURN_JUMP_M = 40
+        /** SHOW не реже этого, пока маршрут активен: приборка могла погасить подсказку сама (h243, h137). */
+        const val NAVI_SHOW_EVERY_MS = 10_000L
 
         /** Запоздалые манёвр/дистанция после конца маршрута не стартуют его заново в этом окне. */
         const val TAIL_MS = 5000L

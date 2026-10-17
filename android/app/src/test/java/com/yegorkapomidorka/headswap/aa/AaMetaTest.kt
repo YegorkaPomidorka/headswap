@@ -378,6 +378,26 @@ class AaMetaTest {
     }
 
     @Test
+    fun periodicShowWhileDriving() {
+        val r = Rig()
+        r.core.onCarlifeSubscribe(listOf(0), true)
+        r.start()
+        r.core.onNavStatus(1)
+        r.core.onNavTurn(AaMeta.parseNavState(navState(8, "Main St"))!!)
+        var m = 2000
+        r.core.onNavDistance(AaMeta.parseNavPosition(navPosition(m, 200))!!)
+        // едем: дистанция меняется каждую секунду, SHOW не реже раза в 10 с, остальное UPDATE
+        repeat(25) {
+            r.now += 1000
+            m -= 10
+            r.core.onNavDistance(AaMeta.parseNavPosition(navPosition(m, 200))!!)
+        }
+        assertEquals(26, r.link.turns.size)
+        val shows = r.link.turns.withIndex().filter { it.value.action == 1 }.map { it.index }
+        assertEquals(listOf(0, 10, 20), shows)
+    }
+
+    @Test
     fun sameKeyTurnDetectedByDistanceJump() {
         val r = Rig()
         r.core.onCarlifeSubscribe(listOf(0), true)
