@@ -619,8 +619,9 @@ class CarLifeSession(
     }
 
     /**
-     * VW ID (h196): ГУ рвёт USB EIO на IDR > ~600 КиБ. Потолок перекодирования 4 Мбит/с под флагом ГУ (флаг мог прийти
-     * после старта энкодера - битрейт снижается на лету). Остальные ГУ не затрагиваются.
+     * VW ID (h196): ГУ рвёт USB EIO на IDR > ~600 КиБ. Потолок перекодирования 2 Мбит/с под флагом ГУ (флаг мог прийти
+     * после старта энкодера - битрейт снижается на лету). С 4 Мбит/с сессия рвалась в первые 10-15 с, пока страховка
+     * опускала потолок; за поездку он сам сходился к 1,7 Мбит/с. Остальные ГУ не затрагиваются.
      */
     private fun applyVwCeiling() {
         if (!bridge.huVw20082138) return
@@ -1017,7 +1018,7 @@ class CarLifeSession(
         private val TOUCH_TO_AA = setOf(0, 1, 2, 5, 6)
         private const val MAX_AUDIO_QUEUE = 180       // звук не принимается, если в общей очереди больше пакетов
         private const val BITRATE_POLL_MS = 100L
-        private const val VW_20082138_CEILING_BPS = 4_000_000
+        private const val VW_20082138_CEILING_BPS = 2_000_000
         private const val VW_20082138_MIN_BPS = 1_500_000
         private const val VW_20082138_IDR_LIMIT = 450_000
         private const val VW_20082138_CUT_INTERVAL_MS = 1000L
