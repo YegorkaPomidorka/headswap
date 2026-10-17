@@ -123,13 +123,70 @@ class ProtocolTest {
     fun touchGestureParse() {
         val p = PbWriter().int32(1, 10).int32(2, 20).toByteArray()
         assertEquals(CarlifeTouch(0, 10, 20), CarlifeTouch.parse(Msg.TOUCH_ACTION_DOWN, p))
-        assertEquals(CarlifeTouch(3, 10, 20), CarlifeTouch.parse(Msg.TOUCH_SINGLE_CLICK, p))
+        assertEquals(CarlifeTouch(3, 10, 20, click = CarlifeTouch.CLICK_SINGLE), CarlifeTouch.parse(Msg.TOUCH_SINGLE_CLICK, p))
+        assertEquals(CarlifeTouch(3, 10, 20, click = CarlifeTouch.CLICK_DOUBLE), CarlifeTouch.parse(Msg.TOUCH_DOUBLE_CLICK, p))
+        assertEquals(CarlifeTouch(3, 10, 20, click = CarlifeTouch.CLICK_LONG), CarlifeTouch.parse(Msg.TOUCH_LONG_PRESS, p))
         assertEquals(CarlifeTouch(261, 10, 20), CarlifeTouch.parse(Msg.TOUCH_ACTION_POINTER_DOWN, p))
         assertEquals(CarlifeTouch(6, 10, 20), CarlifeTouch.parse(Msg.TOUCH_ACTION_POINTER_UP, p))
         assertEquals(CarlifeTouch(262, 10, 20), CarlifeTouch.parse(Msg.TOUCH_ACTION_OTHERPOINTER_UP, p))
         val move2 = PbWriter().int32(1, 10).int32(2, 20).int32(3, 30).int32(4, 40).toByteArray()
         assertEquals(CarlifeTouch(2, 10, 20, 30, 40), CarlifeTouch.parse(Msg.TOUCH_ACTION_MOVE, move2))
         assertNull(CarlifeTouch.parse(Msg.TOUCH_CAR_HARD_KEY_CODE, p))
+    }
+
+    /** Прогоняет жестовые коды через TouchClicks, как сессия; возвращает "action@x,y" событий для AA (только 0/1/2/5/6). */
+    private fun clicks(vararg events: Int): List<String> {
+        val tc = TouchClicks()
+        val p = PbWriter().int32(1, 10).int32(2, 20).toByteArray()
+        return events.flatMap { tc.expand(CarlifeTouch.parse(it, p)!!) }
+            .filter { it.masked in setOf(0, 1, 2, 5, 6) }
+            .map { "${it.action}@${it.x},${it.y}" }
+    }
+
+    @Test
+    fun touchClicksSingleIsTap() {
+        assertEquals(listOf("0@10,20", "1@10,20"), clicks(Msg.TOUCH_SINGLE_CLICK))
+    }
+
+    @Test
+    fun touchClicksBeginPlusClickOnlyReleases() {
+        assertEquals(listOf("0@10,20", "1@10,20"), clicks(Msg.TOUCH_ACTION_BEGIN, Msg.TOUCH_SINGLE_CLICK))
+    }
+
+    @Test
+    fun touchClicksAfterFullGestureIsSeparateTap() {
+        assertEquals(
+            listOf("0@10,20", "1@10,20", "0@10,20", "1@10,20"),
+            clicks(Msg.TOUCH_ACTION_DOWN, Msg.TOUCH_ACTION_UP, Msg.TOUCH_SINGLE_CLICK),
+        )
+    }
+
+    @Test
+    fun touchClicksLongPress() {
+        assertEquals(listOf("0@10,20"), clicks(Msg.TOUCH_ACTION_DOWN, Msg.TOUCH_LONG_PRESS))
+        assertEquals(listOf("0@10,20", "1@10,20"), clicks(Msg.TOUCH_LONG_PRESS))
+    }
+
+    @Test
+    fun touchClicksDoubleIsOneTap() {
+        // первый тап двойного пришёл как SINGLE_CLICK, второй - BEGIN + DOUBLE_CLICK
+        assertEquals(
+            listOf("0@10,20", "1@10,20", "0@10,20", "1@10,20"),
+            clicks(Msg.TOUCH_SINGLE_CLICK, Msg.TOUCH_ACTION_BEGIN, Msg.TOUCH_DOUBLE_CLICK),
+        )
+    }
+
+    @Test
+    fun touchClicksResetAndPassthrough() {
+        val tc = TouchClicks()
+        tc.expand(CarlifeTouch(0, 1, 2))
+        assertEquals(true, tc.fingerDown)
+        // POINTER_UP первичный флаг не сбрасывает
+        tc.expand(CarlifeTouch(6, 1, 2))
+        assertEquals(true, tc.fingerDown)
+        tc.reset()
+        assertEquals(false, tc.fingerDown)
+        assertEquals(listOf(CarlifeTouch(2, 5, 6)), tc.expand(CarlifeTouch(2, 5, 6)))
     }
 
     @Test
