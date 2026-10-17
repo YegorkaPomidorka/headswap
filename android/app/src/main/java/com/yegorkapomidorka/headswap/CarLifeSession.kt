@@ -200,7 +200,8 @@ class CarLifeSession(
                 (if (m.resv != 0) " [resv=${m.resv}]" else "") +
                 (if (Schemas.byType[m.type] == null && m.body.isNotEmpty()) " [схемы нет]" else "")
             val quiet = m.type == Msg.TOUCH_ACTION_MOVE || (m.type == Msg.TOUCH_ACTION && touchCount > 20 && isMove(m.body))
-            AppLog.msg("RX", chan, inner.size, m.type, m.declaredLen, decoded, inner, ui = !quiet, note = note)
+            // MOVE идут десятками в секунду: строка в файл, hex-дамп только у остальных
+            AppLog.msg("RX", chan, inner.size, m.type, m.declaredLen, decoded, inner, ui = !quiet, note = note, dump = !quiet)
             if (chan == Ch.CMD) onCmd(m) else onTouch(m)
         } else {
             val m = Wire.parseData(inner)
@@ -848,30 +849,35 @@ class CarLifeSession(
                 (m.type == Msg.NAVI_NEXT_TURN_INFO && PbReader.parse(m.body)?.let { PbReader.int(it, 1) } == 2)
             AppLog.msg("TX", chan, inner.size, m.type, m.declaredLen, decoded, inner, ui = !quiet)
         } else {
-            val m = Wire.parseData(inner) ?: return
+            // заголовок без копии тела: parseData копировал каждый кадр и аудио-пакет только ради лога
+            if (inner.size < 12) return
+            val declared = Wire.u32(inner, 0)
+            val time = Wire.u32(inner, 4)
+            val type = Wire.u32(inner, 8)
+            val size = if (declared < 0) inner.size - 12 else minOf(declared, inner.size - 12)
             if (chan != Ch.VIDEO) { // аудио моста: INIT/STOP всегда, DATA - первые и каждый 200-й
                 audioTx++
-                if (m.data.size <= 16 || audioTx <= 3 || audioTx % 200 == 0L) {
+                if (size <= 16 || audioTx <= 3 || audioTx % 200 == 0L) {
                     AppLog.i(
-                        "TX ${Ch.name(chan)} ${Msg.hex(m.type)} ${Msg.name(m.type)} len=${m.data.size} time=${m.time} #$audioTx" +
-                            (if (m.data.size <= 16) " ${Hex.compact(m.data, 16)}" else ""), ui = false
+                        "TX ${Ch.name(chan)} ${Msg.hex(type)} ${Msg.name(type)} len=$size time=$time #$audioTx" +
+                            (if (size <= 16) " ${Hex.compact(inner.copyOfRange(12, 12 + size), 16)}" else ""), ui = false
                     )
                 }
                 return
             }
-            if (m.data.isEmpty()) { // keepalive на PAUSE: пустой VIDEO_DATA (Desay) или VIDEO_HEARTBEAT (VW 20082120)
+            if (size == 0) { // keepalive на PAUSE: пустой VIDEO_DATA (Desay) или VIDEO_HEARTBEAT (VW 20082120)
                 vBeats++
-                if (vBeats <= 3) AppLog.msg("TX", chan, inner.size, m.type, m.declaredLen, null, inner)
+                if (vBeats <= 3) AppLog.msg("TX", chan, inner.size, type, declared, null, inner)
                 return
             }
             vFrames++
-            vBytes += m.data.size
-            if (vFrames == 1L) WLog.ev(WLog.HS, "first-video", "bytes" to m.data.size)
-            val key = AnnexB.nalTypes(m.data).contains(5)
+            vBytes += size
+            if (vFrames == 1L) WLog.ev(WLog.HS, "first-video", "bytes" to size)
+            val nals = AnnexB.nalTypes(inner, 12)
+            val key = 5 in nals
             if (key) vKeys++
-            val nals = AnnexB.nalTypes(m.data)
             if (vFrames <= 5 || key) {
-                AppLog.msg("TX", chan, inner.size, m.type, m.declaredLen, "nal=$nals", inner, ui = vFrames <= 5)
+                AppLog.msg("TX", chan, inner.size, type, declared, "nal=$nals", inner, ui = vFrames <= 5)
             }
         }
     }

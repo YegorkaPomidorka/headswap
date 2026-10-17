@@ -684,14 +684,14 @@ object Hex {
 object AnnexB {
     private val SC4 = byteArrayOf(0, 0, 0, 1)
 
-    /** Позиции стартовых кодов: (начало кода, длина кода 3 или 4). */
-    private fun startCodes(d: ByteArray): List<IntArray> {
+    /** Позиции стартовых кодов с байта [from]: (начало кода, длина кода 3 или 4). */
+    private fun startCodes(d: ByteArray, from: Int = 0): List<IntArray> {
         val res = ArrayList<IntArray>()
-        var i = 0
+        var i = from
         while (i + 2 < d.size) {
             if (d[i].toInt() == 0 && d[i + 1].toInt() == 0) {
                 if (d[i + 2].toInt() == 1) {
-                    val s = if (i > 0 && d[i - 1].toInt() == 0 && (res.isEmpty() || res.last()[0] + res.last()[1] <= i - 1)) i - 1 else i
+                    val s = if (i > from && d[i - 1].toInt() == 0 && (res.isEmpty() || res.last()[0] + res.last()[1] <= i - 1)) i - 1 else i
                     res.add(intArrayOf(s, i + 3 - s))
                     i += 3
                     continue
@@ -717,10 +717,10 @@ object AnnexB {
         return out.toByteArray()
     }
 
-    /** NAL-типы (nal_unit_type) в порядке следования. */
-    fun nalTypes(d: ByteArray): List<Int> {
+    /** NAL-типы (nal_unit_type) в порядке следования; [from] - начало Annex-B внутри массива (без копии, например тело CarLife-сообщения). */
+    fun nalTypes(d: ByteArray, from: Int = 0): List<Int> {
         val res = ArrayList<Int>()
-        for (s in startCodes(d)) {
+        for (s in startCodes(d, from)) {
             val p = s[0] + s[1]
             if (p < d.size) res.add(d[p].toInt() and 0x1F)
         }

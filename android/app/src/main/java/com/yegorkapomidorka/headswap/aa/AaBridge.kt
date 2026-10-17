@@ -1020,24 +1020,37 @@ class AaBridgeCore(
         if (carlifeStarted) transcoder?.feedConfig(aaConfig!!)
     }
 
-    @Synchronized
+    /**
+     * Кадр AA. Решение (куда и что слать) - под блокировкой ядра, а подача в декодер - после неё: feedFrame ждёт
+     * входной буфер MediaCodec до 15 мс, и всё это время под блокировкой стояли бы выход энкодера (onEncoderFrame),
+     * тачи и звук. Порядок кадров сохраняется: onFrame зовёт одна нить AA-сессии.
+     */
     override fun onFrame(annexB: ByteArray, ptsUs: Long) {
+        val feed = synchronized(this) { routeFrame(annexB, ptsUs) } ?: return
+        feed()
+    }
+
+    /** Логика onFrame под блокировкой; не null - подача в транскодер, которую надо выполнить уже без блокировки. */
+    private fun routeFrame(annexB: ByteArray, ptsUs: Long): (() -> Unit)? {
         aaVideoSeen = true
         AaState.frames.incrementAndGet()
         AaState.bytes += annexB.size
         if (!carlifeStarted) {
             drop("CarLife ещё не прислал START")
-            return
+            return null
         }
         val b = AnnexB.normalize(annexB)
         val types = AnnexB.nalTypes(b)
         lastAaFrameAt = clockMs()
         aaFrames++
         val t = transcoder
-        if (t != null) {
-            feedTranscoder(t, b, types, ptsUs)
-            return
-        }
+        if (t != null) return feedTranscoder(t, b, types, ptsUs)
+        sendPassthrough(b, types)
+        return null
+    }
+
+    /** passthrough: H.264 AA как есть в CarLife (под блокировкой ядра). */
+    private fun sendPassthrough(b: ByteArray, types: List<Int>) {
         if (!gotIdr) {
             if (5 !in types) {
                 drop("P-кадр до IDR nal=$types")
@@ -1137,18 +1150,21 @@ class AaBridgeCore(
         transcoder?.resetDecoder()
     }
 
-    /** AA-кадр -> декодер. До первого IDR после START/пересоздания кадры отбрасываются (декодеру нужен IDR). */
-    private fun feedTranscoder(t: VideoTranscoder, b: ByteArray, types: List<Int>, ptsUs: Long) {
+    /**
+     * AA-кадр -> декодер. До первого IDR после START/пересоздания кадры отбрасываются (декодеру нужен IDR).
+     * Состояние меняется здесь, под блокировкой; сама подача (feedFrame может ждать буфер) - в возвращённой функции.
+     */
+    private fun feedTranscoder(t: VideoTranscoder, b: ByteArray, types: List<Int>, ptsUs: Long): (() -> Unit)? {
         if (!gotIdr) {
             if (5 !in types) {
                 drop("P-кадр до IDR (декодер ждёт) nal=$types")
-                return
+                return null
             }
             val payload = if (AnnexB.startsWithSps(b) && 8 in types) b else {
                 val cfg = aaConfig
                 if (cfg == null) {
                     drop("IDR без SPS/PPS и без CODEC_CONFIG")
-                    return
+                    return null
                 }
                 AnnexB.glue(cfg, b)
             }
@@ -1157,12 +1173,14 @@ class AaBridgeCore(
             outputEnabled = true
             log("BRIDGE AA IDR -> декодер (${payload.size} Б, nal=${AnnexB.nalTypes(payload)})", true)
             // переход с заглушки: энкодер начнёт с её кадра и растворит его в AA (до feedFrame, чтобы GL-нить взвела его раньше первого кадра)
-            if (active != Source.AA) link.placeholderSnapshot()?.let { t.startIntro(it) }
-            t.feedFrame(payload, ptsUs)
-            t.requestSyncFrame()    // первый кадр энкодера после включения выхода сразу IDR, без ожидания до ~1 с
-            return
+            val intro = if (active != Source.AA) link.placeholderSnapshot() else null
+            return {
+                intro?.let { t.startIntro(it) }
+                t.feedFrame(payload, ptsUs)
+                t.requestSyncFrame()    // первый кадр энкодера после включения выхода сразу IDR, без ожидания до ~1 с
+            }
         }
-        t.feedFrame(b, ptsUs)
+        return { t.feedFrame(b, ptsUs) }
     }
 
     @Synchronized

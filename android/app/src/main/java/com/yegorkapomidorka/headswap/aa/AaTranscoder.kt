@@ -217,6 +217,8 @@ class AaTranscoder(
         totalIn.incrementAndGet()
         val idr = 5 in AnnexB.nalTypes(annexB)
         synchronized(lock) {
+            // мост подаёт кадры вне своей блокировки: stop() мог пройти между проверкой выше и lock, декодер не пересоздаём
+            if (!running) return
             if (decoder == null || (cfgStale && idr)) {
                 if (!idr) {
                     winDrop.incrementAndGet()
