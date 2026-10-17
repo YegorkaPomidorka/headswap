@@ -537,6 +537,40 @@ class AaBridgeAudioTest {
     }
 
     @Test
+    fun routeEndReleasesNaviAfterLastGuidance() {
+        val navi = { link.modules.filter { it.first == 2 }.map { it.second } }
+        core.onCarlifeSubscribe(listOf(0), true)
+        core.onCarlifeStart()
+        core.onNavStatus(1)
+        core.onAudioData(SPEECH, pcm(100), 1)                            // подсказка на маршруте
+        core.onAudioStop(SPEECH)
+        timers.advance(1500)
+        assertEquals("TTS не отпускает NAVI посреди маршрута", listOf(1), navi())
+        core.onNavStatus(2)                                              // маршрут закончен, TTS молчит
+        assertEquals(listOf(1, 0), navi())
+        // «Вы прибыли» после конца маршрута: NAVI=1 на время подсказки и NAVI=0 после неё
+        core.onAudioData(SPEECH, pcm(100), 2)
+        assertEquals(listOf(1, 0, 1), navi())
+        core.onAudioStop(SPEECH)
+        timers.advance(1500)
+        assertEquals(listOf(1, 0, 1, 0), navi())
+    }
+
+    @Test
+    fun routeEndDuringGuidanceReleasesNaviOnTtsStop() {
+        val navi = { link.modules.filter { it.first == 2 }.map { it.second } }
+        core.onCarlifeSubscribe(listOf(0), true)
+        core.onCarlifeStart()
+        core.onNavStatus(1)
+        core.onAudioData(SPEECH, pcm(100), 1)
+        core.onNavStatus(2)                                              // конец маршрута во время подсказки
+        assertEquals(listOf(1), navi())
+        core.onAudioStop(SPEECH)
+        timers.advance(1500)
+        assertEquals(listOf(1, 0), navi())
+    }
+
+    @Test
     fun mediaAndGuidanceSwitchEachInitOnceAndStopIndependently() {
         core.onCarlifeStart()
         core.onAudioData(AapMessages.CH_AUDIO_MEDIA, pcm(100), 1)

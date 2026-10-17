@@ -223,6 +223,7 @@ class AaBridgeCore(
     private var naviSent = false               // MODULE_STATUS NAVI=1 ушёл (держит TTS и/или маршрут)
     private var ttsNaviHeld = false            // NAVI=1 нужен ради TTS (до stopAllAudio)
     private var routeNaviHeld = false          // NAVI=1 нужен ради маршрута (MetaRelay)
+    private var naviReleaseAfterTts = false    // маршрут закончился: NAVI=0 после ближайшего TTS STOP
     private var mediaPaused = false            // MEDIA на ГУ стоит на PAUSE (STOP ещё не слали)
     private var mediaGuard = false             // TTS_STOP уже ушёл, ждём +300 мс до управляющих пакетов MEDIA
     private var pendingMediaPause = false      // желаемое состояние MEDIA = пауза, применим после TTS
@@ -933,6 +934,11 @@ class AaBridgeCore(
             return
         }
         routeNaviHeld = on
+        naviReleaseAfterTts = !on
+        if (!on && naviSent && ttsNaviHeld && audioInited[CarlifeAudio.CH_TTS] != true) {
+            // h137/h243: TTS держал NAVI=1 до конца сессии, приборка Honda оставляла последнюю подсказку гореть
+            ttsNaviHeld = false
+        }
         if (on && !naviSent) {
             if (link.sendModuleStatus(CarlifeAudio.MODULE_NAVI, 1)) {
                 naviSent = true
@@ -958,6 +964,13 @@ class AaBridgeCore(
             }
             link.sendAudio(ch, CarlifeAudio.stopType(ch), ByteArray(0))
             log("BRIDGE CarLife ${chName(ch)} STOP (0x%08x)".format(CarlifeAudio.stopType(ch)), true)
+            // маршрут уже закончен («Вы прибыли» идёт после него): последняя подсказка отзвучала - отпускаем NAVI
+            if (ch == CarlifeAudio.CH_TTS && naviReleaseAfterTts && naviSent && !routeNaviHeld) {
+                ttsNaviHeld = false
+                naviSent = false
+                link.sendModuleStatus(CarlifeAudio.MODULE_NAVI, 0)
+                log("BRIDGE CarLife MODULE_STATUS NAVI=0 (маршрут закончен, TTS отзвучал)", true)
+            }
         }
     }
 
@@ -968,6 +981,7 @@ class AaBridgeCore(
         mediaReleaseTimer.cancel()
         naviSent = false
         ttsNaviHeld = false
+        naviReleaseAfterTts = false
         mediaPaused = false
         mediaGuard = false
         pendingMediaPause = false
