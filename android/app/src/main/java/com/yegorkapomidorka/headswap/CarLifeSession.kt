@@ -259,7 +259,11 @@ class CarLifeSession(
                 for (c in Handshake.startBatch(cfg.screenOn, info)) sendCmd(c.type, c.body)
                 val mod = Handshake.moduleStatus(huMajor)
                 try {
-                    sched.schedule({ sendCmd(mod.type, mod.body) }, Handshake.MODULE_STATUS_DELAY_MS, TimeUnit.MILLISECONDS)
+                    val ids = Msgs.moduleIds(huMajor).joinToString(",")
+                    sched.schedule({
+                        AppLog.i("MODULE_STATUS модули=$ids")
+                        sendCmd(mod.type, mod.body)
+                    }, Handshake.MODULE_STATUS_DELAY_MS, TimeUnit.MILLISECONDS)
                 } catch (_: java.util.concurrent.RejectedExecutionException) {
                     // сессия уже закрывается
                 }

@@ -326,8 +326,19 @@ class ProtocolTest {
     }
 
     @Test
+    fun moduleStatusWithout89ByDefault() {
+        assertFalse(Msgs.SEND_MODULES_8_9)
+        for (major in listOf(1, 2, 3)) {
+            val f = PbReader.parse(Msgs.moduleStatusList(major))!!
+            assertEquals(5, PbReader.int(f, 1))
+            val pairs = PbReader.all(f, 2).map { PbReader.parse(it.data!!)!! }.map { PbReader.int(it, 1) to PbReader.int(it, 2) }
+            assertEquals(listOf(1, 2, 3, 4, 6).map { it to 0 }, pairs)
+        }
+    }
+
+    @Test
     fun moduleStatusIs44BytesForHuV2() {
-        val body = Msgs.moduleStatusList(2)
+        val body = Msgs.moduleStatusList(2, with89 = true)
         assertEquals(44, body.size)
         val f = PbReader.parse(body)!!
         assertEquals(7, PbReader.int(f, 1))
@@ -336,7 +347,8 @@ class ProtocolTest {
         // первая запись целиком: moduleStatus{1,0}
         assertArrayEquals(hex("08 07 12 04 08 01 10 00"), body.copyOf(8))
         // ГУ major 1: без 8 и 9
-        assertEquals(5, PbReader.int(PbReader.parse(Msgs.moduleStatusList(1))!!, 1))
+        assertEquals(5, PbReader.int(PbReader.parse(Msgs.moduleStatusList(1, with89 = true))!!, 1))
+        assertEquals(7, PbReader.int(PbReader.parse(Msgs.moduleStatusList(3, with89 = true))!!, 1))
         val inner = Wire.cmdInner(Msg.MODULE_STATUS, body)
         assertEquals(0x2C, Wire.u16(inner, 0))
         assertEquals(0x00010026, Wire.u32(inner, 4))
@@ -433,7 +445,7 @@ class ProtocolTest {
         val f = PbReader.parse(got[0].msg.body)!!
         assertEquals(2, PbReader.int(f, 1))
         assertEquals(1, PbReader.int(f, 2))
-        val ids = PbReader.parse(Msgs.moduleStatusList(PbReader.int(f, 1)!!))!!
+        val ids = PbReader.parse(Msgs.moduleStatusList(PbReader.int(f, 1)!!, with89 = true))!!
             .filter { it.number == 2 }.map { PbReader.int(PbReader.parse(it.data!!)!!, 1) }
         assertEquals(listOf(1, 2, 3, 4, 6, 8, 9), ids)
     }
