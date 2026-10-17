@@ -234,6 +234,7 @@ object LogShare {
             appendLine("  масштаб интерфейса AA: ${if (aa.aaDensity == AaDensity.AUTO) "авто" else "${aa.aaDensity} dpi"}")
             appendLine("  частота кадров: ${aa.fpsSetting.name}")
             appendLine("  звук по USB: ${aa.usbAudio}")
+            appendLine("  частота музыки: ${aa.musicRate.name}")
             appendLine("  сертификат: ${aa.certSet}")
             appendLine("  автозапуск сервера ГУ: ${aa.autoServer}")
             appendLine("  микрофон: ${aa.micMode.label}, MODULE_STATUS VR: ${aa.micVrStatus}")

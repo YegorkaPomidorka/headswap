@@ -35,10 +35,14 @@ data class BitrateProfile(
  * Целевой битрейт энкодера по состоянию видео-очереди CarLife: ГУ принимает видео с ограниченной скоростью
  * (Kia Seltos ~210 КиБ/с), энкодер на 6 Мбит/с забивает очередь и задержка растёт до секунд. Вниз - до 0.8 скорости слива,
  * вверх - ступенями после затишья (см. [BitrateProfile]). Чистая логика: время приходит параметром, кодек не трогает.
- * Зовётся с одной нити; [current] читается с любой.
+ * [update] зовётся с одной нити, [lowerCeiling] - с любой; [current] читается с любой.
  */
-class BitratePolicy(val ceilingBps: Int, floorBps: Int = FLOOR_BPS, val profile: BitrateProfile = BitrateProfile.USB) {
+class BitratePolicy(ceilingBps: Int, floorBps: Int = FLOOR_BPS, val profile: BitrateProfile = BitrateProfile.USB) {
     val floorBps = min(floorBps, ceilingBps)
+
+    /** Потолок, бит/с. Только вниз и на лету - [lowerCeiling] (ГУ с лимитом на размер кадра). */
+    @Volatile var ceilingBps = ceilingBps
+        private set
 
     /** Битрейт старта сессии: потолок (USB) или его доля (воздух). */
     val startBps = max(this.floorBps, (ceilingBps * profile.startFraction).toInt())
@@ -73,6 +77,7 @@ class BitratePolicy(val ceilingBps: Int, floorBps: Int = FLOOR_BPS, val profile:
      * если он изменился, иначе null. Бэклог сглаживается EWMA по времени (tau 1 с), поэтому одиночный IDR на 160 КБ
      * не даёт отката, а результат не зависит от частоты вызовов.
      */
+    @Synchronized
     fun update(nowMs: Long, backlogMs: Double, drainBytesPerSec: Double): Int? {
         smoothedMs = if (lastSampleMs == NEVER) backlogMs else {
             val dt = max(nowMs - lastSampleMs, 0L)
@@ -107,7 +112,7 @@ class BitratePolicy(val ceilingBps: Int, floorBps: Int = FLOOR_BPS, val profile:
         }
 
         if (calmSinceMs != NEVER && nowMs - calmSinceMs >= profile.upWaitMs && nowMs >= upNotBeforeMs && current < ceilingBps) {
-            val cap = if (nowMs - cleanSinceMs >= profile.aboveStartAfterMs) ceilingBps else startBps
+            val cap = if (nowMs - cleanSinceMs >= profile.aboveStartAfterMs) ceilingBps else min(startBps, ceilingBps)
             if (current >= cap) return null
             val target = min(cap, max(current + 1, (current * profile.upFactor).toInt()))
             lastReason = "бэклог < %d мс уже %d с".format(UP_BACKLOG_MS, (nowMs - calmSinceMs) / 1000)
@@ -117,6 +122,23 @@ class BitratePolicy(val ceilingBps: Int, floorBps: Int = FLOOR_BPS, val profile:
             return target
         }
         return null
+    }
+
+    /**
+     * Опустить потолок (не ниже [floorBps]); выше текущего он не поднимается. Если [current] выше нового потолка, он
+     * срезается до него. true = потолок изменился (вызывающий сверяет [current] и применяет к энкодеру).
+     */
+    @Synchronized
+    fun lowerCeiling(newCeilingBps: Int): Boolean {
+        val c = max(floorBps, newCeilingBps)
+        if (c >= ceilingBps) return false
+        ceilingBps = c
+        if (current > c) {
+            current = c
+            lastReason = "потолок снижен до %d кбит/с".format(c / 1000)
+            if (c < minBps) minBps = c
+        }
+        return true
     }
 
     companion object {

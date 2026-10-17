@@ -43,6 +43,9 @@ interface CarlifeLink {
      */
     fun requestMicRecord(start: Boolean): Boolean = false
 
+    /** Ключевой кадр энкодера (размер в байтах) ушёл в CarLife; зовётся только на ГУ с лимитом размера IDR (VW ID, h196). */
+    fun onEncodedKeyFrame(size: Int) {}
+
     /** Состояние видео-очереди (слив, бэклог, длина) для статистики моста; null = нет данных. */
     fun videoStats(): LinkVideoStats? = null
 
@@ -150,6 +153,13 @@ class AaBridgeCore(
         private set
     @Volatile var huVw20082120 = false         // VW (STATISTIC_INFO channel 20082120, h93): без heartbeat рвёт USB через ~3,7 с PAUSE
         private set
+    @Volatile var huVw20082138 = false         // VW ID (channel 20082138, "VW BT 1538", h196): IDR > ~600 КиБ рвёт USB EIO
+        private set
+    @Volatile var huHyundaiCn7 = false         // ГУ Hyundai CN7 (product wp_cn7cpe_cn, h218): в режиме «Авто» музыка 32 кГц с ресэмплом 48→32
+        private set
+    @Volatile var musicRateProvider: () -> MusicRate = { MusicRate.DEFAULT }
+    private var resampler: MusicResampler? = null    // null при 48000: PCM идёт как есть
+    private var mediaRateLogged = MEDIA_RATE
     private val audioInited = HashMap<Int, Boolean>()
     private val audioLogged = HashMap<Int, Long>()
 
@@ -205,6 +215,8 @@ class AaBridgeCore(
     private var carlifePaused = false          // VIDEO_ENCODER_PAUSE после последнего START
     private var exitPending = false            // «Выйти» в AA: GO_TO_DESKTOP ушёл, ждём PAUSE от ГУ, чтобы отдать AA NATIVE
     private var huPausedAa = false             // плеер AA поставили на паузу, когда ГУ ушло на свой источник; MEDIA не пересылаем до play
+    private var resumeOnHuMusic = false        // паузу поставили мы (127 при игравшем AA): на MUSIC=1 от ГУ можно вернуть play
+    private var lastHuResumeMs = NEVER         // когда по MUSIC=1 от ГУ слали AA KEYCODE 126
     @Volatile private var lastUserInputMs = NEVER   // последний тач DOWN / клавиша / шайба / голос с ГУ
     private var lastHfpConnectMs = NEVER       // ГУ прислало BT_HFP_CONNECTION=connected (дальше AA сам запускает автоплей по BT)
     private var lastPauseKeyMs = NEVER         // когда последний раз слали AA KEYCODE 127
@@ -303,9 +315,15 @@ class AaBridgeCore(
         carlifePaused = false
         exitPending = false
         huPausedAa = false
+        resumeOnHuMusic = false
+        lastHuResumeMs = NEVER
         gotIdr = false
         huDesayG6S = false                     // HU_INFO / STATISTIC_INFO придут заново в этой сессии
         huVw20082120 = false                   // HU_INFO / STATISTIC_INFO придут заново в этой сессии
+        huVw20082138 = false                   // HU_INFO / STATISTIC_INFO придут заново в этой сессии
+        huHyundaiCn7 = false                   // HU_INFO придёт заново в этой сессии
+        mediaRateLogged = MEDIA_RATE
+        resampler?.reset()
         if (aaVideoSeen) placeholderText = TEXT_WAIT_FRAME
         meta.onAttach()
         link.showPlaceholder(placeholderText)
@@ -335,7 +353,8 @@ class AaBridgeCore(
             peer?.requestKeyFrame()
         }
         if (!warm) meta.onCarlifeStart()
-        // play на возврат не шлём: звук CarLife сразу отбирает у ГУ радио, а слушать радио под навигацию - сценарий
+        // play на START не шлём: звук CarLife сразу отбирает у ГУ радио, а слушать радио под навигацию - сценарий (h33).
+        // Вернуть музыку - только по явному MUSIC=1 от ГУ (onCarlifeMusicControl).
         if (huPausedAa) log("BRIDGE CarLife START: AA на паузе после ухода ГУ на свой источник, музыку не запускаю", true)
     }
 
@@ -345,6 +364,10 @@ class AaBridgeCore(
      * следующего play, отвечаем MUSIC=0 - иначе ГУ видит CarLife-музыку активной и спорит с радио.
      * Хвост держим и когда AA уже на паузе (Honda: MUSIC=0 после паузы ассистентом, хвост буфера давал MEDIA INIT
      * через 40 мс), и MUSIC=0 отвечаем, даже если MEDIA PAUSE отложен до конца TTS (лог Егора 2026-10-13).
+     *
+     * status=1 - Desay G6S вернулся на CarLife-музыку (пачка 10-20 MUSIC=1 рядом с START). После нашей паузы это выбор
+     * пользователя на ГУ: AA KEYCODE 126 и MUSIC=1 на всю пачку (лог h214 2026-10-17). Простой возврат на карту
+     * (NAVI) приходит без MUSIC=1 - там радио не трогаем. Свежая сессия тоже шлёт MUSIC=1, но паузы нашей там нет.
      */
     @Synchronized
     fun onCarlifeMusicControl(status: Int?): Boolean {
@@ -353,12 +376,28 @@ class AaBridgeCore(
             if (meta.playing && !huPausedAa && p != null) {
                 log("BRIDGE ГУ ушло на свой источник (MUSIC=0${if (carlifePaused) " после PAUSE" else ""}): AA KEYCODE $KEYCODE_MEDIA_PAUSE, MEDIA на паузу", true)
                 sendPauseKey(p)
+                resumeOnHuMusic = true
             } else if (!huPausedAa) {
                 log("BRIDGE ГУ ушло на свой источник (MUSIC=0), AA не играет: хвост MEDIA не пересылаю до play", true)
+                resumeOnHuMusic = false
             }
             huPausedAa = true
             requestMediaPause("ГУ MODULE_CONTROL MUSIC=0")
             return false
+        }
+        if (HU_MUSIC_RESUME_ENABLED && status == 1 && huDesayG6S) {
+            val now = clockMs()
+            val p = peer
+            if (huPausedAa && resumeOnHuMusic && p != null) {
+                huPausedAa = false
+                resumeOnHuMusic = false
+                lastHuResumeMs = now
+                lastUserInputMs = now              // выбор источника на ГУ - ввод пользователя, BT-гард его не перебивает
+                log("BRIDGE ГУ вернулось на CarLife-музыку (MUSIC=1) после нашей паузы: AA KEYCODE $KEYCODE_MEDIA_PLAY", true)
+                p.sendKey(KEYCODE_MEDIA_PLAY)
+                return true
+            }
+            if (now - lastHuResumeMs < HU_RESUME_ANSWER_MS) return true   // пачка MUSIC=1, пока AA раскачивается
         }
         return musicActive
     }
@@ -393,6 +432,7 @@ class AaBridgeCore(
             return
         }
         huPausedAa = false
+        resumeOnHuMusic = false
         log("BRIDGE $why: MEDIA снова пересылаю", true)
     }
 
@@ -444,15 +484,21 @@ class AaBridgeCore(
         }
     }
 
-    /** HU_INFO ГУ разобран: Desay G6S опознаём по производителю и модели (другие ГУ Desay SV под запрет не попадают). */
-    fun onHuInfo(manufacturer: String?, model: String?) {
+    /**
+     * HU_INFO ГУ разобран: Desay G6S опознаём по производителю и модели (другие ГУ Desay SV под запрет не попадают),
+     * Hyundai CN7 - по product.
+     */
+    fun onHuInfo(manufacturer: String?, model: String?, product: String? = null) {
         if (manufacturer == DESAY_MANUFACTURER && model == DESAY_G6S_MODEL) huDesayG6S = true
+        if (manufacturer == VW_20082138_MANUFACTURER) huVw20082138 = true
+        if (product == HYUNDAI_CN7_PRODUCT) huHyundaiCn7 = true
     }
 
     /** STATISTIC_INFO ГУ разобран: запасной признак Desay G6S и признак VW 20082120 - канал сборки прошивки. */
     fun onHuStatistic(channel: String?) {
         if (channel == DESAY_G6S_CHANNEL) huDesayG6S = true
         if (channel == VW_20082120_CHANNEL) huVw20082120 = true
+        if (channel == VW_20082138_CHANNEL) huVw20082138 = true
     }
 
     /** CarLife-сессия закрыта (USB EIO / detach / Стоп). AA не трогаем; from - закрываемая ссылка, чужую не отцепляем. */
@@ -686,7 +732,8 @@ class AaBridgeCore(
             return
         }
         if (audioInited[ch] != true) {
-            val rate = if (ch == CarlifeAudio.CH_MEDIA) 48000 else 16000
+            val setting = if (ch == CarlifeAudio.CH_MEDIA) musicRateProvider() else MusicRate.AUTO
+            val rate = if (ch != CarlifeAudio.CH_MEDIA) 16000 else setting.hz ?: if (huHyundaiCn7) MEDIA_RATE_CN7 else MEDIA_RATE
             val channels = if (ch == CarlifeAudio.CH_MEDIA) 2 else 1
             if (ch == CarlifeAudio.CH_TTS && NAVI_STATUS_ENABLED) {
                 ttsNaviHeld = true
@@ -709,9 +756,17 @@ class AaBridgeCore(
             } else {
                 mediaPaused = false
                 mediaGateDrops = 0
+                // частота фиксируется на MEDIA INIT; каждый новый INIT - поток с чистого листа
+                resampler = if (rate == MEDIA_RATE) null else resampler?.takeIf { it.outRate == rate }?.also { it.reset() } ?: MusicResampler(rate)
+                if (rate != MEDIA_RATE && rate != mediaRateLogged) {
+                    val why = if (setting.hz != null) "настройка" else "авто: Hyundai CN7"
+                    log("BRIDGE музыка $rate Гц, ресэмпл $MEDIA_RATE→$rate ($why)", true)
+                }
+                mediaRateLogged = rate
                 musicStatus(1)
             }
         }
+        var out = pcm
         if (ch == CarlifeAudio.CH_MEDIA) {
             val eq = eqProvider()
             if (eq != eqLogged) {
@@ -720,11 +775,16 @@ class AaBridgeCore(
             }
             equalizer.update(eq)
             equalizer.process(pcm)
+            val rs = resampler
+            if (rs != null) {
+                out = rs.process(pcm)
+                if (out.isEmpty()) return
+            }
         }
         var off = 0
-        while (off < pcm.size) {
-            val n = minOf(CarlifeAudio.MAX_CHUNK, pcm.size - off)
-            val chunk = if (off == 0 && n == pcm.size) pcm else pcm.copyOfRange(off, off + n)
+        while (off < out.size) {
+            val n = minOf(CarlifeAudio.MAX_CHUNK, out.size - off)
+            val chunk = if (off == 0 && n == out.size) out else out.copyOfRange(off, off + n)
             if (!link.sendAudio(ch, CarlifeAudio.dataType(ch), chunk)) {
                 audioDropped++
             } else {
@@ -1150,6 +1210,7 @@ class AaBridgeCore(
                 log("BRIDGE IDR энкодера -> CarLife ${payload.size} Б nal=${AnnexB.nalTypes(payload)}", true)
             }
             AaState.status = "мост: AA -> CarLife (перекодирование)"
+            if (huVw20082138) link.onEncodedKeyFrame(payload.size)
             return
         }
         if (!link.sendVideo(data)) {
@@ -1162,6 +1223,7 @@ class AaBridgeCore(
         sent++
         if (idr) idrSent++
         AaState.bridgeSent = sent
+        if (idr && huVw20082138) link.onEncodedKeyFrame(data.size)
     }
 
     /**
@@ -1281,8 +1343,14 @@ class AaBridgeCore(
          */
         @Volatile @JvmStatic var ROUTE_NAVI_STATUS_ENABLED = true
 
-        /** ГУ ушло на свой источник (PAUSE + MODULE_CONTROL MUSIC=0): AA на паузу, на следующем START - play. */
+        /** ГУ ушло на свой источник (MODULE_CONTROL MUSIC=0): AA на паузу; на START play не шлём. */
         @Volatile @JvmStatic var HU_MUSIC_FOLLOW_ENABLED = true
+
+        /** Desay G6S: MUSIC=1 после нашей паузы по MUSIC=0 - AA play (KEYCODE 126) и ответ MUSIC=1. */
+        @Volatile @JvmStatic var HU_MUSIC_RESUME_ENABLED = true
+
+        /** Сколько отвечать MUSIC=1 на пачку MUSIC=1 после нашего play, пока MEDIA INIT ещё не пришёл. */
+        const val HU_RESUME_ANSWER_MS = 3_000L
 
         /**
          * Mazda CX-5: AA сам запускает музыку через 5-9 с после BT_HFP_CONNECTION. Пока ГУ на своём источнике, такой play
@@ -1344,6 +1412,11 @@ class AaBridgeCore(
         const val DESAY_G6S_MODEL = "G6S"
         const val DESAY_G6S_CHANNEL = "20622116"          // STATISTIC_INFO.channel у Mazda CX-5; Vezel - 20832125, другая Mazda - 21520001
         const val VW_20082120_CHANNEL = "20082120"        // VW, protocol 1.0, versionName="RADIO" (h93); Tharu CNS3 - 20082122
+        const val VW_20082138_CHANNEL = "20082138"        // VW ID (h196): HU_INFO manufacturer=model="VW BT 1538"
+        const val VW_20082138_MANUFACTURER = "VW BT 1538"
+        const val HYUNDAI_CN7_PRODUCT = "wp_cn7cpe_cn"    // HU_INFO.product Hyundai Elantra CN7 (h218): manufacturer QTI, model "sm6150_au for arm64"
+        const val MEDIA_RATE = 48000
+        const val MEDIA_RATE_CN7 = 32000
         const val KEYFRAME_WAIT_MS = 1500L
         const val KEYFRAME_RETRY_MS = 4000L
         private const val NEVER = Long.MIN_VALUE / 4

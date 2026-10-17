@@ -124,12 +124,20 @@ class BridgeService : Service() {
     /** Подключений ГУ к RFCOMM `carlife` в этом ожидании и показана ли подсказка «переподключи Bluetooth». Только главная нить. */
     private var btAcceptsThisWait = 0
     private var btHintShown = false
+    /** Висит уведомление «включите Wi-Fi» (Wi-Fi Direct упёрся в выключенный Wi-Fi). Только главная нить. */
+    private var wifiOffShown = false
     private val btHintTick = Runnable { checkBtHint() }
     private var wakeLock: PowerManager.WakeLock? = null
     private val audioDiag = AudioDiag()
     /** Ветка A, диагностика: RFCOMM `carlife` слушаем, пока ждём машину по Wi-Fi. Колбэки с bt-нити перекидываем на главную. */
     private val btProbe by lazy {
-        CarlifeBtProbe(this, onAccept = { main.post { onBtAccept() } }, onTargetInfo = { mac -> main.post { onBtTargetInfo(mac) } })
+        CarlifeBtProbe(
+            this,
+            onAccept = { main.post { onBtAccept() } },
+            onTargetInfo = { mac -> main.post { onBtTargetInfo(mac) } },
+            onP2pBusy = { main.post { onP2pBusy() } },
+            onWifi = { on -> main.post { onP2pWifi(on) } },
+        )
     }
     /** Автозапуск пропущен из-за неподключённой службы спецвозможностей: RETRY запустит его, когда она появится. */
     @Volatile private var serverStartPending = false
@@ -227,6 +235,12 @@ class BridgeService : Service() {
                 failStart()
                 return START_NOT_STICKY
             }
+            if (wifiBMode && linkWaiting && !stopRequested) {
+                // повторное нажатие, ожидание уже идёт: счётчики accept/TARGET_INFO не сбрасываем (иначе ложный bt-hint, h126)
+                autoStarted = false
+                WLog.ev(WLog.TRIGGER, "manual-mark", "why" to "waiting")
+                return START_NOT_STICKY
+            }
             wifiBMode = true
             autoStarted = false      // ручной запуск: уход машины по Bluetooth его не гасит
             stopRequested = false
@@ -295,7 +309,10 @@ class BridgeService : Service() {
             ifaces = { LanIface.scan().let { all -> if (carNetwork != null) all.filter { it.name == carIface } else all } },
             bindNetwork = carNetwork,
             onIfaces = { list ->
-                CarLifeState.wireless = if (list.isEmpty()) getString(R.string.wl_state_no_hotspot)
+                // Wi-Fi Direct-машине хотспот не нужен, а включённый он занимает Wi-Fi Direct (h214): не просим его включить
+                CarLifeState.wireless = if (list.isEmpty()) {
+                    if (wifiDirectCar) waitingText("Wi-Fi Direct") else getString(R.string.wl_state_no_hotspot)
+                }
                 else waitingText(list.joinToString(", ") { it.name })
             },
         )
@@ -371,6 +388,12 @@ class BridgeService : Service() {
         if (carNetBusy) carNetImpl?.release("p2p")      // колбэки снимаются без вызовов: onUnavailable/onLost не придут
         if (CarWifi(this).isSet) logCarSkip()
         cancelHint()
+    }
+
+    /** discoverPeers вернул BUSY: на Samsung это включённая точка доступа, просим её выключить. */
+    private fun onP2pBusy() {
+        if (!wifiBMode || stopRequested || !linkWaiting) return
+        CarLifeState.wireless = getString(R.string.wl_state_p2p_busy)
     }
 
     private fun onBtAccept() {
@@ -488,6 +511,42 @@ class BridgeService : Service() {
     private fun cancelBtHint() {
         main.removeCallbacks(btHintTick)
         getSystemService(NotificationManager::class.java).cancel(BT_HINT_NOTIF_ID)
+        cancelWifiOff()
+    }
+
+    private fun cancelWifiOff() {
+        if (!wifiOffShown) return
+        wifiOffShown = false
+        getSystemService(NotificationManager::class.java).cancel(WIFI_OFF_NOTIF_ID)
+    }
+
+    /**
+     * Вход в группу ГУ упёрся в выключенный Wi-Fi (Android держит P2P выключенным, discover отвечает BUSY): просим включить
+     * Wi-Fi и выключить точку доступа. Wi-Fi включили - снимаем просьбу, P2pJoin входит сам. Нажатие открывает панель Wi-Fi.
+     */
+    private fun onP2pWifi(on: Boolean) {
+        if (on) {
+            if (CarLifeState.wireless == getString(R.string.wl_state_wifi_off)) CarLifeState.wireless = waitingText("…")
+            cancelWifiOff()
+            return
+        }
+        if (!wifiBMode || stopRequested || session != null) return
+        wifiOffShown = true
+        CarLifeState.wireless = getString(R.string.wl_state_wifi_off)
+        val open = PendingIntent.getActivity(
+            this, 4, Intent(Settings.Panel.ACTION_WIFI).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+        )
+        val n = Notification.Builder(this, CHANNEL)
+            .setSmallIcon(R.drawable.ic_stat_headswap)
+            .setContentTitle(getString(R.string.wl_wifi_off_title))
+            .setContentText(getString(R.string.wl_wifi_off_text))
+            .setStyle(Notification.BigTextStyle().bigText(getString(R.string.wl_wifi_off_text)))
+            .setContentIntent(open)
+            .setAutoCancel(true)
+            .build()
+        getSystemService(NotificationManager::class.java).notify(WIFI_OFF_NOTIF_ID, n)
+        WLog.ev(WLog.TRIGGER, "wifi-off-hint")
     }
 
     /** 30 с ожидания в авторежиме, а 6/6 нет: ГУ, возможно, не в сети телефона. Нажатие открывает панель Wi-Fi. */
@@ -514,7 +573,7 @@ class BridgeService : Service() {
 
     /** 15 с ожидания, а ГУ к RFCOMM `carlife` не подключалась: если телефон с машиной по Bluetooth, просим переподключить его. */
     private fun checkBtHint() {
-        if (!wifiBMode || stopRequested || session != null || btHintShown || btAcceptsThisWait > 0) return
+        if (!wifiBMode || stopRequested || session != null || btHintShown || btAcceptsThisWait > 0 || p2pThisWait) return
         CarBtState.check(this, CarProfile(this).btMac) { carBt ->
             val mode = CarProfile(this).connMode
             val show = BtReconnectHint.shouldShow(
@@ -522,6 +581,7 @@ class BridgeService : Service() {
                 sessionActive = session != null,
                 waitedMs = SystemClock.elapsedRealtime() - waitSince,
                 acceptsThisWait = btAcceptsThisWait,
+                targetInfoThisWait = p2pThisWait,
                 carBtConnected = carBt,
                 mode = mode,
                 alreadyShown = btHintShown,
@@ -702,6 +762,7 @@ class BridgeService : Service() {
             val log = { line: String, ui: Boolean -> AppLog.i(line, ui) }
             val core = AaBridgeCore(log, clockUs = { SystemClock.elapsedRealtimeNanos() / 1_000 })
             core.micModeProvider = { aaPrefs.micMode }
+            core.musicRateProvider = { aaPrefs.musicRate }
             core.phoneMic = PhoneMicCapture(applicationContext)
             core.usbAudioEnabled = aaPrefs.usbAudio
             EqLive.settings = aaPrefs.eq
@@ -885,6 +946,7 @@ class BridgeService : Service() {
         private const val NOTIF_ID = 1
         private const val HINT_NOTIF_ID = 2
         private const val BT_HINT_NOTIF_ID = 3
+        private const val WIFI_OFF_NOTIF_ID = 4
 
         /** Сервис создан и не уничтожен (один процесс): ресиверу ACL незачем будить пустой сервис ради отбоя. */
         @Volatile var alive = false

@@ -69,8 +69,11 @@ class PhoneMicCapture(private val ctx: Context) : PhoneMic {
         var blocks = 0
         var total = 0L
         var peakAll = 0
-        while (running) {
+        // нить живёт, пока rec - её запись: после stop() и сразу start() (повторный open) running снова true,
+        // и по одному флагу старая нить крутила бы остановленный AudioRecord, не освобождая его
+        while (running && rec === r) {
             val n = r.read(buf, 0, buf.size)
+            if (rec !== r) break               // stop() во время read: хвост остановленной записи не отдаём
             if (n <= 0) {
                 if (n < 0 && running) AppLog.i("MIC phone: read вернул $n, останавливаюсь", true)
                 if (n < 0) break

@@ -98,16 +98,18 @@ object BtReconnectHint {
     /**
      * Показывать ли: идёт ожидание без сессии уже [BT_HINT_MS], ГУ ни разу не подключилась к RFCOMM `carlife`, хотя
      * телефон с машиной по Bluetooth соединён (Mazda открывает carlife только в момент подключения BT), а по хотспоту
-     * эта машина раньше не подключалась. Один показ на ожидание.
+     * эта машина раньше не подключалась. Один показ на ожидание. ГУ уже прислала TARGET_INFO ([targetInfoThisWait]) -
+     * carlife она открыла, переподключать Bluetooth незачем.
      */
     fun shouldShow(
         waiting: Boolean,
         sessionActive: Boolean,
         waitedMs: Long,
         acceptsThisWait: Int,
+        targetInfoThisWait: Boolean,
         carBtConnected: Boolean,
         mode: CarConnMode,
         alreadyShown: Boolean,
-    ): Boolean = waiting && !sessionActive && waitedMs >= BT_HINT_MS && acceptsThisWait == 0 && carBtConnected &&
-        mode != CarConnMode.HOTSPOT && !alreadyShown
+    ): Boolean = waiting && !sessionActive && waitedMs >= BT_HINT_MS && acceptsThisWait == 0 && !targetInfoThisWait &&
+        carBtConnected && mode != CarConnMode.HOTSPOT && !alreadyShown
 }

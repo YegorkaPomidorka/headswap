@@ -147,10 +147,17 @@ class CarLogicTest {
         session: Boolean = false,
         waitedMs: Long = BT_HINT_MS,
         accepts: Int = 0,
+        targetInfo: Boolean = false,
         carBt: Boolean = true,
         mode: CarConnMode = CarConnMode.UNKNOWN,
         shown: Boolean = false,
-    ) = BtReconnectHint.shouldShow(waiting, session, waitedMs, accepts, carBt, mode, shown)
+    ) = BtReconnectHint.shouldShow(waiting, session, waitedMs, accepts, targetInfo, carBt, mode, shown)
+
+    @Test
+    fun btHintNotShownAfterTargetInfo() {
+        assertFalse(btHint(targetInfo = true))
+        assertFalse(btHint(targetInfo = true, mode = CarConnMode.BT_CARLIFE, waitedMs = BT_HINT_MS * 10))
+    }
 
     @Test
     fun btHintShownWhenCarConnectedButSilent() {

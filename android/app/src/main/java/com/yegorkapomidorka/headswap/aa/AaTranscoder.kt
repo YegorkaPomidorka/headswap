@@ -102,8 +102,23 @@ class AaTranscoder(
             }
             throw lastErr ?: IllegalStateException("encoder configure")
         }
-        surface = c.createInputSurface()
-        c.start()
+        var inSurface: Surface? = null
+        try {
+            inSurface = c.createInputSurface()
+            c.start()
+        } catch (e: Exception) {
+            // кодек и Surface ещё не в полях: stop() их не увидит, аппаратный энкодер освобождаем здесь
+            try {
+                inSurface?.release()
+            } catch (_: Exception) {
+            }
+            try {
+                c.release()
+            } catch (_: Exception) {
+            }
+            throw e
+        }
+        surface = inSurface
         encoder = c
         // режим битрейта: CBR/VBR принимают PARAMETER_KEY_VIDEO_BITRATE на лету, CQ - нет; на уровне 2 режим не задавался
         bitrateMode = try {
@@ -230,7 +245,10 @@ class AaTranscoder(
             val buf = d.codec.getInputBuffer(idx)
             if (buf == null || buf.capacity() < annexB.size) {
                 d.codec.queueInputBuffer(idx, 0, 0, ptsUs, 0)
+                // кадр потерян, как и без входного буфера: P после него декодер испортит - ждём IDR от AA
                 winDrop.incrementAndGet()
+                needIdr = true
+                out.onNeedAaKeyFrame()
                 return
             }
             buf.clear()
@@ -270,16 +288,25 @@ class AaTranscoder(
             f.setInteger(MediaFormat.KEY_MAX_INPUT_SIZE, 512 * 1024)
             val c = MediaCodec.createDecoderByType(MIME)
             try {
-                c.configure(f, surf, null, 0)
+                try {
+                    c.configure(f, surf, null, 0)
+                } catch (e: Exception) {
+                    // без low-latency/priority (не все декодеры принимают)
+                    c.reset()
+                    val f2 = MediaFormat.createVideoFormat(MIME, srcWidth, srcHeight)
+                    f2.setByteBuffer("csd-0", ByteBuffer.wrap(s))
+                    f2.setByteBuffer("csd-1", ByteBuffer.wrap(p))
+                    c.configure(f2, surf, null, 0)
+                }
+                c.start()
             } catch (e: Exception) {
-                // без low-latency/priority (не все декодеры принимают)
-                c.reset()
-                val f2 = MediaFormat.createVideoFormat(MIME, srcWidth, srcHeight)
-                f2.setByteBuffer("csd-0", ByteBuffer.wrap(s))
-                f2.setByteBuffer("csd-1", ByteBuffer.wrap(p))
-                c.configure(f2, surf, null, 0)
+                // декодер ещё не в поле decoder: releaseDecoderLocked() его не освободит
+                try {
+                    c.release()
+                } catch (_: Exception) {
+                }
+                throw e
             }
-            c.start()
             val d = Dec(c)
             d.thread = Thread({ decodeLoop(d) }, "aa-trans-dec").also { it.start() }
             decoder = d

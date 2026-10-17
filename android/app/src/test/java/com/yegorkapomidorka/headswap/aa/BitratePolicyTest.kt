@@ -170,4 +170,38 @@ class BitratePolicyTest {
         for (i in 1..100) p.update(i * 100L, 5000.0, 10_000.0)
         assertEquals(500_000, p.current)
     }
+
+    @Test
+    fun lowerCeilingCutsCurrentAndKeepsUpBelowCeiling() {
+        val p = BitratePolicy(8_000_000)
+        assertEquals(8_000_000, p.current)
+        assertTrue(p.lowerCeiling(4_000_000))
+        assertEquals(4_000_000, p.ceilingBps)
+        assertEquals(4_000_000, p.current)
+        assertEquals(4_000_000, p.minBps)
+        // быстрый слив, долгое затишье: выше нового потолка не поднимается
+        for (i in 1..1000) p.update(i * 100L, 0.0, 3.0 * 1024 * 1024)
+        assertEquals(4_000_000, p.current)
+    }
+
+    @Test
+    fun lowerCeilingOnlyLowersAndRespectsFloor() {
+        val p = BitratePolicy(3_000_000)
+        assertTrue(!p.lowerCeiling(3_000_000))
+        assertTrue(!p.lowerCeiling(5_000_000))
+        assertEquals(3_000_000, p.ceilingBps)
+        assertTrue(p.lowerCeiling(100_000))
+        assertEquals(BitratePolicy.FLOOR_BPS, p.ceilingBps)
+        assertEquals(BitratePolicy.FLOOR_BPS, p.current)
+    }
+
+    @Test
+    fun lowerCeilingBelowCurrentLeavesLowerCurrent() {
+        val p = BitratePolicy(6_000_000, profile = BitrateProfile.WIFI)   // старт 4.5 Мбит/с
+        assertEquals(4_500_000, p.current)
+        assertTrue(p.lowerCeiling(5_000_000))
+        assertEquals(4_500_000, p.current)
+        assertTrue(p.lowerCeiling(4_000_000))
+        assertEquals(4_000_000, p.current)
+    }
 }

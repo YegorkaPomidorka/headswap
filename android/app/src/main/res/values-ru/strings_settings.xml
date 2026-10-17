@@ -43,6 +43,8 @@
     <string name="set_apply_next">Применится при следующем подключении.</string>
     <string name="set_needs_transcode">Нужно перекодирование</string>
 
+    <string name="set_music_rate">Частота музыки</string>
+    <string name="set_music_rate_note">Ниже частота — меньше нагрузка на USB и слабое ГУ, но хуже качество. Авто: 48 кГц, для ГУ Hyundai CN7 — 32 кГц. Применится при следующем подключении.</string>
     <string name="set_fps">Частота кадров</string>
     <string name="set_fps_note">Применится при следующем подключении. В прямом пробросе частота не регулируется.</string>
     <string name="set_aa_density">Масштаб интерфейса AA</string>
@@ -135,6 +137,14 @@
     <string name="video_wide_hd_sub">1920×720: чётче и мельче, больше влезает на экран</string>
     <string name="video_wide_976_title">Широкий 2240×976 (VW Tiguan L Pro)</string>
     <string name="video_wide_976_sub">Широкая обрезка под окно CarLife на ГУ VW CNS3</string>
+
+    <!-- Частота музыки (MusicRate) -->
+    <string name="mrate_auto">Авто</string>
+    <string name="mrate_48">48 кГц</string>
+    <string name="mrate_44">44,1 кГц</string>
+    <string name="mrate_32">32 кГц</string>
+    <string name="mrate_24">24 кГц</string>
+    <string name="mrate_22">22 кГц</string>
 
     <!-- Frame rate (FpsSetting) -->
     <string name="fps_auto_title">Авто</string>

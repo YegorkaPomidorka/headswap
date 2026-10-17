@@ -43,6 +43,8 @@
     <string name="set_apply_next">Applies on the next connection.</string>
     <string name="set_needs_transcode">Needs re-encoding</string>
 
+    <string name="set_music_rate">Music sample rate</string>
+    <string name="set_music_rate_note">Lower rate: less load on the USB link and weak head units, but lower quality. Auto: 48 kHz, 32 kHz for Hyundai CN7 head units. Applies on the next connection.</string>
     <string name="set_fps">Frame rate</string>
     <string name="set_fps_note">Applies on the next connection. In direct passthrough the frame rate cannot be changed.</string>
     <string name="set_aa_density">Android Auto UI scale</string>
@@ -135,6 +137,14 @@
     <string name="video_wide_hd_sub">1920×720: sharper and smaller, more fits on the screen</string>
     <string name="video_wide_976_title">Wide 2240×976 (VW Tiguan L Pro)</string>
     <string name="video_wide_976_sub">Wide crop scaled to the CarLife window of the VW CNS3 head unit</string>
+
+    <!-- Music sample rate (MusicRate) -->
+    <string name="mrate_auto">Auto</string>
+    <string name="mrate_48">48 kHz</string>
+    <string name="mrate_44">44.1 kHz</string>
+    <string name="mrate_32">32 kHz</string>
+    <string name="mrate_24">24 kHz</string>
+    <string name="mrate_22">22 kHz</string>
 
     <!-- Frame rate (FpsSetting) -->
     <string name="fps_auto_title">Auto</string>

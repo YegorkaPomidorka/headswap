@@ -13,6 +13,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.After
 import org.junit.Test
+import kotlin.math.abs
 import com.yegorkapomidorka.headswap.aa.AapMessages as M
 
 /** Ссылка, записывающая метаданные и MODULE_STATUS. */
@@ -600,6 +601,28 @@ class AaMetaTest {
     }
 
     @Test
+    fun vwIdFlagByManufacturerAndChannelAndReset() {
+        val r = Rig()
+        assertTrue(!r.core.huVw20082138)
+        r.core.onHuInfo("VW BT 1538", "VW BT 1538")
+        assertTrue(r.core.huVw20082138)
+        r.core.onCarlifeClosed()
+        r.core.attach(MetaLink())
+        assertTrue("новая сессия - флаг заново", !r.core.huVw20082138)
+        r.core.onHuStatistic("20082138")
+        assertTrue(r.core.huVw20082138)
+    }
+
+    @Test
+    fun vwIdFlagNotSetForOtherVw() {
+        val r = Rig()
+        r.core.onHuInfo("", "")
+        r.core.onHuStatistic("20082120")
+        assertTrue(r.core.huVw20082120)
+        assertTrue(!r.core.huVw20082138)
+    }
+
+    @Test
     fun routeNaviOffForDesayByChannel() {
         val r = Rig()
         r.core.onHuInfo("", "")
@@ -620,6 +643,111 @@ class AaMetaTest {
         r.core.onCarlifeStart()
         r.core.onNavStatus(1)
         assertEquals(listOf(1), link2.navi())
+    }
+
+    @Test
+    fun hyundaiCn7FlagByProduct() {
+        val r = Rig()
+        r.core.onHuInfo("QTI", "sm6150_au for arm64")
+        assertFalse("без product флага нет", r.core.huHyundaiCn7)
+        r.core.onHuInfo("QTI", "sm6150_au for arm64", "other_product")
+        assertFalse("чужой product - нет", r.core.huHyundaiCn7)
+        r.core.onHuInfo("QTI", "sm6150_au for arm64", "wp_cn7cpe_cn")
+        assertTrue(r.core.huHyundaiCn7)
+    }
+
+    @Test
+    fun hyundaiCn7FlagResetsOnNewSession() {
+        val r = Rig()
+        r.core.onHuInfo("QTI", "sm6150_au for arm64", "wp_cn7cpe_cn")
+        r.core.onCarlifeClosed()
+        r.core.attach(MetaLink())
+        assertFalse("новая сессия - флаг заново по HU_INFO", r.core.huHyundaiCn7)
+    }
+
+    /** Ссылка, запоминающая INIT и данные MEDIA. */
+    private class CapLink(private val d: MetaLink = MetaLink()) : CarlifeLink by d {
+        val inits = ArrayList<ByteArray>()
+        val data = java.io.ByteArrayOutputStream()
+        val dataBytes get() = data.size()
+        override fun sendAudio(channel: Int, type: Int, payload: ByteArray): Boolean {
+            if (type == CarlifeAudio.MEDIA_INIT) inits.add(payload)
+            if (type == CarlifeAudio.MEDIA_DATA) data.write(payload)
+            return d.sendAudio(channel, type, payload)
+        }
+    }
+
+    private fun pattern() = ByteArray(8192) { (it * 7 + it / 5).toByte() }
+
+    private fun mediaOut(cn7: Boolean, rate: MusicRate = MusicRate.AUTO, logs: MutableList<String>? = null): CapLink {
+        val link = CapLink()
+        val core = AaBridgeCore({ l, _ -> logs?.add(l) }, clockMs = { 1_000_000L })
+        core.musicRateProvider = { rate }
+        core.attach(link)
+        if (cn7) core.onHuInfo("QTI", "sm6150_au for arm64", "wp_cn7cpe_cn")
+        core.onCarlifeStart()
+        repeat(3) { core.onAudioData(M.CH_AUDIO_MEDIA, pattern(), 0) }
+        return link
+    }
+
+    @Test
+    fun hyundaiCn7MediaIs32kHz() {
+        val cn7 = mediaOut(true)
+        assertEquals(1, cn7.inits.size)
+        assertArrayEquals(CarlifeAudio.initBody(32000, 2, 16), cn7.inits[0])
+        assertTrue("3 x 2048 кадра -> 4096 кадров", cn7.dataBytes == 4096 * 4)
+    }
+
+    @Test
+    fun autoRateOnUsualHuIs48kHzUntouched() {
+        val usual = mediaOut(false)
+        assertArrayEquals(CarlifeAudio.initBody(48000, 2, 16), usual.inits[0])
+        assertEquals(3 * 8192, usual.dataBytes)
+        assertArrayEquals(pattern() + pattern() + pattern(), usual.data.toByteArray())
+    }
+
+    @Test
+    fun explicit44kHzOnUsualHu() {
+        val logs = ArrayList<String>()
+        val link = mediaOut(false, MusicRate.HZ44, logs)
+        assertEquals(1, link.inits.size)
+        assertArrayEquals(CarlifeAudio.initBody(44100, 2, 16), link.inits[0])
+        val frames = link.dataBytes / 4
+        assertTrue("6144 кадра x 147/160 = 5644,8, получили $frames", abs(frames - 5645) <= 1)
+        val rateLogs = logs.filter { it.startsWith("BRIDGE музыка") }
+        assertEquals(listOf("BRIDGE музыка 44100 Гц, ресэмпл 48000→44100 (настройка)"), rateLogs)
+    }
+
+    @Test
+    fun explicit48kHzOnCn7OverridesAuto() {
+        val logs = ArrayList<String>()
+        val link = mediaOut(true, MusicRate.HZ48, logs)
+        assertArrayEquals(CarlifeAudio.initBody(48000, 2, 16), link.inits[0])
+        assertArrayEquals(pattern() + pattern() + pattern(), link.data.toByteArray())
+        assertTrue(logs.none { it.startsWith("BRIDGE музыка") })
+    }
+
+    @Test
+    fun explicitRateOnCn7BeatsAuto() {
+        val link = mediaOut(true, MusicRate.HZ24)
+        assertArrayEquals(CarlifeAudio.initBody(24000, 2, 16), link.inits[0])
+        assertEquals(3 * 2048 / 2 * 4, link.dataBytes)
+    }
+
+    @Test
+    fun autoRateLogNamesCn7() {
+        val logs = ArrayList<String>()
+        mediaOut(true, MusicRate.AUTO, logs)
+        assertEquals(listOf("BRIDGE музыка 32000 Гц, ресэмпл 48000→32000 (авто: Hyundai CN7)"), logs.filter { it.startsWith("BRIDGE музыка") })
+    }
+
+    @Test
+    fun musicRateParse() {
+        assertEquals(MusicRate.AUTO, MusicRate.DEFAULT)
+        assertEquals(MusicRate.AUTO, MusicRate.parse(null))
+        assertEquals(MusicRate.AUTO, MusicRate.parse("мусор"))
+        for (r in MusicRate.values()) assertEquals(r, MusicRate.parse(r.name))
+        assertEquals(listOf(null, 48000, 44100, 32000, 24000, 22050), MusicRate.values().map { it.hz })
     }
 
     @Test
@@ -683,6 +811,105 @@ class AaMetaTest {
         r.core.onCarlifePause()
         r.start()
         assertEquals(listOf(127), peer.keys.toList())
+    }
+
+    /** Desay G6S, AA играет, ГУ ушло на радио (MUSIC=0 после PAUSE). */
+    private fun g6sPausedByUs(): Pair<Rig, FakePeer> {
+        val r = Rig()
+        val peer = FakePeer()
+        r.core.peer = peer
+        r.core.onHuInfo("Desay SV Automotive", "G6S")
+        r.start()
+        r.core.onMediaStatus(AaMeta.parseMediaStatus(status(2, 1))!!)
+        r.core.onCarlifePause()
+        assertFalse(r.core.onCarlifeMusicControl(0))
+        assertEquals(listOf(127), peer.keys.toList())
+        return r to peer
+    }
+
+    @Test
+    fun g6sMusicOnAfterOurPauseResumesAaOnceForWholeBurst() {
+        // h214: START, затем пачка MUSIC=1 - play один раз, MUSIC=1 на всю пачку
+        val (r, peer) = g6sPausedByUs()
+        r.now += 950
+        r.start()
+        assertEquals("START сам музыку не запускает", listOf(127), peer.keys.toList())
+        r.now += 300
+        assertTrue(r.core.onCarlifeMusicControl(1))
+        assertEquals(listOf(127, 126), peer.keys.toList())
+        for (i in 0 until 10) {
+            r.now += 50
+            assertTrue("пачка: MUSIC=1, пока AA раскачивается", r.core.onCarlifeMusicControl(1))
+        }
+        assertEquals("126 один раз", listOf(127, 126), peer.keys.toList())
+        assertTrue(r.logs.any { it.contains("вернулось на CarLife-музыку") })
+        // MEDIA снова пересылается
+        val pcm = ByteArray(640)
+        r.core.onAudioData(M.CH_AUDIO_MEDIA, pcm, 0)
+        assertEquals(1, r.link.audio.count { it == CarlifeAudio.MEDIA_DATA })
+        // после окна ответ снова по факту
+        r.now += AaBridgeCore.HU_RESUME_ANSWER_MS
+        r.core.onCarlifeMusicControl(1)
+        assertEquals(listOf(127, 126), peer.keys.toList())
+
+        // MUSIC=1 раньше START (лог 2026-10-13): тоже play
+        val (q, qPeer) = g6sPausedByUs()
+        q.now += 5000
+        assertTrue(q.core.onCarlifeMusicControl(1))
+        q.start()
+        assertEquals(listOf(127, 126), qPeer.keys.toList())
+    }
+
+    @Test
+    fun g6sMusicOnWithoutOurPauseDoesNotPlay() {
+        // свежая сессия: пачка MUSIC=1 через ~2 с после HU_INFO, паузы нашей нет (h33: радио не глушить)
+        val r = Rig()
+        val peer = FakePeer()
+        r.core.peer = peer
+        r.core.onHuInfo("Desay SV Automotive", "G6S")
+        r.start()
+        repeat(10) { assertFalse(r.core.onCarlifeMusicControl(1)) }
+        assertTrue(peer.keys.isEmpty())
+
+        // юзер сам поставил AA на паузу до ухода ГУ: MUSIC=1 не запускает трек
+        val q = Rig()
+        val qPeer = FakePeer()
+        q.core.peer = qPeer
+        q.core.onHuInfo("Desay SV Automotive", "G6S")
+        q.start()
+        q.core.onMediaStatus(AaMeta.parseMediaStatus(status(3, 1))!!)
+        q.core.onCarlifeMusicControl(0)
+        q.start()
+        assertFalse(q.core.onCarlifeMusicControl(1))
+        assertTrue(qPeer.keys.isEmpty())
+
+        // возврат без MUSIC=1 (NAVI): только START - play нет
+        val (n, nPeer) = g6sPausedByUs()
+        n.now += 7000
+        n.start()
+        n.core.onCarlifePause()
+        n.start()
+        assertEquals(listOf(127), nPeer.keys.toList())
+
+        // не Desay G6S: MUSIC=1 после нашей паузы play не шлёт
+        val o = Rig()
+        val oPeer = FakePeer()
+        o.core.peer = oPeer
+        o.start()
+        o.core.onMediaStatus(AaMeta.parseMediaStatus(status(2, 1))!!)
+        o.core.onCarlifeMusicControl(0)
+        o.core.onCarlifeMusicControl(1)
+        assertEquals(listOf(127), oPeer.keys.toList())
+
+        // флаг выключен - старое поведение
+        AaBridgeCore.HU_MUSIC_RESUME_ENABLED = false
+        try {
+            val (f, fPeer) = g6sPausedByUs()
+            assertFalse(f.core.onCarlifeMusicControl(1))
+            assertEquals(listOf(127), fPeer.keys.toList())
+        } finally {
+            AaBridgeCore.HU_MUSIC_RESUME_ENABLED = true
+        }
     }
 
     @Test

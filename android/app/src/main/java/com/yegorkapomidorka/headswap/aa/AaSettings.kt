@@ -21,7 +21,12 @@ class AaPrefs(ctx: Context) {
         get() = sp.getBoolean("usbAudio", true)
         set(v) = sp.edit().putBoolean("usbAudio", v).apply()
 
-    /** Видео моста: перекодирование (по умолчанию) или passthrough H.264 AA как есть. */
+    /** Частота музыки в CarLife (имя MusicRate, по умолчанию Авто). Мост читает на каждый MEDIA INIT. */
+    var musicRate: MusicRate
+        get() = MusicRate.parse(sp.getString("musicRate", MusicRate.DEFAULT.name))
+        set(v) = sp.edit().putString("musicRate", v.name).apply()
+
+    /** Видео моста:перекодирование (по умолчанию) или passthrough H.264 AA как есть. */
     var transcode: Boolean
         get() = sp.getBoolean("transcode", true)
         set(v) = sp.edit().putBoolean("transcode", v).apply()

@@ -3,6 +3,7 @@
 <resources>
     <string name="wl_state_waiting">жду машину по Wi-Fi (%1$s)</string>
     <string name="wl_state_no_hotspot">нет точки доступа: включите хотспот на телефоне</string>
+    <string name="wl_state_p2p_busy">Wi-Fi Direct занят: выключите точку доступа на телефоне</string>
     <string name="wl_state_connected">машина подключилась по Wi-Fi</string>
     <string name="wl_state_lost">связь потеряна, жду машину снова</string>
     <string name="wl_state_auto">машина рядом по Bluetooth, жду по Wi-Fi (%1$s)</string>
@@ -10,5 +11,8 @@
     <string name="wl_hint_text">Подключите телефон к Wi-Fi машины или включите точку доступа. Нажмите, чтобы открыть Wi-Fi.</string>
     <string name="wl_bt_hint_title">Переподключите Bluetooth машины</string>
     <string name="wl_bt_hint_text">Машина подключена по Bluetooth, но не открыла беспроводной CarLife. Выключите и включите Bluetooth на телефоне.</string>
+    <string name="wl_state_wifi_off">включите Wi-Fi на телефоне (подключаться к сети не нужно) и выключите точку доступа</string>
+    <string name="wl_wifi_off_title">Включите Wi-Fi на телефоне</string>
+    <string name="wl_wifi_off_text">Машина подключается через Wi-Fi Direct: включите Wi-Fi (подключаться к сети не нужно) и выключите точку доступа. Нажмите, чтобы открыть Wi-Fi.</string>
     <string name="wl_state_gave_up">машина не подключилась за %1$d мин</string>
 </resources>

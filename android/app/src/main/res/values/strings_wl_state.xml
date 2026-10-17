@@ -3,6 +3,7 @@
 <resources>
     <string name="wl_state_waiting">waiting for the car over Wi-Fi (%1$s)</string>
     <string name="wl_state_no_hotspot">no hotspot: turn on the phone\'s Wi-Fi hotspot</string>
+    <string name="wl_state_p2p_busy">Wi-Fi Direct is busy: turn off the phone\'s hotspot</string>
     <string name="wl_state_connected">car connected over Wi-Fi</string>
     <string name="wl_state_lost">connection lost, waiting for the car again</string>
     <string name="wl_state_auto">car is near over Bluetooth, waiting over Wi-Fi (%1$s)</string>
@@ -10,5 +11,8 @@
     <string name="wl_hint_text">Connect the phone to the car\'s Wi-Fi or turn on the hotspot. Tap to open Wi-Fi.</string>
     <string name="wl_bt_hint_title">Reconnect the car\'s Bluetooth</string>
     <string name="wl_bt_hint_text">The car is connected over Bluetooth but hasn\'t opened wireless CarLife. Turn Bluetooth off and on on the phone.</string>
+    <string name="wl_state_wifi_off">turn on Wi-Fi on the phone (no need to join a network) and turn off the hotspot</string>
+    <string name="wl_wifi_off_title">Turn on Wi-Fi on the phone</string>
+    <string name="wl_wifi_off_text">The car connects over Wi-Fi Direct: turn on Wi-Fi (no need to join a network) and turn off the hotspot. Tap to open Wi-Fi.</string>
     <string name="wl_state_gave_up">the car did not connect within %1$d min</string>
 </resources>

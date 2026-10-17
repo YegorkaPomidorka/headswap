@@ -113,8 +113,15 @@ class GlRelay(
             }
             latch.countDown()
         }
-        if (!latch.await(5, TimeUnit.SECONDS)) throw IllegalStateException("GL-нить не поднялась")
-        initError?.let { throw IllegalStateException("инициализация GL: ${it.message}", it) }
+        // при отказе освобождаем EGL и нить: окно EGL держит Surface энкодера, и запасной путь (декодер прямо в энкодер) к нему не подключится
+        if (!latch.await(5, TimeUnit.SECONDS)) {
+            stop()
+            throw IllegalStateException("GL-нить не поднялась")
+        }
+        initError?.let {
+            stop()
+            throw IllegalStateException("инициализация GL: ${it.message}", it)
+        }
         handler.postDelayed(tick, 20)
     }
 
@@ -205,7 +212,8 @@ class GlRelay(
             try {
                 handler.removeCallbacks(tick)
                 st?.release()
-                inputSurface.release()
+                // init() мог упасть до inputSurface: без проверки исключение пропустило бы освобождение EGL ниже
+                if (::inputSurface.isInitialized) inputSurface.release()
                 if (display != EGL14.EGL_NO_DISPLAY) {
                     EGL14.eglMakeCurrent(display, EGL14.EGL_NO_SURFACE, EGL14.EGL_NO_SURFACE, EGL14.EGL_NO_CONTEXT)
                     if (eglSurface != EGL14.EGL_NO_SURFACE) EGL14.eglDestroySurface(display, eglSurface)

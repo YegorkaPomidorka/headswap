@@ -51,17 +51,32 @@ class VideoSource(
         if (running) return
         val c = MediaCodec.createEncoderByType(MIME)
         encoderName = c.name
-        var fmt = format(withExtras = true)
+        var s: Surface? = null
         try {
-            c.configure(fmt, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE)
+            var fmt = format(withExtras = true)
+            try {
+                c.configure(fmt, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE)
+            } catch (e: Exception) {
+                AppLog.e("configure с profile/CBR не прошёл, пробую минимальный формат", e)
+                c.reset()
+                fmt = format(withExtras = false)
+                c.configure(fmt, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE)
+            }
+            s = c.createInputSurface()
+            c.start()
         } catch (e: Exception) {
-            AppLog.e("configure с profile/CBR не прошёл, пробую минимальный формат", e)
-            c.reset()
-            fmt = format(withExtras = false)
-            c.configure(fmt, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE)
+            // codec ещё null: stop() вышел бы сразу, аппаратный энкодер освобождаем здесь
+            try {
+                s?.release()
+            } catch (_: Exception) {
+            }
+            try {
+                c.release()
+            } catch (_: Exception) {
+            }
+            throw e
         }
-        surface = c.createInputSurface()
-        c.start()
+        surface = s
         codec = c
         running = true
         drainThread = Thread({ drainLoop(c) }, "video-enc-drain").also { it.start() }
