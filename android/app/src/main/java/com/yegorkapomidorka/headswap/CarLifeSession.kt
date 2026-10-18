@@ -320,6 +320,13 @@ class CarLifeSession(
                 }
             }
             Msg.HU_FEATURE_CONFIG_RESPONSE -> onFeatureConfig(m)
+            Msg.CAR_DATA_SUBSCRIBE_RSP -> {
+                // NX4C (h242) сам GPS/скорость не шлёт: подписываемся, как Baidu. Остальным ГУ как раньше, только лог
+                if (bridge.huMobisNx4c) for ((id, flag) in Msgs.carDataStartModules(m.body)) {
+                    AppLog.i("== CAR_DATA_SUBSCRIBE_RSP: NX4C, отвечаю CAR_DATA_START moduleID=$id flag=$flag frequency=0")
+                    sendCmd(Msg.CAR_DATA_START, Msgs.carDataStart(id, flag))
+                }
+            }
             Msg.BT_START_IDENTIFY_REQ -> {
                 // Baidu BtDeviceManager :436-457: без HFP с ГУ и BLUETOOTH_AUTO_CONNECT - status=0 с адресом ГУ.
                 // Остальным ГУ не отвечаем, как раньше (живут и без ответа)
@@ -503,6 +510,12 @@ class CarLifeSession(
 
     /** START: гейт AA сбрасывается, заглушка (если активна) стартует с SPS+PPS+IDR. */
     private fun onVideoStart() {
+        if (bridge.huMobisNx4c && carlifeStarted && !paused) {
+            // NX4C (h242) повторяет START раз в 1 с без PAUSE. Baidu (Recorder.resumeFromHeadUnit/startThread) на это
+            // ничего не делает: ни нового IDR, ни сброса гейта
+            AppLog.i("видео: повторный START без PAUSE (NX4C), игнор, как Baidu")
+            return
+        }
         paused = false
         if (pendingW <= 0) {
             pendingW = mode.outW
@@ -953,7 +966,12 @@ class CarLifeSession(
     //   и 2026-10-16 Wi-Fi), реконнект с FOREGROUND выдёргивал юзера из меню ГУ в CarLife: VIDEO_HEARTBEAT 0x20002 сразу
     //   и раз в 100 мс, как Baidu Recorder.sendEmptyPacketBackground (~50 мс).
     private fun pauseHeartbeat() {
-        if (closed.get() || !paused || !PAUSE_KEEPALIVE_ENABLED) return
+        if (closed.get()) return
+        if (bridge.huMobisNx4c && carlifeStarted && !paused) {
+            playHeartbeat()
+            return
+        }
+        if (!paused || !PAUSE_KEEPALIVE_ENABLED) return
         val (type, period) =
             if (bridge.huVw20082120) Msg.VIDEO_HEARTBEAT to PAUSE_HEARTBEAT_MS else Msg.VIDEO_DATA to pauseKeepaliveMs
         val now = SystemClock.elapsedRealtime()
@@ -961,6 +979,19 @@ class CarLifeSession(
         if (vBeats == 0L) AppLog.i("видео: PAUSE, шлю пустой ${Msg.name(type)} раз в $period мс, чтобы ГУ не рвало USB")
         lastVideoTx = now
         send(Ch.VIDEO, Wire.dataInner(type, unixSeconds(), ByteArray(0)))
+    }
+
+    private var lastPlayHeartbeat = 0L
+
+    // NX4C (h242): ГУ раз в секунду переспрашивает START и через 4 тика рвёт USB, хотя кадры идут. Проба: живость
+    // видеоканала по VIDEO_HEARTBEAT 0x20002 (док C++-либы: «ГУ принимает от телефона пакеты-heartbeat»), раз в 500 мс
+    // и при идущем видео. lastVideoTx не трогаем: он про кадры
+    private fun playHeartbeat() {
+        val now = SystemClock.elapsedRealtime()
+        if (now - lastPlayHeartbeat < PLAY_HEARTBEAT_MS) return
+        if (lastPlayHeartbeat == 0L) AppLog.i("видео: NX4C, шлю VIDEO_HEARTBEAT раз в $PLAY_HEARTBEAT_MS мс при идущем видео")
+        lastPlayHeartbeat = now
+        send(Ch.VIDEO, Wire.dataInner(Msg.VIDEO_HEARTBEAT, unixSeconds(), ByteArray(0)))
     }
 
     private fun tick() {
@@ -1040,6 +1071,7 @@ class CarLifeSession(
         private const val SILENCE_MS = 10_000L
         private const val PAUSE_KEEPALIVE_MS = 2_000L  // Desay G6S: пустой VIDEO_DATA
         private const val PAUSE_HEARTBEAT_MS = 100L    // VW 20082120: пустой VIDEO_HEARTBEAT
+        private const val PLAY_HEARTBEAT_MS = 500L     // NX4C: VIDEO_HEARTBEAT при идущем видео
 
         /** На воздухе раз в ~1 с: ГУ на Wi-Fi рвут видео-сокет быстрее (план 5.2 п.4). */
         private const val PAUSE_KEEPALIVE_AIR_MS = 900L

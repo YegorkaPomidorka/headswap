@@ -13,6 +13,21 @@ import org.junit.Test
 class ProtocolTest {
 
     @Test
+    fun carDataStartFromNx4cRsp() {
+        // CAR_DATA_SUBSCRIBE_RSP NX4C (h242): cnt=6, модули {id, flag=1, frequency=1}
+        fun info(id: Int, flag: Int) = PbWriter().int32(1, id).int32(2, flag).int32(3, 1).toByteArray()
+        val rsp = PbWriter().int32(1, 6).bytes(2, info(0, 1)).bytes(2, info(1, 1)).bytes(2, info(2, 1))
+            .bytes(2, info(3, 1)).bytes(2, info(4, 1)).bytes(2, info(5, 1)).toByteArray()
+        assertEquals(listOf(0 to 1, 1 to 1, 4 to 1), Msgs.carDataStartModules(rsp))
+        val noGps = PbWriter().int32(1, 1).bytes(2, info(0, 0)).toByteArray()
+        assertEquals("GPS только с flag 1|2, как Baidu", emptyList<Pair<Int, Int>>(), Msgs.carDataStartModules(noGps))
+        val f = PbReader.parse(Msgs.carDataStart(1, 1))!!
+        assertEquals(1, PbReader.int(f, 1))
+        assertEquals(1, PbReader.int(f, 2))
+        assertEquals(0, PbReader.int(f, 3))
+    }
+
+    @Test
     fun btIdentifyResultBody() {
         val f = PbReader.parse(Msgs.btIdentifyResult(0, "40:D5:21:DD:D0:4C"))!!
         assertEquals(0, PbReader.int(f, 1))

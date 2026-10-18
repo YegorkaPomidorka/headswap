@@ -58,6 +58,8 @@ object Msg {
     const val MEDIA_INFO = 0x00010035
     const val MEDIA_PROGRESS_BAR = 0x00010036
     const val CAR_DATA_SUBSCRIBE = 0x00010031
+    const val CAR_DATA_SUBSCRIBE_RSP = 0x00018032
+    const val CAR_DATA_START = 0x00010033
     const val CONNECT_EXCEPTION = 0x00010037
     const val BT_HFP_CONNECTION = 0x00018042
     const val CARLIFE_DATA_SUBSCRIBE = 0x00018043
@@ -149,8 +151,8 @@ object Msg {
         NAVI_NEXT_TURN_INFO to "NAVI_NEXT_TURN_INFO",
         0x00010031 to "CAR_DATA_SUBSCRIBE",
         0x00010032 to "CAR_DATA_SUBSCRIBE_DONE(C++)",
-        0x00018032 to "CAR_DATA_SUBSCRIBE_RSP(Java)",
-        0x00010033 to "CAR_DATA_START",
+        CAR_DATA_SUBSCRIBE_RSP to "CAR_DATA_SUBSCRIBE_RSP(Java)",
+        CAR_DATA_START to "CAR_DATA_START",
         0x00010034 to "CAR_DATA_STOP",
         MEDIA_INFO to "MEDIA_INFO",
         MEDIA_PROGRESS_BAR to "MEDIA_PROGRESS_BAR",
@@ -521,6 +523,31 @@ object Msgs {
     fun authenResponse(encryptValue: String) = PbWriter().string(1, encryptValue).toByteArray()
 
     fun authenRequest(random: String) = PbWriter().string(1, random).toByteArray()
+
+    /**
+     * Ответ на CAR_DATA_SUBSCRIBE_RSP (CarlifeVehicleInfoList {cnt=1; repeated CarlifeVehicleInfo=2}) как Baidu
+     * CarDataSubscribeManager :207-235: CAR_DATA_START на GPS (flag 1|2), скорость и передачу, frequency=0.
+     * Пары (moduleID, flag); тела CarlifeVehicleInfo {moduleID=1, frequency=3, flag=2}.
+     */
+    fun carDataStartModules(rsp: ByteArray): List<Pair<Int, Int>> {
+        val list = PbReader.parse(rsp) ?: return emptyList()
+        return list.filter { it.number == 2 && it.wire == 2 }.mapNotNull { e ->
+            val f = e.data?.let { PbReader.parse(it) } ?: return@mapNotNull null
+            val id = PbReader.int(f, 1) ?: return@mapNotNull null
+            val flag = PbReader.int(f, 2) ?: 0
+            when (id) {
+                CAR_MODULE_GPS -> if (flag == 1 || flag == 2) id to flag else null
+                CAR_MODULE_VELOCITY, CAR_MODULE_GEAR -> id to flag
+                else -> null
+            }
+        }
+    }
+
+    fun carDataStart(moduleId: Int, flag: Int) = PbWriter().int32(1, moduleId).int32(3, 0).int32(2, flag).toByteArray()
+
+    const val CAR_MODULE_GPS = 0       // CarDataSubscribeManager.ModuleID
+    const val CAR_MODULE_VELOCITY = 1
+    const val CAR_MODULE_GEAR = 4
 
     /** CarlifeBTIdentifyResultInd {required int32 status=1; required string address=2} (Baidu BtHfpProtocolHelper :135-147). */
     fun btIdentifyResult(status: Int, address: String) = PbWriter().int32(1, status).string(2, address).toByteArray()
