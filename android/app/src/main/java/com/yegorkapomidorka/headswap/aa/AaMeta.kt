@@ -91,7 +91,7 @@ class CarlifeMediaInfo(
     val songId: String = "-1",
     val mode: Int = 0,
 ) {
-    override fun toString() = "song=\"$song\" artist=\"$artist\" album=\"$album\" duration=${durationSeconds}s source=$source art=${AaMeta.blobInfo(art)}"
+    override fun toString() = "song=\"$song\" artist=\"$artist\" album=\"$album\" duration=${durationSeconds}s source=$source songId=$songId art=${AaMeta.blobInfo(art)}"
 }
 
 /** Одно сообщение CarLife NAVI_NEXT_TURN_INFO (поле 6 и иконку выбирает CarLife-сторона по настройке). */
@@ -450,6 +450,7 @@ class MetaRelay(
     private var infoKey: String? = null
     private var infoPending = false            // MEDIA_INFO отложен, пока AA не играет
     private var trackSeq = 0
+    private var infoSeq = 0
     private var posMs: Int? = null
     private var lastProgressMs: Int? = null
     private var lastProgressAt = NEVER
@@ -546,16 +547,23 @@ class MetaRelay(
         val key = listOf(m.song, m.artist, m.album, m.durationSeconds, m.art?.contentHashCode(), m.art?.size).joinToString("|")
         if (key == infoKey) return
         // тот же трек с новой обложкой - источник прежний (ГУ различает треки по source), новый трек - новый ключ
-        val sameTrack = info?.let { it.song == (m.song ?: "") && it.artist == (m.artist ?: "") && it.album == (m.album ?: "") } == true
+        val song = m.song ?: ""
+        val artist = m.artist ?: ""
+        // h219: ГУ (SEMIDRIVE X9) держит первую обложку - не даём ей ключ-константу: пустой альбом и songId="-1"
+        val album = m.album?.takeIf { it.isNotBlank() } ?: artist.ifBlank { song }
+        val sameTrack = info?.let { it.song == song && it.artist == artist && it.album == album } == true
         if (!sameTrack) trackSeq++
         infoKey = key
+        infoSeq++
         info = CarlifeMediaInfo(
             source = "${mediaSource.ifEmpty { "aa" }}#$trackSeq",
-            song = m.song ?: "",
-            artist = m.artist ?: "",
-            album = m.album ?: "",
+            song = song,
+            artist = artist,
+            album = album,
             art = m.art,
             durationSeconds = m.durationSeconds ?: 0,
+            // новый на каждую смену полей/обложки, в т.ч. вторую обложку того же трека
+            songId = infoSeq.toString(),
         )
         if (!sameTrack) lastProgressMs = null
         sendInfo(if (sameTrack) "обложка/поля трека обновились" else "новый трек")
