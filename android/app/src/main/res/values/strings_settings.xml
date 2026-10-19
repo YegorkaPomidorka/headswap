@@ -127,6 +127,8 @@
     <string name="video_r720_sub">Fits most head units</string>
     <string name="video_p720_title">720×1280 (portrait)</string>
     <string name="video_p720_sub">For portrait screens</string>
+    <string name="video_p1104_title">960×1104 (portrait, 600 dp)</string>
+    <string name="video_p1104_sub">Visible area of a 960×1280 portrait screen</string>
     <string name="video_r1080_title">1920×1080</string>
     <string name="video_r1080_sub">Sharper, but heavier for the phone and head unit</string>
     <string name="video_r1440_title">2560×1440 (experimental)</string>

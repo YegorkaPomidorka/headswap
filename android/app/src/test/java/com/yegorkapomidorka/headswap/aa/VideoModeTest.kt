@@ -22,6 +22,7 @@ class VideoModeTest {
             VideoMode.WIDE_HD to Row("1920x1080", 0, 360, 160, 1920, 720, 6_000_000),
             VideoMode.WIDE_976 to Row("1920x1080", 0, 244, 160, 2240, 976, 8_000_000),
             VideoMode.P720 to Row("720x1280", 0, 0, 160, 720, 1280, 4_000_000),
+            VideoMode.P_1104 to Row("1080x1920", 0, 678, 288, 960, 1104, 6_000_000),
         )
         assertEquals(expected.keys, VideoMode.values().toSet())
         for ((m, r) in expected) {
@@ -32,8 +33,8 @@ class VideoModeTest {
             assertEquals(m.name, r.w, m.outW)
             assertEquals(m.name, r.h, m.outH)
             assertEquals(m.name, r.bitrate, m.bitrate)
-            // выход CarLife = кадр AA без margin-ов (WIDE_976 - исключение: область 1920x836 масштабируется в 2240x976)
-            if (m != VideoMode.WIDE_976) {
+            // выход CarLife = кадр AA без margin-ов (исключения со scale: WIDE_976 1920x836 -> 2240x976, P_1104 1080x1242 -> 960x1104)
+            if (m != VideoMode.WIDE_976 && m != VideoMode.P_1104) {
                 assertEquals(m.name, m.aaW - m.marginW, m.outW)
                 assertEquals(m.name, m.aaH - m.marginH, m.outH)
             }
