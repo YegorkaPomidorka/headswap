@@ -112,6 +112,14 @@ class CarLogicTest {
         assertEquals(0L, CarNetPolicy.delayMs(null, carBtNear = true))         // холодный старт, машина по BT рядом
         assertEquals(0L, CarNetPolicy.delayMs(CAR_RECENT_MS * 10, carBtNear = true))
         assertEquals(CAR_NET_DELAY_MS, CarNetPolicy.delayMs(null, carBtNear = false))
+        assertEquals(0L, CarNetPolicy.delayMs(null, carNetProven = true))      // ГУ уже приходила через свою сеть
+        assertEquals("wpa2", CarSecPolicy.first(null, hasPass = true))
+        assertEquals("wpa3", CarSecPolicy.first("wpa3", hasPass = true))
+        assertEquals("open", CarSecPolicy.first("wpa2", hasPass = false))
+        assertTrue(CarSecPolicy.retryWpa3(null, "wpa2", hasPass = true))         // защита ещё не известна: пробуем WPA3
+        assertFalse(CarSecPolicy.retryWpa3("wpa2", "wpa2", hasPass = true))     // WPA2 уже удавался: машины просто нет в эфире
+        assertFalse(CarSecPolicy.retryWpa3(null, "wpa3", hasPass = true))
+        assertEquals(CAR_NET_DELAY_MS, CarNetPolicy.delayMs(CAR_RECENT_MS, carNetProven = false))
     }
 
     @Test

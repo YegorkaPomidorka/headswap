@@ -17,6 +17,32 @@
     <string name="dev_meta_progress_title">Прогресс в секундах</string>
     <string name="dev_meta_progress_sub">MEDIA_PROGRESS_BAR в с вместо мс (если на ГУ в 1000 раз больше)</string>
 
+    <string name="dev_section_video">Видео (с переподключения)</string>
+    <string name="dev_custom_res_title">Своё разрешение</string>
+    <string name="dev_custom_res_sub">Вместо режима из настроек видео</string>
+    <string name="dev_custom_w">Ширина</string>
+    <string name="dev_custom_h">Высота</string>
+    <string name="dev_custom_hint">Ширина 640–2240, высота 640–1080, чётные</string>
+    <string name="dev_custom_from_hu">Как просит ГУ · %1$d×%2$d</string>
+    <string name="dev_custom_k_plate">Подложка AA</string>
+    <string name="dev_custom_k_margins">Поля</string>
+    <string name="dev_custom_k_scale">Масштаб</string>
+    <string name="dev_custom_k_bitrate">Битрейт</string>
+    <string name="dev_custom_v_size">%1$d×%2$d</string>
+    <string name="dev_custom_v_scale_one">1:1</string>
+    <string name="dev_custom_v_scale">×%1$.2f</string>
+    <string name="dev_custom_v_bitrate">до %1$.1f Мбит/с</string>
+    <string name="dev_custom_err_width">Ширина вне 640–2240</string>
+    <string name="dev_custom_err_height">Высота вне 640–1080</string>
+    <string name="dev_custom_err_odd">Нужны чётные значения</string>
+    <string name="dev_custom_err_portrait">Вертикальные экраны не поддерживаются</string>
+    <string name="dev_custom_err_encoder">Телефон не кодирует такой размер</string>
+    <string name="dev_custom_err_fmt">%1$s. Не сохранено</string>
+    <string name="dev_custom_warn_16">Не кратно 16: на части телефонов кодировщик может не взять такой размер</string>
+    <string name="dev_custom_warn_scale">Растяжение больше 1,3: картинка будет мыльной</string>
+    <string name="dev_custom_warn_transcode">Перекодирование выключено — будет 1280×720</string>
+    <string name="dev_custom_note">Работает только с перекодированием.</string>
+
     <string name="dev_section_actions">Действия</string>
     <string name="dev_action_scan">Сканировать</string>
     <string name="dev_action_stop_bridge">Стоп моста</string>

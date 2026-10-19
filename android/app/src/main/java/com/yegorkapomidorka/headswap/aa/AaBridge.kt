@@ -94,8 +94,13 @@ class AaBridgeCore(
                 field = v
                 fingers.clear()
             }
+            v?.sendNightMode(huTheme == THEME_DARK)
         }
     @Volatile private var link: CarlifeLink = NoLink
+
+    /** Последний CHANGE_MD_THEME от ГУ (0 светлая, 1 тёмная, 2 авто); до него - светлая. */
+    @Volatile var huTheme: Int = THEME_LIGHT
+        private set
 
     @Volatile private var carlifeStarted = false
     private var aaConfig: ByteArray? = null
@@ -105,6 +110,10 @@ class AaBridgeCore(
     private var placeholderText = TEXT_START_SERVER
     private var waitSince = 0L
     private var lastKeyframeRequest = NEVER
+    private var lastIdrSentMs = NEVER              // когда в CarLife ушёл последний IDR passthrough (h295)
+    private var h295TouchAt = NEVER                // когда тач запросил keyframe-цикл; NEVER = IDR после тача не ждём
+    private var h295LastTrigger = NEVER
+    private var h295LastTouchAt = NEVER            // последний тач от ГУ любого action
 
     var dropped = 0L
         private set
@@ -125,7 +134,7 @@ class AaBridgeCore(
      * Разрешение видео, снятое один раз при создании хоста (уже с учётом passthrough): им построена AA (SDR),
      * его же берут CarLife-сессия (INIT_DONE, энкодер) и маппинг тача. Prefs отсюда не читаются.
      */
-    @Volatile var videoMode: VideoMode = VideoMode.DEFAULT
+    @Volatile var videoMode: VideoGeometry = VideoMode.DEFAULT
 
     /** Ручной DPI интерфейса AA, снятый вместе с videoMode (AaDensity.AUTO = density режима). Только SDR, на кроп и тач не влияет. */
     @Volatile var densityOverride: Int = AaDensity.AUTO
@@ -154,12 +163,18 @@ class AaBridgeCore(
     @Volatile private var btAudio = false
     @Volatile var huDesayG6S = false           // ГУ Desay G6S (Mazda CX-5): NAVI=1 глушит штатное радио, маршрутный NAVI не шлём
         private set
+    @Volatile var huHonda = false              // Honda (STATISTIC_INFO channel 2077xxxx/2083xxxx, HU_INFO пустой): roadName на приборке режется по байтам и клеткам
+        private set
     @Volatile var huVwBt1420 = false           // VW BT 1420 (Павел, канал 20082138): по воздуху без heartbeat на PAUSE рвёт CarLife через ~1 мин
     @Volatile var huVw20082120 = false         // VW (STATISTIC_INFO channel 20082120 h93, 20082122 h222): без heartbeat рвёт USB через 3,7-5,6 с PAUSE
         private set
     @Volatile var huVw20082138 = false         // VW ID (channel 20082138, "VW BT 1538", h196): IDR > ~600 КиБ рвёт USB EIO
         private set
     @Volatile var huHyundaiCn7 = false         // ГУ Hyundai CN7 (product wp_cn7cpe_cn, h218): в режиме «Авто» музыка 32 кГц с ресэмплом 48→32
+        private set
+    @Volatile var huPioneerRm56 = false        // ГУ Pioneer RM56E8B (Dongfeng DF6, h277): 4-5 Мбит/с рвут USB EIO за 25-30 с, живёт на ~1 Мбит/с и fps ≤ 15
+        private set
+    @Volatile var huHonda20772121 = false      // Honda Civic 11 (channel 20772121, h295): после камеры/меню ГУ молча сбрасывает декодер, passthrough ждёт IDR
         private set
     @Volatile var musicRateProvider: () -> MusicRate = { MusicRate.DEFAULT }
     private var resampler: MusicResampler? = null    // null при 48000: PCM идёт как есть
@@ -225,6 +240,7 @@ class AaBridgeCore(
     private var lastHfpConnectMs = NEVER       // ГУ прислало BT_HFP_CONNECTION=connected (дальше AA сам запускает автоплей по BT)
     private var lastPauseKeyMs = NEVER         // когда последний раз слали AA KEYCODE 127
     private var naviSent = false               // MODULE_STATUS NAVI=1 ушёл (держит TTS и/или маршрут)
+    private var naviEndPending = false           // маршрут кончился, пока NAVI=1 держал TTS: NAVI=0 уйдёт после TTS STOP
     private var ttsNaviHeld = false            // NAVI=1 нужен ради TTS (до stopAllAudio)
     private var routeNaviHeld = false          // NAVI=1 нужен ради маршрута (MetaRelay)
     private var mediaPaused = false            // MEDIA на ГУ стоит на PAUSE (STOP ещё не слали)
@@ -324,11 +340,17 @@ class AaBridgeCore(
         gotIdr = false
         huDesayG6S = false                     // HU_INFO / STATISTIC_INFO придут заново в этой сессии
         huVw20082120 = false                   // HU_INFO / STATISTIC_INFO придут заново в этой сессии
+        huHonda = false                        // STATISTIC_INFO придёт заново в этой сессии
         huVwBt1420 = false                     // HU_INFO придёт заново в этой сессии
         huVw20082138 = false                   // HU_INFO / STATISTIC_INFO придут заново в этой сессии
         vwIdName = false
         vwIdChannel = false
         huHyundaiCn7 = false                   // HU_INFO придёт заново в этой сессии
+        huPioneerRm56 = false                  // HU_INFO придёт заново в этой сессии
+        huHonda20772121 = false                // HU_INFO / STATISTIC_INFO придут заново в этой сессии
+        h295TouchAt = NEVER
+        h295LastTrigger = NEVER
+        h295LastTouchAt = NEVER
         mediaRateLogged = MEDIA_RATE
         resampler?.reset()
         if (aaVideoSeen) placeholderText = TEXT_WAIT_FRAME
@@ -363,6 +385,7 @@ class AaBridgeCore(
             return
         }
         gotIdr = false
+        h295TouchAt = NEVER
         waitSince = if (aaVideoSeen) clockMs() - KEYFRAME_WAIT_MS else 0L
         lastKeyframeRequest = NEVER
         log("BRIDGE CarLife START: источник=$active, AA видео ${if (aaVideoSeen) "идёт, запрашиваю ключевой кадр" else "ещё нет"}", true)
@@ -466,6 +489,16 @@ class AaBridgeCore(
         for (id in moduleIds) meta.onSubscribe(id, on)
     }
 
+    /** CHANGE_MD_THEME от ГУ (h294): тёмная -> ночной режим AA, светлая -> день; авто (2) и прочее - день. */
+    fun onCarlifeTheme(mode: Int?) {
+        val m = mode ?: return log("BRIDGE CHANGE_MD_THEME без themeModes, тему не меняю", true)
+        val prev = huTheme
+        huTheme = m
+        val night = m == THEME_DARK
+        log("BRIDGE тема ГУ $prev -> $m (${themeName(m)}): AA night=$night${if (peer == null) ", AA не подключён, отдам при подключении" else ""}", true)
+        peer?.sendNightMode(night)
+    }
+
     /** VIDEO_ENCODER_PAUSE от ГУ: следующий START - полный, со сбросом звука. */
     @Synchronized
     fun onCarlifePause() {
@@ -516,6 +549,15 @@ class AaBridgeCore(
         if (manufacturer == VW_BT_1420_MANUFACTURER) huVwBt1420 = true
         updateVwId()
         if (product == HYUNDAI_CN7_PRODUCT) huHyundaiCn7 = true
+        if (manufacturer == PIONEER_MANUFACTURER && model == PIONEER_RM56_MODEL) {
+            if (!huPioneerRm56) log("BRIDGE ГУ Pioneer RM56E8B: потолок ${PIONEER_RM56_CEILING_BPS / 1000} кбит/с, fps ≤ $PIONEER_RM56_MAX_FPS", true)
+            huPioneerRm56 = true
+            // в passthrough потолок и fps не работают (h277 test1); BridgeService вернёт поле к настройке на следующей сессии
+            if (!transcodeEnabled) {
+                transcodeEnabled = true
+                log("BRIDGE ГУ Pioneer RM56E8B: passthrough отключаю, перекодирование принудительно", true)
+            }
+        }
     }
 
     private var vwIdName = false               // HU_INFO manufacturer = BT-имя ГУ "VW BT 1538"
@@ -534,7 +576,9 @@ class AaBridgeCore(
     /** STATISTIC_INFO ГУ разобран: запасной признак Desay G6S и признак VW 20082120 - канал сборки прошивки. */
     fun onHuStatistic(channel: String?) {
         if (channel == DESAY_G6S_CHANNEL) huDesayG6S = true
+        if (channel == HONDA_20772121_CHANNEL) huHonda20772121 = true
         if (channel == VW_20082120_CHANNEL || channel == VW_CNS3_20082122_CHANNEL || channel == VW_CNS3_20082134_CHANNEL) huVw20082120 = true
+        if (isHondaChannel(channel)) huHonda = true
         vwIdChannel = channel == VW_20082138_CHANNEL
         updateVwId()
     }
@@ -581,7 +625,55 @@ class AaBridgeCore(
      * До двух пальцев; id оставшегося пальца после POINTER_UP не меняется. Координаты кадра ГУ -> кадр AA через
      * [VideoMode.mapTouch] (без margin-ов 1:1). Один палец уходит в AA так же, как до мультитача (id 0, action_index 0).
      */
-    fun onCarlifeTouch(action: Int, x: Int, y: Int, px: Int = 0, py: Int = 0) = synchronized(touchLock) {
+    fun onCarlifeTouch(action: Int, x: Int, y: Int, px: Int = 0, py: Int = 0) {
+        dispatchTouch(action, x, y, px, py)
+        onHuTouch(action and 0xFF)                                            // вне touchLock: вложенных блокировок нет
+    }
+
+    /**
+     * h295, Honda Civic 11 (20772121): ГУ после камеры заднего хода / меню машины молча сбрасывает декодер и ничего не шлёт
+     * (ни PAUSE, ни START), а AA в passthrough даёт IDR раз в минуты. Камера/меню - пауза в тачах CarLife, при обычной
+     * работе тапы идут чаще. DOWN после паузы >= [H295_TOUCH_IDLE_MS] при старом IDR - вероятно, чёрный экран: сразу просим
+     * у AA ключевой кадр полным циклом NATIVE -> PROJECTED (мягкий PROJECTED на Samsung IDR не давал), gate не закрываем,
+     * P-кадры идут. Пришедший IDR в [onFrame] получает SPS/PPS из CODEC_CONFIG: после сброса декодера ГУ голый IDR может не принять.
+     * Время прошлого тача читаем до обновления, поэтому второй DOWN-дубль ГУ (~2 мс) триггер не повторяет.
+     */
+    @Synchronized
+    private fun onHuTouch(act: Int) {
+        val now = clockMs()
+        val sinceTouch = now - h295LastTouchAt
+        h295LastTouchAt = now
+        if (act != AapMessages.TOUCH_DOWN) return
+        if (!huHonda20772121 || transcoder != null || !carlifeStarted || !gotIdr) return
+        val sinceIdr = now - lastIdrSentMs
+        if (sinceIdr <= H295_IDR_STALE_MS || sinceTouch < H295_TOUCH_IDLE_MS || now - h295LastTrigger < H295_TRIGGER_MIN_MS) return
+        h295LastTrigger = now
+        h295TouchAt = now
+        lastKeyframeRequest = now
+        keyframeRequests++
+        log("BRIDGE h295: тач после $sinceIdr мс без IDR, пауза в тачах $sinceTouch мс -> keyframe-цикл", true)
+        peer?.requestKeyFrame()
+    }
+
+    /** h295: IDR после цикла так и не пришёл за [H295_WAIT_GIVEUP_MS] - не вешаем на него чужой IDR в логе и склейке. */
+    private fun h295GiveUp(now: Long) {
+        if (h295TouchAt != NEVER && now - h295TouchAt > H295_WAIT_GIVEUP_MS) h295TouchAt = NEVER
+    }
+
+    /** h295: IDR, которого ждали после тача, уходит с SPS/PPS из CODEC_CONFIG, если в кадре их нет. Иначе кадр как есть. */
+    private fun h295Prepare(b: ByteArray, types: List<Int>): ByteArray {
+        if (h295TouchAt == NEVER || 5 !in types || (AnnexB.startsWithSps(b) && 8 in types)) return b
+        val cfg = aaConfig ?: return b
+        return AnnexB.glue(cfg, b)
+    }
+
+    private fun h295IdrSeen(before: ByteArray, after: ByteArray) {
+        if (h295TouchAt == NEVER) return
+        log("BRIDGE h295: IDR через ${lastIdrSentMs - h295TouchAt} мс после тача, nal=${AnnexB.nalTypes(before)} -> ${AnnexB.nalTypes(after)}", true)
+        h295TouchAt = NEVER
+    }
+
+    private fun dispatchTouch(action: Int, x: Int, y: Int, px: Int, py: Int) = synchronized(touchLock) {
         val act = action and 0xFF
         val idx = action ushr 8
         if (act == AapMessages.TOUCH_DOWN || act == AapMessages.TOUCH_POINTER_DOWN) lastUserInputMs = clockMs()
@@ -657,11 +749,11 @@ class AaBridgeCore(
             val f = fingers[0]
             val a = points[0]
             if (a.x == f.x && a.y == f.y) log("BRIDGE тач $name ${f.x},${f.y} -> AA", ui)
-            else log("BRIDGE тач $name ГУ ${f.x},${f.y} -> AA ${a.x},${a.y} (${mode.name})", ui)
+            else log("BRIDGE тач $name ГУ ${f.x},${f.y} -> AA ${a.x},${a.y} (${mode.label})", ui)
         } else {
             val gu = fingers.joinToString(" ") { "#${it.id} ${it.x},${it.y}" }
             val aa = points.joinToString(" ") { "#${it.id} ${it.x},${it.y}" }
-            log("BRIDGE тач $name[$index] пальцев ${points.size}: ГУ $gu -> AA $aa (${mode.name})", ui)
+            log("BRIDGE тач $name[$index] пальцев ${points.size}: ГУ $gu -> AA $aa (${mode.label})", ui)
         }
         p.sendTouch(act, index, points)
     }
@@ -771,7 +863,11 @@ class AaBridgeCore(
         }
         if (audioInited[ch] != true) {
             val setting = if (ch == CarlifeAudio.CH_MEDIA) musicRateProvider() else MusicRate.AUTO
-            val rate = if (ch != CarlifeAudio.CH_MEDIA) 16000 else setting.hz ?: if (huHyundaiCn7) MEDIA_RATE_CN7 else MEDIA_RATE
+            val rate = when {
+                ch != CarlifeAudio.CH_MEDIA -> 16000
+                huPioneerRm56 -> MEDIA_RATE_PIONEER_RM56    // независимо от настройки: USB ГУ не тянет видео + музыку
+                else -> setting.hz ?: if (huHyundaiCn7) MEDIA_RATE_CN7 else MEDIA_RATE
+            }
             val channels = if (ch == CarlifeAudio.CH_MEDIA) 2 else 1
             if (ch == CarlifeAudio.CH_TTS && NAVI_STATUS_ENABLED) {
                 ttsNaviHeld = true
@@ -788,6 +884,7 @@ class AaBridgeCore(
             audioInited[ch] = true
             log("BRIDGE CarLife ${chName(ch)} INIT ${rate}Гц ${channels}к 16бит (0x%08x)".format(CarlifeAudio.initType(ch)), true)
             if (ch == CarlifeAudio.CH_TTS) {
+                if (huVw20082120) sendTtsPreroll()
                 ttsPackets = 0
                 mediaGuard = false
                 mediaReleaseTimer.cancel()
@@ -797,7 +894,11 @@ class AaBridgeCore(
                 // частота фиксируется на MEDIA INIT; каждый новый INIT - поток с чистого листа
                 resampler = if (rate == MEDIA_RATE) null else resampler?.takeIf { it.outRate == rate }?.also { it.reset() } ?: MusicResampler(rate)
                 if (rate != MEDIA_RATE && rate != mediaRateLogged) {
-                    val why = if (setting.hz != null) "настройка" else "авто: Hyundai CN7"
+                    val why = when {
+                        huPioneerRm56 -> "авто: Pioneer RM56E8B"
+                        setting.hz != null -> "настройка"
+                        else -> "авто: Hyundai CN7"
+                    }
                     log("BRIDGE музыка $rate Гц, ресэмпл $MEDIA_RATE→$rate ($why)", true)
                 }
                 mediaRateLogged = rate
@@ -911,6 +1012,26 @@ class AaBridgeCore(
         musicStatus(0)
     }
 
+    /**
+     * Тишина сразу после TTS_INIT (VW CNS3 20082122, h222: шипение в начале подсказки). Baidu копит фразу
+     * и шлёт её пачкой по 4096 Б быстрее реального времени (NaviTTSController.splitAndSendTTSData), у ГУ
+     * есть запас; AA отдаёт речь в реальном времени с первого пакета, запаса нет. Нули дают ГУ открыть
+     * тракт на тишине и держат буфер на TTS_PREROLL_MS впереди до конца фразы.
+     */
+    private fun sendTtsPreroll() {
+        val zeros = ByteArray(TTS_PREROLL_BYTES)
+        var off = 0
+        while (off < zeros.size) {
+            val n = minOf(TTS_PREROLL_CHUNK, zeros.size - off)
+            if (!link.sendAudio(CarlifeAudio.CH_TTS, CarlifeAudio.TTS_DATA, zeros.copyOfRange(off, off + n))) {
+                log("BRIDGE TTS пре-ролл: очередь полна, отправлено ${off * 1000 / TTS_BYTES_PER_SEC} из $TTS_PREROLL_MS мс", true)
+                return
+            }
+            off += n
+        }
+        log("BRIDGE TTS пре-ролл $TTS_PREROLL_MS мс тишины (${zeros.size} Б) после INIT", true)
+    }
+
     /** Фактический TTS_STOP (таймер debounce); после него MEDIA-пакеты ждут ещё MEDIA_AFTER_TTS_MS. */
     private fun ttsStopNow() {
         stopAudio(CarlifeAudio.CH_TTS)
@@ -971,6 +1092,7 @@ class AaBridgeCore(
             return
         }
         routeNaviHeld = on
+        if (on) naviEndPending = false
         if (on && !naviSent) {
             if (link.sendModuleStatus(CarlifeAudio.MODULE_NAVI, 1)) {
                 naviSent = true
@@ -981,6 +1103,7 @@ class AaBridgeCore(
             link.sendModuleStatus(CarlifeAudio.MODULE_NAVI, 0)
             log("BRIDGE CarLife MODULE_STATUS NAVI=0 (маршрут закончен)", true)
         } else if (!on && naviSent) {
+            naviEndPending = true
             log("BRIDGE маршрут закончен, NAVI=1 держит TTS", false)
         }
     }
@@ -997,6 +1120,21 @@ class AaBridgeCore(
             link.sendAudio(ch, CarlifeAudio.stopType(ch), ByteArray(0))
             log("BRIDGE CarLife ${chName(ch)} STOP (0x%08x)".format(CarlifeAudio.stopType(ch)), true)
         }
+        if (ch == CarlifeAudio.CH_TTS) releaseTtsNavi()
+    }
+
+    /**
+     * TTS закончился: NAVI больше не нужен ради него. Если маршрут уже кончился (последнее «Вы прибыли» играло
+     * после INACTIVE), NAVI=0 уходит здесь, иначе приборка остаётся в навигации до конца сессии.
+     */
+    private fun releaseTtsNavi() {
+        ttsNaviHeld = false
+        if (naviEndPending && naviSent && !routeNaviHeld) {
+            naviEndPending = false
+            naviSent = false
+            link.sendModuleStatus(CarlifeAudio.MODULE_NAVI, 0)
+            log("BRIDGE CarLife MODULE_STATUS NAVI=0 (TTS закончился, маршрута нет)", true)
+        }
     }
 
     /** Сброс звукового состояния CarLife-сессии (START / закрытие): ссылка уже новая или мёртвая, ничего не шлём. */
@@ -1005,6 +1143,7 @@ class AaBridgeCore(
         ttsStopTimer.cancel()
         mediaReleaseTimer.cancel()
         naviSent = false
+        naviEndPending = false
         ttsNaviHeld = false
         mediaPaused = false
         mediaGuard = false
@@ -1098,6 +1237,8 @@ class AaBridgeCore(
             waitSince = 0
             sent++
             idrSent++
+            lastIdrSentMs = clockMs()
+            h295IdrSeen(b, payload)
             if (active != Source.AA) {
                 active = Source.AA
                 log("BRIDGE источник -> AA (первый IDR ${payload.size} Б, nal=${AnnexB.nalTypes(payload)})", true)
@@ -1108,7 +1249,8 @@ class AaBridgeCore(
             AaState.status = "мост: AA -> CarLife"
             return
         }
-        if (!link.sendVideo(b)) {
+        val out = h295Prepare(b, types)
+        if (!link.sendVideo(out)) {
             // кадр потерян: декодер ГУ поплывёт, ждём новый IDR
             gotIdr = false
             waitSince = clockMs()
@@ -1116,7 +1258,11 @@ class AaBridgeCore(
             return
         }
         sent++
-        if (5 in types) idrSent++
+        if (5 in types) {
+            idrSent++
+            lastIdrSentMs = clockMs()
+            h295IdrSeen(b, out)
+        }
         AaState.bridgeSent = sent
     }
 
@@ -1131,8 +1277,10 @@ class AaBridgeCore(
     @Synchronized
     fun tick() {
         logStats()
-        if (!carlifeStarted || gotIdr || !aaVideoSeen) return
+        if (!carlifeStarted) return
         val now = clockMs()
+        h295GiveUp(now)
+        if (gotIdr || !aaVideoSeen) return
         if (waitSince == 0L) waitSince = now
         if (now - waitSince >= KEYFRAME_WAIT_MS && now - lastKeyframeRequest >= KEYFRAME_RETRY_MS) {
             lastKeyframeRequest = now
@@ -1152,6 +1300,12 @@ class AaBridgeCore(
             transcoder = t
             if (t == null) {
                 log("BRIDGE !!!!!! транскодер не поднялся (MediaCodec), откат на passthrough", true)
+                val g = videoMode
+                if (g is CustomVideoMode) {
+                    // TODO: откат на R720 пересозданием хоста; пока ГУ ждёт кадр out, а получит кадр подложки AA с полями
+                    log("BRIDGE !!!!!! своё разрешение ${g.outW}x${g.outH} без транскодера не получится: ГУ ждёт ${g.outW}x${g.outH}, " +
+                        "а уйдёт кадр AA ${g.aaResolution} с полями ${g.marginW}x${g.marginH}. Выключите «Своё разрешение» или задайте другой размер", true)
+                }
                 return
             }
         }
@@ -1352,6 +1506,15 @@ class AaBridgeCore(
     }
 
     companion object {
+        /** CarlifeThemeState.themeModes (SkinDisplayModeManager в CarLife 8.6.7). */
+        const val THEME_LIGHT = 0
+        const val THEME_DARK = 1
+        const val THEME_AUTO = 2
+
+        fun themeName(mode: Int) = when (mode) {
+            THEME_LIGHT -> "светлая"; THEME_DARK -> "тёмная"; THEME_AUTO -> "авто"; else -> "?"
+        }
+
         /** action&255 TOUCH_ACTION, которые уходят в AA (у AA те же коды PointerAction). */
         private val TOUCH_NAMES = mapOf(
             AapMessages.TOUCH_DOWN to "DOWN", AapMessages.TOUCH_UP to "UP", AapMessages.TOUCH_MOVE to "MOVE",
@@ -1407,6 +1570,11 @@ class AaBridgeCore(
         const val MEDIA_AFTER_TTS_MS = 300L
         const val VOICE_EXIT_DELAY_MS = 500L
         private const val TTS_DIAG_PACKETS = 3
+        /** Пре-ролл тишины TTS на VW 20082120/20082122/20082134 (h222); 16 кГц моно 16 бит, куски как у Baidu. */
+        const val TTS_PREROLL_MS = 400
+        private const val TTS_BYTES_PER_SEC = 16000 * 2
+        const val TTS_PREROLL_BYTES = TTS_PREROLL_MS * TTS_BYTES_PER_SEC / 1000
+        private const val TTS_PREROLL_CHUNK = 4096
 
         /** Android KEYCODE_SEARCH: в AA запускает голосового ассистента. */
         const val KEYCODE_SEARCH = 84
@@ -1452,6 +1620,12 @@ class AaBridgeCore(
         const val DESAY_MANUFACTURER = "Desay SV Automotive"
         const val DESAY_G6S_MODEL = "G6S"
         const val DESAY_G6S_CHANNEL = "20622116"          // STATISTIC_INFO.channel у Mazda CX-5; Vezel - 20832125, другая Mazda - 21520001
+        /** Префиксы STATISTIC_INFO.channel у Honda (CarLife 1.1.0, HU_INFO пустой, BT «Honda HFT»): 2077xxxx (Civic 11, UR-V), 2083xxxx (Vezel и др.). */
+        val HONDA_CHANNEL_PREFIXES = listOf("2077", "2083")
+
+        fun isHondaChannel(channel: String?) =
+            channel != null && channel.length == 8 && HONDA_CHANNEL_PREFIXES.any { channel.startsWith(it) }
+        const val HONDA_20772121_CHANNEL = "20772121"     // Honda Civic 11 2023 (Китай, h295): после камеры/меню ГУ не просит IDR
         const val VW_20082120_CHANNEL = "20082120"        // VW, protocol 1.0, versionName="RADIO" (h93)
         const val VW_CNS3_20082122_CHANNEL = "20082122"   // VW CNS3 (Tharu и др.): рвёт USB через ~5,6 с PAUSE без heartbeat (h222)
         const val VW_CNS3_20082134_CHANNEL = "20082134"   // VW CNS3 Tiguan L Pro: рвёт CarLife по Wi-Fi через ~5,1-5,7 с PAUSE (h224)
@@ -1459,10 +1633,21 @@ class AaBridgeCore(
         const val VW_BT_1420_MANUFACTURER = "VW BT 1420"  // VW (Павел): HU_INFO manufacturer=model, канал 20082138
         const val VW_20082138_MANUFACTURER = "VW BT 1538"
         const val HYUNDAI_CN7_PRODUCT = "wp_cn7cpe_cn"    // HU_INFO.product Hyundai Elantra CN7 (h218): manufacturer QTI, model "sm6150_au for arm64"
+        const val PIONEER_MANUFACTURER = "Pioneer"        // HU_INFO Pioneer RM56E8B (Dongfeng DF6, h277): manufacturer="Pioneer" model="RM56E8B"
+        const val PIONEER_RM56_MODEL = "RM56E8B"
+        const val PIONEER_RM56_CEILING_BPS = 800_000      // 4-5 Мбит/с рвут USB за 25-30 с, 2 Мбит/с - 195 с, 800 кбит/с - 1301 с; test1: 1 Мбит/с + музыка 32 кГц (~1 Мбит/с PCM) рвёт за 23-140 с
+        const val PIONEER_RM56_MAX_FPS = 10
         const val MEDIA_RATE = 48000
         const val MEDIA_RATE_CN7 = 32000
+        const val MEDIA_RATE_PIONEER_RM56 = 22050         // h277: музыка 32 кГц добавляла на USB ~1 Мбит/с, 22,05 кГц - вдвое меньше
         const val KEYFRAME_WAIT_MS = 1500L
         const val KEYFRAME_RETRY_MS = 4000L
+
+        /** h295: тач на ГУ 20772121 при IDR старше этого порога в passthrough - вероятно, ГУ сбросил декодер (камера/меню). */
+        const val H295_IDR_STALE_MS = 2500L
+        const val H295_TRIGGER_MIN_MS = 3000L
+        const val H295_TOUCH_IDLE_MS = 4000L      // пауза в тачах от ГУ перед триггером (камера/меню)
+        const val H295_WAIT_GIVEUP_MS = 10_000L   // после цикла ждём IDR для лога и склейки SPS/PPS не дольше этого
         private const val NEVER = Long.MIN_VALUE / 4
     }
 }

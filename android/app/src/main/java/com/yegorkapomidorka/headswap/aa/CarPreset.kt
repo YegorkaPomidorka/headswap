@@ -22,6 +22,10 @@ private val KOREAN = CarSettings(fps = FpsSetting.FPS15, musicRate = MusicRate.H
  * Имя элемента хранится в prefs: не переименовывать.
  */
 enum class CarPreset(val titleRes: Int, val settings: CarSettings = CarSettings()) {
+    /** ГУ 1920×640 (h269). */
+    CITROEN_C5_X(R.string.car_citroen_c5_x, CarSettings(videoMode = VideoMode.WIDE_640)),
+    /** Экран 1024×600, слабый USB ГУ (h277): мост сам форсирует перекодирование и потолок 800 кбит/с. */
+    DONGFENG_DF6_2023(R.string.car_dongfeng_df6_2023, CarSettings(videoMode = VideoMode.R1024)),
     PEUGEOT_5008_2024(R.string.car_peugeot_5008_2024),
     HONDA_BREEZE_2(R.string.car_honda_breeze_2),
     /** h243: 1920×1080, «работает достойно». */
@@ -45,7 +49,8 @@ enum class CarPreset(val titleRes: Int, val settings: CarSettings = CarSettings(
     /** yftech: заработало на 15 кадрах (h10, h41). */
     MITSUBISHI_OUTLANDER_4(R.string.car_mitsubishi_outlander_4, CarSettings(fps = FpsSetting.FPS15)),
     SKODA_KAMIQ_GT_2021(R.string.car_skoda_kamiq_gt_2021),
-    SKODA_OCTAVIA_PRO(R.string.car_skoda_octavia_pro),
+    /** CNS3 просит 2:1, 1280×640 (h292); на 1080p виснет (h305). */
+    SKODA_OCTAVIA_PRO(R.string.car_skoda_octavia_pro, CarSettings(videoMode = VideoMode.WIDE_2_1)),
     TOYOTA_COROLLA_CROSS_2024(R.string.car_toyota_corolla_cross_2024),
     TOYOTA_LEVIN(R.string.car_toyota_levin),
     /** Китай: 1920×1080, 30 кадров (Егор, 18.10). */

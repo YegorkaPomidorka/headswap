@@ -27,6 +27,13 @@ class CarPresetTest {
     }
 
     @Test
+    fun newResolutionPresets() {
+        assertEquals(VideoMode.WIDE_640, CarPreset.CITROEN_C5_X.settings.videoMode)
+        assertEquals(VideoMode.WIDE_2_1, CarPreset.SKODA_OCTAVIA_PRO.settings.videoMode)
+        assertEquals(VideoMode.R1024, CarPreset.DONGFENG_DF6_2023.settings.videoMode)
+    }
+
+    @Test
     fun parse() {
         for (p in CarPreset.values()) assertEquals(p, CarPreset.parse(p.name))
         assertNull(CarPreset.parse(null))

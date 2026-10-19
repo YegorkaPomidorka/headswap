@@ -18,7 +18,7 @@ import com.yegorkapomidorka.headswap.aa.ThermalLevel
 import com.yegorkapomidorka.headswap.aa.ThermalSource
 import com.yegorkapomidorka.headswap.aa.ThermalThrottle
 import com.yegorkapomidorka.headswap.aa.TranscodeOutput
-import com.yegorkapomidorka.headswap.aa.VideoMode
+import com.yegorkapomidorka.headswap.aa.VideoGeometry
 import com.yegorkapomidorka.headswap.aa.VideoQueueLimit
 import com.yegorkapomidorka.headswap.aa.VideoTranscoder
 import java.util.concurrent.Executors
@@ -56,11 +56,13 @@ class CarLifeSession(
     private val bridge: AaBridgeCore,
     /** Нагрев телефона: по нему перекодирование снижает fps и битрейт. */
     private val thermal: ThermalSource = ThermalSource.NONE,
+    /** Размер кадра из VIDEO_ENCODER_INIT ГУ (для подсказки «Как просит ГУ» в разделе для разработчиков). */
+    private val onHuSize: (Int, Int) -> Unit = { _, _ -> },
     private val onClosed: (String) -> Unit,
 ) : VideoSource.Listener, CarlifeLink {
 
     /** Видео-режим хоста, снятый при подключении: одинаков для INIT_DONE, энкодера и тача в течение всей сессии. */
-    private val mode: VideoMode = bridge.videoMode
+    private val mode: VideoGeometry = bridge.videoMode
 
     /** Транспорт сессии: usb-aoa, tcp-debug или tcp6. */
     val transportKind: String get() = transport.caps.kind
@@ -134,6 +136,7 @@ class CarLifeSession(
     private var vBeats = 0L
     private var vDropped = 0L
     private var audioTx = 0L
+    private var ttsTxSinceInit = 0       // TTS_DATA после последнего TTS_INIT: первые TTS_TX_LOGGED с временем отправки
     @Volatile private var micRxPackets = 0L
     @Volatile private var micRxBytes = 0L
     /** Когда сами слали MODULE_STATUS VR=1: ответный MODULE_CONTROL VR=1 сразу после него считаем эхом. */
@@ -157,7 +160,7 @@ class CarLifeSession(
         WLog.ev(WLog.LINK, "session", "transport" to transport.caps.kind)
         if (air) {
             WLog.ev(WLog.VIDEO, "policy", "profile" to bitratePolicy.profile.name, "startKbps" to bitratePolicy.startBps / 1000,
-                "ceilingKbps" to bitratePolicy.ceilingBps / 1000, "mode" to mode.name, "transcode" to bridge.transcodeEnabled)
+                "ceilingKbps" to bitratePolicy.ceilingBps / 1000, "mode" to mode.label, "transcode" to bridge.transcodeEnabled)
         }
         CarLifeState.status = "соединено, жду HU_PROTOCOL_VERSION"
         transport.start(::dispatch, ::logTx, ::close)
@@ -346,8 +349,16 @@ class CarLifeSession(
                 AppLog.i("== ГУ просит JPEG-режим видео: отвечаю ACK, но шлю только H.264")
                 sendCmd(Msg.VIDEO_ENCODER_JPEG_ACK, null)
             }
-            Msg.REQUEST_MD_THEME_STATE -> sendCmd(Msg.RESPONSE_MD_THEME_STATE, Msgs.themeState(THEME_LIGHT))
-            Msg.CHANGE_MD_THEME -> AppLog.i("== CHANGE_MD_THEME ${PbText.render(m.body, Schemas.themeState)}")
+            Msg.REQUEST_MD_THEME_STATE -> {
+                // наша тема = последняя, что прислало ГУ (её же показывает AA), до CHANGE_MD_THEME - светлая
+                val mode = bridge.huTheme
+                AppLog.i("== REQUEST_MD_THEME_STATE: отвечаю themeModes=$mode (${AaBridgeCore.themeName(mode)})")
+                sendCmd(Msg.RESPONSE_MD_THEME_STATE, Msgs.themeState(mode))
+            }
+            Msg.CHANGE_MD_THEME -> {
+                AppLog.i("== CHANGE_MD_THEME ${PbText.render(m.body, Schemas.themeState)}")
+                bridge.onCarlifeTheme(PbReader.parse(m.body)?.let { PbReader.int(it, 1) })
+            }
             Msg.HU_AUTHEN_RESULT -> {
                 val f = PbReader.parse(m.body)
                 val ok = f?.let { PbReader.int(it, 1) }
@@ -422,13 +433,15 @@ class CarLifeSession(
             AppLog.i("видео: FRAME_RATE_CHANGE fps=$fps, настройка фиксирована на $fixed: отвечаю DONE, частоту не меняю")
             return
         }
-        val applied = maxOf(fps, Handshake.MIN_APPLIED_FPS)
+        val wanted = maxOf(fps, Handshake.MIN_APPLIED_FPS)
+        val applied = Handshake.capFps(wanted, huMaxFps())
         val old = targetFps
         targetFps = applied
         val capped = thermalThrottle.capFps(applied)
         val live = bridge.setTargetFps(capped)
+        val hu = if (applied != wanted) ", потолок ГУ $applied" else ""
         val heat = if (capped != applied) ", из-за нагрева $capped" else ""
-        AppLog.i("видео: FRAME_RATE_CHANGE fps=$fps, целевой fps $old -> $applied$heat${if (live) "" else " (транскодер ещё не создан, применится при старте)"}")
+        AppLog.i("видео: FRAME_RATE_CHANGE fps=$fps, целевой fps $old -> $applied$hu$heat${if (live) "" else " (транскодер ещё не создан, применится при старте)"}")
     }
 
     private fun onVideoInit(m: CmdMsg) {
@@ -437,6 +450,7 @@ class CarLifeSession(
         val rh = f?.let { PbReader.int(it, 2) } ?: 0
         val rf = f?.let { PbReader.int(it, 3) } ?: 0
         requested = "${rw}x$rh fps=$rf"
+        if (rw > 0 && rh > 0) onHuSize(rw, rh)
         AppLog.i("== ГУ ПРОСИТ РАЗРЕШЕНИЕ: ${rw}x$rh fps=$rf")
         WLog.ev(WLog.HS, "VIDEO_ENCODER_INIT", "size" to "${rw}x$rh", "fps" to rf)
         if (videoInited && pendingW > 0) {
@@ -446,8 +460,8 @@ class CarLifeSession(
             return
         }
         // размер задаёт видео-режим (по умолчанию 1280x720 fps 30: ГУ Honda принимает и показывает целиком, проверено в машине)
-        val (w, h, why) = Triple(mode.outW, mode.outH, "мост: режим ${mode.name}")
-        val fps = Handshake.chooseFps(cfg.fpsSetting, rf)
+        val (w, h, why) = Triple(mode.outW, mode.outH, "мост: режим ${mode.label}")
+        val fps = Handshake.chooseFps(cfg.fpsSetting, rf, huMaxFps())
         pendingW = w
         pendingH = h
         pendingFps = fps
@@ -504,7 +518,7 @@ class CarLifeSession(
         if (pendingW <= 0) {
             pendingW = mode.outW
             pendingH = mode.outH
-            chosen = "${mode.outW}x${mode.outH} (START без INIT, мост, режим ${mode.name})"
+            chosen = "${mode.outW}x${mode.outH} (START без INIT, мост, режим ${mode.label})"
         }
         carlifeStarted = true
         synchronized(videoLock) {
@@ -525,7 +539,9 @@ class CarLifeSession(
                 cur.requestKeyFrame()
                 return
             }
-            val s = VideoSource(pendingW, pendingH, pendingFps, if (air) bitratePolicy.current else mode.bitrate, this)
+            // Pioneer RM56E8B (h277): и заглушка на USB не выше потолка ГУ (без setEncoderBitrate: тут держим srcLock)
+            val stubBps = if (bridge.huPioneerRm56) minOf(mode.bitrate, AaBridgeCore.PIONEER_RM56_CEILING_BPS) else mode.bitrate
+            val s = VideoSource(pendingW, pendingH, pendingFps, if (air) bitratePolicy.current else stubBps, this)
             s.banner = text
             try {
                 s.start()
@@ -618,7 +634,7 @@ class CarLifeSession(
             if (qf > maxQueueFrames) maxQueueFrames = qf
             val real = VideoQueueLimit.backlogMs(transport.queuedVideoBytes, rate)
             val sinceOverflow = lastOverflowMs.let { if (it == NEVER_MS) -1L else now - it }
-            applyVwCeiling()
+            applyHuCeilings()
             val old = bitratePolicy.current
             val bps = bitratePolicy.update(now, VideoQueueLimit.policyBacklogMs(real, sinceOverflow), rate) ?: return
             if (placeholder?.setBitrate(bps) ?: bridge.setEncoderBitrate(bps)) {
@@ -644,6 +660,27 @@ class CarLifeSession(
         AppLog.i("VW 20082138: потолок битрейта ${bitratePolicy.ceilingBps / 1000} кбит/с (лимит размера IDR)")
         if (bitratePolicy.current != old) bridge.setEncoderBitrate(bitratePolicy.current)
     }
+
+    /**
+     * Pioneer RM56E8B (h277): ГУ рвёт USB EIO за 25-30 с на 4-5 Мбит/с, на ~2 Мбит/с прожила 195 с, стабильно только на 800 кбит/с.
+     * Потолок 1 Мбит/с под флагом ГУ (HU_INFO приходит до INIT, но потолок применяется и на лету). Тепловой потолок
+     * ([BitratePolicy.thermalCapBps]) живёт отдельно и берётся через min в update(), поэтому с ним не конфликтует.
+     */
+    private fun applyPioneerCeiling() {
+        if (!bridge.huPioneerRm56) return
+        val old = bitratePolicy.current
+        if (!bitratePolicy.lowerCeiling(AaBridgeCore.PIONEER_RM56_CEILING_BPS)) return
+        AppLog.i("Pioneer RM56E8B: потолок битрейта ${bitratePolicy.ceilingBps / 1000} кбит/с")
+        if (bitratePolicy.current != old) bridge.setEncoderBitrate(bitratePolicy.current)
+    }
+
+    private fun applyHuCeilings() {
+        applyVwCeiling()
+        applyPioneerCeiling()
+    }
+
+    /** Потолок fps под ГУ (Pioneer RM56E8B: 15), null = без ограничения. */
+    private fun huMaxFps(): Int? = if (bridge.huPioneerRm56) AaBridgeCore.PIONEER_RM56_MAX_FPS else null
 
     /** Страховка VW ID: IDR > 450 КБ - потолок ×0,75 (не ниже 1,5 Мбит/с), не чаще раза в секунду; кадр уже ушёл. */
     override fun onEncodedKeyFrame(size: Int) {
@@ -754,8 +791,24 @@ class CarLifeSession(
         return metaSubmit("MEDIA_PROGRESS_BAR") { sendCmd(Msg.MEDIA_PROGRESS_BAR, Msgs.mediaProgress(progressBar)) }
     }
 
+    private var hondaRoadLogged = false
+
+    /** Honda (channel 2077xxxx/2083xxxx): roadName под ≤24 клетки / ≤31 Б, иначе приборка отбрасывает строку. Остальные ГУ - без изменений. */
+    private fun fitRoad(info: NaviTurnInfo): NaviTurnInfo {
+        if (!bridge.huHonda) return info
+        if (!hondaRoadLogged) {
+            hondaRoadLogged = true
+            AppLog.i("== Honda приборка: roadName подгоняю под ≤24 клетки / ≤31 Б")
+        }
+        val road = HondaClusterRoad.fit(info.roadName)
+        if (road == info.roadName) return info
+        AppLog.i("метаданные: road→\"$road\" (${road.toByteArray(Charsets.UTF_8).size} Б)", ui = false)
+        return NaviTurnInfo(info.action, info.nextTurn, road, info.totalDistance, info.remainDistance, info.timeSeconds)
+    }
+
     override fun sendNaviTurn(info: NaviTurnInfo): Boolean {
         if (!cfg.metaNavi) return false
+        val sent = fitRoad(info)
         return metaSubmit("NAVI_NEXT_TURN_INFO") {
             // конец маршрута (action 3) - иконка пустая, как Baidu onNaviStateChange(false)
             val icon = if (!cfg.naviField6.icon || info.action == 3) ByteArray(0) else turnIcons.getOrPut(info.nextTurn) {
@@ -763,13 +816,13 @@ class CarLifeSession(
                     AppLog.i("метаданные: стрелка nextTurn=${info.nextTurn} ${PbText.blob(it)}", ui = false)
                 }
             }
-            sendCmd(Msg.NAVI_NEXT_TURN_INFO, Msgs.naviNextTurn(info, cfg.naviField6, icon))
+            sendCmd(Msg.NAVI_NEXT_TURN_INFO, Msgs.naviNextTurn(sent, cfg.naviField6, icon))
         }
     }
 
     /** Транскодер моста: декодер AA (кадр режима) -> кроп -> Surface энкодера (выход режима). null, если MediaCodec не поднялся. */
     override fun createTranscoder(out: TranscodeOutput): VideoTranscoder? = try {
-        applyVwCeiling()
+        applyHuCeilings()
         AaTranscoder(
             mode.outW, mode.outH, thermalThrottle.capFps(targetFps), bitratePolicy.current, out, { AppLog.i(it, false) },
             srcWidth = mode.aaW, srcHeight = mode.aaH, crop = mode.crop,
@@ -866,7 +919,9 @@ class CarLifeSession(
             val m = Wire.parseData(inner) ?: return
             if (chan != Ch.VIDEO) { // аудио моста: INIT/STOP всегда, DATA - первые и каждый 200-й
                 audioTx++
-                if (m.data.size <= 16 || audioTx <= 3 || audioTx % 200 == 0L) {
+                if (m.type == CarlifeAudio.TTS_INIT) ttsTxSinceInit = 0
+                val ttsHead = m.type == CarlifeAudio.TTS_DATA && ++ttsTxSinceInit <= TTS_TX_LOGGED
+                if (m.data.size <= 16 || audioTx <= 3 || audioTx % 200 == 0L || ttsHead) {
                     AppLog.i(
                         "TX ${Ch.name(chan)} ${Msg.hex(m.type)} ${Msg.name(m.type)} len=${m.data.size} time=${m.time} #$audioTx" +
                             (if (m.data.size <= 16) " ${Hex.compact(m.data, 16)}" else ""), ui = false
@@ -1086,6 +1141,7 @@ class CarLifeSession(
 
         /** action&255 тача, которые мост переводит в AA: DOWN, UP, MOVE, POINTER_DOWN, POINTER_UP. */
         private val TOUCH_TO_AA = setOf(0, 1, 2, 5, 6)
+        private const val TTS_TX_LOGGED = 8           // TTS_DATA после INIT с временем записи в транспорт (h222)
         private const val MAX_AUDIO_QUEUE = 180       // звук не принимается, если в общей очереди больше пакетов
         private const val BITRATE_POLL_MS = 100L
         private const val VW_20082138_CEILING_BPS = 2_000_000
@@ -1117,9 +1173,6 @@ class CarLifeSession(
         /** moduleID голосового помощника в MODULE_STATUS (ModuleStatusManage: 4 = VR). */
         private const val MODULE_VR = 4
         private const val VR_ECHO_MS = 1500L
-
-        /** SkinDisplayModeManager.getDisplayModeInt: 0 светлая, 1 тёмная, 2 авто. */
-        private const val THEME_LIGHT = 0
 
         /** Поле time видеопакета: unix-секунды (Recorder.sendVideoData :930-962). */
         private fun unixSeconds() = (System.currentTimeMillis() / 1000).toInt()

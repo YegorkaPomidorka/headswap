@@ -96,6 +96,11 @@ class FakePeer : AaPeer {
     override fun sendVideoFocusNative() {
         natives++
     }
+
+    val nights = CopyOnWriteArrayList<Boolean>()
+    override fun sendNightMode(night: Boolean) {
+        nights.add(night)
+    }
 }
 
 class AaBridgeCoreTest {
@@ -110,6 +115,22 @@ class AaBridgeCoreTest {
     private val core = AaBridgeCore({ l, _ -> logs.add(l) }, { now }).also { it.attach(link) }
 
     private fun types(b: ByteArray) = AnnexB.nalTypes(b)
+
+    @Test
+    fun huThemeDrivesAaNightModeAndSurvivesPeerReconnect() {
+        val p = FakePeer()
+        core.peer = p
+        assertEquals(listOf(false), p.nights.toList())        // до CHANGE_MD_THEME - день
+        core.onCarlifeTheme(AaBridgeCore.THEME_DARK)
+        core.onCarlifeTheme(AaBridgeCore.THEME_AUTO)
+        core.onCarlifeTheme(null)                              // без поля - тему не трогаем
+        core.onCarlifeTheme(AaBridgeCore.THEME_DARK)
+        assertEquals(listOf(false, true, false, true), p.nights.toList())
+        assertEquals(AaBridgeCore.THEME_DARK, core.huTheme)
+        val p2 = FakePeer()
+        core.peer = p2                                         // новая AA-сессия получает текущую тему сразу
+        assertEquals(listOf(true), p2.nights.toList())
+    }
 
     @Test
     fun startsWithPlaceholderAndHidesItOnFirstIdrGluedWithConfig() {
@@ -206,6 +227,167 @@ class AaBridgeCoreTest {
         core.tick()
         assertEquals(2, peer.keyframes)
     }
+
+    /** Passthrough, IDR ушёл в now=0, затем P-кадры; peer подключён. */
+    private fun h295Setup(hondaFlag: Boolean): FakePeer {
+        val peer = FakePeer()
+        core.peer = peer
+        if (hondaFlag) core.onHuStatistic(AaBridgeCore.HONDA_20772121_CHANNEL)
+        core.onCarlifeStart()
+        core.onCodecConfig(cfg)
+        core.onFrame(idr, 1)
+        core.onFrame(p1, 2)
+        return peer
+    }
+
+    @Test
+    fun h295TouchAfterIdleAndStaleIdrRequestsKeyframeCycleAndKeepsGateOpen() {
+        val peer = h295Setup(true)
+        val sentBefore = link.sent.size
+        now = 5000
+        core.onCarlifeTouch(0, 10, 10)
+        assertEquals("тач ушёл в AA", 1, peer.touches.size)
+        assertEquals("сразу полный цикл", 1, peer.keyframes)
+        assertTrue(logs.any { it.startsWith("BRIDGE h295: тач после 5000 мс без IDR, пауза в тачах ") && it.endsWith(" мс -> keyframe-цикл") })
+        core.onFrame(p1, 3)                                   // gate открыт: P-кадр проходит
+        assertEquals(sentBefore + 1, link.sent.size)
+        assertArrayEquals(p1, link.sent.last())
+        core.onTouch(0)                                       // второй DOWN ГУ (~2 мс): пауза в тачах ~0, триггера нет
+        assertEquals(1, peer.keyframes)
+        core.tick()                                           // отдельного фолбэка нет
+        assertEquals(1, peer.keyframes)
+        now = 5400
+        core.onFrame(idr, 4)                                  // IDR в обычной ветке (gate открыт), без takeover
+        assertEquals(1, link.takeovers)
+        assertEquals(1, link.hides)
+        core.onFrame(p1, 5)
+        assertArrayEquals(p1, link.sent.last())
+    }
+
+    @Test
+    fun h295AwaitedBareIdrIsGluedWithAaConfig() {
+        h295Setup(true)
+        now = 5000
+        core.onTouch(0)
+        now = 7500
+        core.onFrame(idr, 4)
+        assertArrayEquals(cfg + idr, link.sent.last())
+        assertEquals(listOf(7, 8, 5), types(link.sent.last()))
+        assertTrue(logs.any { it.startsWith("BRIDGE h295: IDR через 2500 мс после тача, nal=[5] -> [7, 8, 5]") })
+        now = 7600
+        core.onFrame(idr, 5)                                  // ожидание закончено: следующий IDR как в main
+        assertArrayEquals(idr, link.sent.last())
+        core.onFrame(p1, 6)
+        assertArrayEquals(p1, link.sent.last())
+    }
+
+    @Test
+    fun h295AwaitedIdrWithInlineSpsPpsIsNotGluedAgain() {
+        h295Setup(true)
+        now = 5000
+        core.onTouch(0)
+        now = 6000
+        core.onFrame(cfg + idr, 4)
+        assertArrayEquals(cfg + idr, link.sent.last())
+        assertTrue(logs.any { it.startsWith("BRIDGE h295: IDR через 1000 мс после тача, nal=[7, 8, 5] -> [7, 8, 5]") })
+    }
+
+    @Test
+    fun h295IdrWithoutTriggerIsNotGlued() {
+        h295Setup(true)
+        now = 100
+        core.onFrame(idr, 4)
+        assertArrayEquals(idr, link.sent.last())
+        now = 2000                                            // IDR свежий: триггера нет и после паузы
+        core.onTouch(0)
+        core.onFrame(idr, 5)
+        assertArrayEquals(idr, link.sent.last())
+        assertTrue(logs.none { it.startsWith("BRIDGE h295: IDR через") })
+    }
+
+    @Test
+    fun h295PFramesAfterTriggerAreNotTouched() {
+        h295Setup(true)
+        now = 5000
+        core.onTouch(0)
+        core.onFrame(p1, 3)
+        assertArrayEquals(p1, link.sent.last())
+    }
+
+    @Test
+    fun h295IdrAfterGiveUpIsNotGlued() {
+        h295Setup(true)
+        now = 5000
+        core.onTouch(0)
+        now = 15_100
+        core.tick()                                           // 10.1 с без IDR: ожидание сброшено
+        core.onFrame(idr, 4)
+        assertArrayEquals(idr, link.sent.last())
+        assertTrue(logs.none { it.startsWith("BRIDGE h295: IDR через") })
+    }
+
+    @Test
+    fun h295NoTriggerIfPreviousTouchWasLessThanIdleAgo() {
+        val peer = h295Setup(true)
+        now = 1000
+        core.onTouch(0)                                       // IDR свежий, но тач запомнен
+        now = 3000
+        core.onTouch(2)                                       // MOVE тоже считается тачем
+        now = 6900                                            // IDR старый, прошлый тач 3.9 с назад (< 4 с)
+        core.onTouch(0)
+        assertEquals("пауза 3.9 с < 4 с", 0, peer.keyframes)
+        now = 10_900                                          // прошлый тач ровно 4 с назад
+        core.onTouch(0)
+        assertEquals(1, peer.keyframes)
+    }
+
+    @Test
+    fun h295FreshIdrDoesNotTriggerEvenAfterIdle() {
+        val peer = h295Setup(true)
+        now = 2000                                            // IDR 2 с назад (<= 2.5 с)
+        core.onTouch(0)
+        assertEquals(0, peer.keyframes)
+    }
+
+    @Test
+    fun h295RateLimitsRepeatedTriggers() {
+        val peer = h295Setup(true)
+        now = 5000
+        core.onTouch(0)
+        assertEquals(1, peer.keyframes)
+        now = 9100                                            // пауза 4.1 с, но с триггера 4.1 с > 3 с: можно снова
+        core.onTouch(0)
+        assertEquals(2, peer.keyframes)
+        now = 13_200
+        core.onFrame(idr, 4)
+        now = 20_000
+        core.tick()
+        assertEquals("tick циклов не добавляет", 2, peer.keyframes)
+    }
+
+    @Test
+    fun h295DoesNothingWithoutHondaFlag() {
+        val peer = h295Setup(false)
+        now = 60_000
+        core.onTouch(0)
+        assertEquals(0, peer.keyframes)
+        core.onFrame(p1, 3)
+        assertArrayEquals(p1, link.sent.last())               // gate открыт
+    }
+
+    @Test
+    fun h295MoveUpAreNotTriggersAndAttachResetsFlag() {
+        val peer = h295Setup(true)
+        now = 60_000
+        core.onTouch(2)                                       // MOVE - не триггер
+        core.onTouch(1)                                       // UP - не триггер
+        assertEquals(0, peer.keyframes)
+        assertTrue(core.huHonda20772121)
+        core.attach(link)                                     // новая сессия сбрасывает флаг ГУ
+        assertFalse(core.huHonda20772121)
+    }
+
+    private fun AaBridgeCore.onTouch(action: Int) = onCarlifeTouch(action, 10, 10)
 
     @Test
     fun keyframeRequestWaitsForDelayWhenAaVideoAppearsAfterStart() {
@@ -672,6 +854,43 @@ class AaBridgeAudioTest {
         assertEquals(2, link.modules.count { it == 2 to 1 })             // флаг сброшен: в новой сессии снова NAVI=1
         core.onCarlifeClosed(link)
         assertEquals(1, link.modules.count { it == 2 to 0 })             // закрытие сессии NAVI=0 не шлёт (USB мёртв)
+    }
+
+    @Test
+    fun vwCns3TtsGetsSilencePrerollAfterInitOnlyOnRealInit() {
+        core.onHuInfo("Volkswagen", "CNS3")
+        core.onHuStatistic("20082122")                                   // h222: шипение в начале подсказки
+        core.onCarlifeStart()
+        val speech = pcm(2048, 7)
+        core.onAudioStart(SPEECH)
+        core.onAudioData(SPEECH, speech, 1)
+        val tts = link.audio.filter { it.chan == 4 }
+        assertEquals(0x40001, tts[0].type)
+        val pre = tts.drop(1).dropLast(1)
+        assertEquals(listOf(4096, 4096, 4096, 512), pre.map { it.payload.size })  // 400 мс 16 кГц моно = 12800 Б кусками Baidu
+        assertTrue(pre.all { p -> p.type == 0x40003 && p.payload.all { it == 0.toByte() } })
+        assertArrayEquals(speech, tts.last().payload)                    // речь после тишины, без изменений
+        // STOP отменён новым START: INIT не повторяется, пре-ролла тоже нет
+        core.onAudioStop(SPEECH)
+        timers.advance(1000)
+        core.onAudioStart(SPEECH)
+        core.onAudioData(SPEECH, speech, 2)
+        assertEquals(tts.size + 1, link.audio.count { it.chan == 4 })
+        // после настоящего TTS_STOP следующий INIT снова с пре-роллом
+        core.onAudioStop(SPEECH)
+        timers.advance(1500)
+        val before = link.audio.size
+        core.onAudioData(SPEECH, speech, 3)
+        assertEquals(listOf(0x40001) + List(5) { 0x40003 }, link.audio.drop(before).map { it.type })
+    }
+
+    @Test
+    fun ttsWithoutVwFlagHasNoPreroll() {
+        core.onHuInfo("", "")
+        core.onHuStatistic("20622116")                                   // Desay: другая ГУ
+        core.onCarlifeStart()
+        core.onAudioData(SPEECH, pcm(640), 1)
+        assertEquals(listOf(0x40001, 0x40003), link.audio.map { it.type })
     }
 
     @Test

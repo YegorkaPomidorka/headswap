@@ -13,54 +13,37 @@ data class VideoCrop(val u0: Float, val v0: Float, val u1: Float, val v1: Float)
 }
 
 /**
- * Разрешение видео: единственный источник правды для AA (SDR), выхода CarLife (INIT_DONE, энкодер), кропа и тача.
- * Режим снимается один раз на подключение (AaBridgeCore.videoMode) и дальше везде берётся оттуда, prefs не читаются.
+ * Геометрия видео: единственный источник правды для AA (SDR), выхода CarLife (INIT_DONE, энкодер), кропа и тача.
+ * Снимается один раз на подключение (AaBridgeCore.videoMode) и дальше везде берётся оттуда, prefs не читаются.
+ * Реализуют пресет [VideoMode] и пользовательский [CustomVideoMode].
  */
-enum class VideoMode(
-    val titleRes: Int,
-    val subRes: Int,
+interface VideoGeometry {
     /** Разрешение AA в SDR (SDR-строка AapMessages.serviceDiscoveryResponse). */
-    val aaResolution: String,
+    val aaResolution: String
+    val aaW: Int
+    val aaH: Int
     /** Поля margin_width / margin_height в VideoConfiguration SDR (суммарно, делятся пополам по краям). */
-    val marginW: Int,
-    val marginH: Int,
-    val density: Int,
+    val marginW: Int
+    val marginH: Int
+    val density: Int
     /** Размер кадра, который уходит на ГУ (INIT_DONE и энкодер). */
-    val outW: Int,
-    val outH: Int,
-    val bitrate: Int,
-) {
-    R800(R.string.video_r800_title, R.string.video_r800_sub, "800x480", 0, 0, 120, 800, 480, 4_000_000),
-    R720(R.string.video_r720_title, R.string.video_r720_sub, "1280x720", 0, 0, 160, 1280, 720, 4_000_000),
-    /** 720×1280 - портрет для вертикальных ГУ (h291: экран 960×1280, штатный AA рисует вертикальный Coolwalk). */
-    P720(R.string.video_p720_title, R.string.video_p720_sub, "720x1280", 0, 0, 160, 720, 1280, 4_000_000),
-    /**
-     * 960×1104 - видимая область вертикальной ГУ 960×1280 между шапкой и климатом (h291, штатный AA рисует туда, ширина 600 dp):
-     * из кадра AA 1080×1920 вырезается центр 1080×1242 и масштабируется ×0,889, density 288 = 600 dp по ширине.
-     */
-    P_1104(R.string.video_p1104_title, R.string.video_p1104_sub, "1080x1920", 0, 678, 288, 960, 1104, 6_000_000),
-    R1080(R.string.video_r1080_title, R.string.video_r1080_sub, "1920x1080", 0, 0, 240, 1920, 1080, 8_000_000),
-    R1440(R.string.video_r1440_title, R.string.video_r1440_sub, "2560x1440", 0, 0, 320, 2560, 1440, 12_000_000),
-    WIDE(R.string.video_wide_title, R.string.video_wide_sub, "1280x720", 0, 240, 160, 1280, 480, 4_000_000),
-    /** 1728×648 - нативный экран Desay SV G6S (Мазда): из кадра AA 1920×1080 вырезается центр, поля по обеим осям. */
-    WIDE_MID(R.string.video_wide_mid_title, R.string.video_wide_mid_sub, "1920x1080", 192, 432, 160, 1728, 648, 5_000_000),
-    WIDE_HD(R.string.video_wide_hd_title, R.string.video_wide_hd_sub, "1920x1080", 0, 360, 160, 1920, 720, 6_000_000),
-    /** 2240×976 - окно CarLife на VW CNS3 (Tiguan L Pro, экран 2240×1260 с полосами штатного ГУ): из кадра AA 1920×1080 вырезается центральная полоса 1920×836 и масштабируется ×1,167. */
-    WIDE_976(R.string.video_wide_976_title, R.string.video_wide_976_sub, "1920x1080", 0, 244, 160, 2240, 976, 8_000_000);
+    val outW: Int
+    val outH: Int
+    val bitrate: Int
 
-    val aaW: Int = aaResolution.substringBefore('x').toInt()
-    val aaH: Int = aaResolution.substringAfter('x').toInt()
+    /** Короткая метка для логов: имя enum или «custom 2240x976». */
+    val label: String
 
     /** Кроп транскодера: центральная полоса без margin-ов (AA рисует интерфейс только внутри них). */
-    val crop: VideoCrop =
-        if (marginW == 0 && marginH == 0) VideoCrop.NONE
+    val crop: VideoCrop
+        get() = if (marginW == 0 && marginH == 0) VideoCrop.NONE
         else VideoCrop(marginW / 2f / aaW, marginH / 2f / aaH, 1f - marginW / 2f / aaW, 1f - marginH / 2f / aaH)
 
     /** Кроп возможен только при перекодировании: в passthrough WIDE недоступен. */
     val needsTranscode: Boolean get() = !crop.isNone
 
-    /** Режим, который реально применится при данном переключателе перекодирования. */
-    fun effective(transcode: Boolean): VideoMode = if (!transcode && needsTranscode) R720 else this
+    /** Геометрия, которая реально применится при данном переключателе перекодирования. */
+    fun effective(transcode: Boolean): VideoGeometry = if (!transcode && needsTranscode) VideoMode.R720 else this
 
     /** Метка выхода для UI: «1280×720». */
     val outLabel: String get() = "${outW}×$outH"
@@ -84,17 +67,64 @@ enum class VideoMode(
     /** Density, которая уйдёт в SDR: ручная из настроек или своя у режима (AaDensity.AUTO). На кроп и тач не влияет. */
     fun densityFor(densityOverride: Int): Int = if (densityOverride == AaDensity.AUTO) density else densityOverride
 
-    /** Опции SDR для AA этого режима; densityOverride - ручной DPI интерфейса AA (AaDensity.AUTO = density режима). */
+    /** Опции SDR для AA этой геометрии; densityOverride - ручной DPI интерфейса AA (AaDensity.AUTO = density режима). */
     fun sdOptions(fullAudio: Boolean, densityOverride: Int = AaDensity.AUTO, carMake: String? = null) = AapSdOptions(
         resolution = aaResolution, density = densityFor(densityOverride), marginW = marginW, marginH = marginH, fullAudio = fullAudio,
         carMake = carMake,
     )
 
+    /** Строка для лога. */
+    fun describe(densityOverride: Int = AaDensity.AUTO): String
+}
+
+/** Разрешение видео - пресет. */
+enum class VideoMode(
+    val titleRes: Int,
+    val subRes: Int,
+    override val aaResolution: String,
+    override val marginW: Int,
+    override val marginH: Int,
+    override val density: Int,
+    override val outW: Int,
+    override val outH: Int,
+    override val bitrate: Int,
+) : VideoGeometry {
+    R800(R.string.video_r800_title, R.string.video_r800_sub, "800x480", 0, 0, 120, 800, 480, 4_000_000),
+    /** 1024×600 - частое разрешение китайских ГУ (Pioneer RM56E8B, h277): из кадра AA 1280×720 вырезается центр 1024×600, 1:1. */
+    R1024(R.string.video_r1024_title, R.string.video_r1024_sub, "1280x720", 256, 120, 160, 1024, 600, 2_000_000),
+    R720(R.string.video_r720_title, R.string.video_r720_sub, "1280x720", 0, 0, 160, 1280, 720, 4_000_000),
+    /** 720×1280 - портрет для вертикальных ГУ (h291: экран 960×1280, штатный AA рисует вертикальный Coolwalk). */
+    P720(R.string.video_p720_title, R.string.video_p720_sub, "720x1280", 0, 0, 160, 720, 1280, 4_000_000),
+    /**
+     * 960×1104 - видимая область вертикальной ГУ 960×1280 между шапкой и климатом (h291, штатный AA рисует туда, ширина 600 dp):
+     * из кадра AA 1080×1920 вырезается центр 1080×1242 и масштабируется ×0,889, density 288 = 600 dp по ширине.
+     */
+    P_1104(R.string.video_p1104_title, R.string.video_p1104_sub, "1080x1920", 0, 678, 288, 960, 1104, 6_000_000),
+    R1080(R.string.video_r1080_title, R.string.video_r1080_sub, "1920x1080", 0, 0, 240, 1920, 1080, 8_000_000),
+    R1440(R.string.video_r1440_title, R.string.video_r1440_sub, "2560x1440", 0, 0, 320, 2560, 1440, 12_000_000),
+    WIDE(R.string.video_wide_title, R.string.video_wide_sub, "1280x720", 0, 240, 160, 1280, 480, 4_000_000),
+    /** 1728×648 - нативный экран Desay SV G6S (Мазда): из кадра AA 1920×1080 вырезается центр, поля по обеим осям. */
+    WIDE_MID(R.string.video_wide_mid_title, R.string.video_wide_mid_sub, "1920x1080", 192, 432, 160, 1728, 648, 5_000_000),
+    WIDE_HD(R.string.video_wide_hd_title, R.string.video_wide_hd_sub, "1920x1080", 0, 360, 160, 1920, 720, 6_000_000),
+    /** 1920×640 - экран Citroen C5 X (ГУ просит 1920×640, h269): из кадра AA 1920×1080 вырезается центральная полоса 1920×640. */
+    WIDE_640(R.string.video_wide_640_title, R.string.video_wide_640_sub, "1920x1080", 0, 440, 160, 1920, 640, 6_000_000),
+    /** 1280×640 - экран Skoda Octavia A8 Pro (ГУ SKODA CNS3 просит 1280×640, h292): из кадра AA 1280×720 вырезается центральная полоса 1280×640, 1:1. */
+    WIDE_2_1(R.string.video_wide_2_1_title, R.string.video_wide_2_1_sub, "1280x720", 0, 80, 160, 1280, 640, 4_000_000),
+    /** 2240×976 - окно CarLife на VW CNS3 (Tiguan L Pro, экран 2240×1260 с полосами штатного ГУ): из кадра AA 1920×1080 вырезается центральная полоса 1920×836 и масштабируется ×1,167. */
+    WIDE_976(R.string.video_wide_976_title, R.string.video_wide_976_sub, "1920x1080", 0, 244, 160, 2240, 976, 8_000_000);
+
+    override val aaW: Int = aaResolution.substringBefore('x').toInt()
+    override val aaH: Int = aaResolution.substringAfter('x').toInt()
+    override val label: String get() = name
+
+    /** Режим, который реально применится при данном переключателе перекодирования. */
+    override fun effective(transcode: Boolean): VideoMode = if (!transcode && needsTranscode) R720 else this
+
     /**
      * Строка для лога: «видео-режим WIDE: AA 1280x720 margins 0x240 density 160, CarLife 1280x480, кроп v 0.167..0.833».
      * С ручным DPI: «density 200 (вручную, авто 160)».
      */
-    fun describe(densityOverride: Int = AaDensity.AUTO): String {
+    override fun describe(densityOverride: Int): String {
         fun f(v: Float) = String.format(Locale.US, "%.3f", v)
         val cropText = if (crop.isNone) "без кропа" else buildString {
             append("кроп")
@@ -110,6 +140,93 @@ enum class VideoMode(
 
         /** По имени из prefs; неизвестное/пустое = по умолчанию. */
         fun parse(key: String?): VideoMode = values().firstOrNull { it.name == key } ?: DEFAULT
+    }
+}
+
+/** Причина, по которой размер для [CustomVideoMode] не принимается. */
+enum class CustomResError { WIDTH_RANGE, HEIGHT_RANGE, ODD, PORTRAIT }
+
+/**
+ * Своё разрешение (раздел для разработчиков): кадр outW×outH для ГУ, который строится как в WIDE-режимах:
+ * подложка AA (800x480, 1280x720 или 1920x1080) + поля + кроп центра и масштаб в транскодере.
+ * Наименьшая подложка, в которую кадр влезает целиком = поля, масштаб 1:1. Шире 1920 - аспект вписывается в 1920x1080
+ * и область растягивается до кадра (как WIDE_976). Только с перекодированием. Все поля, кроме outW/outH, вычисляются,
+ * поэтому сравнение по значению (data class) покрывает всю геометрию.
+ * Конструктор не проверяет диапазон (так воспроизводятся и старые пресеты вроде 1024x600); для ввода пользователя - [from].
+ */
+data class CustomVideoMode(override val outW: Int, override val outH: Int) : VideoGeometry {
+    private val plate: Pair<Int, Int> = plateFor(outW, outH)
+    private val area: Pair<Int, Int> = areaFor(outW, outH, plate)
+
+    override val aaW: Int get() = plate.first
+    override val aaH: Int get() = plate.second
+    override val aaResolution: String get() = "${aaW}x$aaH"
+    override val marginW: Int get() = plate.first - area.first
+    override val marginH: Int get() = plate.second - area.second
+    override val density: Int get() = DENSITY
+    override val label: String get() = "custom ${outW}x$outH"
+
+    /** Размер области интерфейса AA (подложка без полей), которая масштабируется в кадр. */
+    val areaW: Int get() = area.first
+    val areaH: Int get() = area.second
+
+    /** Битрейт растёт с площадью кадра: 4 Мбит/с на 1280x720, в пределах 2..8 Мбит/с. */
+    override val bitrate: Int
+        get() = (BASE_BITRATE.toLong() * outW * outH / (1280L * 720L)).coerceIn(MIN_BITRATE.toLong(), MAX_BITRATE.toLong()).toInt()
+
+    /** Масштаб области до кадра: 1.0 = 1:1. */
+    val scale: Double get() = maxOf(outW.toDouble() / areaW, outH.toDouble() / areaH)
+
+    /** Без перекодирования свой размер недоступен, даже когда полей нет (1280x720): кадр строит только транскодер. */
+    override val needsTranscode: Boolean get() = true
+
+    override fun describe(densityOverride: Int): String {
+        val dens = densityFor(densityOverride)
+        val mbps = bitrate / 1_000_000.0
+        val rate = if (bitrate % 1_000_000 == 0) "${bitrate / 1_000_000}M" else String.format(Locale.US, "%.1fM", mbps)
+        return "custom ${outW}x$outH ← AA $aaResolution поля ${marginW}x$marginH ×${String.format(Locale.US, "%.3f", scale)} dpi $dens $rate"
+    }
+
+    companion object {
+        const val MIN_W = 640
+        const val MAX_W = 2240
+        const val MIN_H = 640
+        const val MAX_H = 1080
+        const val DENSITY = 160
+        const val BASE_BITRATE = 4_000_000
+        const val MIN_BITRATE = 2_000_000
+        const val MAX_BITRATE = 8_000_000
+        private val PLATES = listOf(800 to 480, 1280 to 720, 1920 to 1080)
+        private val MAX_PLATE = PLATES.last()
+
+        /** Почему размер не годится; null = годится. */
+        fun check(w: Int, h: Int): CustomResError? = when {
+            w !in MIN_W..MAX_W -> CustomResError.WIDTH_RANGE
+            h !in MIN_H..MAX_H -> CustomResError.HEIGHT_RANGE
+            w % 2 != 0 || h % 2 != 0 -> CustomResError.ODD
+            w < h -> CustomResError.PORTRAIT
+            else -> null
+        }
+
+        /** Валидный размер -> режим, иначе null. */
+        fun from(w: Int, h: Int): CustomVideoMode? = if (check(w, h) == null) CustomVideoMode(w, h) else null
+
+        /** Итоговая геометрия из prefs: свой размер включён и валиден - он, иначе пресет. Невалидные сохранённые значения = откат на пресет. */
+        fun resolve(enabled: Boolean, w: Int, h: Int, preset: VideoMode): VideoGeometry =
+            (if (enabled) from(w, h) else null) ?: preset
+
+        private fun plateFor(w: Int, h: Int): Pair<Int, Int> =
+            PLATES.firstOrNull { w <= it.first && h <= it.second } ?: MAX_PLATE
+
+        private fun even(v: Double): Int = (Math.round(v / 2.0) * 2).toInt()
+
+        private fun areaFor(w: Int, h: Int, plate: Pair<Int, Int>): Pair<Int, Int> {
+            if (w <= plate.first && h <= plate.second) return w to h
+            // не влезает ни в одну подложку: аспект вписывается в 1920x1080
+            val (pw, ph) = MAX_PLATE
+            return if (w.toDouble() / h >= pw.toDouble() / ph) pw to even(pw.toDouble() * h / w)
+            else even(ph.toDouble() * w / h) to ph
+        }
     }
 }
 

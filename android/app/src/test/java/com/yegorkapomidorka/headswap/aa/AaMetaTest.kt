@@ -287,8 +287,9 @@ class AaMetaTest {
         r.core.onNavTurn(AaMeta.parseNavState(navState(8, "Main St"))!!)
         r.core.onNavDistance(AaMeta.parseNavPosition(navPosition(300, 30))!!)
         assertTrue(r.link.turns.isEmpty())
-        assertTrue(r.link.navi().isEmpty())
-        // подписка START moduleID=0 -> NAVI=1 и текущий манёвр сразу
+        // NAVI=1 уходит до подписки: VW BT 1538 (h244) подписывается только после него
+        assertEquals(listOf(1), r.link.navi())
+        // подписка START moduleID=0 -> текущий манёвр сразу, NAVI=1 не дублируется
         r.core.onCarlifeSubscribe(listOf(0), true)
         assertEquals(listOf(1), r.link.navi())
         assertEquals(1, r.link.turns.size)
@@ -508,6 +509,35 @@ class AaMetaTest {
     }
 
     @Test
+    fun naviReleasedWhenTtsEndsAfterRouteEnded() {
+        AaBridgeCore.TTS_DEBOUNCE_ENABLED = false
+        try {
+            val r = Rig()
+            r.core.onCarlifeSubscribe(listOf(0), true)
+            r.start()
+            r.core.onNavStatus(1)
+            r.core.onAudioData(M.CH_AUDIO_SPEECH, ByteArray(640), 0)
+            r.core.onNavStatus(2)                                   // «Вы прибыли» ещё играет
+            assertEquals(listOf(1), r.link.navi())
+            r.core.onAudioStop(M.CH_AUDIO_SPEECH)
+            assertEquals("TTS кончился после маршрута: NAVI=0, приборка гаснет", listOf(1, 0), r.link.navi())
+
+            // маршрут идёт: конец TTS NAVI не трогает
+            val q = Rig()
+            q.core.onCarlifeSubscribe(listOf(0), true)
+            q.start()
+            q.core.onNavStatus(1)
+            q.core.onAudioData(M.CH_AUDIO_SPEECH, ByteArray(640), 0)
+            q.core.onAudioStop(M.CH_AUDIO_SPEECH)
+            assertEquals(listOf(1), q.link.navi())
+            q.core.onNavStatus(2)                                   // крестик посреди маршрута, TTS уже молчит
+            assertEquals("отмена маршрута: NAVI=0", listOf(1, 0), q.link.navi())
+        } finally {
+            AaBridgeCore.TTS_DEBOUNCE_ENABLED = true
+        }
+    }
+
+    @Test
     fun replayAfterNewCarlifeSession() {
         val r = Rig()
         r.core.onCarlifeSubscribe(listOf(0), true)
@@ -594,6 +624,23 @@ class AaMetaTest {
         assertTrue("одного канала мало", !r.core.huVw20082138)
         r.core.onHuInfo("VW BT 1538", "VW BT 1538")
         assertTrue(r.core.huVw20082138)
+    }
+
+    @Test
+    fun pioneerRm56FlagByManufacturerAndModelAndReset() {
+        val r = Rig()
+        assertTrue(!r.core.huPioneerRm56)
+        r.core.onHuInfo("Pioneer", "AVH-Z9200")                 // другая модель Pioneer под обход не попадает
+        assertTrue(!r.core.huPioneerRm56)
+        r.core.onHuInfo("Other", "RM56E8B")
+        assertTrue(!r.core.huPioneerRm56)
+        r.core.onHuInfo("Pioneer", "RM56E8B", null)
+        assertTrue(r.core.huPioneerRm56)
+        r.core.onCarlifeClosed()
+        r.core.attach(MetaLink())
+        assertTrue("новая сессия - флаг заново", !r.core.huPioneerRm56)
+        r.core.onHuInfo("Honda", "CR-V")
+        assertTrue(!r.core.huPioneerRm56)
     }
 
     @Test

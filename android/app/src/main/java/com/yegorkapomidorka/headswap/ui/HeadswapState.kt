@@ -292,7 +292,7 @@ object HeadswapStatus {
             usbAudio = aaPrefs.usbAudio,
             // известный текст нет-сертификата подменяем ресурсом, остальные ошибки показываем как есть
             setupError = AaState.setupError?.let { if (it == AaCreds.MISSING_TEXT) UiText.res(R.string.home_err_no_cert) else UiText.raw(it) },
-            videoRes = (CarLifeState.videoMode ?: aaPrefs.videoMode.effective(aaPrefs.transcode)).outLabel,
+            videoRes = (CarLifeState.videoMode ?: aaPrefs.videoGeometry.effective(aaPrefs.transcode)).outLabel,
             aaConsent = AutoServer.consentPending(),
             wireless = CarLifeState.wirelessSession,
         )

@@ -32,7 +32,7 @@ import com.yegorkapomidorka.headswap.aa.MetaRelay
 import com.yegorkapomidorka.headswap.aa.MicMode
 import com.yegorkapomidorka.headswap.aa.PhoneMicCapture
 import com.yegorkapomidorka.headswap.aa.ServerPhase
-import com.yegorkapomidorka.headswap.aa.VideoMode
+import com.yegorkapomidorka.headswap.aa.VideoGeometry
 import com.yegorkapomidorka.headswap.autosrv.AutoServer
 import com.yegorkapomidorka.headswap.autosrv.AutoServerPolicy
 import com.yegorkapomidorka.headswap.autosrv.Trigger
@@ -363,8 +363,9 @@ class BridgeService : Service() {
             return
         }
         val since = sinceCarMs()
-        val delay = CarNetPolicy.delayMs(since, carBtNear)
-        if (delay == 0L) WLog.ev(WLog.LINK, "car-net-now", "sinceCarMs" to since, "carBt" to carBtNear)
+        val proven = CarWifi(this).proven
+        val delay = CarNetPolicy.delayMs(since, carBtNear, proven)
+        if (delay == 0L) WLog.ev(WLog.LINK, "car-net-now", "sinceCarMs" to since, "carBt" to carBtNear, "proven" to proven)
         main.postDelayed(carNetTick, (delay - (SystemClock.elapsedRealtime() - waitSince)).coerceAtLeast(0))
         if (delay > 0L) checkCarBtNear()
     }
@@ -391,7 +392,7 @@ class BridgeService : Service() {
             waitedMs = SystemClock.elapsedRealtime() - waitSince,
             sixOfSixReady = sixReady,
             wifiDirectCar = wifiDirectCar,
-            delayMs = CarNetPolicy.delayMs(sinceCarMs(), carBtNear),
+            delayMs = CarNetPolicy.delayMs(sinceCarMs(), carBtNear, w.proven),
         )
         if (!ok) return
         carNet.request(ssid, w.pass, CAR_NET_TIMEOUT_MS, ::onCarNetAvailable, ::onCarNetUnavailable, ::onCarNetLost)
@@ -715,6 +716,13 @@ class BridgeService : Service() {
                         sixReady = true
                         // подключение без Wi-Fi Direct: этой машине P2P не нужен (если в этом ожидании TARGET_INFO был, режим не трогаем)
                         if (hotspotPeer && !p2pThisWait) CarProfile(this).connMode = CarConnMode.HOTSPOT
+                        // 6/6 пришли из сети машины (маяк ходил только в ней): дальше просим её сразу, без CAR_NET_DELAY_MS
+                        if (hotspotPeer && carNetImpl?.current != null) CarWifi(this).let { w ->
+                            if (w.isSet && !w.proven) {
+                                w.markProven()
+                                WLog.ev(WLog.LINK, "car-net-proven")
+                            }
+                        }
                         if (beacon != null) {
                             cancelHint()      // 6/6: подсказка про Wi-Fi больше не нужна
                             CarLifeState.wireless = getString(R.string.wl_state_connected)
@@ -779,17 +787,18 @@ class BridgeService : Service() {
         // AA-сессия к серверу ГУ на 127.0.0.1:5277 живёт на уровне сервиса (BridgeHost), а не этой USB-сессии
         var h = host
         // режим фиксируется на подключение; тёплая AA с другой геометрией не годится (SDR уже ушёл), её закрываем
-        val wantMode = aaPrefs.videoMode.effective(aaPrefs.transcode)
+        val chosenGeometry = aaPrefs.videoGeometry
+        val wantMode = chosenGeometry.effective(aaPrefs.transcode)
         val wantDensity = aaPrefs.aaDensity
         if (h != null && !h.isDead && h.core.videoMode != wantMode) {
-            AppLog.i("BRIDGE: видео-режим сменился (${h.core.videoMode.name} -> ${wantMode.name}), тёплую AA закрываю и поднимаю заново")
+            AppLog.i("BRIDGE: видео-режим сменился (${h.core.videoMode.label} -> ${wantMode.label}), тёплую AA закрываю и поднимаю заново")
             h.shutdown("смена видео-режима")
         } else if (h != null && !h.isDead && h.core.densityOverride != wantDensity) {
             AppLog.i("BRIDGE: DPI AA сменился (${h.core.densityOverride} -> $wantDensity, 0 = авто), тёплую AA закрываю и поднимаю заново")
             h.shutdown("смена DPI AA")
         }
         if (h == null || h.isDead) {
-            h = createHost(aaPrefs, wantMode, wantDensity, previous = h)
+            h = createHost(aaPrefs, chosenGeometry, wantMode, wantDensity, previous = h)
             host = h
             if (h == null) {
                 // нет сертификата head unit или мост не собрался: причина уже в AaState.setupError, USB-сессию не открываем
@@ -817,7 +826,7 @@ class BridgeService : Service() {
         stopRequested = false
 
         val sref = arrayOfNulls<CarLifeSession>(1)
-        val s = CarLifeSession(transport, cfg, h.core, PhoneThermal(this)) { reason -> main.post { onSessionClosed(sref[0]!!, reason) } }
+        val s = CarLifeSession(transport, cfg, h.core, PhoneThermal(this), onHuSize = { w, hh -> aaPrefs.saveHuSize(w, hh) }) { reason -> main.post { onSessionClosed(sref[0]!!, reason) } }
         sref[0] = s
         session = s
         s.start()
@@ -825,7 +834,7 @@ class BridgeService : Service() {
     }
 
     /** Новый AA-хост: ядро, коннектор, сертификаты. null = мост не поднялся (причина в AaState.setupError). */
-    private fun createHost(aaPrefs: AaPrefs, mode: VideoMode, densityOverride: Int, previous: BridgeHost?): BridgeHost? {
+    private fun createHost(aaPrefs: AaPrefs, chosen: VideoGeometry, mode: VideoGeometry, densityOverride: Int, previous: BridgeHost?): BridgeHost? {
         return try {
             val loaded = AaCreds.load(this, aaPrefs.certSet)
             AaState.setupError = null
@@ -843,7 +852,7 @@ class BridgeService : Service() {
             core.videoMode = mode
             core.densityOverride = densityOverride
             core.expectFeatureConfig = true
-            if (aaPrefs.videoMode != mode) AppLog.i("BRIDGE видео-режим ${aaPrefs.videoMode.name} недоступен без перекодирования, использую ${mode.name}")
+            if (chosen != mode) AppLog.i("BRIDGE видео-режим ${chosen.label} недоступен без перекодирования, использую ${mode.label}")
             // аудио-синки (MEDIA/SPEECH) объявляются в момент запроса телефона, когда уже известно решение по звуку
             val conn = AaConnector(
                 core, loaded.creds, log,

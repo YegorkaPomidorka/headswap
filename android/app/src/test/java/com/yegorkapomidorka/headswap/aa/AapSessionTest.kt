@@ -210,6 +210,12 @@ class AapSessionTest {
             sendMsg(1, M.SENSOR_START_REQUEST, AapPb().v(1, 10).v(2, 0).toByteArray())
             assertArrayEquals(Golden["sensor_start_response"], expect(1, M.SENSOR_START_RESPONSE))
             assertArrayEquals(Golden["night"], expect(1, M.SENSOR_EVENT))
+            if (::session.isInitialized) {                    // сценарии с AaConnector сессию не передают
+                session.sendNightMode(true)                   // CHANGE_MD_THEME тёмная после старта сенсора
+                assertArrayEquals(M.nightModeEvent(true).payload, expect(1, M.SENSOR_EVENT))
+                session.sendNightMode(false)
+                assertArrayEquals(Golden["night"], expect(1, M.SENSOR_EVENT))
+            }
             sendMsg(3, M.INPUT_BINDING_REQUEST, AapPb().v(1, 3).v(1, 4).v(1, 84).toByteArray())
             assertArrayEquals(Golden["binding_response"], expect(3, M.INPUT_BINDING_RESPONSE))
 

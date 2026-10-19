@@ -76,8 +76,12 @@ class CarNetwork(ctx: Context, private val onState: (CarNetState) -> Unit = {}) 
     ) {
         if (state == CarNetState.REQUESTING || state == CarNetState.AVAILABLE) return
         logStaConcurrency()
-        start(Params(ssid, pass, timeoutMs, onAvailable, onUnavailable, onLost), if (pass.isEmpty()) Sec.OPEN else Sec.WPA2)
+        val first = CarSecPolicy.first(rememberedSec(ssid), pass.isNotEmpty())
+        start(Params(ssid, pass, timeoutMs, onAvailable, onUnavailable, onLost), Sec.entries.first { it.label == first })
     }
+
+    /** Удачная защита из [CarWifi], если просим именно сохранённую сеть машины. */
+    private fun rememberedSec(ssid: String): String? = CarWifi(app).let { if (it.ssid == ssid) it.sec else null }
 
     /** Снять запрос (и сеть, если её держал только он). Можно звать сколько угодно раз. */
     fun release(why: String) {
@@ -159,7 +163,9 @@ class CarNetwork(ctx: Context, private val onState: (CarNetState) -> Unit = {}) 
             current = network
             ifaceName = name
             state = CarNetState.AVAILABLE
-            WLog.ev(NET, "car-available", "iface" to name)
+            CarWifi(app).let { if (it.ssid == p.ssid) it.rememberSec(sec.label) }
+            WLog.ev(NET, "car-available", "iface" to name, "sec" to sec.label,
+                "addr" to linkProperties.linkAddresses.firstOrNull { it.address is java.net.Inet4Address }?.address?.hostAddress)
             p.onAvailable(network)
         }
 
@@ -167,7 +173,7 @@ class CarNetwork(ctx: Context, private val onState: (CarNetState) -> Unit = {}) 
             if (stale()) return
             unregister()
             WLog.ev(NET, "car-unavailable", "sec" to sec.label)
-            if (sec == Sec.WPA2 && p.pass.isNotEmpty()) {
+            if (CarSecPolicy.retryWpa3(rememberedSec(p.ssid), sec.label, p.pass.isNotEmpty())) {
                 start(p, Sec.WPA3)      // сеть могла быть WPA3: одна повторная попытка
                 return
             }

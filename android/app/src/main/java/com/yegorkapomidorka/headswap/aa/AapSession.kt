@@ -78,6 +78,9 @@ interface AaPeer {
 
     /** VideoFocusNotification NATIVE (unsolicited = false): ГУ ушёл с проекции. По умолчанию игнорируется. */
     fun sendVideoFocusNative() {}
+
+    /** Ночной режим AA (сенсор NIGHT): запоминается и уходит, как только телефон запустил сенсор. По умолчанию игнорируется. */
+    fun sendNightMode(night: Boolean) {}
 }
 
 class AapSession(
@@ -232,6 +235,24 @@ class AapSession(
         }
         log("AA VideoFocus NATIVE (ГУ вышел из CarLife)", true)
         outQueue.offer(MsgJob(M.videoFocusNotification(projected = false, unsolicited = false), false, "exit: NATIVE"))
+    }
+
+    @Volatile private var nightMode = false
+    @Volatile private var nightSensorStarted = false
+
+    override fun sendNightMode(night: Boolean) {
+        val changed = night != nightMode
+        nightMode = night
+        if (!nightSensorStarted) {
+            if (changed) log("AA night=$night запомнила, сенсор NIGHT ещё не запущен телефоном", true)
+            return
+        }
+        if (!established || stopReason != null || !writerActive) {
+            log("AA night=$night пропущен: сессия ${if (!established) "не готова" else "завершается"}", true)
+            return
+        }
+        log("AA SENSOR night=$night (тема ГУ)", true)
+        outQueue.offer(MsgJob(M.nightModeEvent(night), false, "night=$night"))
     }
 
     /** PCM микрофона: нарезается на кадры по 128 мс и уходит в окно maxUnacked; без открытой микрофонной сессии игнорируется. */
@@ -668,7 +689,11 @@ class AapSession(
         if (type != M.SENSOR_START_REQUEST) return
         val sensorType = firstVarint(payload, 1)?.toInt()
         send(M.sensorStartResponse())
-        if (sensorType == 10) send(M.nightModeEvent(false))               // NIGHT
+        if (sensorType == 10) {                                            // NIGHT
+            nightSensorStarted = true                                      // до send: смена темы в этот момент уйдёт следом
+            send(M.nightModeEvent(nightMode))
+            log("AA SENSOR NIGHT запущен, night=$nightMode", true)
+        }
     }
 
     private fun onMediaControl(chan: Int, type: Int, payload: ByteArray) {

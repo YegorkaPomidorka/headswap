@@ -1,5 +1,6 @@
 package com.yegorkapomidorka.headswap
 
+import com.yegorkapomidorka.headswap.aa.AaBridgeCore
 import com.yegorkapomidorka.headswap.aa.FpsSetting
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
@@ -689,6 +690,33 @@ class ProtocolTest {
         assertEquals(FpsSetting.FPS15, FpsSetting.parse("FPS15"))
         assertEquals(FpsSetting.AUTO, FpsSetting.parse(null))
         assertEquals(FpsSetting.AUTO, FpsSetting.parse("мусор"))
+    }
+
+    @Test
+    fun chooseFpsHuCapForPioneer() {
+        // Pioneer RM56E8B (h277): потолок 10 и в Авто, и при фиксированных настройках; без потолка поведение прежнее
+        val cap = AaBridgeCore.PIONEER_RM56_MAX_FPS
+        assertEquals(10, cap)
+        assertEquals(10, Handshake.chooseFps(FpsSetting.AUTO, 30, cap))
+        assertEquals(10, Handshake.chooseFps(FpsSetting.AUTO, 0, cap))
+        assertEquals(10, Handshake.chooseFps(FpsSetting.FPS30, 30, cap))
+        assertEquals(10, Handshake.chooseFps(FpsSetting.FPS15, 30, cap))
+        assertEquals(8, Handshake.chooseFps(FpsSetting.AUTO, 8, cap))
+        assertEquals(30, Handshake.chooseFps(FpsSetting.AUTO, 30, null))
+        assertEquals(30, Handshake.chooseFps(FpsSetting.AUTO, 30))
+    }
+
+    @Test
+    fun capFpsAppliesToFrameRateChange() {
+        // FRAME_RATE_CHANGE: max(fps, MIN_APPLIED_FPS), затем потолок ГУ
+        val cap = AaBridgeCore.PIONEER_RM56_MAX_FPS
+        fun applied(fps: Int, huMax: Int?) = Handshake.capFps(maxOf(fps, Handshake.MIN_APPLIED_FPS), huMax)
+        assertEquals(10, applied(30, cap))
+        assertEquals(10, applied(15, cap))
+        assertEquals(10, applied(12, cap))
+        assertEquals(10, applied(3, cap))
+        assertEquals(30, applied(30, null))
+        assertEquals(10, applied(3, null))
     }
 
     @Test

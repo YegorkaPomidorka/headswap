@@ -648,7 +648,8 @@ class MetaRelay(
         shown = false
         lastSent = null
         log("META маршрут начат ($why)", true)
-        if (navSubscribed && ready()) navHold(true)
+        // NAVI=1 без подписки: VW BT 1538 (h244) шлёт SUBSCRIBE_START только после NAVI=1
+        if (ready()) navHold(true)
     }
 
     private fun endRoute(why: String) {

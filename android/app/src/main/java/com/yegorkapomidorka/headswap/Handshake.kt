@@ -148,8 +148,11 @@ object Handshake {
 
     /**
      * fps для INIT_DONE. Авто: как у Baidu (fps из INIT, если в 1..30, иначе 30); 15 и 30 - фиксированно.
-     * Honda шлёт fps=0, Kia 15, Mazda 30.
+     * Honda шлёт fps=0, Kia 15, Mazda 30. [huMaxFps] - потолок под слабое ГУ (Pioneer RM56E8B, h277), null = нет.
      */
-    fun chooseFps(setting: FpsSetting, requested: Int): Int =
-        setting.fixed ?: if (requested in 1..30) requested else DEFAULT_FPS
+    fun chooseFps(setting: FpsSetting, requested: Int, huMaxFps: Int? = null): Int =
+        capFps(setting.fixed ?: if (requested in 1..30) requested else DEFAULT_FPS, huMaxFps)
+
+    /** Потолок fps под конкретное ГУ (null = без ограничения). */
+    fun capFps(fps: Int, huMaxFps: Int?): Int = huMaxFps?.let { minOf(fps, it) } ?: fps
 }

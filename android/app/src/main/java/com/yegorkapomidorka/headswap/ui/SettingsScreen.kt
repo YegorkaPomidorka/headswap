@@ -34,6 +34,7 @@ import com.yegorkapomidorka.headswap.R
 import com.yegorkapomidorka.headswap.aa.AaDensity
 import com.yegorkapomidorka.headswap.aa.AaPrefs
 import com.yegorkapomidorka.headswap.aa.CAR_MAKES
+import com.yegorkapomidorka.headswap.aa.CustomVideoMode
 import com.yegorkapomidorka.headswap.aa.EQ_BAND_MAX
 import com.yegorkapomidorka.headswap.aa.EQ_BAND_MIN
 import com.yegorkapomidorka.headswap.aa.EQ_FREQS
@@ -234,7 +235,8 @@ class SettingsScreen(host: MainActivity) : Screen(host) {
         set(SettingsSection.APPEARANCE, c.getString(R.string.set_sum_appearance, lang, theme))
 
         val mode = c.getString(if (aa.transcode) R.string.set_transcode_title else R.string.set_direct_title)
-        val res = c.getString(aa.videoMode.effective(aa.transcode).titleRes)
+        val geo = aa.videoGeometry.effective(aa.transcode)
+        val res = if (geo is VideoMode) c.getString(geo.titleRes) else geo.outLabel
         val dpi = aa.aaDensity.takeIf { it != AaDensity.AUTO }?.let { c.getString(R.string.set_sum_density, it) }
         set(SettingsSection.VIDEO, listOfNotNull(mode, res, dpi, c.getString(aa.fpsSetting.titleRes)).joinToString(" · "))
 
@@ -351,6 +353,7 @@ class SettingsSectionScreen(host: MainActivity, val section: SettingsSection) : 
     private var makeValue: TextView? = null
     private var transcodeSeg: Segmented? = null
     private var transcodeNote: TextView? = null
+    private var customResNote: TextView? = null
     private var fpsSeg: Segmented? = null
     private var densityValue: TextView? = null
     private var densitySub: TextView? = null
@@ -689,6 +692,7 @@ class SettingsSectionScreen(host: MainActivity, val section: SettingsSection) : 
         transcodeNote = note("")
 
         body.addView(c.sectionTitle(c.getString(R.string.set_resolution)))
+        customResNote = note("").apply { visibility = View.GONE }
         for (m in VideoMode.values()) {
             val row = RadioRow(c, c.getString(m.titleRes), c.getString(m.subRes)) { setVideoMode(m) }
             modeRows[m] = row
@@ -728,11 +732,17 @@ class SettingsSectionScreen(host: MainActivity, val section: SettingsSection) : 
     /** Без перекодирования «широкий» недоступен: радио затемнено, фактический режим 1280×720 (в prefs выбор остаётся). */
     private fun refreshVideoMode() {
         val shown = aa.videoMode.effective(aa.transcode)
+        // своё разрешение из раздела для разработчиков перекрывает список (без перекодирования оно само уходит в R720)
+        val custom = aa.videoGeometry.effective(aa.transcode) as? CustomVideoMode
+        customResNote?.apply {
+            visibility = if (custom != null) View.VISIBLE else View.GONE
+            if (custom != null) text = ctx.getString(R.string.set_custom_res_active, custom.outLabel, ctx.getString(R.string.dev_title))
+        }
         for ((m, row) in modeRows) {
             val blocked = m.needsTranscode && !aa.transcode
             row.setSelected(m == shown)
             row.setSub(if (blocked) ctx.getString(R.string.set_needs_transcode) else ctx.getString(m.subRes))
-            row.view.alpha = if (blocked) 0.45f else 1f
+            row.view.alpha = if (blocked) 0.45f else if (custom != null) 0.6f else 1f
         }
         refreshDensity()      // «авто» зависит от режима
     }
@@ -778,7 +788,7 @@ class SettingsSectionScreen(host: MainActivity, val section: SettingsSection) : 
     }
 
     /** density режима, который реально применится (с учётом passthrough). */
-    private fun autoDensity(): Int = aa.videoMode.effective(aa.transcode).density
+    private fun autoDensity(): Int = aa.videoGeometry.effective(aa.transcode).density
 
     private fun setDensity(v: Int) {
         aa.aaDensity = v

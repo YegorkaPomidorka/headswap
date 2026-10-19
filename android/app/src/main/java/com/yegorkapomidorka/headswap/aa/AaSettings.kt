@@ -36,6 +36,37 @@ class AaPrefs(ctx: Context) {
         get() = VideoMode.parse(sp.getString("videoMode", VideoMode.DEFAULT.name))
         set(v) = sp.edit().putString("videoMode", v.name).apply()
 
+    /** Своё разрешение (раздел для разработчиков): вместо [videoMode], только с перекодированием. Читается один раз на подключение. */
+    var customRes: Boolean
+        get() = sp.getBoolean("customRes", false)
+        set(v) = sp.edit().putBoolean("customRes", v).apply()
+
+    var customW: Int
+        get() = sp.getInt("customW", DEFAULT_CUSTOM_W)
+        set(v) = sp.edit().putInt("customW", v).apply()
+
+    var customH: Int
+        get() = sp.getInt("customH", DEFAULT_CUSTOM_H)
+        set(v) = sp.edit().putInt("customH", v).apply()
+
+    /** Размер, который ГУ просила в VIDEO_ENCODER_INIT в последней сессии; 0 = ещё не было. */
+    var lastHuW: Int
+        get() = sp.getInt("lastHuW", 0)
+        set(v) = sp.edit().putInt("lastHuW", v).apply()
+
+    var lastHuH: Int
+        get() = sp.getInt("lastHuH", 0)
+        set(v) = sp.edit().putInt("lastHuH", v).apply()
+
+    /** Сохранить размер, запрошенный ГУ (нули и мусор не пишем). */
+    fun saveHuSize(w: Int, h: Int) {
+        if (w > 0 && h > 0) sp.edit().putInt("lastHuW", w).putInt("lastHuH", h).apply()
+    }
+
+    /** Итоговая геометрия видео: своё разрешение (если включено и валидно) или [videoMode]. Перекодирование учитывается через effective(). */
+    val videoGeometry: VideoGeometry
+        get() = CustomVideoMode.resolve(customRes, customW, customH, videoMode)
+
     /** Ручной DPI интерфейса AA (AaDensity), 0 = авто (density режима). Читается один раз на подключение. */
     var aaDensity: Int
         get() = AaDensity.parse(sp.getInt("aaDensity", AaDensity.AUTO))
@@ -141,6 +172,11 @@ class AaPrefs(ctx: Context) {
             val n = v.normalized()
             sp.edit().putString("eqCustomBands", n.bandsCsv()).putInt("eqCustomPreamp", n.preamp).apply()
         }
+
+    companion object {
+        const val DEFAULT_CUSTOM_W = 1920
+        const val DEFAULT_CUSTOM_H = 720
+    }
 }
 
 /** Марки для настройки «Марка автомобиля» (канонические английские написания). */
