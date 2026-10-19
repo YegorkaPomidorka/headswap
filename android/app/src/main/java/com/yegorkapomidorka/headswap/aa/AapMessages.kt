@@ -333,6 +333,8 @@ object AapMessages {
             "1280x720" -> 2
             "1920x1080" -> 3
             "2560x1440" -> 4
+            // портретные коды AA (VideoCodecResolutionType): 5 = 3840x2160, 6 = 720x1280
+            "720x1280" -> 6
             else -> throw IllegalArgumentException("неизвестное разрешение ${o.resolution}")
         }
         val r = AapPb()

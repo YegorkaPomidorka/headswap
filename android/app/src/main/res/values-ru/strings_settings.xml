@@ -125,6 +125,8 @@
     <string name="video_r800_sub">Для небольших экранов</string>
     <string name="video_r720_title">1280×720 (стандарт)</string>
     <string name="video_r720_sub">Подходит большинству ГУ</string>
+    <string name="video_p720_title">720×1280 (вертикальный)</string>
+    <string name="video_p720_sub">Для вертикальных экранов</string>
     <string name="video_r1080_title">1920×1080</string>
     <string name="video_r1080_sub">Чётче, но тяжелее для телефона и ГУ</string>
     <string name="video_r1440_title">2560×1440 (экспериментальный)</string>

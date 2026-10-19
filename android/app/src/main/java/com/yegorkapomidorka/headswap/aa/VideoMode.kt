@@ -32,6 +32,8 @@ enum class VideoMode(
 ) {
     R800(R.string.video_r800_title, R.string.video_r800_sub, "800x480", 0, 0, 120, 800, 480, 4_000_000),
     R720(R.string.video_r720_title, R.string.video_r720_sub, "1280x720", 0, 0, 160, 1280, 720, 4_000_000),
+    /** 720×1280 - портрет для вертикальных ГУ (h291: экран 960×1280, штатный AA рисует вертикальный Coolwalk). */
+    P720(R.string.video_p720_title, R.string.video_p720_sub, "720x1280", 0, 0, 160, 720, 1280, 4_000_000),
     R1080(R.string.video_r1080_title, R.string.video_r1080_sub, "1920x1080", 0, 0, 240, 1920, 1080, 8_000_000),
     R1440(R.string.video_r1440_title, R.string.video_r1440_sub, "2560x1440", 0, 0, 320, 2560, 1440, 12_000_000),
     WIDE(R.string.video_wide_title, R.string.video_wide_sub, "1280x720", 0, 240, 160, 1280, 480, 4_000_000),

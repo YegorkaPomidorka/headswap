@@ -21,6 +21,7 @@ class VideoModeTest {
             VideoMode.WIDE_MID to Row("1920x1080", 192, 432, 160, 1728, 648, 5_000_000),
             VideoMode.WIDE_HD to Row("1920x1080", 0, 360, 160, 1920, 720, 6_000_000),
             VideoMode.WIDE_976 to Row("1920x1080", 0, 244, 160, 2240, 976, 8_000_000),
+            VideoMode.P720 to Row("720x1280", 0, 0, 160, 720, 1280, 4_000_000),
         )
         assertEquals(expected.keys, VideoMode.values().toSet())
         for ((m, r) in expected) {
