@@ -163,6 +163,8 @@ class AaBridgeCore(
         private set
     @Volatile var huHyundaiCn7 = false         // ГУ Hyundai CN7 (product wp_cn7cpe_cn, h218): в режиме «Авто» музыка 32 кГц с ресэмплом 48→32
         private set
+    @Volatile var huHondaEns1 = false          // Honda e:NS1 (channel 20772115, h100): MEDIA молчит; старт музыки как у Baidu для протокола <3
+        private set
     @Volatile var musicRateProvider: () -> MusicRate = { MusicRate.DEFAULT }
     private var resampler: MusicResampler? = null    // null при 48000: PCM идёт как есть
     private var mediaRateLogged = MEDIA_RATE
@@ -332,6 +334,7 @@ class AaBridgeCore(
         vwIdName = false
         vwIdChannel = false
         huHyundaiCn7 = false                   // HU_INFO придёт заново в этой сессии
+        huHondaEns1 = false                    // STATISTIC_INFO придёт заново в этой сессии
         mediaRateLogged = MEDIA_RATE
         resampler?.reset()
         if (aaVideoSeen) placeholderText = TEXT_WAIT_FRAME
@@ -539,6 +542,7 @@ class AaBridgeCore(
         if (channel == DESAY_G6S_CHANNEL) huDesayG6S = true
         if (channel == VW_20082120_CHANNEL || channel == VW_CNS3_20082122_CHANNEL || channel == VW_CNS3_20082134_CHANNEL) huVw20082120 = true
         if (isHondaChannel(channel)) huHonda = true
+        if (channel == HONDA_ENS1_CHANNEL) huHondaEns1 = true
         vwIdChannel = channel == VW_20082138_CHANNEL
         updateVwId()
     }
@@ -775,8 +779,22 @@ class AaBridgeCore(
         }
         if (audioInited[ch] != true) {
             val setting = if (ch == CarlifeAudio.CH_MEDIA) musicRateProvider() else MusicRate.AUTO
-            val rate = if (ch != CarlifeAudio.CH_MEDIA) 16000 else setting.hz ?: if (huHyundaiCn7) MEDIA_RATE_CN7 else MEDIA_RATE
+            val rate = if (ch != CarlifeAudio.CH_MEDIA) 16000 else setting.hz ?: when {
+                huHyundaiCn7 -> MEDIA_RATE_CN7
+                huHondaEns1 -> MEDIA_RATE_ENS1
+                else -> MEDIA_RATE
+            }
             val channels = if (ch == CarlifeAudio.CH_MEDIA) 2 else 1
+            val ens1Start = ch == CarlifeAudio.CH_MEDIA && huHondaEns1
+            if (ens1Start) {
+                // как Baidu на ГУ с протоколом <3: MUSIC=0, MUSIC=1, INIT, STOP, INIT (MusicAudioHelper/AudioPlayTask)
+                musicStatus(0)
+                musicStatus(1)
+                if (link.sendAudio(ch, CarlifeAudio.initType(ch), CarlifeAudio.initBody(rate, channels, 16))) {
+                    link.sendAudio(ch, CarlifeAudio.stopType(ch), ByteArray(0))
+                }
+                log("BRIDGE Honda e:NS1: MUSIC=0, MUSIC=1, INIT, STOP перед основным INIT (как Baidu)", true)
+            }
             if (ch == CarlifeAudio.CH_TTS && NAVI_STATUS_ENABLED) {
                 ttsNaviHeld = true
                 // как MD: перед TTS шлёт MODULE_STATUS NAVI=1 и держит его
@@ -801,11 +819,11 @@ class AaBridgeCore(
                 // частота фиксируется на MEDIA INIT; каждый новый INIT - поток с чистого листа
                 resampler = if (rate == MEDIA_RATE) null else resampler?.takeIf { it.outRate == rate }?.also { it.reset() } ?: MusicResampler(rate)
                 if (rate != MEDIA_RATE && rate != mediaRateLogged) {
-                    val why = if (setting.hz != null) "настройка" else "авто: Hyundai CN7"
+                    val why = if (setting.hz != null) "настройка" else if (huHondaEns1) "авто: Honda e:NS1" else "авто: Hyundai CN7"
                     log("BRIDGE музыка $rate Гц, ресэмпл $MEDIA_RATE→$rate ($why)", true)
                 }
                 mediaRateLogged = rate
-                musicStatus(1)
+                if (!ens1Start) musicStatus(1)
             }
         }
         var out = pcm
@@ -823,9 +841,10 @@ class AaBridgeCore(
                 if (out.isEmpty()) return
             }
         }
+        val maxChunk = if (ch == CarlifeAudio.CH_MEDIA && huHondaEns1) MEDIA_CHUNK_ENS1 else CarlifeAudio.MAX_CHUNK
         var off = 0
         while (off < out.size) {
-            val n = minOf(CarlifeAudio.MAX_CHUNK, out.size - off)
+            val n = minOf(maxChunk, out.size - off)
             val chunk = if (off == 0 && n == out.size) out else out.copyOfRange(off, off + n)
             if (!link.sendAudio(ch, CarlifeAudio.dataType(ch), chunk)) {
                 audioDropped++
@@ -1470,6 +1489,9 @@ class AaBridgeCore(
         const val HYUNDAI_CN7_PRODUCT = "wp_cn7cpe_cn"    // HU_INFO.product Hyundai Elantra CN7 (h218): manufacturer QTI, model "sm6150_au for arm64"
         const val MEDIA_RATE = 48000
         const val MEDIA_RATE_CN7 = 32000
+        const val HONDA_ENS1_CHANNEL = "20772115"         // STATISTIC_INFO.channel Honda e:NS1 (h100); Vezel 20832125 играет и без этого
+        const val MEDIA_RATE_ENS1 = 44100                 // Baidu без FEATURE_CONFIG MEDIA_SAMPLE_RATE=1 шлёт 44100 (MusicAudioHelper)
+        const val MEDIA_CHUNK_ENS1 = 4096                 // Baidu режет PCM музыки по 4096 Б (AudioPlayTask)
         const val KEYFRAME_WAIT_MS = 1500L
         const val KEYFRAME_RETRY_MS = 4000L
         private const val NEVER = Long.MIN_VALUE / 4
