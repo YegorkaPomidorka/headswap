@@ -148,7 +148,7 @@ object AdbLink {
                 return@synchronized
             }
             val io = try {
-                MultiSocketTransport(HashMap(pending), PORTS, "ADB (TCP 127.0.0.1)", {}, caps = TransportCaps.TCP_ADB)
+                MultiSocketTransport(HashMap(pending), PORTS, "ADB (TCP)", {}, caps = TransportCaps.TCP_ADB)
             } catch (e: Exception) {
                 AppLog.e("ADB: потоки сокетов", e)
                 resetAll()
