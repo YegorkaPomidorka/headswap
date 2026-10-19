@@ -83,11 +83,11 @@ object AppLog {
         }
     }
 
-    /** Лог одного сообщения: заголовок + hexdump первых 256 байт inner и декодированный protobuf. */
-    fun msg(dir: String, chan: Int, outerLen: Int, type: Int, len: Int, decoded: String?, inner: ByteArray, ui: Boolean = true, note: String = "") {
+    /** Лог одного сообщения: заголовок + hexdump первых 256 байт inner (dump=false - без него) и декодированный protobuf. */
+    fun msg(dir: String, chan: Int, outerLen: Int, type: Int, len: Int, decoded: String?, inner: ByteArray, ui: Boolean = true, note: String = "", dump: Boolean = true) {
         val head = "$dir ${Ch.name(chan)} ${Msg.hex(type)} ${Msg.name(type)} len=$len" +
             (if (decoded != null) " $decoded" else "") + note
         i(head, ui)
-        detail("    outer: chan=$chan len=$outerLen\n" + Hex.dump(inner, 256).prependIndent("    "))
+        if (dump) detail("    outer: chan=$chan len=$outerLen\n" + Hex.dump(inner, 256).prependIndent("    "))
     }
 }

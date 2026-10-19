@@ -139,19 +139,25 @@ object LogShare {
             Toast.makeText(ctx, ctx.getString(R.string.share_zip_failed, e.message), Toast.LENGTH_LONG).show()
             return
         }
+        var dst: Uri? = null
         try {
             val values = ContentValues().apply {
                 put(MediaStore.Downloads.DISPLAY_NAME, zip.name)
                 put(MediaStore.Downloads.MIME_TYPE, "application/zip")
                 put(MediaStore.Downloads.RELATIVE_PATH, "Download/")
             }
-            val dst = ctx.contentResolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values)
+            val uri = ctx.contentResolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values)
                 ?: throw java.io.IOException("MediaStore не создал файл")
-            ctx.contentResolver.openOutputStream(dst)!!.use { out -> zip.inputStream().use { it.copyTo(out) } }
+            dst = uri
+            val os = ctx.contentResolver.openOutputStream(uri) ?: throw java.io.IOException("MediaStore не открыл файл на запись")
+            os.use { out -> zip.inputStream().use { it.copyTo(out) } }
+            dst = null      // дописан: дальше не удалять
             AppLog.i("архив сохранён в Загрузки: ${zip.name}")
             Toast.makeText(ctx, ctx.getString(R.string.share_saved, zip.name), Toast.LENGTH_LONG).show()
         } catch (e: Exception) {
             AppLog.e("не сохранить в Загрузки, делюсь файлом", e)
+            // пустой или недописанный архив в «Загрузках» не оставляем
+            dst?.let { runCatching { ctx.contentResolver.delete(it, null, null) } }
             shareFile(ctx, zip, "application/zip", ctx.getString(R.string.share_subject_archive))
         }
     }

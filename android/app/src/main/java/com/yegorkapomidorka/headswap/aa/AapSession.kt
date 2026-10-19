@@ -1,5 +1,6 @@
 package com.yegorkapomidorka.headswap.aa
 
+import com.yegorkapomidorka.headswap.LogThrottle
 import com.yegorkapomidorka.headswap.PbReader
 import java.io.IOException
 import java.net.InetSocketAddress
@@ -126,6 +127,9 @@ class AapSession(
     private val reasm = F.Reassembler { log("AA reassembly: $it", true) }
     private val frames = ArrayDeque<F.Frame>()
     private val sessionIds = HashMap<Int, Int>()
+    // медиа (кадры, аудио, их ACK, микрофон) в лог прорежено: первые и каждый 200-й по каналу и типу (номер в строке #N)
+    private val rxMediaLog = LogThrottle()
+    private val txMediaLog = LogThrottle()
     private val outQueue = LinkedBlockingQueue<Job>()
     private var writer: Thread? = null
     @Volatile private var writerActive = false
@@ -460,7 +464,8 @@ class AapSession(
                         }
                     }
                     is MsgJob -> {
-                        logMsg("TX", job.out.chan, job.out.type, job.out.payload, job.media, job.note)
+                        val n = if (job.media) txMediaLog.next(mediaKey(job.out.chan, job.out.type)) else -1L
+                        if (n != 0L) logMsg("TX", job.out.chan, job.out.type, job.out.payload, job.media, if (n > 0) "${job.note} #$n".trim() else job.note)
                         val plaintext = F.typed(job.out.type, job.out.payload)
                         for (fr in F.splitMessage(plaintext, job.out.chan, job.out.type)) {
                             val record = tls.encrypt(fr.chunk)
@@ -515,6 +520,8 @@ class AapSession(
         log("AA TX CONTROL(0) ENCAPSULATED_SSL len=${data.size} plain frame", false)
         sendRaw(F.buildPlain(F.CHANNEL_CONTROL, M.ENCAPSULATED_SSL, data))
     }
+
+    private fun mediaKey(chan: Int, type: Int) = (chan shl 16) or (type and 0xFFFF)
 
     private fun logMsg(dir: String, chan: Int, type: Int, payload: ByteArray, media: Boolean, note: String = "", text: String? = null) {
         val body = text ?: M.describe(chan, type, payload)
@@ -757,7 +764,9 @@ class AapSession(
             audioSink?.onAudioData(chan, body, ptsUs)
         }
 
-        logMsg("RX", chan, type, body, media = true, note = note, text = "")
+        // CODEC_CONFIG редкий и важный - всегда; DATA прорежено
+        val n = if (isData) rxMediaLog.next(mediaKey(chan, type)) else -1L
+        if (n != 0L) logMsg("RX", chan, type, body, media = true, note = if (n > 0) "$note #$n" else note, text = "")
         // Видео подтверждает и DATA, и CODEC_CONFIG (AapTransport.kt dispatchVideo), аудио только DATA.
         if (chan == M.CH_VIDEO || isData) send(M.mediaAck(chan, sessionIds[chan] ?: 0), media = true)
     }

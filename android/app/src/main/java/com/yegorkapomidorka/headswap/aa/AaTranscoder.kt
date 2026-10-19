@@ -65,6 +65,7 @@ class AaTranscoder(
     private val winOut = AtomicLong()
     private val winDrop = AtomicLong()
     private val winDecLatUs = AtomicLong()
+    private val winDecLatN = AtomicLong()               // кадров с известным временем подачи (знаменатель winDecLatUs)
     private val winEncLatUs = AtomicLong()
     private val winEncLatN = AtomicLong()
     private var winStartMs = SystemClock.elapsedRealtime()
@@ -217,6 +218,8 @@ class AaTranscoder(
         totalIn.incrementAndGet()
         val idr = 5 in AnnexB.nalTypes(annexB)
         synchronized(lock) {
+            // мост подаёт кадры вне своей блокировки: stop() мог пройти между проверкой выше и lock, декодер не пересоздаём
+            if (!running) return
             if (decoder == null || (cfgStale && idr)) {
                 if (!idr) {
                     winDrop.incrementAndGet()
@@ -244,7 +247,12 @@ class AaTranscoder(
             }
             val buf = d.codec.getInputBuffer(idx)
             if (buf == null || buf.capacity() < annexB.size) {
-                d.codec.queueInputBuffer(idx, 0, 0, ptsUs, 0)
+                try {
+                    d.codec.queueInputBuffer(idx, 0, 0, ptsUs, 0)
+                } catch (e: Exception) {
+                    out.onTranscodeError("декодер: queueInputBuffer: ${e.message}")
+                    return
+                }
                 // кадр потерян, как и без входного буфера: P после него декодер испортит - ждём IDR от AA
                 winDrop.incrementAndGet()
                 needIdr = true
@@ -254,7 +262,9 @@ class AaTranscoder(
             buf.clear()
             buf.put(annexB)
             inTimes[ptsUs] = SystemClock.elapsedRealtimeNanos()
-            if (inTimes.size > 256) inTimes.keys.take(128).forEach { inTimes.remove(it) }
+            // ConcurrentHashMap без порядка: выбрасываем самые старые pts (AA шлёт их по возрастанию), а не случайные,
+            // иначе пропадали метки кадров, которые декодер ещё выдаст
+            if (inTimes.size > 256) inTimes.keys.sorted().take(128).forEach { inTimes.remove(it) }
             try {
                 d.codec.queueInputBuffer(idx, 0, annexB.size, ptsUs, 0)
                 if (idr) needIdr = false
@@ -338,7 +348,10 @@ class AaTranscoder(
                     if (render) {
                         winDecoded.incrementAndGet()
                         totalDecoded.incrementAndGet()
-                        if (inAt != null) winDecLatUs.addAndGet((SystemClock.elapsedRealtimeNanos() - inAt) / 1000)
+                        if (inAt != null) {
+                            winDecLatUs.addAndGet((SystemClock.elapsedRealtimeNanos() - inAt) / 1000)
+                            winDecLatN.incrementAndGet()
+                        }
                     }
                 } else if (idx == MediaCodec.INFO_OUTPUT_FORMAT_CHANGED) {
                     log("транскодер: формат вывода декодера ${d.codec.outputFormat}")
@@ -435,9 +448,10 @@ class AaTranscoder(
         val outN = winOut.getAndSet(0)
         val drop = winDrop.getAndSet(0)
         val decLat = winDecLatUs.getAndSet(0)
+        val decLatN = winDecLatN.getAndSet(0)
         val encLat = winEncLatUs.getAndSet(0)
         val encN = winEncLatN.getAndSet(0)
-        val decMs = if (dec > 0) decLat / dec / 1000.0 else 0.0
+        val decMs = if (decLatN > 0) decLat / decLatN / 1000.0 else 0.0
         val encMs = if (encN > 0) encLat / encN / 1000.0 else 0.0
         val r = relay
         val redrawsNow = r?.redraws?.get() ?: 0L

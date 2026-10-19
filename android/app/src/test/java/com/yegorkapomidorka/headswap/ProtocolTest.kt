@@ -294,6 +294,19 @@ class ProtocolTest {
     }
 
     @Test
+    fun annexBNalTypesFromOffsetInCarlifeMessage() {
+        // тело VIDEO_DATA внутри inner: заголовок [len][time][type 00 02 00 01] не должен дать ложный старт-код
+        val frame = hex("00 00 00 01 67 AA 00 00 00 01 68 BB 00 00 01 65 CC")
+        val inner = Wire.dataInner(Msg.VIDEO_DATA, 1, frame)
+        assertEquals(listOf(7, 8, 5), AnnexB.nalTypes(inner, 12))
+        assertEquals(AnnexB.nalTypes(frame), AnnexB.nalTypes(inner, 12))
+        // первый код 3-байтный сразу на границе: ноль заголовка перед ним не превращает его в 4-байтный за пределами тела
+        val p = hex("00 00 01 41 11")
+        assertEquals(listOf(1), AnnexB.nalTypes(Wire.dataInner(Msg.VIDEO_DATA, 0, p), 12))
+        assertEquals(emptyList<Int>(), AnnexB.nalTypes(Wire.dataInner(Msg.VIDEO_DATA, 0, ByteArray(0)), 12))
+    }
+
+    @Test
     fun mdInfoLiesSdk29OnAndroid13Plus() {
         assertEquals(Pair("29", 29), DeviceInfo.reportedSdk(36))
         assertEquals(Pair("29", 29), DeviceInfo.reportedSdk(33))

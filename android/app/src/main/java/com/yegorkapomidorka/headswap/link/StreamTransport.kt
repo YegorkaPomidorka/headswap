@@ -7,6 +7,7 @@ import com.yegorkapomidorka.headswap.Ch
 import com.yegorkapomidorka.headswap.FrameParser
 import com.yegorkapomidorka.headswap.Hex
 import com.yegorkapomidorka.headswap.InnerAssembler
+import com.yegorkapomidorka.headswap.LogThrottle
 import com.yegorkapomidorka.headswap.ProtocolDesync
 import com.yegorkapomidorka.headswap.Wire
 import com.yegorkapomidorka.headswap.aa.DrainMeter
@@ -43,6 +44,7 @@ class StreamTransport(
     private val parser = FrameParser()
     private val assembler = InnerAssembler()
     private val closed = AtomicBoolean(false)
+    private val rawLog = LogThrottle(first = RAW_LOG_FIRST, every = RAW_LOG_EVERY)
     private var reader: Thread? = null
     private var writer: Thread? = null
     @Volatile private var desync = false
@@ -104,7 +106,9 @@ class StreamTransport(
                 }
                 lastRxMs = clock()
                 rx += n
-                AppLog.detail("RAW rx read=$n bytes: ${Hex.compact(buf.copyOf(minOf(n, 32)), 32)}")
+                // сырой дамп - начало сессии (рукопожатие) и дальше редко: каждое чтение USB (микрофон ГУ, тачи) в лог стоило CPU
+                val k = rawLog.next(0)
+                if (k != 0L) AppLog.detail("RAW rx read=$n bytes #$k: ${Hex.compact(buf.copyOf(minOf(n, 32)), 32)}")
                 if (desync) continue
                 try {
                     parser.feed(buf, 0, n) { chan, inner -> assembler.feed(chan, inner, sink) }
@@ -148,6 +152,9 @@ class StreamTransport(
     }
 
     companion object {
+        private const val RAW_LOG_FIRST = 50L
+        private const val RAW_LOG_EVERY = 1000L
+
         /** USB-аксессуар (AOA) или debug-TCP, открытый как ParcelFileDescriptor. */
         fun fromPfd(pfd: ParcelFileDescriptor, caps: TransportCaps, label: String) = StreamTransport(
             FileInputStream(pfd.fileDescriptor), FileOutputStream(pfd.fileDescriptor), caps, label,
