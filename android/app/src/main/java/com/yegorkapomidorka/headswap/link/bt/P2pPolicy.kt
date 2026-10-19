@@ -15,4 +15,19 @@ object P2pPolicy {
         active -> P2pOnTarget.RESTART
         else -> P2pOnTarget.START
     }
+
+    /**
+     * Группа ГУ распалась, а Bluetooth жив (h211, Mazda G6S: задний ход дольше ~25 с): сама ГУ TARGET_INFO не шлёт,
+     * пока не переподключит Bluetooth, а это бывает только после сна машины. Просим его сами: через 2 с, 5 с, дальше
+     * раз в 10 с; null - хватит (~10 мин без входа, ГУ явно не хочет).
+     */
+    fun rejoinDelayMs(attempt: Int): Long? = when {
+        attempt < 0 -> null
+        attempt == 0 -> 2_000L
+        attempt == 1 -> 5_000L
+        attempt < REJOIN_ATTEMPTS -> 10_000L
+        else -> null
+    }
+
+    const val REJOIN_ATTEMPTS = 60
 }

@@ -8,6 +8,8 @@ import android.bluetooth.BluetoothSocket
 import android.content.Context
 import android.content.pm.PackageManager
 import android.os.Build
+import android.os.Handler
+import android.os.Looper
 import android.os.SystemClock
 import com.yegorkapomidorka.headswap.AppLog
 import com.yegorkapomidorka.headswap.CarLifeState
@@ -38,11 +40,17 @@ class CarlifeBtProbe(
     private val lock = Any()
     @Volatile private var accepts = 0
     @Volatile private var active: BluetoothSocket? = null
-    private val p2p = P2pJoin(ctx, onBusy = { onP2pBusy() }, onWifi = { on -> onWifi(on) }, onJoined = { ip -> onP2pJoined(ip) }, onLost = { p2pIp = null })
+    private val p2p = P2pJoin(ctx, onBusy = { onP2pBusy() }, onWifi = { on -> onWifi(on) }, onJoined = { ip -> onP2pJoined(ip) }, onLost = { onP2pLost() })
     /** Адрес телефона в группе ГУ (после входа) и запрос IP от ГУ: MD_WIFI_IP уходит, когда есть оба. */
     @Volatile private var p2pIp: String? = null
     @Volatile private var ipRequested = false
     private val txLock = Any()
+    private val main = Handler(Looper.getMainLooper())
+    /** Последние реквизиты от ГУ, даже пропущенные «уже в группе»: по ним входим заново после распада группы (h211). */
+    @Volatile private var lastTarget: P2pTarget? = null
+    /** Поколение восстановления после распада группы: новый BT-сеанс, вход в группу или стоп его отменяют. */
+    @Volatile private var rejoinGen = 0
+    @Volatile private var rejoining = false
 
     /** Входящий TCP из P2P-группы ГУ: пускаем в Tcp6Listener наравне с подсетями маяка. */
     fun ownsPeer(a: java.net.InetAddress): Boolean = p2p.owns(a)
@@ -58,7 +66,10 @@ class CarlifeBtProbe(
         }
         p2pIp = null
         ipRequested = false
-        accepts = 0      // за этот запуск: в строке `stop` accepts= считаются подключения ГУ с последнего start
+        lastTarget = null
+        rejoinGen++
+        rejoining = false
+        accepts = 0     // за этот запуск: в строке `stop` accepts= считаются подключения ГУ с последнего start
         val adapter = ctx.getSystemService(BluetoothManager::class.java)?.adapter
         when {
             adapter == null -> return fail("нет адаптера")
@@ -86,6 +97,8 @@ class CarlifeBtProbe(
             servers.toList().also { servers.clear() }
         }
         for (s in list) try { s.close() } catch (_: IOException) {}
+        rejoinGen++
+        rejoining = false
         active?.let { try { it.close() } catch (_: IOException) {} }
         p2p.stop(why)
         WLog.ev(WLog.BT, "stop", "why" to why, "accepts" to accepts)
@@ -124,6 +137,8 @@ class CarlifeBtProbe(
         active?.let { old -> try { old.close() } catch (_: IOException) {} }      // ГУ переподключилась: старый канал закрываем
         active = s
         ipRequested = false
+        rejoinGen++      // ГУ переподключила BT: TARGET_INFO придёт обычным обменом, свои запросы снимаем
+        rejoining = false
         try {
             val inp = s.inputStream
             Thread.sleep(300)
@@ -153,6 +168,7 @@ class CarlifeBtProbe(
                             val t = P2pTarget.parse(f.body)
                             if (t == null) WLog.ev(WLog.P2P, "off", "why" to "TARGET_INFO не разобран")
                             else {
+                                lastTarget = t
                                 onTargetInfo(dev?.address)
                                 p2p.start(t)
                             }
@@ -186,7 +202,54 @@ class CarlifeBtProbe(
     private fun onP2pJoined(ip: java.net.Inet4Address) {
         p2pIp = ip.hostAddress
         CarLifeState.btProbe = "телефон в группе ГУ (${ip.hostAddress})" + if (ipRequested) "" else ", ГУ ещё не просила IP"
+        if (rejoining) WLog.ev(WLog.P2P, "rejoin-joined", "ipRequested" to ipRequested)
+        rejoining = false
+        rejoinGen++
+        // MD_WIFI_IP только на IP_REQUEST, как Baidu (BluetoothWirlessHelper:65-69, 289-291): без запроса не шлём
         sendIpIfReady()
+    }
+
+    /**
+     * Группа ГУ распалась (главная нить). Если Bluetooth тоже упал, ГУ переподключит его и пришлёт TARGET_INFO сама.
+     * Если жив (h211: Mazda G6S на заднем ходу снимает Wi-Fi Direct, RFCOMM держит), новый TARGET_INFO не придёт до сна
+     * машины: входим заново по последним реквизитам и просим TARGET_INFO сами, пока не войдём.
+     */
+    private fun onP2pLost() {
+        p2pIp = null
+        val s = active
+        if (!running || s == null) return
+        rejoining = true
+        val g = ++rejoinGen
+        WLog.ev(WLog.P2P, "rejoin-arm", "cached" to (lastTarget != null))
+        AppLog.i("Wi-Fi Direct: группа ГУ распалась, Bluetooth жив - сама прошу у ГУ реквизиты")
+        scheduleRejoin(g, s, 0)
+    }
+
+    private fun scheduleRejoin(g: Int, s: BluetoothSocket, attempt: Int) {
+        val d = P2pPolicy.rejoinDelayMs(attempt)
+        if (d == null) {
+            WLog.ev(WLog.P2P, "rejoin-give-up", "attempts" to attempt)
+            AppLog.i("Wi-Fi Direct: ГУ не подняла группу за $attempt запросов, жду переподключения Bluetooth")
+            return
+        }
+        main.postDelayed({ rejoinStep(g, s, attempt) }, d)
+    }
+
+    private fun rejoinStep(g: Int, s: BluetoothSocket, attempt: Int) {
+        if (g != rejoinGen || !running || active !== s || p2pIp != null) return
+        if (attempt == 0) lastTarget?.let {
+            WLog.ev(WLog.P2P, "rejoin-cached")
+            p2p.start(it)
+        }
+        Thread({
+            try {
+                WLog.ev(WLog.P2P, "rejoin-ask", "n" to attempt + 1)
+                send(s, BtMsg.MD_TARGET_INFO_REQUEST)
+            } catch (e: IOException) {
+                WLog.ev(WLog.BT, "tx-fail", "type" to "TARGET_INFO_REQUEST", "err" to e.message)
+            }
+        }, "bt-rejoin").apply { isDaemon = true }.start()
+        scheduleRejoin(g, s, attempt + 1)
     }
 
     /** MD_WIFI_IP после IP_REQUEST и входа в группу; на повторный запрос того же адреса отвечаем снова. */
