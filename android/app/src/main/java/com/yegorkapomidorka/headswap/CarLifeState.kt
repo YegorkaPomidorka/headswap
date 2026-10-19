@@ -25,6 +25,9 @@ object CarLifeState {
     /** Беспровод (бета, ветка B): что сейчас происходит, для экрана; null - режим не включён. */
     @Volatile var wireless: String? = null
 
+    /** Режим ожидания машины по воздуху включён (сессия может идти или ещё нет); пишет BridgeService, нужен главному экрану для «Остановить». */
+    @Volatile var wirelessWaiting: Boolean = false
+
     /** Bluetooth-проба ветки A: что прислала ГУ по RFCOMM `carlife`; null - проба не запускалась. */
     @Volatile var btProbe: String? = null
 

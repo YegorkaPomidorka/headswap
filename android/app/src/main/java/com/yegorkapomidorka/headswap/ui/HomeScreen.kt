@@ -192,6 +192,9 @@ class HomeScreen(host: MainActivity) : Screen(host) {
             }
             footer.addView(c.primaryButton(label, icon).apply { setOnClickListener { Actions.startServerFromUi(c) } })
         }
+        if (st.wirelessWait) {
+            footer.addView(c.outlineButton(c.getString(R.string.wl_start), R.drawable.ic_wifi).apply { setOnClickListener { WirelessStart.request(host) } })
+        }
         st.outline?.let { o ->
             val b = when (o) {
                 OutlineAction.STOP -> c.outlineButton(c.getString(R.string.home_btn_stop), R.drawable.ic_stop).apply { setOnClickListener { Actions.stopBridge(c) } }

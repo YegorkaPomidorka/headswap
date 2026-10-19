@@ -29,5 +29,12 @@ object P2pPolicy {
         else -> null
     }
 
+    /**
+     * h185: три запроса TARGET_INFO (на 2-й, 7-й и 17-й секундах) ГУ проигнорировала - она сама Bluetooth не переподключит
+     * (выключали Wi-Fi телефона), поэтому рвём RFCOMM; на следующем шаге (~27 с) проверяем, что группа так и не поднялась.
+     */
+    fun rejoinDropBt(attempt: Int): Boolean = attempt >= REJOIN_DROP_BT_AFTER
+
     const val REJOIN_ATTEMPTS = 60
+    const val REJOIN_DROP_BT_AFTER = 3
 }

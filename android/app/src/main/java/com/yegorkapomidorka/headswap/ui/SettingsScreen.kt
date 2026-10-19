@@ -50,7 +50,6 @@ import com.yegorkapomidorka.headswap.link.car.CarNetwork
 import com.yegorkapomidorka.headswap.link.car.CarPairing
 import com.yegorkapomidorka.headswap.link.car.CarProfile
 import com.yegorkapomidorka.headswap.link.car.CarWifi
-import com.yegorkapomidorka.headswap.link.diag.NetProbe
 import com.yegorkapomidorka.headswap.update.UpdatePrefs
 import com.yegorkapomidorka.headswap.update.Updater
 import java.text.NumberFormat
@@ -376,7 +375,6 @@ class SettingsSectionScreen(host: MainActivity, val section: SettingsSection) : 
     private var updButton: TextView? = null
     private var wlStatus: TextView? = null
     private var wlNoPermission: TextView? = null
-    private var wlAwaitingPermission = false
     private var wlCarLine: TextView? = null
     private var wlCarWarn: TextView? = null
     private var wlCarForget: View? = null
@@ -425,11 +423,8 @@ class SettingsSectionScreen(host: MainActivity, val section: SettingsSection) : 
 
     override fun onPermissionResult() {
         refreshMic()
-        if (wlAwaitingPermission) {
-            wlAwaitingPermission = false
-            val lan = Build.VERSION.SDK_INT < 37 || NetProbe.localNetworkGranted(ctx) == "granted"
-            if (lan) startWireless() else wlNoPermission?.visibility = View.VISIBLE
-        }
+        // старт ожидания после разрешений делает MainActivity через WirelessStart (с любого экрана), тут только предупреждение
+        if (WirelessStart.lanDenied) wlNoPermission?.visibility = View.VISIBLE
         if (wlAwaitingCarPermission) {
             wlAwaitingCarPermission = false
             CarPairing.start(host)      // без разрешения выбор всё равно возможен, refreshWireless предупредит
@@ -595,34 +590,13 @@ class SettingsSectionScreen(host: MainActivity, val section: SettingsSection) : 
         CarPairing.start(host)
     }
 
-    /**
-     * На Android 17+ без ACCESS_LOCAL_NETWORK LAN режется молча: сначала спрашиваем, старт - в onPermissionResult.
-     * BLUETOOTH_CONNECT (Android 12+) и «Устройства поблизости» (Wi-Fi Direct) - для ветки A, без них беспровод всё равно стартует.
-     */
+    /** Запрос разрешений и старт ожидания - общий с главным экраном ([WirelessStart]). */
     private fun onWirelessStart() {
         wlNoPermission?.visibility = View.GONE
-        val ask = ArrayList<String>()
-        if (Build.VERSION.SDK_INT >= 37 && NetProbe.localNetworkGranted(ctx) != "granted") ask += Manifest.permission.ACCESS_LOCAL_NETWORK
-        if (!carBtGranted()) ask += Manifest.permission.BLUETOOTH_CONNECT
-        // ветка A: вход в Wi-Fi Direct-группу ГУ; без него беспровод стартует, но только веткой B
-        val p2p = if (Build.VERSION.SDK_INT >= 33) Manifest.permission.NEARBY_WIFI_DEVICES else Manifest.permission.ACCESS_FINE_LOCATION
-        if (ctx.checkSelfPermission(p2p) != PackageManager.PERMISSION_GRANTED) ask += p2p
-        if (ask.isNotEmpty()) {
-            wlAwaitingPermission = true
-            host.requestPermissions(ask.toTypedArray(), REQ_LOCAL_NETWORK)
-            return
-        }
-        startWireless()
-    }
-
-    private fun startWireless() {
-        AppLog.i("кнопка «Ждать машину по Wi-Fi»")
-        ctx.startForegroundService(Intent(ctx, BridgeService::class.java).setAction(BridgeService.ACTION_WIFI_B))
+        WirelessStart.request(host)
     }
 
     private companion object {
-        /** Тот же код, что MainActivity.REQ_LOCAL_NETWORK: результат попадает в её лог. */
-        const val REQ_LOCAL_NETWORK = 37
         /** BLUETOOTH_CONNECT перед выбором машины (38 занят диалогом CDM, CarPairing.REQ_CAR_PAIR). */
         const val REQ_CAR_BT = 39
         /** Проверка Wi-Fi машины из настроек: сколько ждём одобрения и входа, и сколько держим сеть после входа. */

@@ -3,6 +3,7 @@
 <resources>
     <string name="wl_state_waiting">waiting for the car over Wi-Fi (%1$s)</string>
     <string name="wl_state_no_hotspot">no hotspot: turn on the phone\'s Wi-Fi hotspot</string>
+    <string name="wl_state_wait_bt">waiting for the car over Bluetooth</string>
     <string name="wl_state_p2p_busy">Wi-Fi Direct is busy: turn off the phone\'s hotspot</string>
     <string name="wl_state_connected">car connected over Wi-Fi</string>
     <string name="wl_state_lost">connection lost, waiting for the car again</string>

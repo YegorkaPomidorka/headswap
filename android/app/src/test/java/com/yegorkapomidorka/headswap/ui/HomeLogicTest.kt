@@ -18,7 +18,34 @@ class HomeLogicTest {
         setupError: UiText? = null,
         consent: Boolean = false,
         wireless: Boolean = false,
-    ) = Inputs(running, status, protocol, serverUp, autoReady, lost, graceLeft, 8, usbAudio, setupError, aaConsent = consent, wireless = wireless)
+        offered: Boolean = false,
+        waiting: Boolean = false,
+    ) = Inputs(
+        running, status, protocol, serverUp, autoReady, lost, graceLeft, 8, usbAudio, setupError, aaConsent = consent, wireless = wireless,
+        wirelessOffered = offered, wirelessWaiting = waiting,
+    )
+
+    /** h185: беспровод уже использовался, моста нет - под основной кнопкой «Ждать машину по Wi-Fi». */
+    @Test
+    fun wirelessWaitButtonWhenOffered() {
+        assertEquals(false, HomeLogic.compute(inp()).wirelessWait)
+        val s = HomeLogic.compute(inp(offered = true))
+        assertEquals(true, s.wirelessWait)
+        assertEquals(PrimaryAction.START_SERVER, s.primary)
+    }
+
+    /** h185: ожидание по воздуху без моста - «Остановить»; во время беспроводной сессии «Ждать» нет. */
+    @Test
+    fun stopWhileWaitingOverAir() {
+        val s = HomeLogic.compute(inp(offered = true, waiting = true))
+        assertEquals(OutlineAction.STOP, s.outline)
+        assertEquals(true, s.wirelessWait)
+        val serverUp = HomeLogic.compute(inp(serverUp = true, waiting = true))
+        assertEquals(OutlineAction.STOP, serverUp.outline)
+        val conn = HomeLogic.compute(inp(running = true, status = "мост: AA -> CarLife", protocol = true, wireless = true, offered = true, waiting = true))
+        assertEquals(false, conn.wirelessWait)
+        assertEquals(OutlineAction.STOP, conn.outline)
+    }
 
     @Test
     fun errorWhenCertificateMissing() {

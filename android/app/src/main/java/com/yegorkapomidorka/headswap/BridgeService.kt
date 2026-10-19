@@ -5,6 +5,7 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
+import android.bluetooth.BluetoothAdapter
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
@@ -13,6 +14,7 @@ import android.content.pm.PackageManager
 import android.content.pm.ServiceInfo
 import android.hardware.usb.UsbManager
 import android.net.Network
+import android.net.wifi.WifiManager
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
@@ -85,6 +87,21 @@ class BridgeService : Service() {
     private var linkWaiting = false
     /** Беспровод (бета, ветка B) включён пользователем: после обрыва снова ждём машину. Пишет главная нить, читает и коннектор (автозапуск сервера AA). */
     @Volatile private var wifiBMode = false
+        set(v) {
+            field = v
+            CarLifeState.wirelessWaiting = v
+            if (v) registerRadioReceiver() else unregisterRadioReceiver()
+        }
+    /** Ресивер состояния Bluetooth и Wi-Fi: висит, пока включён [wifiBMode] (h185). Только главная нить. */
+    private var radioReceiverOn = false
+    private val radioReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent) {
+            when (intent.action) {
+                BluetoothAdapter.ACTION_STATE_CHANGED -> onBtState(intent.getIntExtra(BluetoothAdapter.EXTRA_STATE, BluetoothAdapter.ERROR))
+                WifiManager.WIFI_STATE_CHANGED_ACTION -> onWifiState(intent.getIntExtra(WifiManager.EXTRA_WIFI_STATE, WifiManager.WIFI_STATE_UNKNOWN))
+            }
+        }
+    }
     /**
      * Авторежим: выбранная машина рядом по Bluetooth (ACL_CONNECTED), ожидание по Wi-Fi держим, пока она рядом.
      * Пишет главная нить, читают колбэки статуса. Зеркало в CarLifeState.carAuto для отчёта.
@@ -126,6 +143,12 @@ class BridgeService : Service() {
     /** Wi-Fi Direct-машина (TARGET_INFO в этом ожидании или в профиле): сеть машины не запрашиваем, wifi-подсказку не показываем. */
     private val wifiDirectCar: Boolean
         get() = p2pThisWait || CarProfile(this).connMode == CarConnMode.BT_CARLIFE
+    /**
+     * ГУ уже подключалась к RFCOMM или присылала TARGET_INFO с запуска сервиса: Wi-Fi Direct-машина, хотспот не просим.
+     * [beginWait] не сбрасывает (повторное «Ждать» не должно возвращать подсказку про хотспот, h185); в отличие от [wifiDirectCar]
+     * на сеть машины и подсказки не влияет. Только главная нить.
+     */
+    private var directCarSeen = false
     /** `car-skip` уже записан в этом ожидании. Только главная нить. */
     private var carSkipLogged = false
     /** Подключений ГУ к RFCOMM `carlife` в этом ожидании и показана ли подсказка «переподключи Bluetooth». Только главная нить. */
@@ -158,6 +181,48 @@ class BridgeService : Service() {
                 session?.takeIf { it.transportKind == TransportCaps.USB_AOA.kind }?.close("аксессуар отключён (broadcast)")
             }
         }
+    }
+
+    private fun registerRadioReceiver() {
+        if (radioReceiverOn) return
+        radioReceiverOn = true
+        val f = IntentFilter().apply {
+            addAction(BluetoothAdapter.ACTION_STATE_CHANGED)
+            addAction(WifiManager.WIFI_STATE_CHANGED_ACTION)
+        }
+        registerReceiver(radioReceiver, f, Context.RECEIVER_NOT_EXPORTED)
+    }
+
+    private fun unregisterRadioReceiver() {
+        if (!radioReceiverOn) return
+        radioReceiverOn = false
+        try {
+            unregisterReceiver(radioReceiver)
+        } catch (_: Exception) {
+        }
+    }
+
+    /**
+     * Bluetooth телефона выключили/включили, пока ждём машину по воздуху (h185). После включения старых сокетов нет,
+     * поэтому проба безопасно перезапускается и слушатели RFCOMM поднимаются заново (при выключенном BT start() их не создал).
+     */
+    private fun onBtState(state: Int) {
+        if (state != BluetoothAdapter.STATE_ON && state != BluetoothAdapter.STATE_OFF) return
+        val on = state == BluetoothAdapter.STATE_ON
+        AppLog.i("Bluetooth: ${if (on) "включён" else "выключен"}")
+        WLog.ev(WLog.BT, "adapter", "on" to on)
+        // при идущей сессии не трогаем: stop пробы снимает и P2P-группу (removeGroup), а слушатели RFCOMM accept-цикл пересоздаст сам
+        if (on && wifiBMode && !stopRequested && session == null) {
+            btProbe.stop("bt-on")
+            btProbe.start()
+        }
+    }
+
+    private fun onWifiState(state: Int) {
+        if (state != WifiManager.WIFI_STATE_ENABLED && state != WifiManager.WIFI_STATE_DISABLED) return
+        val on = state == WifiManager.WIFI_STATE_ENABLED
+        AppLog.i("Wi-Fi: ${if (on) "включён" else "выключен"}")
+        WLog.ev(WLog.P2P, "wifi-adapter", "on" to on)
     }
 
     override fun onCreate() {
@@ -242,10 +307,13 @@ class BridgeService : Service() {
                 failStart()
                 return START_NOT_STICKY
             }
-            if (wifiBMode && linkWaiting && !stopRequested) {
-                // повторное нажатие, ожидание уже идёт: счётчики accept/TARGET_INFO не сбрасываем (иначе ложный bt-hint, h126)
+            if (wifiBMode && !stopRequested) {
+                // повторное «Ждать» при ожидании (сессия сюда не доходит, см. выше): как «Остановить» → «Ждать», но без
+                // markUserStop и без сброса autoMode. Зависшее ожидание (h185: обрыв Wi-Fi, ГУ молчит по Bluetooth) иначе не вылечить
+                AppLog.i("сервис: wifi-b: повторное «Ждать» - перезапускаю ожидание")
                 autoStarted = false
-                WLog.ev(WLog.TRIGGER, "manual-mark", "why" to "waiting")
+                WLog.ev(WLog.TRIGGER, "manual-restart", "waiting" to linkWaiting)
+                restartWait()
                 return START_NOT_STICKY
             }
             wifiBMode = true
@@ -318,9 +386,7 @@ class BridgeService : Service() {
             bindNetwork = carNetwork,
             onIfaces = { list ->
                 // Wi-Fi Direct-машине хотспот не нужен, а включённый он занимает Wi-Fi Direct (h214): не просим его включить
-                CarLifeState.wireless = if (list.isEmpty()) {
-                    if (wifiDirectCar) waitingText("Wi-Fi Direct") else getString(R.string.wl_state_no_hotspot)
-                }
+                CarLifeState.wireless = if (list.isEmpty()) noIfacesText()
                 else waitingText(list.joinToString(", ") { it.name })
             },
         )
@@ -331,6 +397,35 @@ class BridgeService : Service() {
             main.postDelayed(hintTick, AUTO_HINT_MS)
         }
         if (linkWaiting) scheduleCarNet()
+    }
+
+    /**
+     * Повторное «Ждать»: пробу Bluetooth перезапускаем (ГУ увидит новое RFCOMM-подключение и пришлёт TARGET_INFO), ожидание
+     * 6/6 заводим заново. Идущее ожидание обрываем как при смене сети машины ([restartingForCarNet]): ветка отказа в
+     * startTcp6 это не сдача, через [WIFI_B_REARM_MS] ожидание стартует само. Только главная нить, сессии нет.
+     */
+    private fun restartWait() {
+        btProbe.stop("повторное ждать")
+        beginWait()
+        if (linkWaiting) {
+            btProbe.start()
+            abortWaitForRestart()
+        } else {
+            startWifiB()
+            btProbe.start()
+        }
+    }
+
+    private fun abortWaitForRestart() {
+        if (!linkWaiting || !wifiBMode || stopRequested || session != null) return
+        val l = pendingTcp6
+        if (l == null) {      // слушатель ещё открывается: повторим, пока ждём
+            main.postDelayed({ abortWaitForRestart() }, 300)
+            return
+        }
+        restartingForCarNet = true
+        WLog.ev(WLog.LINK, "rearm", "after" to "manual-wait")
+        l.abort()
     }
 
     /** Новое ожидание по Wi-Fi (авто или ручное): сброс счётчиков и таймер подсказки про Bluetooth. */
@@ -417,10 +512,12 @@ class BridgeService : Service() {
         // машина выбрана и это она: запоминаем навсегда; не выбрана или чужая - только на это ожидание
         if (CarMac.same(profile.btMac, mac)) profile.connMode = CarConnMode.BT_CARLIFE
         p2pThisWait = true
+        directCarSeen = true
         main.removeCallbacks(carNetTick)
         if (carNetBusy) carNetImpl?.release("p2p")      // колбэки снимаются без вызовов: onUnavailable/onLost не придут
         if (CarWifi(this).isSet) logCarSkip()
         cancelHint()
+        refreshNoIfacesStatus()
     }
 
     /** discoverPeers вернул BUSY: на Samsung это включённая точка доступа, просим её выключить. */
@@ -432,7 +529,9 @@ class BridgeService : Service() {
     private fun onBtAccept() {
         if (!wifiBMode || stopRequested) return
         btAcceptsThisWait++
+        directCarSeen = true
         cancelBtHint()
+        refreshNoIfacesStatus()
     }
 
     private fun onCarNetAvailable(@Suppress("UNUSED_PARAMETER") network: Network) {
@@ -463,6 +562,18 @@ class BridgeService : Service() {
         if (!wifiBMode || stopRequested || session != null) return
         restartForCarNet()
         scheduleCarNet()
+    }
+
+    /**
+     * Нет подсетей для маяка: Wi-Fi Direct-машине (профиль, TARGET_INFO или ГУ уже подключалась к RFCOMM в этом ожидании)
+     * хотспот не нужен - она идёт по Bluetooth (h185), остальным просим включить точку доступа.
+     */
+    private fun noIfacesText() =
+        getString(if (wifiDirectCar || directCarSeen) R.string.wl_state_wait_bt else R.string.wl_state_no_hotspot)
+
+    /** Статус «нет точки доступа» остался с момента до того, как стало ясно, что машина Wi-Fi Direct: маяк его сам не обновит. */
+    private fun refreshNoIfacesStatus() {
+        if (CarLifeState.wireless == getString(R.string.wl_state_no_hotspot)) CarLifeState.wireless = noIfacesText()
     }
 
     /** Статус ожидания; в авторежиме с пометкой, что машина рядом по Bluetooth. */
@@ -999,6 +1110,8 @@ class BridgeService : Service() {
             unregisterReceiver(detachReceiver)
         } catch (_: Exception) {
         }
+        unregisterRadioReceiver()
+        CarLifeState.wirelessWaiting = false
         stopRequested = true
         alive = false
         autoMode = false

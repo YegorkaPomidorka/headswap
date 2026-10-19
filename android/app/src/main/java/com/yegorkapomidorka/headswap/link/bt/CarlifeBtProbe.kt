@@ -51,6 +51,8 @@ class CarlifeBtProbe(
     /** Поколение восстановления после распада группы: новый BT-сеанс, вход в группу или стоп его отменяют. */
     @Volatile private var rejoinGen = 0
     @Volatile private var rejoining = false
+    /** Поколение слушателей RFCOMM: start()/stop() его меняют, нить accept прежнего запуска выходит, а не пересоздаёт сокет. Под [lock]. */
+    @Volatile private var listenGen = 0
 
     /** Входящий TCP из P2P-группы ГУ: пускаем в Tcp6Listener наравне с подсетями маяка. */
     fun ownsPeer(a: java.net.InetAddress): Boolean = p2p.owns(a)
@@ -60,9 +62,10 @@ class CarlifeBtProbe(
 
     @SuppressLint("MissingPermission")
     fun start() {
-        synchronized(lock) {
+        val gen = synchronized(lock) {
             if (running) return
             running = true
+            ++listenGen
         }
         p2pIp = null
         ipRequested = false
@@ -85,7 +88,7 @@ class CarlifeBtProbe(
             }
             synchronized(lock) { servers += ss }
             WLog.ev(WLog.BT, "listen", "uuid" to tag, "name" to SERVICE_NAME)
-            Thread({ acceptLoop(tag, ss) }, "bt-accept-$tag").apply { isDaemon = true }.start()
+            Thread({ acceptLoop(tag, uuid, gen, ss) }, "bt-accept-$tag").apply { isDaemon = true }.start()
         }
         CarLifeState.btProbe = if (synchronized(lock) { servers.isEmpty() }) "не слушает" else "слушаю carlife, ГУ не подключалась"
     }
@@ -94,6 +97,7 @@ class CarlifeBtProbe(
         val list = synchronized(lock) {
             if (!running) return
             running = false
+            listenGen++      // нити accept старого запуска не должны пересоздавать слушатели, если start() успеет раньше их выхода
             servers.toList().also { servers.clear() }
         }
         for (s in list) try { s.close() } catch (_: IOException) {}
@@ -110,17 +114,68 @@ class CarlifeBtProbe(
         WLog.ev(WLog.BT, "off", "why" to why)
     }
 
-    private fun acceptLoop(tag: String, ss: BluetoothServerSocket) {
-        while (running) {
+    private fun listening(gen: Int) = running && gen == listenGen
+
+    /**
+     * Нить на один UUID: accept, разговор с ГУ, снова accept (старое соединение закрыто - принимаем новое на том же сокете).
+     * Сбой accept при живом запуске (h185: Bluetooth/Wi-Fi переключали, стек сбросил слушатель) не конец: пересоздаём
+     * серверный сокет через [REOPEN_MS], пока Bluetooth выключен - ждём без горячего цикла.
+     */
+    @SuppressLint("MissingPermission")
+    private fun acceptLoop(tag: String, uuid: UUID, gen: Int, first: BluetoothServerSocket) {
+        var ss: BluetoothServerSocket? = first
+        var offLogged = false
+        while (listening(gen)) {
+            val cur = ss
+            if (cur == null) {
+                val adapter = ctx.getSystemService(BluetoothManager::class.java)?.adapter
+                if (adapter == null || !adapter.isEnabled) {
+                    if (!offLogged) WLog.ev(WLog.BT, "listen-wait", "uuid" to tag, "why" to "Bluetooth выключен")
+                    offLogged = true
+                } else {
+                    offLogged = false
+                    val fresh = try {
+                        adapter.listenUsingRfcommWithServiceRecord(SERVICE_NAME, uuid)
+                    } catch (e: Exception) {
+                        WLog.ev(WLog.BT, "listen-fail", "uuid" to tag, "err" to e.message)
+                        null
+                    }
+                    if (fresh != null) {
+                        val stale = synchronized(lock) { if (listening(gen)) { servers += fresh; false } else true }
+                        if (stale) {
+                            try { fresh.close() } catch (_: IOException) {}
+                            return
+                        }
+                        ss = fresh
+                        WLog.ev(WLog.BT, "listen", "uuid" to tag, "name" to SERVICE_NAME)
+                        continue
+                    }
+                }
+                if (!pause()) return
+                continue
+            }
             val s = try {
-                ss.accept()
-            } catch (_: IOException) {
-                return
+                cur.accept()
+            } catch (e: IOException) {
+                synchronized(lock) { servers.remove(cur) }
+                try { cur.close() } catch (_: IOException) {}
+                ss = null
+                if (!listening(gen)) return
+                WLog.ev(WLog.BT, "listen-reopen", "uuid" to tag, "err" to e.message)
+                if (!pause()) return
+                continue
             }
             accepts++
             onAccept()
             talk(tag, s)
         }
+    }
+
+    private fun pause(): Boolean = try {
+        Thread.sleep(REOPEN_MS)
+        true
+    } catch (_: InterruptedException) {
+        false
     }
 
     @SuppressLint("MissingPermission")
@@ -237,6 +292,7 @@ class CarlifeBtProbe(
 
     private fun rejoinStep(g: Int, s: BluetoothSocket, attempt: Int) {
         if (g != rejoinGen || !running || active !== s || p2pIp != null) return
+        if (P2pPolicy.rejoinDropBt(attempt)) return dropBt(s, attempt)
         if (attempt == 0) lastTarget?.let {
             WLog.ev(WLog.P2P, "rejoin-cached")
             p2p.start(it)
@@ -250,6 +306,20 @@ class CarlifeBtProbe(
             }
         }, "bt-rejoin").apply { isDaemon = true }.start()
         scheduleRejoin(g, s, attempt + 1)
+    }
+
+    /**
+     * ГУ молчит на запросы TARGET_INFO (h185: телефон выключал/включал Wi-Fi, RFCOMM остался жив, а ГУ группу не
+     * поднимает): закрываем только активный сокет, слушатели остаются. Цикл accept принимает переподключение ГУ, и
+     * TARGET_INFO приходит обычным обменом. [stop] тут нельзя: он оборвёт и слушателей, и само восстановление.
+     */
+    private fun dropBt(s: BluetoothSocket, attempts: Int) {
+        rejoining = false
+        rejoinGen++
+        WLog.ev(WLog.P2P, "rejoin-drop-bt", "attempts" to attempts)
+        AppLog.i("Wi-Fi Direct: ГУ не подняла группу за $attempts запросов, рву Bluetooth - жду, пока она переподключится")
+        CarLifeState.btProbe = "Bluetooth сброшен, жду переподключения ГУ"
+        try { s.close() } catch (_: IOException) {}
     }
 
     /** MD_WIFI_IP после IP_REQUEST и входа в группу; на повторный запрос того же адреса отвечаем снова. */
@@ -269,6 +339,8 @@ class CarlifeBtProbe(
 
     companion object {
         const val SERVICE_NAME = "carlife"
+        /** Пауза перед пересозданием серверного сокета после сбоя accept и между проверками включения Bluetooth. */
+        private const val REOPEN_MS = 2_000L
         val UUIDS = listOf(
             "spp" to UUID.fromString("00001101-0000-1000-8000-00805F9B34FB"),
             "carlife" to UUID.fromString("a45bc7e5-bb50-4949-9de1-f78299cf6d78"),

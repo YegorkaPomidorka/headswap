@@ -29,4 +29,14 @@ class P2pPolicyTest {
         assertEquals(10_000L, P2pPolicy.rejoinDelayMs(P2pPolicy.REJOIN_ATTEMPTS - 1))
         assertEquals(null, P2pPolicy.rejoinDelayMs(P2pPolicy.REJOIN_ATTEMPTS))
     }
+
+    /** h185: после трёх безответных запросов (попытки 0..2) на шаге 3 рвём живой RFCOMM, чтобы ГУ переподключила его. */
+    @Test
+    fun rejoinDropsBtAfterThreeAsks() {
+        assertEquals(3, P2pPolicy.REJOIN_DROP_BT_AFTER)
+        assertEquals(false, P2pPolicy.rejoinDropBt(0))
+        assertEquals(false, P2pPolicy.rejoinDropBt(P2pPolicy.REJOIN_DROP_BT_AFTER - 1))
+        assertEquals(true, P2pPolicy.rejoinDropBt(P2pPolicy.REJOIN_DROP_BT_AFTER))
+        assertEquals(true, P2pPolicy.rejoinDropBt(P2pPolicy.REJOIN_ATTEMPTS))
+    }
 }

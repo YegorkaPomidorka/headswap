@@ -3,6 +3,7 @@ package com.yegorkapomidorka.headswap.ui
 import android.content.Context
 import android.hardware.usb.UsbManager
 import android.os.SystemClock
+import com.yegorkapomidorka.headswap.BuildConfig
 import com.yegorkapomidorka.headswap.CarLifeState
 import com.yegorkapomidorka.headswap.R
 import com.yegorkapomidorka.headswap.aa.AaCreds
@@ -10,6 +11,7 @@ import com.yegorkapomidorka.headswap.aa.AaPrefs
 import com.yegorkapomidorka.headswap.aa.AaState
 import com.yegorkapomidorka.headswap.autosrv.AutoResult
 import com.yegorkapomidorka.headswap.autosrv.AutoServer
+import com.yegorkapomidorka.headswap.link.car.CarProfile
 
 /** Сводка состояния для главного экрана и уведомления. Чистая логика без Android: считается из Inputs. */
 enum class Phase { OFF, WAITING, CONNECTED, RECONNECTING, ERROR }
@@ -40,6 +42,8 @@ data class HomeState(
     val showChain: Boolean,
     val notifTitle: UiText,
     val notifText: UiText,
+    /** Доп. кнопка «Ждать машину по Wi-Fi» под основной (h185); true только в беспроводной бете и когда беспровод уже использовался. */
+    val wirelessWait: Boolean = false,
 )
 
 class Inputs(
@@ -63,6 +67,10 @@ class Inputs(
     val aaConsent: Boolean = false,
     /** Сессия идёт по Wi-Fi: CarLife и звук идут к ГУ по воздуху, кабеля нет. */
     val wireless: Boolean = false,
+    /** Бета беспровода и им уже пользовались (кнопка запускалась или выбрана машина): на главном экране есть «Ждать машину по Wi-Fi». */
+    val wirelessOffered: Boolean = false,
+    /** Режим ожидания по воздуху включён (сессии ещё может не быть): на главном экране нужна «Остановить». */
+    val wirelessWaiting: Boolean = false,
 )
 
 object HomeLogic {
@@ -75,7 +83,21 @@ object HomeLogic {
     private val CARLIFE_WIFI = UiText.raw("CarLife 2.0 · Wi-Fi")
     private val TEXT_START_CHAIN = UiText.res(R.string.home_sub_start_chain)
 
-    fun compute(i: Inputs): HomeState {
+    fun compute(i: Inputs): HomeState = withWireless(i, base(i))
+
+    /**
+     * Беспровод поверх любого состояния (h185): пока ждём машину по воздуху без моста, «Остановить» вместо прочей
+     * контурной кнопки; «Ждать машину по Wi-Fi» - когда моста нет или он ждёт по воздуху (повторное нажатие
+     * перезапускает ожидание), но не во время беспроводной сессии.
+     */
+    private fun withWireless(i: Inputs, s: HomeState): HomeState {
+        val stop = i.wirelessWaiting && !i.wireless && (!i.bridgeRunning || s.outline == null)
+        val wait = i.wirelessOffered && !i.wireless && (!i.bridgeRunning || i.wirelessWaiting)
+        if (!stop && !wait) return s
+        return s.copy(outline = if (stop) OutlineAction.STOP else s.outline, wirelessWait = wait)
+    }
+
+    private fun base(i: Inputs): HomeState {
         val st = i.aaStatus
         val reconnecting = i.bridgeRunning && "USB потерян" in st
         val connected = i.bridgeRunning && st.startsWith("мост: AA -> CarLife")
@@ -295,6 +317,8 @@ object HeadswapStatus {
             videoRes = (CarLifeState.videoMode ?: aaPrefs.videoMode.effective(aaPrefs.transcode)).outLabel,
             aaConsent = AutoServer.consentPending(),
             wireless = CarLifeState.wirelessSession,
+            wirelessOffered = BuildConfig.WIRELESS_BETA && (UiPrefs(ctx).wirelessUsed || CarProfile(ctx).isSet),
+            wirelessWaiting = CarLifeState.wirelessWaiting,
         )
     }
 

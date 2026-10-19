@@ -56,6 +56,11 @@ class UiPrefs(ctx: Context) {
         get() = sp.getString("theme", "system") ?: "system"
         set(v) = sp.edit().putString("theme", v).apply()
 
+    /** Беспровод уже запускали кнопкой «Ждать машину по Wi-Fi»: на главном экране показываем её и без выбранной машины (h185). */
+    var wirelessUsed: Boolean
+        get() = sp.getBoolean("wirelessUsed", false)
+        set(v) = sp.edit().putBoolean("wirelessUsed", v).apply()
+
     fun isManualDone(id: String): Boolean = sp.getBoolean("manual_$id", false)
 
     fun setManualDone(id: String, v: Boolean) = sp.edit().putBoolean("manual_$id", v).apply()

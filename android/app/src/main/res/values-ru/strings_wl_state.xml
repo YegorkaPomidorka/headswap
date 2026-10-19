@@ -3,6 +3,7 @@
 <resources>
     <string name="wl_state_waiting">жду машину по Wi-Fi (%1$s)</string>
     <string name="wl_state_no_hotspot">нет точки доступа: включите хотспот на телефоне</string>
+    <string name="wl_state_wait_bt">жду машину по Bluetooth</string>
     <string name="wl_state_p2p_busy">Wi-Fi Direct занят: выключите точку доступа на телефоне</string>
     <string name="wl_state_connected">машина подключилась по Wi-Fi</string>
     <string name="wl_state_lost">связь потеряна, жду машину снова</string>

@@ -29,6 +29,7 @@ import com.yegorkapomidorka.headswap.ui.SettingsSection
 import com.yegorkapomidorka.headswap.ui.SettingsSectionScreen
 import com.yegorkapomidorka.headswap.ui.StepId
 import com.yegorkapomidorka.headswap.ui.UiPrefs
+import com.yegorkapomidorka.headswap.ui.WirelessStart
 import com.yegorkapomidorka.headswap.update.Updater
 
 /**
@@ -137,6 +138,8 @@ class MainActivity : Activity() {
     @Deprecated("Deprecated in Java")
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        // старт ожидания по Wi-Fi не зависит от экрана, с которого нажали (h185); раньше экрана, чтобы он видел итог
+        if (requestCode == REQ_LOCAL_NETWORK) WirelessStart.onResult(this)
         current()?.onPermissionResult()
         if (requestCode == REQ_LOCAL_NETWORK) AppLog.i("ACCESS_LOCAL_NETWORK: ${NetProbe.localNetworkGranted(this)}")
     }
