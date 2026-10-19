@@ -827,6 +827,9 @@ class AaBridgeCore(
             }
         }
         var out = pcm
+        // уровень музыки от AA (до EQ) и после EQ/ресэмпла: нули на входе = AA отдаёт тишину (h100)
+        val mediaDiag = ch == CarlifeAudio.CH_MEDIA && (audioLogged[ch] ?: 0L).let { it < 3 || (it + 1) % 200 == 0L }
+        val inStats = if (mediaDiag) CarlifeAudio.pcm16Stats(pcm) else null
         if (ch == CarlifeAudio.CH_MEDIA) {
             val eq = eqProvider()
             if (eq != eqLogged) {
@@ -857,6 +860,10 @@ class AaBridgeCore(
         val c = (audioLogged[ch] ?: 0L) + 1
         audioLogged[ch] = c
         if (c <= 2 || c % 200 == 0L) log("BRIDGE AA audio ch$chan ${pcm.size} Б -> CarLife ${chName(ch)} (#$c, всего ${audioBytes / 1024} КиБ)", false)
+        if (inStats != null) {
+            val (outPeak, outRms) = CarlifeAudio.pcm16Stats(out)
+            log("BRIDGE MEDIA пакет #$c: вход peak=${inStats.first} rms=%.1f, выход ${out.size} Б peak=$outPeak rms=%.1f${if (inStats.first == 0) " (AA ОТДАЁТ НУЛИ)" else ""}".format(inStats.second, outRms), false)
+        }
         if (ch == CarlifeAudio.CH_TTS && ++ttsPackets <= TTS_DIAG_PACKETS) {
             val (peak, rms) = CarlifeAudio.pcm16Stats(pcm)
             log("BRIDGE TTS пакет #$ttsPackets: ${pcm.size} Б, peak=$peak rms=%.1f${if (peak == 0) " (ВСЕ НУЛИ)" else ""}".format(rms), false)
