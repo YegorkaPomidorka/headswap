@@ -109,6 +109,11 @@ class AaPrefs(ctx: Context) {
         get() = sp.getBoolean("autoServer", true)
         set(v) = sp.edit().putBoolean("autoServer", v).apply()
 
+    /** Эксперимент h135: включать точку доступа при Bluetooth-подключении к машине и выключать при отключении (через спецвозможности). */
+    var autoHotspot: Boolean
+        get() = sp.getBoolean("autoHotspot", false)
+        set(v) = sp.edit().putBoolean("autoHotspot", v).apply()
+
     /** Источник звука для микрофона AA: машина / телефон / авто (ГУ, при молчании 2 с - телефон). */
     var micMode: MicMode
         get() = MicMode.parse(sp.getString("micMode", MicMode.AUTO.key))

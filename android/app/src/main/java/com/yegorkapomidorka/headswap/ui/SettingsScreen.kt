@@ -481,10 +481,26 @@ class SettingsSectionScreen(host: MainActivity, val section: SettingsSection) : 
         wlCwForget = c.outlineButton(c.getString(R.string.wl_cw_forget), heightDp = 56, sp = 16f).apply {
             setOnClickListener { onCarWifiForget() }
         }.also { card.addView(it, lp(MATCH, c.dp(56))) }
+        // h135: точка доступа через спецвозможности (эксперимент)
+        card.addView(ToggleRow(c, c.getString(R.string.wl_hs_auto), c.getString(R.string.wl_hs_auto_sub), aa.autoHotspot, 72, false, 15f, 13f) { aa.autoHotspot = it }.view,
+            lp(MATCH, WRAP).apply { topMargin = c.dp(8) })
+        card.addView(c.outlineButton(c.getString(R.string.wl_hs_on), heightDp = 56, sp = 16f).apply { setOnClickListener { onHotspotButton(true) } },
+            lp(MATCH, c.dp(56)))
+        card.addView(c.outlineButton(c.getString(R.string.wl_hs_off), heightDp = 56, sp = 16f).apply { setOnClickListener { onHotspotButton(false) } },
+            lp(MATCH, c.dp(56)))
         card.addView(c.linkButton(c.getString(R.string.wl_report), heightDp = 52, sp = 16f).apply { setOnClickListener { LogShare.shareReport(c) } },
             lp(MATCH, c.dp(52)))
         refreshWireless()
         return card
+    }
+
+    /** Ручной запуск эксперимента h135; выключение по кнопке не смотрит, включали ли точку мы. */
+    private fun onHotspotButton(on: Boolean) {
+        if (!AutoServer.isConnected) {
+            Actions.enableServiceDialog(ctx)
+            return
+        }
+        AutoServer.hotspot(on, "button", force = true)
     }
 
     private fun refreshWireless() {

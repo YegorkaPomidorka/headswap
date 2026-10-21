@@ -170,6 +170,10 @@
     <string name="wl_off">off</string>
     <string name="wl_no_permission">Without the “Nearby devices” permission the car cannot connect over Wi-Fi</string>
     <string name="wl_report">Send wireless report</string>
+    <string name="wl_hs_auto">Turn on the hotspot when connecting to the car (experiment, via accessibility)</string>
+    <string name="wl_hs_auto_sub">Headswap turns the phone hotspot on when it connects to the selected car over Bluetooth and off when it disconnects. Needs the accessibility service. If it fails, send the log.</string>
+    <string name="wl_hs_on">Turn the hotspot on now</string>
+    <string name="wl_hs_off">Turn the hotspot off now</string>
     <string name="wl_car_line">Car: %1$s</string>
     <string name="wl_car_none">not selected</string>
     <string name="wl_car_note">When the phone connects to this car over Bluetooth, Headswap starts waiting for it over Wi-Fi by itself</string>

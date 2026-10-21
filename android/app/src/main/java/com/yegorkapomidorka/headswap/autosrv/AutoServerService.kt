@@ -15,8 +15,10 @@ import com.yegorkapomidorka.headswap.MainActivity
 import com.yegorkapomidorka.headswap.AppLog
 
 /**
- * Служба спецвозможностей: только окна com.google.android.projection.gearhead (см. res/xml/autosrv_config.xml).
- * Сама ничего не делает; сценарий (ServerAutomation) гоняет AutoServer на своей нити через AccessibilityServerUi.
+ * Служба спецвозможностей: без фильтра по пакетам (см. res/xml/autosrv_config.xml), чтобы эксперимент h135 видел
+ * Настройки и шторку. Сама ничего не делает; сценарии гоняет AutoServer на своей нити: AA (ServerAutomation) через
+ * AccessibilityServerUi, который сам берёт только окна com.google.android.projection.gearhead, и точка доступа
+ * (HotspotAutomation) через AccessibilityHotspotUi.
  */
 class AutoServerService : AccessibilityService() {
     override fun attachBaseContext(base: Context) {
@@ -31,7 +33,7 @@ class AutoServerService : AccessibilityService() {
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
-        // события не нужны: подписка на окна AA только заставляет систему отдавать дерево узлов
+        // события не нужны: подписка только заставляет систему отдавать дерево узлов окон
     }
 
     override fun onInterrupt() {}

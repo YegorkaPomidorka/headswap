@@ -17,6 +17,7 @@ import android.os.Handler
 import android.os.Looper
 import com.yegorkapomidorka.headswap.AppLog
 import com.yegorkapomidorka.headswap.link.diag.WLog
+import com.yegorkapomidorka.headswap.link.wifi.HotspotState
 import com.yegorkapomidorka.headswap.link.wifi.LanIface
 import java.net.Inet4Address
 import java.net.InetAddress
@@ -313,10 +314,7 @@ class P2pJoin(
         onJoined(lan.ip)
     }
 
-    /** Точка доступа телефона поднята: swlan* у Samsung, ap* у остальных, с IPv4. */
-    private fun hotspotUp(): Boolean = NetworkInterface.getNetworkInterfaces()?.toList().orEmpty().any { ni ->
-        (ni.name.startsWith("swlan") || ni.name.startsWith("ap")) && ni.isUp && ni.inetAddresses.toList().any { it is Inet4Address }
-    }
+    private fun hotspotUp(): Boolean = HotspotState.up()
 
     private fun p2pIface(): LanIface? {
         for (ni in NetworkInterface.getNetworkInterfaces()?.toList().orEmpty()) {

@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="autosrv_label">Headswap: автозапуск сервера ГУ</string>
-    <string name="autosrv_description">Открывает настройки Android Auto и нажимает «Остановить/Запустить сервер головного устройства» перед поездкой. Видит только окна Android Auto.</string>
+    <string name="autosrv_description">Открывает настройки Android Auto и нажимает «Остановить/Запустить сервер головного устройства» перед поездкой. Если включено в настройках беспровода — включает и выключает точку доступа телефона через Настройки или шторку. Нажимает только эти кнопки.</string>
     <string name="action_stop">Стоп</string>
     <string name="action_open_aa">Открыть Android Auto</string>
 

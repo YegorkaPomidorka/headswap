@@ -1,10 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Автозапуск сервера ГУ: только окна Android Auto, чтение дерева узлов, клики через performAction -->
+<!-- Автозапуск сервера ГУ и эксперимент с точкой доступа: чтение дерева узлов, клики через performAction. Без packageNames: нужны окна Настроек и шторки; сценарий AA сам берёт только окна Android Auto -->
 <accessibility-service xmlns:android="http://schemas.android.com/apk/res/android"
     android:accessibilityEventTypes="typeWindowStateChanged|typeWindowContentChanged"
     android:accessibilityFeedbackType="feedbackGeneric"
     android:accessibilityFlags="flagRetrieveInteractiveWindows|flagIncludeNotImportantViews|flagReportViewIds"
     android:canRetrieveWindowContent="true"
     android:description="@string/autosrv_description"
-    android:notificationTimeout="100"
-    android:packageNames="com.google.android.projection.gearhead" />
+    android:notificationTimeout="100" />

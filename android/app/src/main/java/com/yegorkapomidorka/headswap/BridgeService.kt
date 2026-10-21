@@ -483,6 +483,8 @@ class BridgeService : Service() {
             WLog.ev(WLog.TRIGGER, "auto-mark", "why" to "session", "kind" to session?.transportKind)
             return
         }
+        // h135: хотспот поднимет спецвозможностями; маяк пересканирует интерфейсы раз в 2 с и подхватит его сам
+        if (AaPrefs(this).autoHotspot) AutoServer.hotspot(true, "bt")
         if (wifiBMode && linkWaiting) {
             WLog.ev(WLog.TRIGGER, "auto-mark", "why" to "waiting")      // всплеск ACL: ожидание уже идёт
             return
@@ -524,6 +526,8 @@ class BridgeService : Service() {
             WLog.ev(WLog.TRIGGER, "auto-off", "session" to true)
             return
         }
+        // h135: сессии нет, точка больше не нужна (выключит, только если включили мы)
+        if (AaPrefs(this).autoHotspot) AutoServer.hotspot(false, "bt off")
         if (wifiBMode && autoStarted) {
             // порядок важен: режим выключен до abort, ветка отказа в startTcp6 увидит wifiBMode=false
             wifiBMode = false

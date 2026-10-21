@@ -8,6 +8,7 @@ import com.yegorkapomidorka.headswap.AppLog
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicBoolean
 
 /**
  * Точка входа автозапуска сервера ГУ Android Auto: одна автоматизация за раз (повторный вызов
@@ -96,6 +97,36 @@ object AutoServer {
             finish(run, outcome)
         }
         return run
+    }
+
+    private val hotspotQueued = arrayOf(AtomicBoolean(false), AtomicBoolean(false))   // [0] выключить, [1] включить
+
+    /**
+     * Эксперимент h135: включить/выключить точку доступа телефона через спецвозможности (HotspotAutomation).
+     * На той же нити, что и сценарий AA, USB-гейтинг не действует. force: выключать, даже если точку включили не мы.
+     * Повторный запрос того же направления, пока предыдущий в очереди, отбрасывается (всплески ACL).
+     */
+    fun hotspot(on: Boolean, reason: String, force: Boolean = false) {
+        val svc = service
+        val dir = if (on) "включить" else "выключить"
+        if (svc == null) {
+            log("точка доступа: $dir ($reason): служба спецвозможностей не подключена")
+            return
+        }
+        val queued = hotspotQueued[if (on) 1 else 0]
+        if (!queued.compareAndSet(false, true)) {
+            log("точка доступа: $dir ($reason): такой запрос уже в очереди")
+            return
+        }
+        log("точка доступа: $dir ($reason)")
+        exec.execute {
+            queued.set(false)
+            try {
+                HotspotAutomation(AccessibilityHotspotUi(svc), { log("точка: $it") }).run(on, force)
+            } catch (e: Throwable) {
+                AppLog.e("AUTOSRV сбой сценария точки доступа", e)
+            }
+        }
     }
 
     private fun finish(run: Run, outcome: AutoOutcome) {

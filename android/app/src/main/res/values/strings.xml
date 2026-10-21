@@ -3,7 +3,7 @@
 <resources>
     <string name="app_name" translatable="false">Headswap</string>
     <string name="autosrv_label">Headswap: auto-start head unit server</string>
-    <string name="autosrv_description">Opens Android Auto settings and taps \"Stop/Start head unit server\" before a trip. Sees only Android Auto windows.</string>
+    <string name="autosrv_description">Opens Android Auto settings and taps \"Stop/Start head unit server\" before a trip. If enabled in wireless settings, also turns the phone hotspot on and off via Settings or Quick Settings. Taps only these controls.</string>
     <string name="notif_channel_bridge" translatable="false">Headswap</string>
     <string name="action_stop">Stop</string>
     <string name="action_open_aa">Open Android Auto</string>

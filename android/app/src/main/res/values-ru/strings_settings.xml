@@ -170,6 +170,10 @@
     <string name="wl_off">выключено</string>
     <string name="wl_no_permission">Без разрешения “Устройства поблизости” машина не сможет подключиться по Wi-Fi</string>
     <string name="wl_report">Отправить отчёт о связи по воздуху</string>
+    <string name="wl_hs_auto">Включать точку доступа при подключении к машине (эксперимент, через спецвозможности)</string>
+    <string name="wl_hs_auto_sub">Headswap включит точку доступа телефона, когда подключится к выбранной машине по Bluetooth, и выключит при отключении. Нужна служба спецвозможностей. Если не вышло, пришлите лог.</string>
+    <string name="wl_hs_on">Включить точку сейчас</string>
+    <string name="wl_hs_off">Выключить точку сейчас</string>
     <string name="wl_car_line">Машина: %1$s</string>
     <string name="wl_car_none">не выбрана</string>
     <string name="wl_car_note">Когда телефон подключится к этой машине по Bluetooth, Headswap сам начнёт ждать её по Wi-Fi</string>
