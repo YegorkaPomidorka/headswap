@@ -1057,8 +1057,10 @@ class CarLifeSession(
     /**
      * ГУ, которым на PAUSE нужен VIDEO_HEARTBEAT раз в 100 мс: VW 20082120/20082122 (h93, h222) и VW BT 1420 по воздуху
      * (Павел 2026-10-18: без keepalive на PAUSE ГУ закрыла сокет через ~1 мин, с пустым VIDEO_DATA рвала на START).
+     * Тест h395: Desay G6S по USB (Mazda CX-5) рвёт EIO через 35-40 с после PAUSE, пустой VIDEO_DATA раз в 2 с не держит.
      */
-    private val pauseHeartbeatHu: Boolean get() = bridge.huVw20082120 || (air && bridge.huVwBt1420)
+    private val pauseHeartbeatHu: Boolean
+        get() = bridge.huVw20082120 || (air && bridge.huVwBt1420) || (!air && bridge.huDesayG6S)
 
     private fun pauseHeartbeat() {
         if (closed.get() || !paused || !PAUSE_KEEPALIVE_ENABLED) return
