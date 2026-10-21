@@ -783,6 +783,7 @@ class BridgeService : Service() {
             metaMusic = aaPrefs.metaMusic, metaNavi = aaPrefs.metaNavi, naviField6 = aaPrefs.naviField6,
         )
         MetaRelay.PROGRESS_UNIT = if (aaPrefs.progressSeconds) 1 else 1000
+        AaBridgeCore.MODULE_MUSIC_ENABLED = aaPrefs.moduleMusic
 
         // AA-сессия к серверу ГУ на 127.0.0.1:5277 живёт на уровне сервиса (BridgeHost), а не этой USB-сессии
         var h = host

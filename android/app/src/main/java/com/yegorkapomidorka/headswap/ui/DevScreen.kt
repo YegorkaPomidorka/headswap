@@ -25,6 +25,7 @@ import com.yegorkapomidorka.headswap.MainActivity
 import com.yegorkapomidorka.headswap.AppLog
 import com.yegorkapomidorka.headswap.CarLifeState
 import com.yegorkapomidorka.headswap.R
+import com.yegorkapomidorka.headswap.aa.AaBridgeCore
 import com.yegorkapomidorka.headswap.aa.AaPrefs
 import com.yegorkapomidorka.headswap.aa.AaState
 import com.yegorkapomidorka.headswap.aa.CustomResError
@@ -78,6 +79,14 @@ class DevScreen(host: MainActivity) : Screen(host) {
         body.addView(c.sectionTitle(c.getString(R.string.dev_section_mic)))
         body.addView(
             group(listOf(row(c.getString(R.string.dev_mic_vr_title), c.getString(R.string.dev_mic_vr_sub), aa.micVrStatus) { aa.micVrStatus = it })),
+        )
+
+        body.addView(c.sectionTitle(c.getString(R.string.dev_section_audio_bt)))
+        body.addView(
+            group(listOf(row(c.getString(R.string.dev_module_music_title), c.getString(R.string.dev_module_music_sub), aa.moduleMusic) {
+                aa.moduleMusic = it
+                AaBridgeCore.MODULE_MUSIC_ENABLED = it
+            })),
         )
 
         body.addView(c.sectionTitle(c.getString(R.string.dev_section_meta)))

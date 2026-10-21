@@ -5,6 +5,9 @@
     <string name="dev_section_mic">Микрофон ГУ</string>
     <string name="dev_mic_vr_sub">Слать VR 1/0 вместе с MIC_RECORD_* (как Baidu)</string>
 
+    <string name="dev_section_audio_bt">Аудио + Bluetooth</string>
+    <string name="dev_module_music_sub">Слать ГУ MUSIC=1/0 при игре и паузе. Выключено — не слать: ГУ не уходит с Bluetooth-источника</string>
+
     <string name="dev_section_meta">Метаданные на ГУ (с переподключения USB)</string>
     <string name="dev_meta_music_title">Музыка</string>
     <string name="dev_meta_music_sub">Трек, обложка и прогресс: MEDIA_INFO / MEDIA_PROGRESS_BAR</string>

@@ -6,6 +6,10 @@
     <string name="dev_mic_vr_title" translatable="false">MODULE_STATUS VR</string>
     <string name="dev_mic_vr_sub">Send VR 1/0 together with MIC_RECORD_* (like Baidu)</string>
 
+    <string name="dev_section_audio_bt">Audio + Bluetooth</string>
+    <string name="dev_module_music_title" translatable="false">MODULE_STATUS MUSIC</string>
+    <string name="dev_module_music_sub">Send MUSIC=1/0 to the head unit on play and pause. Off: never send, the head unit stays on its Bluetooth source</string>
+
     <string name="dev_section_meta">Metadata on the head unit (applies after USB reconnect)</string>
     <string name="dev_meta_music_title">Music</string>
     <string name="dev_meta_music_sub">Track, cover and progress: MEDIA_INFO / MEDIA_PROGRESS_BAR</string>
