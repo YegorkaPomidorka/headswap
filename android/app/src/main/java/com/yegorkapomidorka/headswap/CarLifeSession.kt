@@ -27,6 +27,8 @@ import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 import com.yegorkapomidorka.headswap.link.CarTransport
 import com.yegorkapomidorka.headswap.link.TransportCaps
+import com.yegorkapomidorka.headswap.link.bt.BtAddr
+import com.yegorkapomidorka.headswap.link.bt.HuBtResolver
 import com.yegorkapomidorka.headswap.link.diag.WLog
 
 /** Настройки сессии, снятые в момент старта. */
@@ -42,6 +44,10 @@ class SessionConfig(
     val metaNavi: Boolean = true,
     /** Поле 6 NAVI_NEXT_TURN_INFO: иконка и/или time. */
     val naviField6: NaviField6 = NaviField6.BOTH,
+    /** MAC Bluetooth телефона для MD_INFO.btaddress; пусто - "unknown" (h366). */
+    val phoneBtAddress: String = "",
+    /** BT_IDENTIFY_RESULT_IND на honda_3ya: 0 выкл, 1 - status=1, 2 - status=0 (h366). */
+    val btIdentifyMode: Int = 0,
 )
 
 /**
@@ -58,6 +64,8 @@ class CarLifeSession(
     private val thermal: ThermalSource = ThermalSource.NONE,
     /** Размер кадра из VIDEO_ENCODER_INIT ГУ (для подсказки «Как просит ГУ» в разделе для разработчиков). */
     private val onHuSize: (Int, Int) -> Unit = { _, _ -> },
+    /** Адрес Bluetooth ГУ с телефонной стороны (RFCOMM carlife, A2DP/HFP) для BT_IDENTIFY_RESULT_IND. */
+    private val huBtResolver: HuBtResolver = HuBtResolver.NONE,
     private val onClosed: (String) -> Unit,
 ) : VideoSource.Listener, CarlifeLink {
 
@@ -123,6 +131,9 @@ class CarLifeSession(
     private var lastMoveFingers = 0
     private val rxByType = java.util.TreeMap<Int, Int>()
     private var huInfo: String? = null
+    /** HU_INFO.product (поле 15): по нему включается BT_IDENTIFY_RESULT_IND (honda_3ya). */
+    @Volatile private var huProduct: String? = null
+    private val btIdentifyScheduled = AtomicBoolean(false)
     private var huStatistic: String? = null
     private var huFeature: String? = null
     private var encryptionNeeded: Boolean? = null
@@ -215,6 +226,7 @@ class CarLifeSession(
                 (if (Schemas.byType[m.type] == null && m.body.isNotEmpty()) " [схемы нет]" else "")
             val quiet = m.type == Msg.TOUCH_ACTION_MOVE || (m.type == Msg.TOUCH_ACTION && touchCount > 20 && isMove(m.body))
             AppLog.msg("RX", chan, inner.size, m.type, m.declaredLen, decoded, inner, ui = !quiet, note = note)
+            logBodyHex(m)
             if (chan == Ch.CMD) onCmd(m) else onTouch(m)
         } else {
             val m = Wire.parseData(inner)
@@ -241,6 +253,20 @@ class CarLifeSession(
         }
         if (m.truncated || m.data.isEmpty()) return
         bridge.onCarlifeMicData(m.data)
+    }
+
+    /**
+     * Тело в основной лог строкой (не только hexdump в detail) для типов, которые иначе не разобрать (h366): BT_* от ГУ - всегда
+     * целиком, неизвестные и без схемы - первые [BODY_HEX_PER_TYPE] раз на тип, до 64 байт.
+     */
+    private fun logBodyHex(m: CmdMsg) {
+        if (m.body.isEmpty()) return
+        val bt = m.type in BT_RX_FULL
+        if (!bt) {
+            val opaque = Msg.name(m.type) == "UNKNOWN" || Schemas.byType[m.type] == null
+            if (!opaque || (rxByType[m.type] ?: 0) > BODY_HEX_PER_TYPE) return
+        }
+        AppLog.i("RX ${Msg.hex(m.type)} ${Msg.name(m.type)} body len=${m.body.size} hex=${Hex.compact(m.body, if (bt) 256 else 64)}", ui = false)
     }
 
     private fun isMove(body: ByteArray): Boolean {
@@ -284,7 +310,8 @@ class CarLifeSession(
                 huInfo = PbText.render(m.body, Schemas.deviceInfo)
                 AppLog.i("== HU_INFO: $huInfo")
                 PbReader.parse(m.body)?.let {
-                    WLog.ev(WLog.HS, "HU_INFO", "manufacturer" to PbReader.str(it, 13), "model" to PbReader.str(it, 14))
+                    huProduct = PbReader.str(it, 15)
+                    WLog.ev(WLog.HS, "HU_INFO","manufacturer" to PbReader.str(it, 13), "model" to PbReader.str(it, 14))
                     bridge.onHuInfo(PbReader.str(it, 13), PbReader.str(it, 14), PbReader.str(it, 15))
                 }
                 logDesay()
@@ -511,6 +538,44 @@ class CarLifeSession(
         if (enc == 1) {
             AppLog.i("== !!! ГУ ТРЕБУЕТ ШИФРОВАНИЕ КАНАЛА (CONTENT_ENCRYPTION=1): нужна цепочка RSA/AES (0x1006A..0x1006E), пока не реализована")
         }
+        scheduleBtIdentify(fc.huBtMac)
+    }
+
+    /**
+     * h366 (Honda CR-V 2026, honda_3ya): ГУ рвёт A2DP через <1 с после старта сессии и не знает, что телефон CarLife = BT-устройство.
+     * Через [BT_IDENTIFY_DELAY_MS] после HU_FEATURE_CONFIG_RESPONSE шлём BT_IDENTIFY_RESULT_IND{status, address ГУ}, один раз за сессию.
+     * Только по настройке ([SessionConfig.btIdentifyMode], по умолчанию выкл) и только для product=honda_3ya.
+     */
+    private fun scheduleBtIdentify(fcMac: String?) {
+        val status = BtAddr.identifyStatus(cfg.btIdentifyMode) ?: return
+        if (huProduct != HONDA_3YA_PRODUCT) {
+            AppLog.i("BT IDENTIFY: включён (status=$status), но HU_INFO.product=${huProduct ?: "нет"} не $HONDA_3YA_PRODUCT, не шлю", ui = false)
+            return
+        }
+        if (!btIdentifyScheduled.compareAndSet(false, true)) return
+        try {
+            sched.schedule({ resolveAndSendBtIdentify(status, fcMac) }, BT_IDENTIFY_DELAY_MS, TimeUnit.MILLISECONDS)
+        } catch (_: java.util.concurrent.RejectedExecutionException) {
+            // сессия уже закрывается
+        }
+    }
+
+    /** Адрес ГУ: huBtMac из FEATURE_CONFIG (сама ГУ назвала), иначе RFCOMM carlife / A2DP / HFP телефона. */
+    private fun resolveAndSendBtIdentify(status: Int, fcMac: String?) {
+        if (closed.get()) return
+        val fromFc = BtAddr.normalize(fcMac)
+        if (BtAddr.isValid(fromFc)) return sendBtIdentify(status, fromFc, "feature_config")
+        huBtResolver.resolve { addr, source ->
+            val a = BtAddr.normalize(addr)
+            if (BtAddr.isValid(a)) sendBtIdentify(status, a, source)
+            else AppLog.i("BT IDENTIFY: адрес ГУ не найден (huBtMac=${fcMac ?: "нет"}, $source)")
+        }
+    }
+
+    private fun sendBtIdentify(status: Int, address: String, source: String) {
+        if (closed.get()) return
+        AppLog.i("BT -> ГУ BT_IDENTIFY_RESULT_IND status=$status address=${BtAddr.mask(address)} (источник: $source)")
+        sendCmd(Msg.BT_IDENTIFY_RESULT_IND, Msgs.btIdentifyResult(status, address))
     }
 
     /** START: гейт AA сбрасывается, заглушка (если активна) стартует с SPS+PPS+IDR. */
@@ -1154,6 +1219,8 @@ class CarLifeSession(
     private fun deviceInfo(): DeviceInfo {
         // SDK_INT >= 33: как в 8.6.7 врём "29"/29
         val (sdk, sdkInt) = DeviceInfo.reportedSdk(Build.VERSION.SDK_INT)
+        val btAddress = DeviceInfo.reportedBtAddress(cfg.phoneBtAddress)
+        if (cfg.phoneBtAddress.isNotBlank()) AppLog.i("BT MD_INFO btaddress=${BtAddr.mask(btAddress)}")
         return DeviceInfo(
             os = "Android",
             board = Build.BOARD,
@@ -1176,7 +1243,8 @@ class CarLifeSession(
             release = Build.VERSION.RELEASE,
             sdk = sdk,
             sdkInt = sdkInt,
-            btaddress = "unknown", // BT-адрес нам недоступен; Baidu шлёт "unknown", если не получил
+            // BT-адрес сами не узнаём (нужен системный доступ); Baidu шлёт "unknown", если не получил. h366: можно задать руками
+            btaddress = btAddress,
             carlifeVersion = Handshake.MD_VERSION,
             carlifeType = Handshake.MD_TYPE_CARLIFE_APP,
         )
@@ -1212,6 +1280,14 @@ class CarLifeSession(
         @Volatile @JvmStatic var PAUSE_KEEPALIVE_ENABLED = true
 
         private const val FEATURE_CONTENT_ENCRYPTION = "CONTENT_ENCRYPTION"
+
+        /** HU_INFO.product Honda CR-V 2026 (SEMIDRIVE x9, h366). */
+        private const val HONDA_3YA_PRODUCT = "honda_3ya"
+        private const val BT_IDENTIFY_DELAY_MS = 1000L
+
+        /** BT_* от ГУ, которые пишем целиком: HU_BT_OOB_INFO, BT_HFP_CONNECTION, BT_HFP_RESPONSE, BT_HFP_STATUS_RESPONSE, BT_START_IDENTIFY_REQ. */
+        private val BT_RX_FULL = setOf(0x00018005, 0x00018042, 0x0001804E, 0x00018050, 0x00018053)
+        private const val BODY_HEX_PER_TYPE = 20
 
         /** moduleID подписки CARLIFE_DATA_SUBSCRIBE на навигацию (CarlifeDataSubscribe: 0 навигация, 2 музыка). */
         private const val SUB_NAVI = 0

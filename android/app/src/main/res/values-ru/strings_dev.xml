@@ -7,6 +7,11 @@
 
     <string name="dev_section_audio_bt">Аудио + Bluetooth</string>
     <string name="dev_module_music_sub">Слать ГУ MUSIC=1/0 при игре и паузе. Выключено — не слать: ГУ не уходит с Bluetooth-источника</string>
+    <string name="dev_bt_addr_title">BT-адрес телефона</string>
+    <string name="dev_bt_addr_hint">Настройки → О телефоне → Адрес Bluetooth; пусто — не слать. Уходит в MD_INFO.btaddress вместо \"unknown\" (с переподключения)</string>
+    <string name="dev_bt_addr_err">Нужны шесть пар hex-цифр, AA:BB:CC:DD:EE:FF</string>
+    <string name="dev_bt_identify_sub">Только Honda CR-V (honda_3ya): сообщить ГУ, что телефон — её Bluetooth-устройство, через 1 с после FEATURE_CONFIG (с переподключения)</string>
+    <string name="dev_bt_identify_off">Выкл</string>
 
     <string name="dev_section_meta">Метаданные на ГУ (с переподключения USB)</string>
     <string name="dev_meta_music_title">Музыка</string>

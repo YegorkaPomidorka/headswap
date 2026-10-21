@@ -9,6 +9,15 @@
     <string name="dev_section_audio_bt">Audio + Bluetooth</string>
     <string name="dev_module_music_title" translatable="false">MODULE_STATUS MUSIC</string>
     <string name="dev_module_music_sub">Send MUSIC=1/0 to the head unit on play and pause. Off: never send, the head unit stays on its Bluetooth source</string>
+    <string name="dev_bt_addr_title">Phone Bluetooth address</string>
+    <string name="dev_bt_addr_placeholder" translatable="false">AA:BB:CC:DD:EE:FF</string>
+    <string name="dev_bt_addr_hint">Settings → About phone → Bluetooth address; empty — do not send. Goes to MD_INFO.btaddress instead of \"unknown\" (applies on reconnect)</string>
+    <string name="dev_bt_addr_err">Expected six hex pairs, AA:BB:CC:DD:EE:FF</string>
+    <string name="dev_bt_identify_title" translatable="false">BT_IDENTIFY_RESULT_IND</string>
+    <string name="dev_bt_identify_sub">Honda CR-V (honda_3ya) only: tell the head unit that the phone is its Bluetooth device, 1 s after FEATURE_CONFIG (applies on reconnect)</string>
+    <string name="dev_bt_identify_off">Off</string>
+    <string name="dev_bt_identify_1" translatable="false">status=1</string>
+    <string name="dev_bt_identify_0" translatable="false">status=0</string>
 
     <string name="dev_section_meta">Metadata on the head unit (applies after USB reconnect)</string>
     <string name="dev_meta_music_title">Music</string>

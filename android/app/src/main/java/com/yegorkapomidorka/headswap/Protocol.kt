@@ -68,6 +68,7 @@ object Msg {
     const val MD_AUTHEN_RESPONSE = 0x00010049
     const val HU_AUTHEN_RESULT = 0x0001804A
     const val MD_AUTHEN_RESULT = 0x0001004B
+    const val BT_IDENTIFY_RESULT_IND = 0x00010054
     const val MD_FEATURE_CONFIG_REQUEST = 0x00010051
     const val HU_FEATURE_CONFIG_RESPONSE = 0x00018052
     const val ERROR_CODE = 0x00018055
@@ -175,7 +176,7 @@ object Msg {
         MD_FEATURE_CONFIG_REQUEST to "MD_FEATURE_CONFIG_REQUEST",
         HU_FEATURE_CONFIG_RESPONSE to "HU_FEATURE_CONFIG_RESPONSE",
         0x00018053 to "BT_START_IDENTIFY_REQ",
-        0x00010054 to "BT_IDENTIFY_RESULT_IND",
+        BT_IDENTIFY_RESULT_IND to "BT_IDENTIFY_RESULT_IND",
         ERROR_CODE to "ERROR_CODE",
         0x00018056 to "VIDEO_ENCODER_JPEG",
         0x00010057 to "VIDEO_ENCODER_JPEG_ACK",
@@ -501,6 +502,9 @@ class DeviceInfo(
          */
         fun reportedSdk(realSdkInt: Int): Pair<String, Int> =
             if (realSdkInt >= 33) Pair("29", 29) else Pair(realSdkInt.toString(), realSdkInt)
+
+        /** Поле 23 MD_INFO: заданный руками адрес Bluetooth телефона, иначе "unknown" (как Baidu без адреса). */
+        fun reportedBtAddress(configured: String): String = configured.ifBlank { "unknown" }
     }
 }
 
@@ -587,6 +591,10 @@ object Msgs {
     }
 
     fun themeState(mode: Int) = PbWriter().int32(1, mode).toByteArray()
+
+    /** CarlifeBTIdentifyResultInd: status (1 = опознан, 0 = нет) и адрес Bluetooth ГУ. */
+    fun btIdentifyResult(status: Int, address: String) =
+        PbWriter().int32(1, status).string(2, address).toByteArray()
 
     /**
      * CarlifeMediaInfo (MusicInfoSender.sendMusicInfoToVehicle :160-262). Все 9 полей proto2 required: пишем всегда,

@@ -155,6 +155,7 @@ object Schemas {
         1 to str("address"), 2 to str("passKey"), 3 to str("hash"), 4 to str("randomizer"),
         5 to str("uuid"), 6 to str("name"), 7 to int("status")
     )
+    val btIdentifyResult = schema("CarlifeBTIdentifyResultInd", 1 to int("status"), 2 to str("address"))
     val statisticsInfo = schema(
         "CarlifeStatisticsInfo",
         1 to str("cuid"), 2 to str("versionName"), 3 to int("versionCode"), 4 to str("channel"),
@@ -201,6 +202,7 @@ object Schemas {
         Msg.MD_INFO to deviceInfo,
         Msg.HU_BT_OOB_INFO to btPairInfo,
         Msg.MD_BT_OOB_INFO to btPairInfo,
+        Msg.BT_IDENTIFY_RESULT_IND to btIdentifyResult,
         Msg.VIDEO_ENCODER_INIT to videoEncoderInfo,
         Msg.VIDEO_ENCODER_INIT_DONE to videoEncoderInfo,
         Msg.VIDEO_ENCODER_FRAME_RATE_CHANGE to videoFrameRate,

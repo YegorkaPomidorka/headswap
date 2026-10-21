@@ -43,6 +43,7 @@ import com.yegorkapomidorka.headswap.link.Tcp6Listener
 import com.yegorkapomidorka.headswap.link.TransportCaps
 import com.yegorkapomidorka.headswap.link.bt.CarBtState
 import com.yegorkapomidorka.headswap.link.bt.CarlifeBtProbe
+import com.yegorkapomidorka.headswap.link.bt.HuBtAddress
 import com.yegorkapomidorka.headswap.link.car.AutoOffDebounce
 import com.yegorkapomidorka.headswap.link.car.BT_HINT_MS
 import com.yegorkapomidorka.headswap.link.car.BtReconnectHint
@@ -781,6 +782,7 @@ class BridgeService : Service() {
         val cfg = SessionConfig(
             screenOn, aaPrefs.micVrStatus, aaPrefs.fpsSetting,
             metaMusic = aaPrefs.metaMusic, metaNavi = aaPrefs.metaNavi, naviField6 = aaPrefs.naviField6,
+            phoneBtAddress = aaPrefs.phoneBtAddress, btIdentifyMode = aaPrefs.btIdentifyMode,
         )
         MetaRelay.PROGRESS_UNIT = if (aaPrefs.progressSeconds) 1 else 1000
         AaBridgeCore.MODULE_MUSIC_ENABLED = aaPrefs.moduleMusic
@@ -827,7 +829,7 @@ class BridgeService : Service() {
         stopRequested = false
 
         val sref = arrayOfNulls<CarLifeSession>(1)
-        val s = CarLifeSession(transport, cfg, h.core, PhoneThermal(this), onHuSize = { w, hh -> aaPrefs.saveHuSize(w, hh) }) { reason -> main.post { onSessionClosed(sref[0]!!, reason) } }
+        val s = CarLifeSession(transport, cfg, h.core, PhoneThermal(this), onHuSize = { w, hh -> aaPrefs.saveHuSize(w, hh) }, huBtResolver = HuBtAddress.resolver(this)) { reason -> main.post { onSessionClosed(sref[0]!!, reason) } }
         sref[0] = s
         session = s
         s.start()

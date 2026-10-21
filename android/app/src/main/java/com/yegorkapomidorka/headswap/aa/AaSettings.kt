@@ -124,6 +124,16 @@ class AaPrefs(ctx: Context) {
         get() = sp.getBoolean("moduleMusic", true)
         set(v) = sp.edit().putBoolean("moduleMusic", v).apply()
 
+    /** MAC Bluetooth телефона для MD_INFO.btaddress (вводится руками); пусто - слать "unknown". Читается на подключение. */
+    var phoneBtAddress: String
+        get() = sp.getString("phoneBtAddress", "") ?: ""
+        set(v) = sp.edit().putString("phoneBtAddress", v).apply()
+
+    /** BT_IDENTIFY_RESULT_IND на Honda honda_3ya (h366): 0 - выкл, 1 - status=1, 2 - status=0. Читается на подключение. */
+    var btIdentifyMode: Int
+        get() = sp.getInt("btIdentifyMode", 0).coerceIn(0, 2)
+        set(v) = sp.edit().putInt("btIdentifyMode", v).apply()
+
     /** Трек, обложка и прогресс из AA -> MEDIA_INFO / MEDIA_PROGRESS_BAR. Читается на подключение. */
     var metaMusic: Boolean
         get() = sp.getBoolean("metaMusic", true)

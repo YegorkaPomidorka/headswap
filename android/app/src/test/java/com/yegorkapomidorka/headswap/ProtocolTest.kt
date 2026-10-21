@@ -2,6 +2,7 @@ package com.yegorkapomidorka.headswap
 
 import com.yegorkapomidorka.headswap.aa.AaBridgeCore
 import com.yegorkapomidorka.headswap.aa.FpsSetting
+import com.yegorkapomidorka.headswap.link.bt.BtAddr
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -324,6 +325,43 @@ class ProtocolTest {
         val txt = PbText.render(body, Schemas.deviceInfo)
         assertTrue(txt.contains("carlifeversion=\"8.6.7\""))
         assertTrue(txt.contains("carlifeType=1"))
+    }
+
+    @Test
+    fun mdInfoBtAddressFromSettingOrUnknown() {
+        // настройка заполнена: поле 23 = её MAC; пусто - "unknown" как раньше
+        val set = DeviceInfo(btaddress = DeviceInfo.reportedBtAddress("AA:BB:CC:DD:A1:B2"))
+        assertEquals("AA:BB:CC:DD:A1:B2", PbReader.str(PbReader.parse(Msgs.deviceInfo(set))!!, 23))
+        for (empty in listOf("", "  ")) {
+            val unset = DeviceInfo(btaddress = DeviceInfo.reportedBtAddress(empty))
+            assertEquals("unknown", PbReader.str(PbReader.parse(Msgs.deviceInfo(unset))!!, 23))
+        }
+    }
+
+    @Test
+    fun btAddrNormalizeValidateMask() {
+        assertEquals("AA:BB:CC:DD:A1:B2", BtAddr.normalize("  aa-bb-cc-dd-a1-b2 "))
+        assertEquals("", BtAddr.normalize(null))
+        assertTrue(BtAddr.isValid("AA:BB:CC:DD:A1:B2"))
+        assertFalse(BtAddr.isValid("aa:bb:cc:dd:a1:b2"))
+        assertFalse(BtAddr.isValid("AA:BB:CC:DD:A1"))
+        assertFalse(BtAddr.isValid("AA:BB:CC:DD:A1:GG"))
+        assertFalse(BtAddr.isValid(null))
+        assertEquals("XX:XX:XX:XX:A1:B2", BtAddr.mask("AA:BB:CC:DD:A1:B2"))
+        assertEquals(1, BtAddr.identifyStatus(1))
+        assertEquals(0, BtAddr.identifyStatus(2))
+        assertNull(BtAddr.identifyStatus(0))
+    }
+
+    @Test
+    fun btIdentifyResultBody() {
+        val body = Msgs.btIdentifyResult(1, "AA:BB:CC:DD:A1:B2")
+        val f = PbReader.parse(body)!!
+        assertEquals(1, PbReader.int(f, 1))
+        assertEquals("AA:BB:CC:DD:A1:B2", PbReader.str(f, 2))
+        assertEquals(0x00010054, Msg.BT_IDENTIFY_RESULT_IND)
+        assertEquals("BT_IDENTIFY_RESULT_IND", Msg.name(Msg.BT_IDENTIFY_RESULT_IND))
+        assertTrue(PbText.render(body, Schemas.byType[Msg.BT_IDENTIFY_RESULT_IND]).contains("address=\"AA:BB:CC:DD:A1:B2\""))
     }
 
     @Test

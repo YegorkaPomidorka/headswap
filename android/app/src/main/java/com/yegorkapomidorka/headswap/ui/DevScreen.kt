@@ -1,6 +1,7 @@
 package com.yegorkapomidorka.headswap.ui
 
 import android.app.AlertDialog
+import android.bluetooth.BluetoothAdapter
 import android.content.Intent
 import android.media.MediaCodecInfo
 import android.media.MediaCodecList
@@ -31,6 +32,7 @@ import com.yegorkapomidorka.headswap.aa.AaState
 import com.yegorkapomidorka.headswap.aa.CustomResError
 import com.yegorkapomidorka.headswap.aa.CustomVideoMode
 import com.yegorkapomidorka.headswap.autosrv.AutoServer
+import com.yegorkapomidorka.headswap.link.bt.BtAddr
 
 /** «Для разработчиков» (Dev.dc.html): отладочные флажки, кнопки, статус и живой лог (последние ~200 строк). */
 class DevScreen(host: MainActivity) : Screen(host) {
@@ -88,6 +90,7 @@ class DevScreen(host: MainActivity) : Screen(host) {
                 AaBridgeCore.MODULE_MUSIC_ENABLED = it
             })),
         )
+        body.addView(btIdentifyCard())
 
         body.addView(c.sectionTitle(c.getString(R.string.dev_section_meta)))
         body.addView(
@@ -289,6 +292,82 @@ class DevScreen(host: MainActivity) : Screen(host) {
         divider.visibility = if (on) View.VISIBLE else View.GONE
         refreshCustomFromHu()
         validateCustom()
+        return card
+    }
+
+    /**
+     * Карточка «BT-адрес телефона + режим BT_IDENTIFY_RESULT_IND» (h366). Адрес: trim, заглавные, «-» -> «:»,
+     * checkBluetoothAddress; невалидный не сохраняется (ошибка под полем), пустой сохраняет пусто.
+     */
+    private fun btIdentifyCard(): LinearLayout {
+        val c = ctx
+        val card = c.card()
+        val field = EditText(c).apply {
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 18f)
+            setTextColor(c.clr(R.color.on))
+            setHintTextColor(c.clr(R.color.on2))
+            typeface = c.sans(500)
+            background = c.shape(c.clr(R.color.surf2), 14)
+            pad(c, 16, 0, 16, 0)
+            isSingleLine = true
+            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_CHARACTERS or InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS
+            filters = arrayOf(InputFilter.LengthFilter(17))
+            hint = c.getString(R.string.dev_bt_addr_placeholder)
+            setText(aa.phoneBtAddress)
+        }
+        val err = c.text("", 14f, 500, c.clr(R.color.err)).apply { visibility = View.GONE }
+        field.addTextChangedListener(object : TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
+            override fun afterTextChanged(s: Editable?) {
+                val n = BtAddr.normalize(s?.toString())
+                when {
+                    n.isEmpty() -> {
+                        aa.phoneBtAddress = ""
+                        err.visibility = View.GONE
+                    }
+                    BluetoothAdapter.checkBluetoothAddress(n) -> {
+                        aa.phoneBtAddress = n
+                        err.visibility = View.GONE
+                    }
+                    else -> {
+                        err.text = c.getString(R.string.dev_custom_err_fmt, c.getString(R.string.dev_bt_addr_err))
+                        err.visibility = View.VISIBLE
+                    }
+                }
+            }
+        })
+        card.addView(
+            c.vbox(10).apply {
+                pad(c, 16, 12, 16, 14)
+                addView(c.text(c.getString(R.string.dev_bt_addr_title), 16f, 500))
+                addView(field, lp(MATCH, c.dp(52)))
+                addView(c.text(c.getString(R.string.dev_bt_addr_hint), 13f, 400, c.clr(R.color.on2)))
+                addView(err, lp(MATCH, WRAP))
+            },
+            lp(MATCH, WRAP),
+        )
+
+        card.addView(c.divider())
+        card.addView(
+            c.vbox(2).apply {
+                pad(c, 16, 12, 16, 4)
+                addView(c.text(c.getString(R.string.dev_bt_identify_title), 16f, 500))
+                addView(c.text(c.getString(R.string.dev_bt_identify_sub), 13f, 400, c.clr(R.color.on2)))
+            },
+            lp(MATCH, WRAP),
+        )
+        val rows = ArrayList<RadioRow>()
+        val labels = listOf(R.string.dev_bt_identify_off, R.string.dev_bt_identify_1, R.string.dev_bt_identify_0)
+        labels.forEachIndexed { mode, label ->
+            val row = RadioRow(c, c.getString(label), "") {
+                aa.btIdentifyMode = mode
+                rows.forEachIndexed { i, r -> r.setSelected(i == mode) }
+            }
+            rows += row
+            card.addView(row.view, lp(MATCH, WRAP))
+        }
+        rows.forEachIndexed { i, r -> r.setSelected(i == aa.btIdentifyMode) }
         return card
     }
 

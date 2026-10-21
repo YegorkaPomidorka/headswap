@@ -114,6 +114,7 @@ class CarlifeBtProbe(
     private fun talk(tag: String, s: BluetoothSocket) {
         val dev = s.remoteDevice
         val name = try { dev?.name } catch (_: SecurityException) { null }
+        dev?.address?.let { HuBtAddress.rfcomm = it }      // адрес ГУ для BT_IDENTIFY_RESULT_IND (CarLifeSession)
         WLog.ev(WLog.BT, "accept", "uuid" to tag, "dev" to WLog.maskMac(dev?.address), "devName" to name)
         AppLog.i("BT carlife: ГУ подключилась по Bluetooth ($tag, ${name ?: "?"})")
         CarLifeState.btProbe = "ГУ подключилась ($tag, ${name ?: "?"})"
