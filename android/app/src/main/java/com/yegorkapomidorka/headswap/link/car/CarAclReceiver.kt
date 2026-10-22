@@ -9,6 +9,8 @@ import android.os.SystemClock
 import com.yegorkapomidorka.headswap.AppLog
 import com.yegorkapomidorka.headswap.BridgeService
 import com.yegorkapomidorka.headswap.BuildConfig
+import com.yegorkapomidorka.headswap.aa.AaPrefs
+import com.yegorkapomidorka.headswap.autosrv.AutoServer
 import com.yegorkapomidorka.headswap.link.diag.WLog
 
 /**
@@ -29,6 +31,7 @@ class CarAclReceiver : BroadcastReceiver() {
             return
         }
         if (action == BluetoothDevice.ACTION_ACL_CONNECTED) {
+            AutoServer.cancelHotspotOff()      // h135: машина вернулась - отложенное выключение точки не нужно
             WLog.ev(WLog.TRIGGER, "acl-connected", "dev" to WLog.maskMac(addr))
             try {
                 context.startForegroundService(Intent(context, BridgeService::class.java).setAction(BridgeService.ACTION_WIFI_B_AUTO))
@@ -38,6 +41,8 @@ class CarAclReceiver : BroadcastReceiver() {
             }
         } else {
             WLog.ev(WLog.TRIGGER, "acl-disconnected", "dev" to WLog.maskMac(addr))
+            // h135: точку гасим сами, без BridgeService (его может не быть); таймер перезапускается на каждый отбой
+            if (AaPrefs(context).autoHotspot) AutoServer.scheduleHotspotOff(context, HOTSPOT_OFF_DELAY_MS, "bt off")
             // сервиса нет - гасить нечего; startService на пустой сервис из фона не нужен
             if (!BridgeService.alive) return
             try {
@@ -55,6 +60,9 @@ class CarAclReceiver : BroadcastReceiver() {
         else intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE)
 
     private companion object {
+        /** Через сколько после отбоя ACL выключать точку: всплески ACL у ГУ. */
+        const val HOTSPOT_OFF_DELAY_MS = 10_000L
+
         /** Чужих устройств у телефона много (наушники, часы): в лог не чаще раза в минуту. */
         val ignoreLog = MinInterval(60_000L) { SystemClock.elapsedRealtime() }
     }

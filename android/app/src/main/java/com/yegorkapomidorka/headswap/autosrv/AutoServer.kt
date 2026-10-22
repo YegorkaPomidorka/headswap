@@ -1,10 +1,20 @@
 package com.yegorkapomidorka.headswap.autosrv
 
+import android.content.BroadcastReceiver
 import android.content.ComponentName
 import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
+import android.os.Build
+import android.os.Handler
+import android.os.Looper
 import android.os.SystemClock
 import android.provider.Settings
 import com.yegorkapomidorka.headswap.AppLog
+import com.yegorkapomidorka.headswap.BridgeService
+import com.yegorkapomidorka.headswap.CarLifeState
+import com.yegorkapomidorka.headswap.link.bt.CarBtState
+import com.yegorkapomidorka.headswap.link.car.CarProfile
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
@@ -122,11 +132,92 @@ object AutoServer {
         exec.execute {
             queued.set(false)
             try {
-                HotspotAutomation(AccessibilityHotspotUi(svc), { log("точка: $it") }).run(on, force)
+                HotspotAutomation.attach(svc)
+                val o = HotspotAutomation(AccessibilityHotspotUi(svc), { log("точка: $it") }).run(on, force)
+                // шторка на заблокированном экране не помогла: повторим после разблокировки (если не отменит возврат машины)
+                if (!on && o.locked && (o.result == HotspotResult.NOT_FOUND || o.result == HotspotResult.TIMEOUT)) deferOffUntilUnlock(svc, reason)
             } catch (e: Throwable) {
                 AppLog.e("AUTOSRV сбой сценария точки доступа", e)
             }
         }
+    }
+
+    private val main = Handler(Looper.getMainLooper())
+    private var offTask: Runnable? = null
+    private var unlockReceiver: BroadcastReceiver? = null
+    private var unlockCtx: Context? = null
+
+    /**
+     * Выключить точку через [delayMs] после отбоя ACL машины; повторный вызов перезапускает таймер. Не зависит от
+     * BridgeService (его могло не быть). Перед выключением проверяет, что машина не вернулась и сессия не идёт.
+     */
+    @Synchronized
+    fun scheduleHotspotOff(ctx: Context, delayMs: Long, reason: String) {
+        val app = ctx.applicationContext
+        offTask?.let { main.removeCallbacks(it) }
+        val task = Runnable {
+            synchronized(this) { offTask = null }
+            offIfCarGone(app, reason, "таймер")
+        }
+        offTask = task
+        main.postDelayed(task, delayMs)
+        log("точка доступа: выключение отложено на $delayMs мс ($reason)")
+    }
+
+    /** Машина вернулась (ACL_CONNECTED): снять отложенное выключение и ожидание разблокировки. */
+    @Synchronized
+    fun cancelHotspotOff() {
+        val t = offTask
+        if (t != null) {
+            main.removeCallbacks(t)
+            offTask = null
+            log("точка доступа: отложенное выключение отменено (машина подключилась)")
+        }
+        dropUnlockReceiver("машина подключилась")
+    }
+
+    private fun offIfCarGone(ctx: Context, reason: String, source: String) {
+        CarBtState.check(ctx, CarProfile(ctx).btMac) { connected ->
+            when {
+                connected -> log("точка доступа: выключение ($reason, $source) пропущено: машина снова подключена по Bluetooth")
+                BridgeService.alive && CarLifeState.running -> log("точка доступа: выключение ($reason, $source) пропущено: идёт сессия")
+                else -> hotspot(false, reason)
+            }
+        }
+    }
+
+    @Synchronized
+    private fun deferOffUntilUnlock(ctx: Context, reason: String) {
+        if (unlockReceiver != null) return
+        val rcv = object : BroadcastReceiver() {
+            override fun onReceive(c: Context, i: Intent) {
+                dropUnlockReceiver("разблокировали")
+                log("точка доступа: телефон разблокирован, повторяю выключение ($reason)")
+                offIfCarGone(c.applicationContext, "unlock", "разблокировка")
+            }
+        }
+        val filter = IntentFilter(Intent.ACTION_USER_PRESENT)
+        try {
+            if (Build.VERSION.SDK_INT >= 33) ctx.registerReceiver(rcv, filter, Context.RECEIVER_NOT_EXPORTED)
+            else ctx.registerReceiver(rcv, filter)
+            unlockReceiver = rcv
+            unlockCtx = ctx
+            log("точка доступа: экран заблокирован, выключение ($reason) отложено до разблокировки")
+        } catch (e: Exception) {
+            AppLog.e("AUTOSRV ресивер разблокировки", e)
+        }
+    }
+
+    @Synchronized
+    private fun dropUnlockReceiver(why: String) {
+        val r = unlockReceiver ?: return
+        unlockReceiver = null
+        try {
+            unlockCtx?.unregisterReceiver(r)
+        } catch (_: Exception) {
+        }
+        unlockCtx = null
+        log("точка доступа: ожидание разблокировки снято ($why)")
     }
 
     private fun finish(run: Run, outcome: AutoOutcome) {

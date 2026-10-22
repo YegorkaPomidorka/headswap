@@ -20,8 +20,8 @@ class AccessibilityHotspotUi(private val svc: AutoServerService) : HotspotUi {
     private var tileNode: AccessibilityNodeInfo? = null
 
     override fun prepareScreen() = base.prepareScreen()
-    override fun hotspotUp() = HotspotState.up()
-    override fun ifaces() = HotspotState.allUp()
+    override fun hotspotUp() = HotspotState.up(svc)
+    override fun ifaces() = HotspotState.snapshot(svc)
     override fun back() = base.back()
     override fun returnToApp() = base.returnToApp()
     override fun now() = System.currentTimeMillis()

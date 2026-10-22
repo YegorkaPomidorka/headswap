@@ -33,7 +33,7 @@ private class FakeHotspotUi : HotspotUi {
 
     override fun prepareScreen() = if (ready) Pair(true, "готов") else Pair(false, "телефон заблокирован")
     override fun hotspotUp() = up
-    override fun ifaces() = if (up) "swlan0 192.168.43.1/24" else "нет"
+    override fun ifaces() = if (up) "ap_state=13 ifaces=wlan2 10.108.108.193/24" else "ap_state=11 ifaces=нет"
     override fun tetherIntents() = intents
 
     override fun openTetherSettings(label: String): String? {
@@ -204,6 +204,18 @@ class HotspotAutomationTest {
         assertEquals("qs", o.path)
         assertTrue(ui.dumps > 0)            // дамп по каждому интенту, где ничего не нашлось
         assertEquals("return", ui.actions.last())
+    }
+
+    @Test
+    fun lockedPhoneMarksOutcomeSoCallerCanRetryAfterUnlock() {
+        ui.ready = false
+        ui.tileFromOpen = 0
+        val o = run(true)
+        assertEquals(HotspotResult.NOT_FOUND, o.result)
+        assertTrue(o.locked)
+        ui.ready = true
+        ui.tileFromOpen = 1
+        assertFalse(run(true).locked)
     }
 
     @Test

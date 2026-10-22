@@ -1,5 +1,8 @@
 package com.yegorkapomidorka.headswap.autosrv
 
+import android.content.Context
+import android.content.SharedPreferences
+
 /** Найденный на экране переключатель точки доступа (свитч в Настройках или плитка шторки). checked = null: состояние не определилось. */
 data class HotspotToggle(val label: String, val checked: Boolean?, val kind: String)
 
@@ -8,10 +11,10 @@ interface HotspotUi {
     /** Экран готов к работе (включён, без блокировки). false = заблокирован, причина в detail. */
     fun prepareScreen(): Pair<Boolean, String>
 
-    /** Точка доступа поднята по сетевым интерфейсам (HotspotState.up). */
+    /** Точка доступа поднята (HotspotState.up: рассылка состояния AP, запасной путь - интерфейсы). */
     fun hotspotUp(): Boolean
 
-    /** Все поднятые интерфейсы с IPv4, строкой для лога. */
+    /** Состояние рассылки AP и все поднятые интерфейсы с IPv4, строкой для лога. */
     fun ifaces(): String
 
     /** Метки интентов, которыми пробуем открыть экран точки доступа в Настройках, по порядку. */
@@ -54,7 +57,8 @@ interface HotspotUi {
 
 enum class HotspotResult { OK, ALREADY, SKIPPED, MISMATCH, NOT_FOUND, TIMEOUT }
 
-class HotspotOutcome(val result: HotspotResult, val detail: String, val path: String?, val ms: Long) {
+/** locked: сценарий шёл при заблокированном экране (только шторка) - итог можно повторить после разблокировки. */
+class HotspotOutcome(val result: HotspotResult, val detail: String, val path: String?, val ms: Long, val locked: Boolean = false) {
     override fun toString() = "$result: $detail" + (path?.let { " (путь $it)" } ?: "") + " за $ms мс"
 }
 
@@ -93,7 +97,7 @@ object HotspotText {
 
 /**
  * Эксперимент h135: включить/выключить точку доступа телефона через интерфейс системы (спецвозможности).
- * Состояние определяется по сетевому интерфейсу (HotspotState), а не по тумблеру. Два пути: экран точки доступа
+ * Состояние определяется по рассылке AP и интерфейсам (HotspotState), а не по тумблеру. Два пути: экран точки доступа
  * в Настройках (телефон разблокирован) и плитка в шторке быстрых настроек (заблокирован или Настройки не помогли).
  * Диагностический зонд: каждый шаг в лог, при неудаче дамп окон.
  */
@@ -106,9 +110,10 @@ class HotspotAutomation(
     private val pollMs: Long = 250,
 ) {
     private val t0 = ui.now()
+    private var locked = false
 
     private fun done(r: HotspotResult, detail: String, path: String? = null): HotspotOutcome {
-        val o = HotspotOutcome(r, detail, path, ui.now() - t0)
+        val o = HotspotOutcome(r, detail, path, ui.now() - t0, locked)
         log("итог: $o")
         return o
     }
@@ -157,6 +162,7 @@ class HotspotAutomation(
             }
             log("путь Настроек не нашёл переключатель, пробую шторку")
         } else {
+            locked = true
             log("телефон заблокирован, сразу шторка быстрых настроек")
         }
         val r = viaQuickSettings(on)
@@ -249,7 +255,25 @@ class HotspotAutomation(
     }
 
     companion object {
-        /** Точку включили мы (по факту поднятия интерфейса после клика); выключаем по отключению от машины только такую. */
-        @Volatile var weEnabled = false
+        private const val PREFS = "hotspot"
+        private const val KEY_WE_ENABLED = "we_enabled"
+
+        @Volatile private var prefs: SharedPreferences? = null
+        @Volatile private var mem = false
+
+        /** Подключить хранилище: флаг переживает смерть процесса и BridgeService. Без вызова (тесты) живёт в памяти. */
+        fun attach(ctx: Context) {
+            val sp = ctx.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            prefs = sp
+            mem = sp.getBoolean(KEY_WE_ENABLED, false)
+        }
+
+        /** Точку включили мы (по факту поднятия точки после клика); выключаем по отключению от машины только такую. */
+        var weEnabled: Boolean
+            get() = mem
+            set(v) {
+                mem = v
+                prefs?.edit()?.putBoolean(KEY_WE_ENABLED, v)?.apply()
+            }
     }
 }

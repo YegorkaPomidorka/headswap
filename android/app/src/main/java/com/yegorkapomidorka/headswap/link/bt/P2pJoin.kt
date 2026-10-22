@@ -314,7 +314,7 @@ class P2pJoin(
         onJoined(lan.ip)
     }
 
-    private fun hotspotUp(): Boolean = HotspotState.up()
+    private fun hotspotUp(): Boolean = HotspotState.up(ctx)
 
     private fun p2pIface(): LanIface? {
         for (ni in NetworkInterface.getNetworkInterfaces()?.toList().orEmpty()) {
