@@ -240,7 +240,7 @@ object LogShare {
             appendLine("  мой автомобиль: ${aa.carPreset?.let { "${it.name}${if (aa.carSettings == it.settings) "" else ", настройки изменены вручную"}" } ?: "не выбрана"}")
             appendLine("  сертификат: ${aa.certSet}")
             appendLine("  автозапуск сервера ГУ: ${aa.autoServer}")
-            appendLine("  микрофон: ${aa.micMode.label}, MODULE_STATUS VR: ${aa.micVrStatus}")
+            appendLine("  микрофон: ${aa.micMode.label}, MODULE_STATUS VR: ${aa.micVrStatus}, MUSIC: ${aa.moduleMusic}")
             appendLine("  проверка обновлений: ${upd.enabled}, на GitHub: ${upd.release()?.version ?: "не проверялось"}")
             appendLine("  метаданные: музыка ${aa.metaMusic}, навигация ${aa.metaNavi}, поле 6 NAVI_NEXT_TURN_INFO: ${aa.naviField6}, прогресс в ${if (aa.progressSeconds) "с" else "мс"}")
             appendLine()

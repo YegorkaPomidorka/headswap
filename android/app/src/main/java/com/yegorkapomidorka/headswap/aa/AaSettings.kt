@@ -129,6 +129,11 @@ class AaPrefs(ctx: Context) {
         get() = sp.getBoolean("micVrStatus", true)
         set(v) = sp.edit().putBoolean("micVrStatus", v).apply()
 
+    /** Слать ГУ MODULE_STATUS MUSIC(3) и отвечать на MODULE_CONTROL MUSIC (AaBridgeCore.MODULE_MUSIC_ENABLED). */
+    var moduleMusic: Boolean
+        get() = sp.getBoolean("moduleMusic", true)
+        set(v) = sp.edit().putBoolean("moduleMusic", v).apply()
+
     /** Трек, обложка и прогресс из AA -> MEDIA_INFO / MEDIA_PROGRESS_BAR. Читается на подключение. */
     var metaMusic: Boolean
         get() = sp.getBoolean("metaMusic", true)
