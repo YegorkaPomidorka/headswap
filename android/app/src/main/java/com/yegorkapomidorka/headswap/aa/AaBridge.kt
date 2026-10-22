@@ -170,6 +170,8 @@ class AaBridgeCore(
     @Volatile var huVwBt1420 = false           // VW BT 1420 (Павел, канал 20082138): по воздуху без heartbeat на PAUSE рвёт CarLife через ~1 мин
     @Volatile var huVw20082120 = false         // VW (STATISTIC_INFO channel 20082120 h93, 20082122 h222): без heartbeat рвёт USB через 3,7-5,6 с PAUSE
         private set
+    @Volatile var huTtsPreroll = false         // VW 20082120/22/34 (h222) и Golf 8 CNS3 20082130 (h279): тишина после TTS_INIT
+        private set
     @Volatile var huVw20082138 = false         // VW ID (channel 20082138, "VW BT 1538", h196): IDR > ~600 КиБ рвёт USB EIO
         private set
     @Volatile var huHyundaiCn7 = false         // ГУ Hyundai CN7 (product wp_cn7cpe_cn, h218): в режиме «Авто» музыка 32 кГц с ресэмплом 48→32
@@ -346,6 +348,7 @@ class AaBridgeCore(
         gotIdr = false
         huDesayG6S = false                     // HU_INFO / STATISTIC_INFO придут заново в этой сессии
         huVw20082120 = false                   // HU_INFO / STATISTIC_INFO придут заново в этой сессии
+        huTtsPreroll = false                   // STATISTIC_INFO придёт заново в этой сессии
         huHonda = false                        // STATISTIC_INFO придёт заново в этой сессии
         huVwBt1420 = false                     // HU_INFO придёт заново в этой сессии
         huVw20082138 = false                   // HU_INFO / STATISTIC_INFO придут заново в этой сессии
@@ -589,6 +592,10 @@ class AaBridgeCore(
             log("BRIDGE ГУ Mazda 20622111: VIDEO_DATA режу на куски ≤ $MAZDA_20622111_MAX_VIDEO_PACKET Б, потолок ${MAZDA_20622111_CEILING_BPS / 1000} кбит/с", true)
         }
         if (channel == VW_20082120_CHANNEL || channel == VW_CNS3_20082122_CHANNEL || channel == VW_CNS3_20082134_CHANNEL) huVw20082120 = true
+        if ((huVw20082120 || channel == VW_GOLF8_20082130_CHANNEL) && !huTtsPreroll) {
+            huTtsPreroll = true
+            log("BRIDGE ГУ VW (channel $channel): $TTS_PREROLL_MS мс тишины после TTS_INIT", true)
+        }
         if (isHondaChannel(channel) && !huHonda) {
             huHonda = true
             log("BRIDGE ГУ Honda (channel $channel): roadName под приборку, стрелки после SUBSCRIBE_START, перевзвод NAVI 0->1", true)
@@ -926,7 +933,7 @@ class AaBridgeCore(
             audioInited[ch] = true
             log("BRIDGE CarLife ${chName(ch)} INIT ${rate}Гц ${channels}к 16бит (0x%08x)".format(CarlifeAudio.initType(ch)), true)
             if (ch == CarlifeAudio.CH_TTS) {
-                if (huVw20082120) sendTtsPreroll()
+                if (huTtsPreroll) sendTtsPreroll()
                 ttsPackets = 0
                 mediaGuard = false
                 mediaReleaseTimer.cancel()
@@ -1613,7 +1620,7 @@ class AaBridgeCore(
         const val MEDIA_AFTER_TTS_MS = 300L
         const val VOICE_EXIT_DELAY_MS = 500L
         private const val TTS_DIAG_PACKETS = 3
-        /** Пре-ролл тишины TTS на VW 20082120/20082122/20082134 (h222); 16 кГц моно 16 бит, куски как у Baidu. */
+        /** Пре-ролл тишины TTS на VW 20082120/20082122/20082134 (h222) и 20082130 (h279); 16 кГц моно 16 бит, куски как у Baidu. */
         const val TTS_PREROLL_MS = 400
         private const val TTS_BYTES_PER_SEC = 16000 * 2
         const val TTS_PREROLL_BYTES = TTS_PREROLL_MS * TTS_BYTES_PER_SEC / 1000
@@ -1679,6 +1686,7 @@ class AaBridgeCore(
         const val VW_20082120_CHANNEL = "20082120"        // VW, protocol 1.0, versionName="RADIO" (h93)
         const val VW_CNS3_20082122_CHANNEL = "20082122"   // VW CNS3 (Tharu и др.): рвёт USB через ~5,6 с PAUSE без heartbeat (h222)
         const val VW_CNS3_20082134_CHANNEL = "20082134"   // VW CNS3 Tiguan L Pro: рвёт CarLife по Wi-Fi через ~5,1-5,7 с PAUSE (h224)
+        const val VW_GOLF8_20082130_CHANNEL = "20082130"  // VW Golf 8 CNS3: музыка приглушается под подсказку с опозданием (h279)
         const val VW_20082138_CHANNEL = "20082138"        // VW ID (h196): HU_INFO manufacturer=model="VW BT 1538"
         const val VW_BT_1420_MANUFACTURER = "VW BT 1420"  // VW (Павел): HU_INFO manufacturer=model, канал 20082138
         const val VW_20082138_MANUFACTURER = "VW BT 1538"

@@ -885,6 +885,20 @@ class AaBridgeAudioTest {
     }
 
     @Test
+    fun golf8Cns3TtsGetsPrerollWithoutPauseHeartbeat() {
+        core.onHuInfo("Volkswagen", "CNS3")
+        core.onHuStatistic("20082130")                                   // h279: приглушение музыки опаздывает
+        assertTrue(core.huTtsPreroll)
+        assertTrue("heartbeat на PAUSE не включаем", !core.huVw20082120)
+        core.onCarlifeStart()
+        core.onAudioStart(SPEECH)
+        core.onAudioData(SPEECH, pcm(2048, 7), 1)
+        val tts = link.audio.filter { it.chan == 4 }
+        assertEquals(listOf(0x40001, 0x40003, 0x40003, 0x40003, 0x40003, 0x40003), tts.map { it.type })
+        assertEquals(listOf(4096, 4096, 4096, 512), tts.drop(1).dropLast(1).map { it.payload.size })
+    }
+
+    @Test
     fun ttsWithoutVwFlagHasNoPreroll() {
         core.onHuInfo("", "")
         core.onHuStatistic("20622116")                                   // Desay: другая ГУ
