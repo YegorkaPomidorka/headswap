@@ -63,6 +63,11 @@ class P2pJoin(
     private var busyReported = false
     /** Неудачных discoverPeers подряд: после [REINIT_AFTER_FAILS] пересоздаём канал. */
     private var discoverFails = 0
+    /** Поисков со сбросом как у Baidu: первые [RESET_RUNS] раз через [RESET_RETRY_MS], дальше обычный повтор. */
+    private var resets = 0
+    /** PEERS_CHANGED за попытку: ноль в логе значит, что фреймворк пиров не присылал вовсе. */
+    private var peersChanged = 0
+    private var lastPeers: String? = null
     /** Группа собрана, ждём IPv4 по DHCP: приглашение уже не висит. */
     private var formed = false
     private var joinedIp: Inet4Address? = null
@@ -128,9 +133,32 @@ class P2pJoin(
     private fun begin(m: WifiP2pManager, ch: WifiP2pManager.Channel, t: P2pTarget) {
         main.removeCallbacks(timeout)
         main.removeCallbacks(retry)
-        if (t.canJoinBySsid) joinBySsid(m, ch, t) else discoverPeers(m, ch)
+        if (t.canJoinBySsid) joinBySsid(m, ch, t) else resetThenDiscover(m, ch)
         main.postDelayed(timeout, JOIN_TIMEOUT_MS)
-        main.postDelayed(retry, DISCOVER_RETRY_MS)
+        main.postDelayed(retry, if (t.canJoinBySsid) DISCOVER_RETRY_MS else RESET_RETRY_MS)
+    }
+
+    /**
+     * Как Baidu (WifiP2pResetTask, WifiDirectDiscoverTask): перед поиском снимаем остатки прошлой попытки -
+     * stopPeerDiscovery, removeGroup, cancelConnect - и только потом discoverPeers. У Pixel на Android 17 голый
+     * discoverPeers ни разу не нашёл ГУ G6S, у Samsung и Xiaomi находит (h406).
+     */
+    @SuppressLint("MissingPermission")
+    private fun resetThenDiscover(m: WifiP2pManager, ch: WifiP2pManager.Channel) {
+        val g = gen
+        peerMode = true   // повтор идёт и тогда, когда цепочка сброса не дошла до discoverPeers
+        resets++
+        WLog.ev(WLog.P2P, "reset", "n" to resets)
+        fun alive() = g == gen && channel === ch && target != null && joinedIp == null && !connecting
+        fun step(next: () -> Unit) = object : WifiP2pManager.ActionListener {
+            override fun onSuccess() { if (alive()) next() }
+            override fun onFailure(reason: Int) { if (alive()) next() }
+        }
+        m.stopPeerDiscovery(ch, step {
+            m.removeGroup(ch, step {
+                m.cancelConnect(ch, step { discoverPeers(m, ch) })
+            })
+        })
     }
 
     /** Wi-Fi включили, пока ждали: P2P поднялся, входим в группу. */
@@ -168,6 +196,7 @@ class P2pJoin(
                         discoverFails = 0
                         discoverPeers(m, fresh)
                     }
+                    resets < RESET_RUNS -> resetThenDiscover(m, ch)
                     discoverFails > 0 -> m.stopPeerDiscovery(ch, object : WifiP2pManager.ActionListener {
                         override fun onSuccess() = again()
                         override fun onFailure(reason: Int) = again()
@@ -177,7 +206,7 @@ class P2pJoin(
                     else -> discoverPeers(m, ch)
                 }
             }
-            main.postDelayed(this, DISCOVER_RETRY_MS)
+            main.postDelayed(this, if (peerMode && resets < RESET_RUNS) RESET_RETRY_MS else DISCOVER_RETRY_MS)
         }
     }
 
@@ -223,7 +252,7 @@ class P2pJoin(
             override fun onSuccess() {
                 if (g != gen) return
                 discoverFails = 0
-                WLog.ev(WLog.P2P, "discover", "res" to "ok", "n" to n)
+                WLog.ev(WLog.P2P, "discover", "res" to "ok", "n" to n, "peersChanged" to peersChanged)
             }
             override fun onFailure(reason: Int) {
                 if (g != gen) return
@@ -251,11 +280,15 @@ class P2pJoin(
         val g = gen
         m.requestPeers(ch) { list ->
             if (g != gen) return@requestPeers
-            val dev: WifiP2pDevice = list.deviceList.firstOrNull { it.deviceName == name } ?: return@requestPeers
-            if (connecting || target == null) return@requestPeers
+            val devs = list?.deviceList.orEmpty()
+            val exact = devs.firstOrNull { it.deviceName == name }
+            // запасное сравнение: пробелы по краям и регистр (h406, Pixel)
+            val dev: WifiP2pDevice? = exact ?: devs.firstOrNull { it.deviceName?.trim().equals(name.trim(), ignoreCase = true) }
+            logPeers(devs, name, dev)
+            if (dev == null || connecting || target == null) return@requestPeers
             connecting = true
             connectAt = System.currentTimeMillis()
-            WLog.ev(WLog.P2P, "peer", "matched" to true, "status" to dev.status)
+            WLog.ev(WLog.P2P, "peer", "matched" to true, "how" to if (exact != null) "exact" else "loose", "status" to dev.status)
             val cfg = WifiP2pConfig().apply {
                 deviceAddress = dev.deviceAddress
                 wps.setup = WpsInfo.PBC
@@ -273,6 +306,28 @@ class P2pJoin(
             })
         }
     }
+
+    /**
+     * Список пиров в лог, только когда он поменялся: без него не отличить «ГУ не видна» от «видна, но имя не то» (h406).
+     * Имена чужих устройств маскируем: начало, длина и признак совпадения с именем ГУ.
+     */
+    private fun logPeers(devs: Collection<WifiP2pDevice>, name: String, dev: WifiP2pDevice?) {
+        val sig = devs.joinToString { "${it.deviceName}/${it.status}" }
+        if (sig == lastPeers) return
+        lastPeers = sig
+        val names = devs.joinToString(" ") { d ->
+            val n = d.deviceName.orEmpty()
+            val eq = when {
+                n == name -> "=="
+                n.trim().equals(name.trim(), ignoreCase = true) -> "~="
+                else -> ""
+            }
+            "${maskName(n)}$eq/${d.status}"
+        }
+        WLog.ev(WLog.P2P, "peers", "n" to devs.size, "want" to maskName(name), "names" to names, "match" to (dev != null))
+    }
+
+    private fun maskName(n: String) = "${n.take(4)}…(${n.length})"
 
     private fun onConnectionChanged() {
         val m = mgr ?: return
@@ -334,7 +389,7 @@ class P2pJoin(
         val r = object : BroadcastReceiver() {
             override fun onReceive(c: Context, i: Intent) {
                 when (i.action) {
-                    WifiP2pManager.WIFI_P2P_PEERS_CHANGED_ACTION -> onPeers()
+                    WifiP2pManager.WIFI_P2P_PEERS_CHANGED_ACTION -> { peersChanged++; onPeers() }
                     WifiP2pManager.WIFI_P2P_CONNECTION_CHANGED_ACTION -> onConnectionChanged()
                     WifiP2pManager.WIFI_P2P_STATE_CHANGED_ACTION -> onP2pState(
                         i.getIntExtra(WifiP2pManager.EXTRA_WIFI_STATE, -1) == WifiP2pManager.WIFI_P2P_STATE_ENABLED
@@ -379,6 +434,9 @@ class P2pJoin(
         discoverRuns = 0
         busyReported = false
         discoverFails = 0
+        resets = 0
+        peersChanged = 0
+        lastPeers = null
         formed = false
         joinedIp = null
         iface = null
@@ -400,6 +458,8 @@ class P2pJoin(
     private companion object {
         const val JOIN_TIMEOUT_MS = 30_000L
         const val DISCOVER_RETRY_MS = 15_000L
+        const val RESET_RETRY_MS = 5_000L
+        const val RESET_RUNS = 6
         const val CONNECT_STALE_MS = 20_000L
         const val REINIT_AFTER_FAILS = 2
         const val IP_RETRY_MS = 500L
