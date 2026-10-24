@@ -879,8 +879,8 @@ class AaBridgeCore(
         }
         val call = if (huVwCns2Delphi) phoneCallProvider() else PhoneCall.IDLE
         val android = delphiKey(code, call) ?: HARD_KEY_TO_ANDROID[code]
-        if (call == PhoneCall.ACTIVE && code == HARD_KEY_SEEK_ADD) {
-            log("BRIDGE руль keycode=$code: идёт звонок, вперёд не шлю", true)
+        if (call == PhoneCall.ACTIVE && code == HARD_KEY_SEEK_SUB) {
+            log("BRIDGE руль keycode=$code: идёт звонок, назад не шлю", true)
             return
         }
         if (android == null) {
@@ -900,15 +900,16 @@ class AaBridgeCore(
 
     /**
      * На новых рулях VW нет кнопки трубки: пока звонит или идёт звонок, перемотка отвечает за звонок.
-     * Звонит: вперёд = принять (CALL), назад = отклонить (ENDCALL). Разговор: назад = положить трубку.
+     * Как на телефоне: зелёная слева, красная справа. Звонит: назад = принять (CALL), вперёд = отклонить (ENDCALL).
+     * Разговор: вперёд = положить трубку.
      * Кнопки паузы тоже нет: удержание перемотки ГУ шлёт как keycode 0, вне звонка это пауза/плей.
      * Только VW CNS2 Delphi 20082114 ([huVwCns2Delphi], Дмитрий); на прочих ГУ всё как было.
      */
     private fun delphiKey(code: Int, call: PhoneCall): Int? = when {
         !huVwCns2Delphi -> null
         call == PhoneCall.IDLE && code == HARD_KEY_SEEK_HOLD -> KEYCODE_MEDIA_PLAY_PAUSE
-        call == PhoneCall.RINGING && code == HARD_KEY_SEEK_ADD -> KEYCODE_CALL
-        call != PhoneCall.IDLE && code == HARD_KEY_SEEK_SUB -> KEYCODE_ENDCALL
+        call == PhoneCall.RINGING && code == HARD_KEY_SEEK_SUB -> KEYCODE_CALL
+        call != PhoneCall.IDLE && code == HARD_KEY_SEEK_ADD -> KEYCODE_ENDCALL
         else -> null
     }
 

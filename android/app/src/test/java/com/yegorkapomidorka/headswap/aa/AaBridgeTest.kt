@@ -569,16 +569,16 @@ class AaBridgeCoreTest {
         assertEquals(listOf(87), peer.keys.toList())
         peer.keys.clear()
         core.onHuStatistic("20082114")                        // VW CNS2 Delphi (Дмитрий)
-        core.onCarlifeHardKey(16)                             // звонит: вперёд = принять
-        core.onCarlifeHardKey(15)                             // звонит: назад = отклонить
+        core.onCarlifeHardKey(15)                             // звонит: назад (зелёная слева) = принять
+        core.onCarlifeHardKey(16)                             // звонит: вперёд (красная справа) = отклонить
         call = PhoneCall.ACTIVE
-        core.onCarlifeHardKey(16)                             // разговор: вперёд глотаем
-        core.onCarlifeHardKey(15)                             // разговор: назад = положить трубку
+        core.onCarlifeHardKey(15)                             // разговор: назад глотаем
+        core.onCarlifeHardKey(16)                             // разговор: вперёд = положить трубку
         call = PhoneCall.IDLE
         core.onCarlifeHardKey(16)                             // без звонка снова перемотка
         core.onCarlifeHardKey(0)                              // удержание перемотки = пауза/плей
         assertEquals(listOf(5, 6, 6, 87, 85), peer.keys.toList())
-        assertTrue(logs.any { it.contains("руль keycode=16 -> AA KEYCODE 5 (звонок RINGING)") })
+        assertTrue(logs.any { it.contains("руль keycode=15 -> AA KEYCODE 5 (звонок RINGING)") })
     }
 
     @Test
