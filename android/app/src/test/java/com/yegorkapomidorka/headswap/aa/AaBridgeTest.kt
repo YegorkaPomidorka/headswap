@@ -1184,6 +1184,49 @@ class AaBridgeAudioTest {
     }
 
     @Test
+    fun vwCns2DelphiDelaysFirstTtsInitAfterNaviAndKeepsSpeech() {
+        val l = FakeLink()
+        val c = AaBridgeCore({ m, _ -> logs.add(m) }, clockMs = { timers.now }, audioSchedule = timers::schedule).also { it.attach(l) }
+        c.ttsPrerollProvider = { TtsPreroll.MS0 }
+        c.onHuStatistic("20082114")                                      // h425: первая подсказка сессии молчит
+        c.onCarlifeStart()
+        val a = pcm(2048, 1)
+        val b = pcm(2048, 2)
+        c.onAudioStart(SPEECH)
+        c.onAudioData(SPEECH, a, 1)
+        timers.advance(100)
+        c.onAudioData(SPEECH, b, 2)
+        assertTrue(l.audio.none { it.chan == 4 })                          // NAVI=1 ушёл, INIT ещё нет: речь копится
+        assertTrue("M2=1" in l.events)
+        timers.advance(200)
+        val tts = l.audio.filter { it.chan == 4 }
+        assertEquals(0x40001, tts[0].type)
+        assertArrayEquals(a + b, tts.drop(1).flatMap { it.payload.toList() }.toByteArray())
+        // следующая фраза: NAVI=1 давно держится - без задержки
+        c.onAudioStop(SPEECH)
+        timers.advance(1500)
+        val before = l.audio.size
+        c.onAudioData(SPEECH, a, 3)
+        assertEquals(0x40001, l.audio[before].type)
+    }
+
+    @Test
+    fun vwCns2DelphiShortPhraseStoppedWhileWaitingForInitStillPlays() {
+        val l = FakeLink()
+        val c = AaBridgeCore({ m, _ -> logs.add(m) }, clockMs = { timers.now }, audioSchedule = timers::schedule).also { it.attach(l) }
+        c.ttsPrerollProvider = { TtsPreroll.MS0 }
+        c.onHuStatistic("20082114")
+        c.onCarlifeStart()
+        c.onAudioStart(SPEECH)
+        c.onAudioData(SPEECH, pcm(2048), 1)
+        c.onAudioStop(SPEECH)
+        timers.advance(300)
+        assertEquals(listOf(0x40001, 0x40003, 0x40003), l.audio.filter { it.chan == 4 }.map { it.type })  // Авто на Delphi: по 1024 Б
+        timers.advance(1500)
+        assertEquals(0x40002, l.audio.last { it.chan == 4 }.type)        // STOP после выдачи, с обычной отсрочкой
+    }
+
+    @Test
     fun speechInVoiceSessionStaysOnTtsWithoutDelphiOrWithPhoneMic() {
         core.onCarlifeStart()
         core.onVoiceSession(1)
