@@ -480,7 +480,10 @@ class BridgeService : Service() {
             return
         }
         if (wifiBMode && linkWaiting) {
-            WLog.ev(WLog.TRIGGER, "auto-mark", "why" to "waiting")      // всплеск ACL: ожидание уже идёт
+            // всплеск ACL: ожидание уже идёт. Без RFCOMM и группы перезапускаем пробник - ГУ открывает SPP на свежих слушателях (h211)
+            val restart = btProbe.idle()
+            WLog.ev(WLog.TRIGGER, "auto-mark", "why" to "waiting", "btRestart" to restart)
+            if (restart) btProbe.restart("ACL вернулся")
             return
         }
         hintShown = false

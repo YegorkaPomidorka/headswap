@@ -58,6 +58,10 @@ class P2pTarget(val deviceName: String?, val ssid: String?, val passphrase: Stri
     val canJoinBySsid: Boolean
         get() = ssid != null && ssid.startsWith("DIRECT-") && ssid.length >= 9 && passphrase != null && passphrase.length in 8..63
 
+    /** Те же реквизиты: ГУ ответила на наш TARGET_INFO_REQUEST тем же, что уже прислала. */
+    fun sameAs(o: P2pTarget): Boolean =
+        deviceName == o.deviceName && ssid == o.ssid && passphrase == o.passphrase && freqMhz == o.freqMhz
+
     companion object {
         fun parse(body: ByteArray): P2pTarget? {
             val f = PbReader.parse(body) ?: return null

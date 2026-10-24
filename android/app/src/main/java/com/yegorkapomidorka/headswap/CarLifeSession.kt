@@ -377,7 +377,7 @@ class CarLifeSession(
             Msg.VIDEO_ENCODER_START -> onVideoStart()
             Msg.VIDEO_ENCODER_PAUSE -> {
                 paused = true
-                if (pauseHeartbeatHu) { // первый heartbeat сразу; Desay - как раньше, через 2 с
+                if (pauseHeartbeatHu) { // первый heartbeat сразу; Desay по USB - как раньше, через 2 с
                     lastVideoTx = 0L
                     pauseHeartbeat()
                 }
@@ -1060,11 +1060,16 @@ class CarLifeSession(
     //   и 2026-10-16 Wi-Fi), реконнект с FOREGROUND выдёргивал юзера из меню ГУ в CarLife: VIDEO_HEARTBEAT 0x20002 сразу
     //   и раз в 100 мс, как Baidu Recorder.sendEmptyPacketBackground (~50 мс). VW CNS3 channel 20082122 так же,
     //   через ~5,6 с (h222, 2026-10-17 USB).
+    // - Desay G6S на воздухе (h211, задний ход): пустой VIDEO_DATA раз в 900 мс не держит, через 24-28 с ГУ снимает
+    //   Wi-Fi Direct; переживали только паузы до 25 с. Baidu на паузе шлёт именно VIDEO_HEARTBEAT (Recorder:906-926),
+    //   ставим его раз в 100 мс, по USB у Desay остаётся VIDEO_DATA.
     /**
-     * ГУ, которым на PAUSE нужен VIDEO_HEARTBEAT раз в 100 мс: VW 20082120/20082122 (h93, h222) и VW BT 1420 по воздуху
-     * (Павел 2026-10-18: без keepalive на PAUSE ГУ закрыла сокет через ~1 мин, с пустым VIDEO_DATA рвала на START).
+     * ГУ, которым на PAUSE нужен VIDEO_HEARTBEAT раз в 100 мс: VW 20082120/20082122 (h93, h222), VW BT 1420 по воздуху
+     * (Павел 2026-10-18: без keepalive на PAUSE ГУ закрыла сокет через ~1 мин, с пустым VIDEO_DATA рвала на START)
+     * и Desay G6S по воздуху (h211).
      */
-    private val pauseHeartbeatHu: Boolean get() = bridge.huVw20082120 || (air && bridge.huVwBt1420)
+    private val pauseHeartbeatHu: Boolean
+        get() = bridge.huVw20082120 || (air && (bridge.huVwBt1420 || bridge.huDesayG6S))
 
     private fun pauseHeartbeat() {
         if (closed.get() || !PAUSE_KEEPALIVE_ENABLED) return
