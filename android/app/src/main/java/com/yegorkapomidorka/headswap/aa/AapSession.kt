@@ -36,6 +36,8 @@ class AapOptions(
     /** Если задан, SDR строится в момент запроса телефона (мост: звук зависит от FEATURE_CONFIG ГУ). */
     val sdProvider: (() -> AapSdOptions)? = null,
     val tls12Only: Boolean = false,
+    /** false = на VIDEO MEDIA_SETUP отвечаем фокусом NATIVE: видео не идёт (долгая проба AaHold). */
+    val videoFocus: Boolean = true,
 )
 
 class AapStats {
@@ -701,7 +703,7 @@ class AapSession(
             type == M.MEDIA_SETUP -> {
                 val unacked = if (chan == M.CH_VIDEO) opts.maxUnackedVideo else opts.maxUnackedAudio
                 send(M.mediaConfig(chan, unacked))
-                if (chan == M.CH_VIDEO) send(M.videoFocusNotification(projected = true, unsolicited = true))
+                if (chan == M.CH_VIDEO) send(M.videoFocusNotification(projected = opts.videoFocus, unsolicited = true))
                 else if (chan in M.AUDIO_CHANNELS) send(M.audioFocusGainUnsolicited())
             }
             type == M.MEDIA_START -> {
@@ -712,7 +714,7 @@ class AapSession(
             type == M.MEDIA_STOP && chan in M.AUDIO_CHANNELS -> audioSink?.onAudioStop(chan)
             type == M.MEDIA_VIDEO_FOCUS_REQUEST && chan == M.CH_VIDEO -> {
                 val mode = PbReader.parse(payload)?.firstOrNull { it.number == 2 && it.wire == 0 }?.num?.toInt()
-                if (mode == 1) send(M.videoFocusNotification(projected = true, unsolicited = false))
+                if (mode == 1) send(M.videoFocusNotification(projected = opts.videoFocus, unsolicited = false))
                 else if (mode == 2) {
                     log("AA VIDEO_FOCUS_REQUEST NATIVE («Выйти»)", true)
                     sink.onAaNativeFocusRequest()      // не отвечаем: NATIVE уйдёт, когда ГУ реально выйдет из CarLife

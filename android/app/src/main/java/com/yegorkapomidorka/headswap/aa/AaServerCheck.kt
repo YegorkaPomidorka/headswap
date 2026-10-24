@@ -322,6 +322,7 @@ object AaServerCheck {
 
     /** AaConnector перед каждым подключением к серверу ГУ (нить коннектора, не main): ручная проба не должна держать сервер. */
     fun beforeBridgeConnect() {
+        if (!AaHold.releaseForBridge(AWAIT_MS)) AppLog.i("AAHOLD стенд не отпустил сервер за $AWAIT_MS мс, подключаюсь всё равно")
         val c = manual ?: return
         if (!c.awaitIdle(AWAIT_MS)) AppLog.i("SRVCHECK проба не закончилась за $AWAIT_MS мс, подключаюсь всё равно")
     }

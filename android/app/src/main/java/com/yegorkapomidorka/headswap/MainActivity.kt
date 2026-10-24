@@ -15,6 +15,7 @@ import android.view.View
 import android.view.WindowInsets
 import android.widget.FrameLayout
 import com.yegorkapomidorka.headswap.aa.AaCreds
+import com.yegorkapomidorka.headswap.aa.AaHold
 import com.yegorkapomidorka.headswap.aa.AaProbe
 import com.yegorkapomidorka.headswap.link.car.CarPairing
 import com.yegorkapomidorka.headswap.link.diag.NetProbe
@@ -241,6 +242,12 @@ class MainActivity : Activity() {
             when (cmd) {
                 "aa_selftest" -> Actions.aaSelftest(this)
                 "aa_probe" -> AaProbe.run(this)                // проба AA-сессии к 127.0.0.1:5277 без CarLife (targetSdk 37)
+                // стенд долгой сессии и восстановления сервера: --ei hold_s N --es close bye|fin|rst --ez video B --ez until_usb B
+                "aa_hold" -> AaHold.run(
+                    this, intent.getIntExtra("hold_s", 180), intent.getStringExtra("close") ?: "bye",
+                    intent.getBooleanExtra("video", false), intent.getBooleanExtra("until_usb", false),
+                )
+                "aa_hold_stop" -> AaHold.stop("команда aa_hold_stop")
                 // проба локальной сети для беспровода: маяк UDP 7999, ответчик 8999 (--ei seconds N --es to <ip>)
                 "net_probe" -> NetProbe.run(this, intent.getIntExtra("seconds", 20), intent.getStringExtra("to"))
                 "net_perm" -> requestLocalNetwork()
