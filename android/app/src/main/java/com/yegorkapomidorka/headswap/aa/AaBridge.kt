@@ -175,7 +175,7 @@ class AaBridgeCore(
     private var vrReply = false                // поток ответа ассистента открыт в канале VR (VR_INIT ушёл)
     @Volatile var huVw20082120 = false        // VW (STATISTIC_INFO channel 20082120 h93, 20082122 h222): без heartbeat рвёт USB через 3,7-5,6 с PAUSE
         private set
-    @Volatile var huVw20082138 = false         // VW ID (channel 20082138, "VW BT 1538", h196): IDR > ~600 КиБ рвёт USB EIO
+    @Volatile var huVw20082138 = false         // VW ID (h196: channel 20082138 + "VW BT 1538"; ID.6 Crozz: 20082128 + "VW BT 9491"): IDR > ~600 КиБ рвёт USB EIO
         private set
     @Volatile var huHyundaiCn7 = false         // ГУ Hyundai CN7 (product wp_cn7cpe_cn, h218): в режиме «Авто» музыка 32 кГц с ресэмплом 48→32
         private set
@@ -371,8 +371,8 @@ class AaBridgeCore(
         huHonda = false                        // STATISTIC_INFO придёт заново в этой сессии
         huVwBt1420 = false                     // HU_INFO придёт заново в этой сессии
         huVw20082138 = false                   // HU_INFO / STATISTIC_INFO придут заново в этой сессии
-        vwIdName = false
-        vwIdChannel = false
+        vwIdName = null
+        vwIdChannel = null
         huHyundaiCn7 = false                   // HU_INFO придёт заново в этой сессии
         huPioneerRm56 = false                  // HU_INFO придёт заново в этой сессии
         huHonda20772121 = false                // HU_INFO / STATISTIC_INFO придут заново в этой сессии
@@ -588,7 +588,7 @@ class AaBridgeCore(
      */
     fun onHuInfo(manufacturer: String?, model: String?, product: String? = null) {
         if (manufacturer == DESAY_MANUFACTURER && model == DESAY_G6S_MODEL) huDesayG6S = true
-        vwIdName = manufacturer == VW_20082138_MANUFACTURER
+        vwIdName = manufacturer?.takeIf { VW_ID_IDR_LIMIT_HUS.containsKey(it) }
         if (manufacturer == VW_BT_1420_MANUFACTURER) huVwBt1420 = true
         updateVwId()
         if (product == HYUNDAI_CN7_PRODUCT) huHyundaiCn7 = true
@@ -603,17 +603,19 @@ class AaBridgeCore(
         }
     }
 
-    private var vwIdName = false               // HU_INFO manufacturer = BT-имя ГУ "VW BT 1538"
-    private var vwIdChannel = false            // STATISTIC_INFO channel = прошивка 20082138
+    private var vwIdName: String? = null       // HU_INFO manufacturer = BT-имя ГУ из [VW_ID_IDR_LIMIT_HUS] ("VW BT 1538", "VW BT 9491")
+    private var vwIdChannel: String? = null    // STATISTIC_INFO channel = прошивка ГУ
 
     /**
-     * VW ID (h196) - только прошивка 20082138 И BT-имя "VW BT 1538": тот же канал у VW BT 1420 (Павел), которому
-     * потолок 2 Мбит/с не нужен (8 Мбит/с по воздуху и USB без обрывов, лог 2026-10-16).
+     * VW ID - прошивка И BT-имя строго парой из [VW_ID_IDR_LIMIT_HUS]: 20082138 + "VW BT 1538" (h196), 20082128 + "VW BT 9491"
+     * (ID.6 Crozz, 24.10.2026). Канал 20082138 тот же у VW BT 1420 (Павел), которому потолок 2 Мбит/с не нужен
+     * (8 Мбит/с по воздуху и USB без обрывов, лог 2026-10-16).
      */
     private fun updateVwId() {
         val was = huVw20082138
-        huVw20082138 = vwIdName && vwIdChannel
-        if (huVw20082138 && !was) log("BRIDGE ГУ VW ID (20082138, VW BT 1538): потолок битрейта по размеру IDR", true)
+        val name = vwIdName
+        huVw20082138 = name != null && vwIdChannel == VW_ID_IDR_LIMIT_HUS[name]
+        if (huVw20082138 && !was) log("BRIDGE ГУ VW ID ($vwIdChannel, $name): потолок битрейта по размеру IDR", true)
     }
 
     /** STATISTIC_INFO ГУ разобран: запасной признак Desay G6S и признак VW 20082120 - канал сборки прошивки. */
@@ -634,7 +636,7 @@ class AaBridgeCore(
             huHonda = true
             log("BRIDGE ГУ Honda (channel $channel): roadName под приборку, стрелки после SUBSCRIBE_START, перевзвод NAVI 0->1", true)
         }
-        vwIdChannel = channel == VW_20082138_CHANNEL
+        vwIdChannel = channel
         updateVwId()
     }
 
@@ -1860,6 +1862,10 @@ class AaBridgeCore(
         const val VW_20082138_CHANNEL = "20082138"        // VW ID (h196): HU_INFO manufacturer=model="VW BT 1538"
         const val VW_BT_1420_MANUFACTURER = "VW BT 1420"  // VW (Павел): HU_INFO manufacturer=model, канал 20082138
         const val VW_20082138_MANUFACTURER = "VW BT 1538"
+        const val VW_20082128_CHANNEL = "20082128"        // VW ID.6 Crozz (24.10.2026): HU_INFO manufacturer=model="VW BT 9491", тот же лимит IDR
+        const val VW_20082128_MANUFACTURER = "VW BT 9491"
+        /** ГУ VW ID с лимитом размера IDR: BT-имя (HU_INFO manufacturer) -> канал прошивки (STATISTIC_INFO); пара обязательна. */
+        val VW_ID_IDR_LIMIT_HUS = mapOf(VW_20082138_MANUFACTURER to VW_20082138_CHANNEL, VW_20082128_MANUFACTURER to VW_20082128_CHANNEL)
         const val HYUNDAI_CN7_PRODUCT = "wp_cn7cpe_cn"    // HU_INFO.product Hyundai Elantra CN7 (h218): manufacturer QTI, model "sm6150_au for arm64"
         const val PIONEER_MANUFACTURER = "Pioneer"        // HU_INFO Pioneer RM56E8B (Dongfeng DF6, h277): manufacturer="Pioneer" model="RM56E8B"
         const val PIONEER_RM56_MODEL = "RM56E8B"

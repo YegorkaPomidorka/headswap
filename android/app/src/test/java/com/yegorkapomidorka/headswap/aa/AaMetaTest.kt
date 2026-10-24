@@ -664,6 +664,22 @@ class AaMetaTest {
     }
 
     @Test
+    fun vwId6CrozzFlagByManufacturerAndChannelAsPair() {
+        val r = Rig()
+        r.core.onHuInfo("VW BT 9491", "VW BT 9491")
+        r.core.onHuStatistic("20082138")                       // канал h196 к имени 9491 - не пара
+        assertTrue("имя и канал только парой", !r.core.huVw20082138)
+        r.core.onHuStatistic("20082128")
+        assertTrue(r.core.huVw20082138)
+        r.core.onCarlifeClosed()
+        r.core.attach(MetaLink())
+        assertTrue("новая сессия - флаг заново", !r.core.huVw20082138)
+        r.core.onHuInfo("VW BT 1420", "VW BT 1420")             // Павел: не в списке, потолок не нужен
+        r.core.onHuStatistic("20082128")
+        assertTrue(!r.core.huVw20082138)
+    }
+
+    @Test
     fun pioneerRm56FlagByManufacturerAndModelAndReset() {
         val r = Rig()
         assertTrue(!r.core.huPioneerRm56)
