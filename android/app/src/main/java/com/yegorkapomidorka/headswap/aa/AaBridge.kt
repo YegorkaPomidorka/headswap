@@ -878,6 +878,7 @@ class AaBridgeCore(
             return
         }
         val call = if (huVwCns2Delphi) phoneCallProvider() else PhoneCall.IDLE
+        if (code == HARD_KEY_MEDIA_STOP) muteMediaOnCall("ГУ прислало keycode=$code")
         val android = delphiKey(code, call) ?: HARD_KEY_TO_ANDROID[code]
         if (call == PhoneCall.ACTIVE && code == HARD_KEY_SEEK_SUB) {
             log("BRIDGE руль keycode=$code: идёт звонок, назад не шлю", true)
@@ -1296,6 +1297,22 @@ class AaBridgeCore(
         }
     }
 
+    /**
+     * VW CNS2 Delphi (h425): на входящем ГУ уходит в свой звонок и перестаёт брать MEDIA. Хвост музыки AA (~3 с до
+     * MEDIA_STOP) забивал общий USB-поток: видео и звук стояли ~20 с, иногда EIO. Если музыка на паузе заранее,
+     * проблемы нет (Дмитрий, лог 24.10 22:13). Поэтому при звонке сразу MEDIA PAUSE и хвост не пересылаем до play AA.
+     */
+    @Synchronized
+    private fun muteMediaOnCall(why: String) {
+        if (!huVwCns2Delphi || huPausedAa || !carlifeStarted) return
+        val call = phoneCallProvider()
+        if (call == PhoneCall.IDLE) return
+        huPausedAa = true
+        resumeOnHuMusic = false
+        log("BRIDGE звонок ${call.name} ($why): MEDIA на паузу, хвост музыки AA не пересылаю (h425)", true)
+        requestMediaPause("звонок на телефоне")
+    }
+
     /** Пускать ли MEDIA_DATA дальше; нет = данные отброшены (голос / ждём INIT после TTS). */
     private fun admitMedia(): Boolean {
         val why = when {
@@ -1323,7 +1340,10 @@ class AaBridgeCore(
     /** Плеер AA сменил состояние (ch9). MUSIC по нему - только когда звук не по USB: иначе им владеет MEDIA INIT/PAUSE. */
     private fun musicByState(playing: Boolean) {
         if (playing) releaseHuPause("AA заиграл")
-        else log("BRIDGE AA плеер остановился: наш KEYCODE $KEYCODE_MEDIA_PAUSE ${ago(lastPauseKeyMs)}, ввод пользователя ${ago(lastUserInputMs)}, BT HFP ${ago(lastHfpConnectMs)}", true)
+        else {
+            log("BRIDGE AA плеер остановился: наш KEYCODE $KEYCODE_MEDIA_PAUSE ${ago(lastPauseKeyMs)}, ввод пользователя ${ago(lastUserInputMs)}, BT HFP ${ago(lastHfpConnectMs)}", true)
+            muteMediaOnCall("плеер AA остановился")
+        }
         if (audioViaUsb || !MODULE_MUSIC_ENABLED || !carlifeStarted) return
         if (link.sendModuleStatus(CarlifeAudio.MODULE_MUSIC, if (playing) 1 else 0)) {
             log("BRIDGE CarLife MODULE_STATUS MUSIC=${if (playing) 1 else 0} (плеер AA, звук не по USB)", true)
@@ -1850,6 +1870,8 @@ class AaBridgeCore(
         const val HARD_KEY_SEEK_ADD = 0x10
         /** VW CNS2 Delphi 20082114: удержание вперёд/назад приходит как keycode 0 (Дмитрий, 24.10). */
         const val HARD_KEY_SEEK_HOLD = 0
+        /** MEDIA_STOP с ГУ; Delphi шлёт его сам, когда уходит на свой звонок. */
+        const val HARD_KEY_MEDIA_STOP = 0x20
 
         /**
          * CarLife hard key (HUJ/CommonParams) -> Android KeyEvent; все значения есть в AapMessages.KEYCODES_SUPPORTED.

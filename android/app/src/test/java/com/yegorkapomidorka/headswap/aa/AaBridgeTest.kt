@@ -755,6 +755,40 @@ class AaBridgeAudioTest {
     private fun hexs(b: ByteArray) = b.joinToString("") { "%02x".format(it) }
 
     @Test
+    fun delphiCallPausesMediaAndDropsTail() {
+        // h425: хвост музыки AA при входящем забивал USB на ~20 с - пауза сразу, хвост не шлём до play
+        core.peer = FakePeer()
+        var call = PhoneCall.IDLE
+        core.phoneCallProvider = { call }
+        core.onHuStatistic("20082114")
+        core.onCarlifeStart()
+        core.onMediaStatus(AaMediaStatus(2, "YandexMusic", 10, null, null, null))
+        core.onAudioData(AapMessages.CH_AUDIO_MEDIA, pcm(100), 1)
+        call = PhoneCall.RINGING
+        core.onMediaStatus(AaMediaStatus(3, "YandexMusic", 10, null, null, null))   // плеер встал под рингтон
+        core.onAudioData(AapMessages.CH_AUDIO_MEDIA, pcm(100), 2)                   // хвост буфера AA
+        core.onCarlifeHardKey(0x20)                                                 // ГУ ушло в звонок: второй раз не паузим
+        core.onAudioStop(AapMessages.CH_AUDIO_MEDIA)
+        assertEquals(listOf(0x30001, 0x30006, 0x30003), link.audio.map { it.type })
+        call = PhoneCall.IDLE
+        core.onAudioStart(AapMessages.CH_AUDIO_MEDIA)                               // после звонка AA заиграл снова
+        core.onAudioData(AapMessages.CH_AUDIO_MEDIA, pcm(100), 3)
+        assertEquals(listOf(0x30001, 0x30006, 0x30003, 0x30001, 0x30006), link.audio.map { it.type })
+    }
+
+    @Test
+    fun callDoesNotTouchMediaOnOtherHu() {
+        core.peer = FakePeer()
+        core.phoneCallProvider = { PhoneCall.RINGING }
+        core.onCarlifeStart()
+        core.onMediaStatus(AaMediaStatus(2, "YandexMusic", 10, null, null, null))
+        core.onAudioData(AapMessages.CH_AUDIO_MEDIA, pcm(100), 1)
+        core.onMediaStatus(AaMediaStatus(3, "YandexMusic", 10, null, null, null))
+        core.onAudioData(AapMessages.CH_AUDIO_MEDIA, pcm(100), 2)
+        assertEquals(listOf(0x30001, 0x30006, 0x30006), link.audio.map { it.type })
+    }
+
+    @Test
     fun mediaInitThenDataOnMediaChannelWithExactCodesAndBodies() {
         core.onCarlifeStart()
         val d = pcm(3840)
