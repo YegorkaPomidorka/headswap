@@ -22,6 +22,7 @@ class CarPresetTest {
         assertEquals(CarSettings(videoMode = VideoMode.WIDE_HD), CarPreset.HONDA_CRV_2026.settings)
         assertEquals(CarSettings(videoMode = VideoMode.R1080), CarPreset.HONDA_VEZEL_2022.settings)
         assertEquals(CarSettings(), CarPreset.VW_THARU_XR.settings)
+        assertEquals(CarSettings(videoMode = VideoMode.R800), CarPreset.VW_E_BORA_2019.settings)
         assertEquals(CarSettings(musicRate = MusicRate.HZ32), CarPreset.KIA_K3_2023.settings)
         assertEquals(VideoMode.WIDE, CarPreset.HYUNDAI_IX35_2021.settings.videoMode)
         assertEquals(MusicRate.HZ32, CarPreset.HYUNDAI_IX35_2021.settings.musicRate)

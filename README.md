@@ -47,6 +47,7 @@
 | Skoda Octavia Pro | 2.0 |
 | Toyota Corolla Cross 2024–2025 | 2.0 |
 | Toyota Levin | — |
+| Volkswagen e-Bora 2019 (MIB 275A, CNS2 Delphi) | 2.0 |
 | Volkswagen Golf 8, комплектация Pro, 2021 | — |
 | Volkswagen ID.Unyx | — |
 | Volkswagen Lamando L | — |
