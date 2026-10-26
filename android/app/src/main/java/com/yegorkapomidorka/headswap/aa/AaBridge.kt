@@ -49,7 +49,7 @@ interface CarlifeLink {
      */
     fun requestMicRecord(start: Boolean): Boolean = false
 
-    /** Ключевой кадр энкодера (размер в байтах) ушёл в CarLife; зовётся только на ГУ с лимитом размера IDR (VW ID, h196). */
+    /** Ключевой кадр энкодера (размер в байтах) ушёл в CarLife; зовётся только на ГУ с лимитом размера IDR (VW ID, h196; Mobis CCNC, h242test4). */
     fun onEncodedKeyFrame(size: Int) {}
 
     /** Состояние видео-очереди (слив, бэклог, длина) для статистики моста; null = нет данных. */
@@ -2226,7 +2226,7 @@ class AaBridgeCore(
                 log("BRIDGE IDR энкодера -> CarLife ${payload.size} Б nal=${AnnexB.nalTypes(payload)}", true)
             }
             AaState.status = "мост: AA -> CarLife (перекодирование)"
-            if (huVw20082138) link.onEncodedKeyFrame(payload.size)
+            if (huVw20082138 || huMobisNx4c) link.onEncodedKeyFrame(payload.size)
             return
         }
         if (!link.sendVideo(data)) {
@@ -2239,7 +2239,7 @@ class AaBridgeCore(
         sent++
         if (idr) idrSent++
         AaState.bridgeSent = sent
-        if (idr && huVw20082138) link.onEncodedKeyFrame(data.size)
+        if (idr && (huVw20082138 || huMobisNx4c)) link.onEncodedKeyFrame(data.size)
     }
 
     /**

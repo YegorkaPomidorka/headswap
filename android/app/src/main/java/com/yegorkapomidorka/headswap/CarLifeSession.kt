@@ -10,6 +10,7 @@ import com.yegorkapomidorka.headswap.aa.BitratePolicy
 import com.yegorkapomidorka.headswap.aa.BitrateProfile
 import com.yegorkapomidorka.headswap.aa.CarlifeLink
 import com.yegorkapomidorka.headswap.aa.FpsSetting
+import com.yegorkapomidorka.headswap.aa.IdrBitrateCeiling
 import com.yegorkapomidorka.headswap.aa.IdrThrottle
 import com.yegorkapomidorka.headswap.aa.CarlifeMediaInfo
 import com.yegorkapomidorka.headswap.aa.LinkVideoStats
@@ -118,6 +119,9 @@ class CarLifeSession(
     @Volatile private var huFeatureItems: List<Pair<String, Int>>? = null
     private var mobisBeatLogged = false
     private var mobisAdaptLogged = false
+    // потолок размера IDR (h242test4): у транскодера и заглушки свой, каждый ведёт битрейт своего энкодера
+    private val mobisAaCeiling = IdrBitrateCeiling(AaBridgeCore.MOBIS_BITRATE)
+    private val mobisStubCeiling = IdrBitrateCeiling(AaBridgeCore.MOBIS_BITRATE)
 
     // находки для итогового резюме
     private var huVersion = "-"
@@ -639,7 +643,7 @@ class CarLifeSession(
             val mobis = bridge.huMobisNx4c
             stubCropped = !mobis && bridge.stubInAaGeometry
             val s = if (mobis) {
-                VideoSource(pendingW, pendingH, AaBridgeCore.MOBIS_FPS, AaBridgeCore.MOBIS_BITRATE, this, baidu = true)
+                VideoSource(pendingW, pendingH, AaBridgeCore.MOBIS_FPS, mobisStubCeiling.current, this, baidu = true)
             } else if (stubCropped) {
                 val (x, y) = bridge.spsCropOrigin
                 VideoSource(mode.aaW, mode.aaH, pendingFps, stubBps, this, Rect(x, y, x + mode.outW, y + mode.outH))
@@ -750,7 +754,7 @@ class CarLifeSession(
             if (bridge.huMobisNx4c) {
                 if (!mobisAdaptLogged) {
                     mobisAdaptLogged = true
-                    AppLog.i("видео: Mobis CCNC, адаптация битрейта выключена: энкодер держит ${AaBridgeCore.MOBIS_BITRATE / 1000} кбит/с VBR, как Baidu")
+                    AppLog.i("видео: Mobis CCNC, адаптация по бэклогу выключена: энкодер ${AaBridgeCore.MOBIS_BITRATE / 1000} кбит/с VBR, как Baidu, вниз только по размеру IDR > ${IdrBitrateCeiling.LIMIT_BYTES / 1024} КБ")
                 }
                 return
             }
@@ -828,8 +832,38 @@ class CarLifeSession(
     /** Потолок fps под ГУ (Pioneer RM56E8B: 15), null = без ограничения. */
     private fun huMaxFps(): Int? = if (bridge.huPioneerRm56) AaBridgeCore.PIONEER_RM56_MAX_FPS else null
 
+    /**
+     * Mobis CCNC (h242test4): ГУ уходит в цикл START -> EIO на IDR > ~600 КБ, а IDR qti VBR на движении растёт каждую
+     * секунду (200 -> 712 КБ при 3,84 Мбит/с). Каждый IDR > 300 КБ режет битрейт энкодера ×0,7 (пол 1 Мбит/с), несколько
+     * маленьких подряд возвращают его ×1,15 ([IdrBitrateCeiling]). [apply] применяет новый битрейт к энкодеру-источнику.
+     */
+    private fun mobisKeyFrame(size: Int, ceiling: IdrBitrateCeiling, who: String, apply: (Int) -> Unit) {
+        val old = ceiling.current
+        val bps = ceiling.onKeyFrame(size)
+        if (bps == null) {
+            if (ceiling.stuckAtFloor == 1) {
+                AppLog.i("Mobis: IDR ${size / 1024} КБ > ${IdrBitrateCeiling.LIMIT_BYTES / 1024}, битрейт $who ${old / 1000} кбит/с уже на полу")
+            }
+            return
+        }
+        try {
+            apply(bps)
+        } catch (e: Exception) {
+            AppLog.e("Mobis: битрейт $who", e)
+        }
+        if (bps < old) {
+            AppLog.i("Mobis: IDR ${size / 1024} КБ > ${IdrBitrateCeiling.LIMIT_BYTES / 1024}, битрейт $who ${old / 1000} -> ${bps / 1000} кбит/с")
+        } else {
+            AppLog.i("Mobis: ${IdrBitrateCeiling.CALM_COUNT} IDR подряд < ${IdrBitrateCeiling.CALM_BYTES / 1024} КБ, битрейт $who ${old / 1000} -> ${bps / 1000} кбит/с")
+        }
+    }
+
     /** Страховка VW ID: IDR > 450 КБ - потолок ×0,75 (не ниже 1,5 Мбит/с), не чаще раза в секунду; кадр уже ушёл. */
     override fun onEncodedKeyFrame(size: Int) {
+        if (bridge.huMobisNx4c) {
+            mobisKeyFrame(size, mobisAaCeiling, "энкодера") { bridge.setEncoderBitrate(it) }
+            return
+        }
         if (size <= VW_20082138_IDR_LIMIT) return
         val now = SystemClock.elapsedRealtime()
         if (vwIdrCutMs != NEVER_MS && now - vwIdrCutMs < VW_20082138_CUT_INTERVAL_MS) return
@@ -971,10 +1005,10 @@ class CarLifeSession(
     /** Транскодер моста: декодер AA (кадр режима) -> кроп -> Surface энкодера (выход режима). null, если MediaCodec не поднялся. */
     override fun createTranscoder(out: TranscodeOutput): VideoTranscoder? = try {
         applyHuCeilings()
-        val mobis = bridge.huMobisNx4c   // Baidu: 20 fps, 3,84 Мбит/с VBR, адаптация битрейта выключена (adaptBitrate)
+        val mobis = bridge.huMobisNx4c   // Baidu: 20 fps, VBR до 3,84 Мбит/с, битрейт ведёт только потолок IDR (mobisKeyFrame)
         AaTranscoder(
             mode.outW, mode.outH, thermalThrottle.capFps(if (mobis) AaBridgeCore.MOBIS_FPS else targetFps),
-            if (mobis) AaBridgeCore.MOBIS_BITRATE else bitratePolicy.current, out, { AppLog.i(it, false) },
+            if (mobis) mobisAaCeiling.current else bitratePolicy.current, out, { AppLog.i(it, false) },
             srcWidth = mode.aaW, srcHeight = mode.aaH, crop = mode.crop, baidu = mobis,
         ).also { it.start() }
     } catch (e: Exception) {
@@ -1124,6 +1158,7 @@ class CarLifeSession(
     }
 
     private fun onEncoderFrame(data: ByteArray, key: Boolean) {
+        if (key && bridge.huMobisNx4c) mobisKeyFrame(data.size, mobisStubCeiling, "заглушки") { source?.setBitrate(it) }
         if (!key && csdPending) {
             vDropped++
             return // до первого IDR ничего не шлём (первый пакет обязан начинаться с SPS)
