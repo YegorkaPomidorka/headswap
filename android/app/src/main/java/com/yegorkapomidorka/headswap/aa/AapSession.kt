@@ -67,6 +67,9 @@ interface AaPeer {
 
     fun requestKeyFrame()
 
+    /** Ключевой кадр одним PROJECTED, без NATIVE и паузы (h529). По умолчанию - полный цикл [requestKeyFrame]. */
+    fun requestKeyFrameSoft() = requestKeyFrame()
+
     /** Нажатие кнопки (Android KeyEvent keycode): down, затем up. По умолчанию игнорируется. */
     fun sendKey(keycode: Int) {}
 
@@ -225,6 +228,15 @@ class AapSession(
         }, "aa-keyframe")
         t.isDaemon = true
         t.start()
+    }
+
+    /** Мягкая встряска (h529): только VideoFocus PROJECTED unsolicited, видео не останавливается. Проверки как в [requestKeyFrame]. */
+    override fun requestKeyFrameSoft() {
+        if (!established || !videoStarted || stopReason != null || !writerActive) {
+            log("AA keyframe soft пропущен: сессия ${if (!established) "не готова" else if (!videoStarted) "без видео" else "завершается"}", false)
+            return
+        }
+        outQueue.offer(MsgJob(M.videoFocusNotification(projected = true, unsolicited = true), false, "keyframe soft: PROJECTED"))
     }
 
     /** VideoFocus NATIVE одним сообщением (без возврата в PROJECTED): ГУ покинул CarLife после «Выйти». */

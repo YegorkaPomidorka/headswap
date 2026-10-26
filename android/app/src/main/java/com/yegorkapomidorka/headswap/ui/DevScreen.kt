@@ -57,6 +57,7 @@ class DevScreen(host: MainActivity) : Screen(host) {
     private val voiceChunkRows = LinkedHashMap<VoiceChunk, RadioRow>()
     private val ttsPrerollRows = LinkedHashMap<TtsPreroll, RadioRow>()
     private val touchDecimationRows = LinkedHashMap<TouchDecimation, RadioRow>()
+    private val shakeTimerRows = LinkedHashMap<Int, RadioRow>()
 
     /** AVC-энкодеры телефона (null = список получить не удалось, тогда размер не проверяем). Список не меняется, считаем один раз. */
     private val avcEncoders: List<MediaCodecInfo.VideoCapabilities>? by lazy {
@@ -92,6 +93,22 @@ class DevScreen(host: MainActivity) : Screen(host) {
                 row(c.getString(R.string.dev_sps_crop_title), c.getString(R.string.dev_sps_crop_sub), aa.spsCrop) { aa.spsCrop = it },
                 row(c.getString(R.string.dev_sps_crop_bottom_title), c.getString(R.string.dev_sps_crop_bottom_sub), aa.spsCropBottom) { aa.spsCropBottom = it },
             )),
+        )
+
+        body.addView(c.sectionTitle(c.getString(R.string.dev_section_shake)))
+        for (sec in SHAKE_TIMER_SEC) {
+            val title = if (sec == 0) c.getString(R.string.dev_shake_timer_off) else c.getString(R.string.dev_shake_timer_value, sec)
+            val row = RadioRow(c, title, "") { setShakeTimer(sec) }
+            shakeTimerRows[sec] = row
+            body.addView(row.view, lp(MATCH, WRAP))
+        }
+        body.addView(
+            c.text(c.getString(R.string.dev_shake_timer_note), 13f, 400, c.clr(R.color.on2)),
+            lp(WRAP, WRAP).margins(c, 8, 2, 8, 8),
+        )
+        refreshShakeTimer()
+        body.addView(
+            group(listOf(row(c.getString(R.string.dev_shake_soft_title), c.getString(R.string.dev_shake_soft_sub), aa.shakeSoft) { aa.shakeSoft = it })),
         )
 
         body.addView(c.sectionTitle(c.getString(R.string.dev_section_meta)))
@@ -273,6 +290,15 @@ class DevScreen(host: MainActivity) : Screen(host) {
     private fun setTouchDecimation(m: TouchDecimation) {
         aa.touchDecimation = m
         refreshTouchDecimation()
+    }
+
+    private fun setShakeTimer(sec: Int) {
+        aa.shakeTimerSec = sec
+        refreshShakeTimer()
+    }
+
+    private fun refreshShakeTimer() {
+        for ((sec, row) in shakeTimerRows) row.setSelected(aa.shakeTimerSec == sec)
     }
 
     private fun refreshTouchDecimation() {
@@ -510,6 +536,7 @@ class DevScreen(host: MainActivity) : Screen(host) {
     }
 
     private companion object {
+        val SHAKE_TIMER_SEC = listOf(0, 3, 5, 10, 15, 30)
         val ERR_RE = Regex("ERROR|ОШИБКА|FAIL|упал|Exception")
         val WARN_RE = Regex("ОТКАТ|потерян|не пришёл|недоступен|не вышло|!!!|не удалось|отброшен")
         val OK_RE = Regex("\\bOK\\b|загружен|подключена|первый IDR|успеш")

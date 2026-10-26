@@ -10,6 +10,12 @@
     <string name="dev_sps_crop_sub">Широкие режимы в прямом пробросе: поля отрезает декодер ГУ (кроп в SPS H.264). Картинка сплющена или съехала — ГУ так не умеет</string>
     <string name="dev_sps_crop_bottom_title">Поля справа и снизу</string>
     <string name="dev_sps_crop_bottom_sub">Android Auto рисует интерфейс в левом верхнем углу, поля уходят вправо и вниз. Для ГУ, которые режут только справа и снизу (картинка съезжала вниз или влево)</string>
+    <string name="dev_section_shake">Встряска ключевого кадра (эксперимент)</string>
+    <string name="dev_shake_timer_note">Раз в N с просить у Android Auto ключевой кадр, если его давно не было. Для ГУ, которые после камеры заднего хода показывают чёрный экран. Только прямой проброс, видео подвисает на время встряски. Применяется при следующем подключении</string>
+    <string name="dev_shake_timer_off">Таймер выкл</string>
+    <string name="dev_shake_timer_value">Раз в %d с</string>
+    <string name="dev_shake_soft_title">Мягкая встряска</string>
+    <string name="dev_shake_soft_sub">Встряска одним PROJECTED, без NATIVE: видео не останавливается. Если ключевой кадр не пришёл за 1,5 с — полный цикл. Касается тапа и таймера</string>
     <string name="dev_section_meta">Метаданные на ГУ (с переподключения USB)</string>
     <string name="dev_meta_music_title">Музыка</string>
     <string name="dev_meta_music_sub">Трек, обложка и прогресс: MEDIA_INFO / MEDIA_PROGRESS_BAR</string>

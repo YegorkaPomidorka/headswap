@@ -11,6 +11,12 @@
     <string name="dev_sps_crop_sub">Wide modes in direct passthrough: the head unit decoder cuts the margins (H.264 SPS cropping). If the picture is squashed or shifted, the head unit does not support it</string>
     <string name="dev_sps_crop_bottom_title">Margins at the right and bottom</string>
     <string name="dev_sps_crop_bottom_sub">Android Auto draws the interface in the top left corner, margins go to the right and bottom. For head units that crop only the right and bottom (picture shifted down or left)</string>
+    <string name="dev_section_shake">Keyframe shake (experiment)</string>
+    <string name="dev_shake_timer_note">Every N seconds ask Android Auto for a keyframe if there has been none for a while. For head units that show a black screen after the reverse camera. Direct passthrough only, the video stalls for the duration of the shake. Applies on the next connection</string>
+    <string name="dev_shake_timer_off">Timer off</string>
+    <string name="dev_shake_timer_value">Every %d s</string>
+    <string name="dev_shake_soft_title">Soft shake</string>
+    <string name="dev_shake_soft_sub">Shake with a single PROJECTED, without NATIVE: the video does not stop. If no keyframe arrives within 1.5 s, a full cycle follows. Affects the tap and the timer</string>
     <string name="dev_section_meta">Metadata on the head unit (applies after USB reconnect)</string>
     <string name="dev_meta_music_title">Music</string>
     <string name="dev_meta_music_sub">Track, cover and progress: MEDIA_INFO / MEDIA_PROGRESS_BAR</string>

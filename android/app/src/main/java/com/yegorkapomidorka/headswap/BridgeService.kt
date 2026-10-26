@@ -867,6 +867,8 @@ class BridgeService : Service() {
             // h529: поля справа/снизу только для SPS-кропа в прямом проброске по кабелю; на воздухе перекодирование принудительное, а транскодер режет центр
             val bottom = !air && !aaPrefs.transcode && aaPrefs.spsCrop && aaPrefs.spsCropBottom && mode.spsCropable
             core.marginsAtBottom = bottom
+            core.shakeTimerMs = aaPrefs.shakeTimerSec * 1000L
+            core.shakeSoft = aaPrefs.shakeSoft
             if (bottom) AppLog.i("BRIDGE SPS-кроп: поля ${mode.marginW} px справа и ${mode.marginH} px снизу (ui_config.margins), интерфейс в левом верхнем углу")
             core.expectFeatureConfig = true
             if (chosen != mode) AppLog.i("BRIDGE видео-режим ${chosen.label} недоступен без перекодирования, использую ${mode.label}")

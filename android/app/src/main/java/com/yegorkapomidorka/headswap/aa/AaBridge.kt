@@ -116,6 +116,9 @@ class AaBridgeCore(
     private var lastIdrSentMs = NEVER              // когда в CarLife ушёл последний IDR passthrough (h295)
     private var h295TouchAt = NEVER                // когда тач запросил keyframe-цикл; NEVER = IDR после тача не ждём
     private var h295LastTrigger = NEVER
+    private var h295SoftAt = NEVER                 // когда ушла мягкая встряска, IDR на неё ещё нет; NEVER = мягкую не ждём
+    private var h295Source = ""                    // кто запустил встряску (тап / таймер) и в каком режиме (мягкая / полная / эскалация) - для логов
+    private var h295Mode = ""
     private var h295LastTouchAt = NEVER            // последний тач от ГУ любого action
 
     var dropped = 0L
@@ -144,6 +147,8 @@ class AaBridgeCore(
 
     /** SDR ушёл с полями целиком справа и снизу (h529, ui_config): SPS-кроп режет только справа и снизу. Снимается вместе с videoMode. */
     @Volatile var marginsAtBottom = false
+    @Volatile var shakeTimerMs = 0L            // h529: встряска AA раз в N мс без IDR в passthrough, 0 = выкл (раздел для разработчиков)
+    @Volatile var shakeSoft = false            // h529: встряска одним PROJECTED, без NATIVE; не пришёл IDR за KEYFRAME_WAIT_MS - полный цикл
     private var transcoder: VideoTranscoder? = null
     private var encCsd: ByteArray? = null
     private var outGotIdr = false
@@ -387,6 +392,7 @@ class AaBridgeCore(
         touchPacer.reset()
         touchPacerLogged = false
         h295TouchAt = NEVER
+        h295SoftAt = NEVER
         h295LastTrigger = NEVER
         h295LastTouchAt = NEVER
         mediaRateLogged = MEDIA_RATE
@@ -432,6 +438,7 @@ class AaBridgeCore(
         }
         gotIdr = false
         h295TouchAt = NEVER
+        h295SoftAt = NEVER
         spsCropKickAt = NEVER
         waitSince = if (aaVideoSeen) clockMs() - KEYFRAME_WAIT_MS else 0L
         lastKeyframeRequest = NEVER
@@ -751,17 +758,61 @@ class AaBridgeCore(
         if (!huHonda20772121 || transcoder != null || !carlifeStarted || !gotIdr) return
         val sinceIdr = now - lastIdrSentMs
         if (sinceIdr <= H295_IDR_STALE_MS || sinceTouch < H295_TOUCH_IDLE_MS || now - h295LastTrigger < H295_TRIGGER_MIN_MS) return
+        log("BRIDGE h295: тач после $sinceIdr мс без IDR, пауза в тачах $sinceTouch мс -> встряска ${shakeLabel()}", true)
+        h295Shake(now, "тап")
+    }
+
+    private fun shakeLabel() = if (shakeSoft) "мягкая" else "полная"
+
+    /**
+     * Встряска AA: просим ключевой кадр и ждём IDR для склейки SPS/PPS и лога. Полная - цикл NATIVE -> PROJECTED
+     * ([AaPeer.requestKeyFrame]); мягкая ([shakeSoft]) - один PROJECTED без остановки видео, [tick] доводит её до
+     * полной, если IDR за [KEYFRAME_WAIT_MS] не пришёл. [source] - "тап" или "таймер", только для логов.
+     */
+    private fun h295Shake(now: Long, source: String) {
         h295LastTrigger = now
         h295TouchAt = now
         lastKeyframeRequest = now
         keyframeRequests++
-        log("BRIDGE h295: тач после $sinceIdr мс без IDR, пауза в тачах $sinceTouch мс -> keyframe-цикл", true)
+        h295Source = source
+        if (shakeSoft) {
+            h295Mode = "мягкая"
+            h295SoftAt = now
+            peer?.requestKeyFrameSoft()
+        } else {
+            h295Mode = "полная"
+            h295SoftAt = NEVER
+            peer?.requestKeyFrame()
+        }
+    }
+
+    /** h295: мягкая встряска без IDR за [KEYFRAME_WAIT_MS] - на этом ГУ/телефоне она не работает, иначе чёрный экран: полный цикл. */
+    private fun h295Escalate(now: Long) {
+        if (h295SoftAt == NEVER || now - h295SoftAt < KEYFRAME_WAIT_MS) return
+        log("BRIDGE h295: мягкая встряска ($h295Source) без IDR за $KEYFRAME_WAIT_MS мс -> полный цикл", true)
+        h295SoftAt = NEVER
+        h295TouchAt = now
+        h295Mode = "эскалация"
+        lastKeyframeRequest = now
+        keyframeRequests++
         peer?.requestKeyFrame()
     }
 
-    /** h295: IDR после цикла так и не пришёл за [H295_WAIT_GIVEUP_MS] - не вешаем на него чужой IDR в логе и склейке. */
+    /** h295: IDR после встряски так и не пришёл за [H295_WAIT_GIVEUP_MS] - не вешаем на него чужой IDR в логе и склейке. */
     private fun h295GiveUp(now: Long) {
-        if (h295TouchAt != NEVER && now - h295TouchAt > H295_WAIT_GIVEUP_MS) h295TouchAt = NEVER
+        if (h295TouchAt == NEVER || now - h295TouchAt <= H295_WAIT_GIVEUP_MS) return
+        log("BRIDGE h295: IDR после встряски ($h295Source, $h295Mode) не пришёл за ${H295_WAIT_GIVEUP_MS / 1000} с", true)
+        h295TouchAt = NEVER
+        h295SoftAt = NEVER
+    }
+
+    /** h529: встряска по таймеру ([shakeTimerMs]) - тот же ход, что тап на Honda, только без ГУ-флага: настройка и есть флаг. */
+    private fun h295Timer(now: Long) {
+        if (shakeTimerMs <= 0 || transcoder != null || !gotIdr || h295TouchAt != NEVER) return
+        val since = now - maxOf(lastIdrSentMs, h295LastTrigger)
+        if (since < shakeTimerMs) return
+        log("BRIDGE h295: таймер ${shakeTimerMs / 1000} с, IDR ${now - lastIdrSentMs} мс назад -> встряска ${shakeLabel()}", true)
+        h295Shake(now, "таймер")
     }
 
     /** h295: IDR, которого ждали после тача, уходит с SPS/PPS из CODEC_CONFIG, если в кадре их нет. Иначе кадр как есть. */
@@ -805,8 +856,9 @@ class AaBridgeCore(
 
     private fun h295IdrSeen(before: ByteArray, after: ByteArray) {
         if (h295TouchAt == NEVER) return
-        log("BRIDGE h295: IDR через ${lastIdrSentMs - h295TouchAt} мс после тача, nal=${AnnexB.nalTypes(before)} -> ${AnnexB.nalTypes(after)}", true)
+        log("BRIDGE h295: IDR через ${lastIdrSentMs - h295TouchAt} мс после встряски ($h295Source, $h295Mode), nal=${AnnexB.nalTypes(before)} -> ${AnnexB.nalTypes(after)}", true)
         h295TouchAt = NEVER
+        h295SoftAt = NEVER
     }
 
     private fun dispatchTouch(action: Int, x: Int, y: Int, px: Int, py: Int) = synchronized(touchLock) {
@@ -1529,6 +1581,8 @@ class AaBridgeCore(
         if (!carlifeStarted) return
         val now = clockMs()
         h295GiveUp(now)
+        h295Escalate(now)
+        h295Timer(now)
         if (spsCropKickAt != NEVER && now >= spsCropKickAt) {
             spsCropKickAt = NEVER
             lastKeyframeRequest = now

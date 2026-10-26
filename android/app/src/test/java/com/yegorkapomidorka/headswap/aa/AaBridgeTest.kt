@@ -82,6 +82,11 @@ class FakePeer : AaPeer {
         keyframes++
     }
 
+    @Volatile var softKeyframes = 0
+    override fun requestKeyFrameSoft() {
+        softKeyframes++
+    }
+
     val keys = CopyOnWriteArrayList<Int>()
     override fun sendKey(keycode: Int) {
         keys.add(keycode)
@@ -248,7 +253,7 @@ class AaBridgeCoreTest {
         core.onCarlifeTouch(0, 10, 10)
         assertEquals("тач ушёл в AA", 1, peer.touches.size)
         assertEquals("сразу полный цикл", 1, peer.keyframes)
-        assertTrue(logs.any { it.startsWith("BRIDGE h295: тач после 5000 мс без IDR, пауза в тачах ") && it.endsWith(" мс -> keyframe-цикл") })
+        assertTrue(logs.any { it.startsWith("BRIDGE h295: тач после 5000 мс без IDR, пауза в тачах ") && it.endsWith(" мс -> встряска полная") })
         core.onFrame(p1, 3)                                   // gate открыт: P-кадр проходит
         assertEquals(sentBefore + 1, link.sent.size)
         assertArrayEquals(p1, link.sent.last())
@@ -273,7 +278,7 @@ class AaBridgeCoreTest {
         core.onFrame(idr, 4)
         assertArrayEquals(cfg + idr, link.sent.last())
         assertEquals(listOf(7, 8, 5), types(link.sent.last()))
-        assertTrue(logs.any { it.startsWith("BRIDGE h295: IDR через 2500 мс после тача, nal=[5] -> [7, 8, 5]") })
+        assertTrue(logs.any { it.startsWith("BRIDGE h295: IDR через 2500 мс после встряски (тап, полная), nal=[5] -> [7, 8, 5]") })
         now = 7600
         core.onFrame(idr, 5)                                  // ожидание закончено: следующий IDR как в main
         assertArrayEquals(idr, link.sent.last())
@@ -289,7 +294,7 @@ class AaBridgeCoreTest {
         now = 6000
         core.onFrame(cfg + idr, 4)
         assertArrayEquals(cfg + idr, link.sent.last())
-        assertTrue(logs.any { it.startsWith("BRIDGE h295: IDR через 1000 мс после тача, nal=[7, 8, 5] -> [7, 8, 5]") })
+        assertTrue(logs.any { it.startsWith("BRIDGE h295: IDR через 1000 мс после встряски (тап, полная), nal=[7, 8, 5] -> [7, 8, 5]") })
     }
 
     @Test
@@ -390,6 +395,177 @@ class AaBridgeCoreTest {
     }
 
     private fun AaBridgeCore.onTouch(action: Int) = onCarlifeTouch(action, 10, 10)
+
+    /** Passthrough, IDR в now=0, таймер встряски [sec] с (h529); ГУ-флага Honda нет - таймер от него не зависит. */
+    private fun shakeSetup(sec: Int, soft: Boolean = false): FakePeer {
+        core.shakeTimerMs = sec * 1000L
+        core.shakeSoft = soft
+        return h295Setup(false)
+    }
+
+    @Test
+    fun shakeTimerOffDoesNothing() {
+        val peer = shakeSetup(0)
+        now = 600_000
+        core.tick()
+        assertEquals(0, peer.keyframes)
+        assertEquals(0, peer.softKeyframes)
+    }
+
+    @Test
+    fun shakeTimerFiresOnceAfterNSecondsWithoutIdrAndNotAgainBeforeAnotherN() {
+        val peer = shakeSetup(5)
+        now = 4999
+        core.tick()
+        assertEquals("до 5 с запросов нет", 0, peer.keyframes)
+        now = 5000
+        core.tick()
+        assertEquals(1, peer.keyframes)
+        assertEquals(0, peer.softKeyframes)
+        assertTrue(logs.any { it == "BRIDGE h295: таймер 5 с, IDR 5000 мс назад -> встряска полная" })
+        now = 9999
+        core.tick()
+        assertEquals("встряска в полёте", 1, peer.keyframes)
+        now = 15_001
+        core.tick()                                           // IDR не пришёл: ожидание сброшено, с триггера (5000) прошло > 5 с
+        assertEquals(2, peer.keyframes)
+        assertTrue(logs.any { it == "BRIDGE h295: IDR после встряски (таймер, полная) не пришёл за 10 с" })
+    }
+
+    @Test
+    fun shakeTimerCountsFromLastIdrAndAwaitedIdrIsGluedAndLogged() {
+        val peer = shakeSetup(5)
+        now = 3000
+        core.onFrame(idr, 3)                                  // новый IDR сдвигает отсчёт
+        now = 5000
+        core.tick()
+        assertEquals(0, peer.keyframes)
+        now = 8000
+        core.tick()
+        assertEquals(1, peer.keyframes)
+        now = 8400
+        core.onFrame(idr, 4)
+        assertArrayEquals(cfg + idr, link.sent.last())
+        assertTrue(logs.any { it.startsWith("BRIDGE h295: IDR через 400 мс после встряски (таймер, полная), nal=[5] -> [7, 8, 5]") })
+        now = 13_399
+        core.tick()
+        assertEquals("отсчёт от IDR в 8400", 1, peer.keyframes)
+        now = 13_400
+        core.tick()
+        assertEquals(2, peer.keyframes)
+    }
+
+    @Test
+    fun shakeTimerDoesNotFireWhileShakeIsInFlight() {
+        val peer = shakeSetup(3)
+        now = 3000
+        core.tick()
+        assertEquals(1, peer.keyframes)
+        now = 4500                                            // IDR старше 3 с, но встряска ждёт IDR
+        core.tick()
+        now = 7000
+        core.tick()
+        assertEquals(1, peer.keyframes)
+    }
+
+    @Test
+    fun shakeTimerSkippedBeforeCarlifeStartAndBeforeFirstIdr() {
+        core.shakeTimerMs = 1000
+        val peer = FakePeer()
+        core.peer = peer
+        now = 60_000
+        core.tick()                                           // START не было
+        core.onCarlifeStart()
+        core.tick()                                           // IDR ещё не было
+        assertEquals(0, peer.keyframes)
+        assertEquals(0, peer.softKeyframes)
+    }
+
+    @Test
+    fun shakeSoftTimerSendsOnlySoftAndNoEscalationIfIdrArrivesInTime() {
+        val peer = shakeSetup(5, soft = true)
+        now = 5000
+        core.tick()
+        assertEquals(1, peer.softKeyframes)
+        assertEquals(0, peer.keyframes)
+        assertTrue(logs.any { it == "BRIDGE h295: таймер 5 с, IDR 5000 мс назад -> встряска мягкая" })
+        now = 6499
+        core.tick()
+        core.onFrame(idr, 3)
+        now = 8000
+        core.tick()
+        assertEquals(1, peer.softKeyframes)
+        assertEquals("эскалации нет", 0, peer.keyframes)
+        assertTrue(logs.any { it.startsWith("BRIDGE h295: IDR через 1499 мс после встряски (таймер, мягкая), nal=") })
+        assertTrue(logs.none { it.contains("-> полный цикл") })
+    }
+
+    @Test
+    fun shakeSoftEscalatesToFullCycleOnceIfNoIdrIn1500Ms() {
+        val peer = shakeSetup(5, soft = true)
+        now = 5000
+        core.tick()
+        now = 6000
+        core.tick()
+        assertEquals(0, peer.keyframes)
+        now = 6500
+        core.tick()
+        assertEquals(1, peer.softKeyframes)
+        assertEquals("один полный цикл", 1, peer.keyframes)
+        assertTrue(logs.any { it == "BRIDGE h295: мягкая встряска (таймер) без IDR за 1500 мс -> полный цикл" })
+        now = 9000
+        core.tick()
+        assertEquals("повторной эскалации и мягкой нет", 1, peer.keyframes)
+        assertEquals(1, peer.softKeyframes)
+        now = 7500
+        core.onFrame(idr, 3)
+        assertArrayEquals(cfg + idr, link.sent.last())
+        assertTrue(logs.any { it.startsWith("BRIDGE h295: IDR через 1000 мс после встряски (таймер, эскалация), nal=[5]") })
+    }
+
+    @Test
+    fun shakeSoftEscalationThenGiveUpLogsEscalationMode() {
+        val peer = shakeSetup(5, soft = true)
+        now = 5000
+        core.tick()
+        now = 6500
+        core.tick()
+        now = 16_501
+        core.tick()
+        assertTrue(logs.any { it == "BRIDGE h295: IDR после встряски (таймер, эскалация) не пришёл за 10 с" })
+        assertEquals(1, peer.keyframes)
+    }
+
+    @Test
+    fun shakeSoftTapUsesSoftRequestAndEscalates() {
+        val peer = h295Setup(true)
+        core.shakeSoft = true
+        now = 5000
+        core.onTouch(0)
+        assertEquals(1, peer.softKeyframes)
+        assertEquals(0, peer.keyframes)
+        assertTrue(logs.any { it.startsWith("BRIDGE h295: тач после 5000 мс без IDR, пауза в тачах ") && it.endsWith(" мс -> встряска мягкая") })
+        now = 6500
+        core.tick()
+        assertEquals(1, peer.keyframes)
+        assertTrue(logs.any { it == "BRIDGE h295: мягкая встряска (тап) без IDR за 1500 мс -> полный цикл" })
+    }
+
+    @Test
+    fun shakeStateIsResetByAttachAndStart() {
+        val peer = shakeSetup(5, soft = true)
+        now = 5000
+        core.tick()
+        core.attach(link)
+        core.onCarlifeStart()
+        core.onCodecConfig(cfg)
+        core.onFrame(idr, 1)                                  // gotIdr, lastIdrSentMs = 5000
+        val before = peer.keyframes                           // START тёплой сессии просит ключевой кадр сам
+        now = 20_000
+        core.tick()
+        assertEquals("эскалации от прошлой сессии нет", before, peer.keyframes)
+        assertEquals(2, peer.softKeyframes)                   // только новая встряска по таймеру
+    }
 
     @Test
     fun keyframeRequestWaitsForDelayWhenAaVideoAppearsAfterStart() {
