@@ -1488,8 +1488,9 @@ class AaBridgeCore(
             sent++
             idrSent++
             lastIdrSentMs = clockMs()
-            // h529 (Vezel): первый IDR AA сразу за IDR заглушки с другим SPS ГУ иногда теряет, и экран чёрный до следующего IDR AA (~60 с)
-            spsCropKickAt = if (videoMode.crop.isNone) NEVER else lastIdrSentMs + SPS_CROP_KICK_MS
+            // h529 (Vezel): первый IDR AA сразу за IDR заглушки ГУ иногда теряет, и экран чёрный до следующего IDR AA (~60 с).
+            // Лог 211335: так и без кропа (R1080), поэтому повторный IDR во всех режимах passthrough и на всех ГУ
+            spsCropKickAt = lastIdrSentMs + SPS_CROP_KICK_MS
             h295IdrSeen(b, payload)
             if (active != Source.AA) {
                 active = Source.AA
@@ -1536,7 +1537,7 @@ class AaBridgeCore(
             spsCropKickAt = NEVER
             lastKeyframeRequest = now
             keyframeRequests++
-            log("BRIDGE SPS-кроп: повторный ключевой кадр через ${SPS_CROP_KICK_MS} мс после первого (ГУ могла потерять его на смене SPS заглушка -> AA)", true)
+            log("BRIDGE повторный ключевой кадр через ${SPS_CROP_KICK_MS} мс после первого (ГУ могла потерять его на смене заглушка -> AA)", true)
             peer?.requestKeyFrame()
         }
         if (gotIdr || !aaVideoSeen) return

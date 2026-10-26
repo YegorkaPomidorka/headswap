@@ -223,9 +223,15 @@ class AaBridgeCoreTest {
         assertEquals(2, peer.keyframes)
         core.onFrame(idr, 4)                                  // после IDR запросы прекращаются
         assertArrayEquals(cfg + idr, link.sent[2])
+        now += 1000
+        core.tick()
+        assertEquals("до повторного кадра (2 с после IDR) ничего", 2, peer.keyframes)
+        now += 1000
+        core.tick()
+        assertEquals("повторный кадр h529 после первого IDR: ровно один", 3, peer.keyframes)
         now += 10_000
         core.tick()
-        assertEquals(2, peer.keyframes)
+        assertEquals(3, peer.keyframes)
     }
 
     /** Passthrough, IDR ушёл в now=0, затем P-кадры; peer подключён. */
@@ -254,8 +260,10 @@ class AaBridgeCoreTest {
         assertArrayEquals(p1, link.sent.last())
         core.onTouch(0)                                       // второй DOWN ГУ (~2 мс): пауза в тачах ~0, триггера нет
         assertEquals(1, peer.keyframes)
-        core.tick()                                           // отдельного фолбэка нет
-        assertEquals(1, peer.keyframes)
+        core.tick()                                           // отдельного h295-фолбэка нет; тик отдаёт лишь повторный кадр h529 (с IDR в 0 прошло > 2 с)
+        assertEquals(2, peer.keyframes)
+        core.tick()
+        assertEquals("повторный кадр одноразовый", 2, peer.keyframes)
         now = 5400
         core.onFrame(idr, 4)                                  // IDR в обычной ветке (gate открыт), без takeover
         assertEquals(1, link.takeovers)
@@ -362,7 +370,30 @@ class AaBridgeCoreTest {
         core.onFrame(idr, 4)
         now = 20_000
         core.tick()
-        assertEquals("tick циклов не добавляет", 2, peer.keyframes)
+        assertEquals("tick добавляет только повторный кадр h529, h295-циклов не добавляет", 3, peer.keyframes)
+        core.tick()
+        assertEquals(3, peer.keyframes)
+    }
+
+    @Test
+    fun repeatedKeyframe2sAfterFirstIdrWithoutCrop() {
+        val peer = FakePeer()
+        core.peer = peer
+        core.onCarlifeStart()
+        core.onCodecConfig(cfg)
+        core.onFrame(idr, 1)                                  // passthrough без SPS-кропа (R1080), IDR в now=0
+        now = AaBridgeCore.SPS_CROP_KICK_MS - 1
+        core.tick()
+        assertEquals("раньше 2000 мс повторного кадра нет", 0, peer.keyframes)
+        assertTrue(logs.none { it.contains("повторный ключевой кадр") })
+        now = AaBridgeCore.SPS_CROP_KICK_MS
+        core.tick()
+        assertEquals(1, peer.keyframes)
+        assertEquals(1, logs.count { it.contains("повторный ключевой кадр") })
+        now += 10_000
+        core.tick()
+        assertEquals("одноразовый", 1, peer.keyframes)
+        assertEquals(1, logs.count { it.contains("повторный ключевой кадр") })
     }
 
     @Test
