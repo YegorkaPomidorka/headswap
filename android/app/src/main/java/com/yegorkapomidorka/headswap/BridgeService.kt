@@ -796,7 +796,7 @@ class BridgeService : Service() {
             AppLog.i("BRIDGE: видео-режим/DPI сменился (DPI ${h.core.densityOverride} -> $wantDensity, 0 = авто), применится после перезапуска сервера ГУ")
         }
         if (h == null || h.isDead) {
-            h = createHost(aaPrefs, chosenGeometry, wantMode, wantDensity, previous = h)
+            h = createHost(aaPrefs, chosenGeometry, wantMode, wantDensity, previous = h, air = transport.caps == TransportCaps.TCP6)
             host = h
             if (h == null) {
                 // нет сертификата head unit или мост не собрался: причина уже в AaState.setupError, USB-сессию не открываем
@@ -835,7 +835,7 @@ class BridgeService : Service() {
     }
 
     /** Новый AA-хост: ядро, коннектор, сертификаты. null = мост не поднялся (причина в AaState.setupError). */
-    private fun createHost(aaPrefs: AaPrefs, chosen: VideoGeometry, mode: VideoGeometry, densityOverride: Int, previous: BridgeHost?): BridgeHost? {
+    private fun createHost(aaPrefs: AaPrefs, chosen: VideoGeometry, mode: VideoGeometry, densityOverride: Int, previous: BridgeHost?, air: Boolean = false): BridgeHost? {
         return try {
             val loaded = AaCreds.load(this, aaPrefs.certSet)
             AaState.setupError = null
@@ -864,8 +864,8 @@ class BridgeService : Service() {
             core.transcodeEnabled = aaPrefs.transcode
             core.videoMode = mode
             core.densityOverride = densityOverride
-            // h529: поля снизу только для SPS-кропа в прямом проброске; транскодер режет центр и с ними не совместим
-            val bottom = !aaPrefs.transcode && aaPrefs.spsCrop && aaPrefs.spsCropBottom && mode.spsCropable
+            // h529: поля справа/снизу только для SPS-кропа в прямом проброске по кабелю; на воздухе перекодирование принудительное, а транскодер режет центр
+            val bottom = !air && !aaPrefs.transcode && aaPrefs.spsCrop && aaPrefs.spsCropBottom && mode.spsCropable
             core.marginsAtBottom = bottom
             if (bottom) AppLog.i("BRIDGE SPS-кроп: поля ${mode.marginW} px справа и ${mode.marginH} px снизу (ui_config.margins), интерфейс в левом верхнем углу")
             core.expectFeatureConfig = true
