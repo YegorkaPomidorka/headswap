@@ -127,25 +127,6 @@ class AaTranscodeCoreTest {
         assertEquals(1, link.created)
     }
 
-    @Test
-    fun shakeTimerIsIgnoredWithTranscoder() {
-        val peer = FakePeer()
-        core.peer = peer
-        core.shakeTimerMs = 5000
-        core.onCarlifeStart()
-        core.onCodecConfig(aaCfg)
-        core.onEncoderConfig(encCfg)
-        core.onFrame(aaIdr, 1)
-        core.onEncoderFrame(encIdr, true)
-        assertTrue(core.isTranscoding)
-        val before = peer.keyframes
-        now = 60_000
-        core.tick()
-        assertEquals(before, peer.keyframes)
-        assertEquals(0, peer.softKeyframes)
-        assertTrue(logs.none { it.contains("таймер") })
-    }
-
     /** Довести до AA-видео в CarLife, затем PAUSE: выход энкодера отбрасывается (как sendVideo=false на паузе). */
     private fun playThenPause() {
         core.onCarlifeStart()

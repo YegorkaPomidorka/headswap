@@ -56,16 +56,6 @@ class AaPrefs(ctx: Context) {
         get() = sp.getBoolean("spsCrop", false)
         set(v) = sp.edit().putBoolean("spsCrop", v).apply()
 
-    /** Встряска AA по таймеру (h529, раздел для разработчиков): раз в N с без IDR просить ключевой кадр в passthrough. 0 = выкл. Мост читает на подключение. */
-    var shakeTimerSec: Int
-        get() = sp.getInt("shakeTimerSec", 0)
-        set(v) = sp.edit().putInt("shakeTimerSec", v).apply()
-
-    /** Встряска (тап Honda и таймер) одним PROJECTED без NATIVE; без IDR за 1,5 с - полный цикл. */
-    var shakeSoft: Boolean
-        get() = sp.getBoolean("shakeSoft", false)
-        set(v) = sp.edit().putBoolean("shakeSoft", v).apply()
-
     /** К SPS-кропу: поле по высоте целиком снизу (ui_config AA), для декодеров, которые режут только снизу (Vezel). */
     var spsCropBottom: Boolean
         get() = sp.getBoolean("spsCropBottom", true)
