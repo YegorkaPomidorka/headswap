@@ -389,6 +389,7 @@ class AaBridgeCore(
         h295TouchAt = NEVER
         h295LastTrigger = NEVER
         h295LastTouchAt = NEVER
+        sessionKickDone = false
         mediaRateLogged = MEDIA_RATE
         mediaChunkLogged = CarlifeAudio.MAX_CHUNK
         voiceChunkLogged = CarlifeAudio.MAX_CHUNK
@@ -774,7 +775,8 @@ class AaBridgeCore(
         return AnnexB.glue(cfg, b)
     }
 
-    private var spsCropKickAt = NEVER              // h529: когда запросить повторный IDR после первого в SPS-кропе
+    private var spsCropKickAt = NEVER              // h529: когда запросить повторный IDR после первого в CarLife-сессии
+    private var sessionKickDone = false            // повторный IDR уже назначен в этой CarLife-сессии; после PAUSE/START мост и так шлёт цикл
     private var spsCropSrc: ByteArray? = null      // последний исходный SPS AA и его переписанная версия (null = не вышло)
     private var spsCropDst: ByteArray? = null
 
@@ -1489,8 +1491,12 @@ class AaBridgeCore(
             idrSent++
             lastIdrSentMs = clockMs()
             // h529 (Vezel): первый IDR AA сразу за IDR заглушки ГУ иногда теряет, и экран чёрный до следующего IDR AA (~60 с).
-            // Лог 211335: так и без кропа (R1080), поэтому повторный IDR во всех режимах passthrough и на всех ГУ
-            spsCropKickAt = lastIdrSentMs + SPS_CROP_KICK_MS
+            // Лог 211335: так и без кропа (R1080), поэтому повторный IDR во всех режимах passthrough и на всех ГУ,
+            // но один раз за CarLife-сессию: после PAUSE/START он дал бы лишнюю встряску (0,9 с стоп-кадра)
+            if (!sessionKickDone) {
+                sessionKickDone = true
+                spsCropKickAt = lastIdrSentMs + SPS_CROP_KICK_MS
+            }
             h295IdrSeen(b, payload)
             if (active != Source.AA) {
                 active = Source.AA

@@ -223,15 +223,58 @@ class AaBridgeCoreTest {
         assertEquals(2, peer.keyframes)
         core.onFrame(idr, 4)                                  // после IDR запросы прекращаются
         assertArrayEquals(cfg + idr, link.sent[2])
-        now += 1000
+        now += AaBridgeCore.SPS_CROP_KICK_MS + 10_000
         core.tick()
-        assertEquals("до повторного кадра (2 с после IDR) ничего", 2, peer.keyframes)
-        now += 1000
+        assertEquals("повторный кадр h529 был на первом старте сессии, после второго START его нет", 2, peer.keyframes)
+        assertEquals(0, logs.count { it.contains("повторный ключевой кадр") })
+    }
+
+    @Test
+    fun noRepeatedKeyframeAfterPauseStartAndNewFirstIdr() {
+        val peer = FakePeer()
+        core.peer = peer
+        core.onCarlifeStart()
+        core.onCodecConfig(cfg)
+        core.onFrame(idr, 1)                                  // первый IDR сессии в now=0
+        now = AaBridgeCore.SPS_CROP_KICK_MS
         core.tick()
-        assertEquals("повторный кадр h529 после первого IDR: ровно один", 3, peer.keyframes)
+        assertEquals("повторный кадр на первом старте", 1, peer.keyframes)
+        now = 10_000
+        core.onCarlifePause()
+        core.onCarlifeStart()                                 // цикл NATIVE -> PROJECTED от самого START
+        assertEquals("START после PAUSE: цикл от START", 2, peer.keyframes)
+        core.onFrame(idr, 2)                                  // новый первый IDR после START
+        now += AaBridgeCore.SPS_CROP_KICK_MS + 10_000
+        core.tick()
+        assertEquals("повторного кадра после PAUSE/START нет", 2, peer.keyframes)
+        assertEquals(1, logs.count { it.contains("повторный ключевой кадр") })
+    }
+
+    @Test
+    fun repeatedKeyframeAgainOnNewCarlifeSession() {
+        val peer = FakePeer()
+        core.peer = peer
+        core.onCarlifeStart()
+        core.onCodecConfig(cfg)
+        core.onFrame(idr, 1)
+        now = AaBridgeCore.SPS_CROP_KICK_MS
+        core.tick()
+        assertEquals(1, peer.keyframes)
+        now = 20_000
+        core.attach(FakeLink())                               // USB вернулся при живой AA: новая CarLife-сессия
+        core.onCarlifeStart()
+        assertEquals("START новой сессии: цикл", 2, peer.keyframes)
+        core.onFrame(idr, 2)
+        now += AaBridgeCore.SPS_CROP_KICK_MS - 1
+        core.tick()
+        assertEquals("раньше 2000 мс повторного кадра нет", 2, peer.keyframes)
+        now += 1
+        core.tick()
+        assertEquals("на новой сессии повторный кадр снова есть", 3, peer.keyframes)
         now += 10_000
         core.tick()
-        assertEquals(3, peer.keyframes)
+        assertEquals("ровно один", 3, peer.keyframes)
+        assertEquals(2, logs.count { it.contains("повторный ключевой кадр") })
     }
 
     /** Passthrough, IDR ушёл в now=0, затем P-кадры; peer подключён. */
