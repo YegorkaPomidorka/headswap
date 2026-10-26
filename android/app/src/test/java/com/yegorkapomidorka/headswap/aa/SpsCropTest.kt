@@ -57,6 +57,11 @@ class SpsCropTest {
             hex("6742801fda014016fc2a159a8283028368509a80"),
             SpsCrop.rewrite(aa720, 0, 0, 40, 40).sps,
         )
+        // поток @diman_tm (h529): AA 1280x720 с полями 512x256, ffmpeg crop 256/256/128/128 -> 768x464
+        assertArrayEquals(
+            hex("6742801fda014016f010202040820419a8080808368509a8"),
+            SpsCrop.rewrite(hex("6742801fda014016e9a8080808368509a8"), 256, 256, 128, 128).sps,
+        )
     }
 
     @Test
