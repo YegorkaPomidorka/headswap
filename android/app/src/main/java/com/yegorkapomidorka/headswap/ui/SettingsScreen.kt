@@ -236,7 +236,7 @@ class SettingsScreen(host: MainActivity) : Screen(host) {
         set(SettingsSection.APPEARANCE, c.getString(R.string.set_sum_appearance, lang, theme))
 
         val mode = c.getString(if (aa.transcode) R.string.set_transcode_title else R.string.set_direct_title)
-        val geo = aa.videoGeometry.effective(aa.transcode)
+        val geo = aa.videoGeometry.effective(aa.transcode, aa.spsCrop)
         val res = if (geo is VideoMode) c.getString(geo.titleRes) else geo.outLabel
         val dpi = aa.aaDensity.takeIf { it != AaDensity.AUTO }?.let { c.getString(R.string.set_sum_density, it) }
         set(SettingsSection.VIDEO, listOfNotNull(mode, res, dpi, c.getString(aa.fpsSetting.titleRes)).joinToString(" · "))
@@ -720,22 +720,22 @@ class SettingsSectionScreen(host: MainActivity, val section: SettingsSection) : 
     }
 
     private fun setVideoMode(m: VideoMode) {
-        if (m.needsTranscode && !aa.transcode) return      // кроп возможен только при перекодировании
+        if (m.needsTranscode && !aa.transcode && !(aa.spsCrop && m.spsCropable)) return      // кроп: перекодирование или SPS-кроп (h529)
         aa.videoMode = m
         refreshVideoMode()
     }
 
     /** Без перекодирования «широкий» недоступен: радио затемнено, фактический режим 1280×720 (в prefs выбор остаётся). */
     private fun refreshVideoMode() {
-        val shown = aa.videoMode.effective(aa.transcode)
+        val shown = aa.videoMode.effective(aa.transcode, aa.spsCrop)
         // своё разрешение из раздела для разработчиков перекрывает список (без перекодирования оно само уходит в R720)
-        val custom = aa.videoGeometry.effective(aa.transcode) as? CustomVideoMode
+        val custom = aa.videoGeometry.effective(aa.transcode, aa.spsCrop) as? CustomVideoMode
         customResNote?.apply {
             visibility = if (custom != null) View.VISIBLE else View.GONE
             if (custom != null) text = ctx.getString(R.string.set_custom_res_active, custom.outLabel, ctx.getString(R.string.dev_title))
         }
         for ((m, row) in modeRows) {
-            val blocked = m.needsTranscode && !aa.transcode
+            val blocked = m.needsTranscode && !aa.transcode && !(aa.spsCrop && m.spsCropable)
             row.setSelected(m == shown)
             row.setSub(if (blocked) ctx.getString(R.string.set_needs_transcode) else ctx.getString(m.subRes))
             row.view.alpha = if (blocked) 0.45f else if (custom != null) 0.6f else 1f
@@ -784,7 +784,7 @@ class SettingsSectionScreen(host: MainActivity, val section: SettingsSection) : 
     }
 
     /** density режима, который реально применится (с учётом passthrough). */
-    private fun autoDensity(): Int = aa.videoGeometry.effective(aa.transcode).density
+    private fun autoDensity(): Int = aa.videoGeometry.effective(aa.transcode, aa.spsCrop).density
 
     private fun setDensity(v: Int) {
         aa.aaDensity = v

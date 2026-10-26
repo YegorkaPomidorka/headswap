@@ -767,6 +767,36 @@ class AaBridgeCore(
         return AnnexB.glue(cfg, b)
     }
 
+    private var spsCropSrc: ByteArray? = null      // последний исходный SPS AA и его переписанная версия (null = не вышло)
+    private var spsCropDst: ByteArray? = null
+
+    /**
+     * Passthrough с полями (WIDE*, R1024 при включённом SPS-кропе, h529): к кропу каждого SPS прибавляются поля AA,
+     * их отрезает декодер ГУ. Не разобрался SPS - уходит исходный (ГУ покажет кадр с полями), причина в логе один раз.
+     * Зовётся только из ветки без транскодера, поэтому срабатывает и при откате с несозданного транскодера.
+     */
+    private fun spsCrop(au: ByteArray): ByteArray {
+        val g = videoMode
+        if (g.crop.isNone) return au
+        return SpsCrop.mapSps(au) { sps ->
+            if (!sps.contentEquals(spsCropSrc)) {
+                spsCropSrc = sps
+                spsCropDst = try {
+                    val r = SpsCrop.rewrite(sps, g.marginW / 2, g.marginW / 2, g.marginH / 2, g.marginH / 2)
+                    if (r.after.visibleW != g.outW || r.after.visibleH != g.outH) {
+                        throw SpsCrop.SpsException("видимая часть ${r.after.visibleW}x${r.after.visibleH}, ГУ ждёт ${g.outW}x${g.outH}")
+                    }
+                    log("BRIDGE SPS-кроп: ${r.before} -> ${r.after}, ${sps.size} -> ${r.sps.size} Б", true)
+                    r.sps
+                } catch (e: SpsCrop.SpsException) {
+                    log("BRIDGE SPS-кроп не применён (${e.message}), SPS ${sps.joinToString("") { "%02x".format(it) }} уходит как есть", true)
+                    null
+                }
+            }
+            spsCropDst ?: sps
+        }
+    }
+
     private fun h295IdrSeen(before: ByteArray, after: ByteArray) {
         if (h295TouchAt == NEVER) return
         log("BRIDGE h295: IDR через ${lastIdrSentMs - h295TouchAt} мс после тача, nal=${AnnexB.nalTypes(before)} -> ${AnnexB.nalTypes(after)}", true)
@@ -1431,14 +1461,14 @@ class AaBridgeCore(
                 drop("P-кадр до IDR nal=$types")
                 return
             }
-            val payload = if (AnnexB.startsWithSps(b) && 8 in types) b else {
+            val payload = spsCrop(if (AnnexB.startsWithSps(b) && 8 in types) b else {
                 val cfg = aaConfig
                 if (cfg == null) {
                     drop("IDR без SPS/PPS и без CODEC_CONFIG")
                     return
                 }
                 AnnexB.glue(cfg, b)
-            }
+            })
             val takeover = active != Source.AA
             if (!(if (takeover) link.sendVideoTakeover(payload) else link.sendVideo(payload))) {
                 drop("первый IDR не принят CarLife (очередь/закрыто)")
@@ -1460,7 +1490,7 @@ class AaBridgeCore(
             AaState.status = "мост: AA -> CarLife"
             return
         }
-        val out = h295Prepare(b, types)
+        val out = h295Prepare(b, types).let { if (5 in types) spsCrop(it) else it }
         if (!link.sendVideo(out)) {
             // кадр потерян: декодер ГУ поплывёт, ждём новый IDR
             gotIdr = false

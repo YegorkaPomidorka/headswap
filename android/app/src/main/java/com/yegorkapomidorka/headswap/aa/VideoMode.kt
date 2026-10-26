@@ -39,11 +39,19 @@ interface VideoGeometry {
         get() = if (marginW == 0 && marginH == 0) VideoCrop.NONE
         else VideoCrop(marginW / 2f / aaW, marginH / 2f / aaH, 1f - marginW / 2f / aaW, 1f - marginH / 2f / aaH)
 
-    /** Кроп возможен только при перекодировании: в passthrough WIDE недоступен. */
+    /** Кроп транскодером: в passthrough WIDE доступен только через SPS-кроп ([spsCropable]). */
     val needsTranscode: Boolean get() = !crop.isNone
 
-    /** Геометрия, которая реально применится при данном переключателе перекодирования. */
-    fun effective(transcode: Boolean): VideoGeometry = if (!transcode && needsTranscode) VideoMode.R720 else this
+    /**
+     * Поля можно отрезать в passthrough правкой SPS (h529): область интерфейса 1:1 с кадром ГУ, без масштаба,
+     * и половина каждого поля кратна единице кропа 4:2:0 (2 px).
+     */
+    val spsCropable: Boolean
+        get() = !crop.isNone && outW == aaW - marginW && outH == aaH - marginH && (marginW / 2) % 2 == 0 && (marginH / 2) % 2 == 0
+
+    /** Геометрия, которая реально применится при данном переключателе перекодирования и SPS-кропе (эксперимент h529). */
+    fun effective(transcode: Boolean, spsCrop: Boolean = false): VideoGeometry =
+        if (!transcode && needsTranscode && !(spsCrop && spsCropable)) VideoMode.R720 else this
 
     /** Метка выхода для UI: «1280×720». */
     val outLabel: String get() = "${outW}×$outH"
@@ -110,8 +118,9 @@ enum class VideoMode(
     override val aaH: Int = aaResolution.substringAfter('x').toInt()
     override val label: String get() = name
 
-    /** Режим, который реально применится при данном переключателе перекодирования. */
-    override fun effective(transcode: Boolean): VideoMode = if (!transcode && needsTranscode) R720 else this
+    /** Режим, который реально применится при данном переключателе перекодирования и SPS-кропе. */
+    override fun effective(transcode: Boolean, spsCrop: Boolean): VideoMode =
+        if (!transcode && needsTranscode && !(spsCrop && spsCropable)) R720 else this
 
     /**
      * Строка для лога: «видео-режим WIDE: AA 1280x720 margins 0x240 density 160, CarLife 1280x480, кроп v 0.167..0.833».

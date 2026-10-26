@@ -788,7 +788,7 @@ class BridgeService : Service() {
         // режим фиксируется на подключение (SDR уже ушёл). Сервер ГУ одноразовый, а перезапустить его теперь некому
         // (службы спецвозможностей нет), поэтому живую AA с другой геометрией или DPI не закрываем: работаем со старым режимом
         val chosenGeometry = aaPrefs.videoGeometry
-        val wantMode = chosenGeometry.effective(aaPrefs.transcode)
+        val wantMode = chosenGeometry.effective(aaPrefs.transcode, aaPrefs.spsCrop)
         val wantDensity = aaPrefs.aaDensity
         if (h != null && !h.isDead && h.core.videoMode != wantMode) {
             AppLog.i("BRIDGE: видео-режим/DPI сменился (${h.core.videoMode.label} -> ${wantMode.label}), применится после перезапуска сервера ГУ")
@@ -810,8 +810,10 @@ class BridgeService : Service() {
         }
         // на воздухе перекодирование обязательно: в passthrough битрейт не регулируется. Режим хоста не трогаем
         // (без перекодирования он уже R720, его можно перекодировать), хост не пересоздаём: сервер AA одноразовый.
-        // Старый режим живого хоста с кропом (WIDE*, R1024) в passthrough не живёт: перекодирование держим включённым
-        val transcode = aaPrefs.transcode || transport.caps == TransportCaps.TCP6 || h.core.videoMode.needsTranscode
+        // Старый режим живого хоста с кропом (WIDE*, R1024) в passthrough живёт только с SPS-кропом (h529): иначе перекодирование
+        val hostMode = h.core.videoMode
+        val transcode = aaPrefs.transcode || transport.caps == TransportCaps.TCP6 ||
+            (hostMode.needsTranscode && !(aaPrefs.spsCrop && hostMode.spsCropable))
         if (h.core.transcodeEnabled != transcode) {
             AppLog.i("BRIDGE видео: ${if (transcode) "перекодирование включаю принудительно (воздух или режим хоста ${h.core.videoMode.label})" else "кабель, возвращаю passthrough по настройке"}")
             h.core.transcodeEnabled = transcode
