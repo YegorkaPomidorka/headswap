@@ -41,6 +41,12 @@ interface CarTransport {
         onClosed: (reason: String) -> Unit,
     )
 
+    /**
+     * Запись как у Baidu: 8 байт внешнего заголовка одним write, весь inner одним write (h242test3, Mobis CCNC).
+     * Нужна только потоку с внешним заголовком; транспорты без него игнорируют.
+     */
+    fun setWholeWrites(on: Boolean) {}
+
     /** Неблокирующая постановка inner в очередь канала. */
     fun send(chan: Int, inner: ByteArray)
 
