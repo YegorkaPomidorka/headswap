@@ -431,7 +431,7 @@ class DevScreen(host: MainActivity) : Screen(host) {
         val warns = buildList {
             if (w % 16 != 0 || h % 16 != 0) add(c.getString(R.string.dev_custom_warn_16))
             if (g.scale > 1.3) add(c.getString(R.string.dev_custom_warn_scale))
-            if (!aa.transcode) add(c.getString(R.string.dev_custom_warn_transcode))
+            if (!aa.transcode && !(aa.spsCrop && g.spsCropable)) add(c.getString(R.string.dev_custom_warn_transcode))
         }
         customWarn?.text = warns.joinToString("\n")
         customWarn?.visibility = if (warns.isEmpty()) View.GONE else View.VISIBLE
