@@ -122,20 +122,6 @@ class SpsCropTest {
         assertTrue(sdr, sdr.contains("5a07" + "0a05" + "0800" + "10e802"))
         val plain = h(AapMessages.serviceDiscoveryResponse(VideoMode.WIDE_HD.sdOptions(false)).payload)
         assertFalse(plain, plain.contains("5a070a05"))
-        // своё 1024x768 (Vezel, 4:3) из 1920x1080: поля 896 справа и 312 снизу, legacy-поля нулевые
-        val vezel = CustomVideoMode(1024, 768)
-        assertTrue(vezel.spsCropable)
-        val s43 = h(AapMessages.serviceDiscoveryResponse(vezel.sdOptions(false, marginsAtBottom = true)).payload)
-        assertTrue(s43, s43.contains("0803100218002000"))
-        assertTrue(s43, s43.contains("5a0c" + "0a0a" + "0800" + "10b802" + "1800" + "208007"))
-    }
-
-    @Test
-    fun rightAndBottomCropFor4x3() {
-        val r = SpsCrop.rewrite(x264High, 0, 896, 0, 312)
-        assertEquals(SpsCrop.Info(1920, 1088, 0, 896, 0, 320, 2, 2), r.after)
-        assertEquals(1024 to 768, r.after.visibleW to r.after.visibleH)
-        assertEquals(r.after, SpsCrop.parse(r.sps))
     }
 
     @Test

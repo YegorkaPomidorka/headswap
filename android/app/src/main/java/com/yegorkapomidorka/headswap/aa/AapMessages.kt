@@ -62,9 +62,8 @@ data class AapSdOptions(
     val marginW: Int = 0,
     val marginH: Int = 0,
     /**
-     * h529: поля целиком справа и снизу через ui_config.margins (поле 11 VideoConfiguration, Insets top/bottom/left/right),
-     * margin_width = margin_height = 0. Интерфейс встаёт в левый верхний угол кадра: декодеры ГУ, которые режут только
-     * справа/снизу (Vezel), покажут его ровно.
+     * h529: поле по высоте целиком снизу через ui_config.margins (поле 11 VideoConfiguration, Insets top/bottom),
+     * margin_height = 0. Интерфейс встаёт в верх кадра: декодеры ГУ, которые режут только снизу (Vezel), покажут его ровно.
      */
     val marginsAtBottom: Boolean = false,
     val mic: Boolean = true,
@@ -349,14 +348,9 @@ object AapMessages {
             .msg(1, AapPb().v(1, SENSOR_NIGHT))))
 
         // video
-        val legacy = !o.marginsAtBottom
-        val vc = AapPb().v(1, resCode).v(2, if (o.fps == 30) 2 else 1).v(3, if (legacy) o.marginW else 0).v(4, if (legacy) o.marginH else 0)
-            .v(5, o.density).v(8, 10000).v(10, MEDIA_CODEC_VIDEO_H264_BP)
-        if (o.marginsAtBottom && (o.marginW > 0 || o.marginH > 0)) {
-            val insets = AapPb().v(1, 0).v(2, o.marginH)
-            if (o.marginW > 0) insets.v(3, 0).v(4, o.marginW)
-            vc.msg(11, AapPb().msg(1, insets))
-        }
+        val vc = AapPb().v(1, resCode).v(2, if (o.fps == 30) 2 else 1).v(3, o.marginW).v(4, if (o.marginsAtBottom) 0 else o.marginH).v(5, o.density)
+            .v(8, 10000).v(10, MEDIA_CODEC_VIDEO_H264_BP)
+        if (o.marginsAtBottom && o.marginH > 0) vc.msg(11, AapPb().msg(1, AapPb().v(1, 0).v(2, o.marginH)))
         r.msg(1, AapPb().v(1, CH_VIDEO).msg(3, AapPb()
             .v(1, MEDIA_CODEC_VIDEO_H264_BP).v(2, AUDIO_NONE).msg(4, vc).bool(5, true)))
 
