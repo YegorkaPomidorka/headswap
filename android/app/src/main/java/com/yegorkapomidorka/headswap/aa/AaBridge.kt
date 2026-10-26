@@ -432,6 +432,7 @@ class AaBridgeCore(
         }
         gotIdr = false
         h295TouchAt = NEVER
+        spsCropKickAt = NEVER
         waitSince = if (aaVideoSeen) clockMs() - KEYFRAME_WAIT_MS else 0L
         lastKeyframeRequest = NEVER
         log("BRIDGE CarLife START: источник=$active, AA видео ${if (aaVideoSeen) "идёт, запрашиваю ключевой кадр" else "ещё нет"}", true)
@@ -770,6 +771,7 @@ class AaBridgeCore(
         return AnnexB.glue(cfg, b)
     }
 
+    private var spsCropKickAt = NEVER              // h529: когда запросить повторный IDR после первого в SPS-кропе
     private var spsCropSrc: ByteArray? = null      // последний исходный SPS AA и его переписанная версия (null = не вышло)
     private var spsCropDst: ByteArray? = null
 
@@ -1483,6 +1485,8 @@ class AaBridgeCore(
             sent++
             idrSent++
             lastIdrSentMs = clockMs()
+            // h529 (Vezel): первый IDR AA сразу за IDR заглушки с другим SPS ГУ иногда теряет, и экран чёрный до следующего IDR AA (~60 с)
+            spsCropKickAt = if (videoMode.crop.isNone) NEVER else lastIdrSentMs + SPS_CROP_KICK_MS
             h295IdrSeen(b, payload)
             if (active != Source.AA) {
                 active = Source.AA
@@ -1525,6 +1529,13 @@ class AaBridgeCore(
         if (!carlifeStarted) return
         val now = clockMs()
         h295GiveUp(now)
+        if (spsCropKickAt != NEVER && now >= spsCropKickAt) {
+            spsCropKickAt = NEVER
+            lastKeyframeRequest = now
+            keyframeRequests++
+            log("BRIDGE SPS-кроп: повторный ключевой кадр через ${SPS_CROP_KICK_MS} мс после первого (ГУ могла потерять его на смене SPS заглушка -> AA)", true)
+            peer?.requestKeyFrame()
+        }
         if (gotIdr || !aaVideoSeen) return
         if (waitSince == 0L) waitSince = now
         if (now - waitSince >= KEYFRAME_WAIT_MS && now - lastKeyframeRequest >= KEYFRAME_RETRY_MS) {
@@ -1903,6 +1914,7 @@ class AaBridgeCore(
         const val MEDIA_RATE_CN7 = 32000
         const val MEDIA_RATE_PIONEER_RM56 = 22050         // h277: музыка 32 кГц добавляла на USB ~1 Мбит/с, 22,05 кГц - вдвое меньше
         const val KEYFRAME_WAIT_MS = 1500L
+        const val SPS_CROP_KICK_MS = 2000L
         const val KEYFRAME_RETRY_MS = 4000L
 
         /** h295: тач на ГУ 20772121 при IDR старше этого порога в passthrough - вероятно, ГУ сбросил декодер (камера/меню). */

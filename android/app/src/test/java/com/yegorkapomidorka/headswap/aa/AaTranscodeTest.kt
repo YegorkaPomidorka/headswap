@@ -233,6 +233,13 @@ class AaTranscodeCoreTest {
         val info = SpsCrop.parse(first.copyOfRange(4, first.size - pps.size - idr.size))
         assertEquals(0, info.top)
         assertEquals(240, info.bottom)
+        val before = core.keyframeRequests
+        now += 1000; core.tick()
+        assertEquals(before, core.keyframeRequests)
+        now += 1500; core.tick()                               // через 2 с после первого IDR - один повторный запрос
+        assertEquals(before + 1, core.keyframeRequests)
+        now += 5000; core.tick()
+        assertEquals(before + 1, core.keyframeRequests)
     }
 
     @Test
