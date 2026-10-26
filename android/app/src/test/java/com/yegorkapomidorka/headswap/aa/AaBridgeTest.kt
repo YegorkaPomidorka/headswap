@@ -385,6 +385,8 @@ class AaBridgeCoreTest {
         assertTrue(core.huHonda20772121)
         core.attach(link)                                     // новая сессия сбрасывает флаг ГУ
         assertFalse(core.huHonda20772121)
+        core.onHuStatistic(AaBridgeCore.HONDA_20832125_CHANNEL) // Vezel: тот же обход после заднего хода
+        assertTrue(core.huHonda20772121)
     }
 
     private fun AaBridgeCore.onTouch(action: Int) = onCarlifeTouch(action, 10, 10)

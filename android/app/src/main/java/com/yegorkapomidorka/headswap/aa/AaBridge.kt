@@ -623,7 +623,7 @@ class AaBridgeCore(
     /** STATISTIC_INFO ГУ разобран: запасной признак Desay G6S и признак VW 20082120 - канал сборки прошивки. */
     fun onHuStatistic(channel: String?) {
         if (channel == DESAY_G6S_CHANNEL) huDesayG6S = true
-        if (channel == HONDA_20772121_CHANNEL) huHonda20772121 = true
+        if (channel == HONDA_20772121_CHANNEL || channel == HONDA_20832125_CHANNEL) huHonda20772121 = true
         if (channel == MAZDA_20622111_CHANNEL && !huMazda20622111) {
             huMazda20622111 = true
             log("BRIDGE ГУ Mazda 20622111: VIDEO_DATA режу на куски ≤ $MAZDA_20622111_MAX_VIDEO_PACKET Б, потолок ${MAZDA_20622111_CEILING_BPS / 1000} кбит/с", true)
@@ -1893,6 +1893,7 @@ class AaBridgeCore(
         fun isHondaChannel(channel: String?) =
             channel != null && channel.length == 8 && HONDA_CHANNEL_PREFIXES.any { channel.startsWith(it) }
         const val HONDA_20772121_CHANNEL = "20772121"     // Honda Civic 11 2023 (Китай, h295): после камеры/меню ГУ не просит IDR
+        const val HONDA_20832125_CHANNEL = "20832125"     // Honda Vezel (ГУ Егора): то же после заднего хода в passthrough, лог 26.10
         /** Mazda Connect 2 (Китай, CarLife 1.0, HU_INFO из заглушек, h238/h359): VIDEO_DATA 16163 Б прошёл, 16518 и 19104 Б - ГУ перестала читать USB. */
         const val MAZDA_20622111_CHANNEL = "20622111"
         const val MAZDA_20622111_MAX_VIDEO_PACKET = 15_000
