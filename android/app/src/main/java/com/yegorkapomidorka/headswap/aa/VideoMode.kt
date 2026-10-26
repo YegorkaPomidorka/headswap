@@ -76,9 +76,9 @@ interface VideoGeometry {
     fun densityFor(densityOverride: Int): Int = if (densityOverride == AaDensity.AUTO) density else densityOverride
 
     /** Опции SDR для AA этой геометрии; densityOverride - ручной DPI интерфейса AA (AaDensity.AUTO = density режима). */
-    fun sdOptions(fullAudio: Boolean, densityOverride: Int = AaDensity.AUTO, carMake: String? = null) = AapSdOptions(
+    fun sdOptions(fullAudio: Boolean, densityOverride: Int = AaDensity.AUTO, carMake: String? = null, marginsAtBottom: Boolean = false) = AapSdOptions(
         resolution = aaResolution, density = densityFor(densityOverride), marginW = marginW, marginH = marginH, fullAudio = fullAudio,
-        carMake = carMake,
+        carMake = carMake, marginsAtBottom = marginsAtBottom,
     )
 
     /** Строка для лога. */

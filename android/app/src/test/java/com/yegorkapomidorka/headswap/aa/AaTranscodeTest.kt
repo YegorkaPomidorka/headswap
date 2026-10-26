@@ -218,6 +218,24 @@ class AaTranscodeCoreTest {
     }
 
     @Test
+    fun passthroughMarginsAtBottomCropsOnlyBottom() {
+        val sc = byteArrayOf(0, 0, 0, 1)
+        val sps = sc + byteArrayOf(0x67, 0x42, 0x80.toByte(), 0x1f, 0xda.toByte(), 0x01, 0x40, 0x16, 0xe9.toByte(), 0xa8.toByte(), 0x28, 0x30, 0x28, 0x36, 0x85.toByte(), 0x09, 0xa8.toByte())
+        val pps = sc + byteArrayOf(0x68, 0xce.toByte(), 0x3c, 0x80.toByte())
+        val idr = sc + byteArrayOf(0x65, 0x88.toByte(), 0x84.toByte(), 0x00, 0x21)
+        core.transcodeEnabled = false
+        core.videoMode = VideoMode.WIDE                        // AA 1280x720, поле 240 целиком снизу
+        core.marginsAtBottom = true
+        core.onCarlifeStart()
+        core.onCodecConfig(sps + pps)
+        core.onFrame(idr, 1)
+        val first = link.sent[0]
+        val info = SpsCrop.parse(first.copyOfRange(4, first.size - pps.size - idr.size))
+        assertEquals(0, info.top)
+        assertEquals(240, info.bottom)
+    }
+
+    @Test
     fun transcoderCreationFailureFallsBackToPassthrough() {
         link.transcoder = null
         core.onCarlifeStart()

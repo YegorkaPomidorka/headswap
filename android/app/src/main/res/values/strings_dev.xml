@@ -9,6 +9,8 @@
     <string name="dev_section_sps_crop">Video crop (experiment, applies after head unit server restart)</string>
     <string name="dev_sps_crop_title">Crop without transcoding</string>
     <string name="dev_sps_crop_sub">Wide modes in direct passthrough: the head unit decoder cuts the margins (H.264 SPS cropping). If the picture is squashed or shifted, the head unit does not support it</string>
+    <string name="dev_sps_crop_bottom_title">Margins at the bottom</string>
+    <string name="dev_sps_crop_bottom_sub">Android Auto draws the interface at the top of the frame, the whole margin goes below. For head units that crop only the bottom (picture shifted down)</string>
     <string name="dev_section_meta">Metadata on the head unit (applies after USB reconnect)</string>
     <string name="dev_meta_music_title">Music</string>
     <string name="dev_meta_music_sub">Track, cover and progress: MEDIA_INFO / MEDIA_PROGRESS_BAR</string>

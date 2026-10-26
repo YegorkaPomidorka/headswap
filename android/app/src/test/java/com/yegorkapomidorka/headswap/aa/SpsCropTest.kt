@@ -109,6 +109,17 @@ class SpsCropTest {
     }
 
     @Test
+    fun sdrMarginsAtBottomUsesUiConfig() {
+        fun h(b: ByteArray) = b.joinToString("") { "%02x".format(it) }
+        val sdr = h(AapMessages.serviceDiscoveryResponse(VideoMode.WIDE_HD.sdOptions(false, marginsAtBottom = true)).payload)
+        // margin_w 0, margin_h 0, density 160 ... ui_config(11){margins(1){top 0, bottom 360}}
+        assertTrue(sdr, sdr.contains("0803100218002000" + "28a001"))
+        assertTrue(sdr, sdr.contains("5a07" + "0a05" + "0800" + "10e802"))
+        val plain = h(AapMessages.serviceDiscoveryResponse(VideoMode.WIDE_HD.sdOptions(false)).payload)
+        assertFalse(plain, plain.contains("5a070a05"))
+    }
+
+    @Test
     fun geometrySpsCropable() {
         for (m in listOf(VideoMode.WIDE, VideoMode.WIDE_MID, VideoMode.WIDE_HD, VideoMode.WIDE_640, VideoMode.WIDE_2_1, VideoMode.R1024)) {
             assertTrue(m.name, m.spsCropable)

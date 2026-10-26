@@ -864,12 +864,16 @@ class BridgeService : Service() {
             core.transcodeEnabled = aaPrefs.transcode
             core.videoMode = mode
             core.densityOverride = densityOverride
+            // h529: поля снизу только для SPS-кропа в прямом проброске; транскодер режет центр и с ними не совместим
+            val bottom = !aaPrefs.transcode && aaPrefs.spsCrop && aaPrefs.spsCropBottom && mode.spsCropable && mode.marginH > 0
+            core.marginsAtBottom = bottom
+            if (bottom) AppLog.i("BRIDGE SPS-кроп: поле ${mode.marginH} px целиком снизу (ui_config.margins), интерфейс в верху кадра")
             core.expectFeatureConfig = true
             if (chosen != mode) AppLog.i("BRIDGE видео-режим ${chosen.label} недоступен без перекодирования, использую ${mode.label}")
             // аудио-синки (MEDIA/SPEECH) объявляются в момент запроса телефона, когда уже известно решение по звуку
             val conn = AaConnector(
                 core, loaded.creds, log,
-                options = { AapOptions(sdProvider = { mode.sdOptions(fullAudio = core.audioViaUsb, densityOverride = densityOverride, carMake = aaPrefs.carMake) }) },
+                options = { AapOptions(sdProvider = { mode.sdOptions(fullAudio = core.audioViaUsb, densityOverride = densityOverride, carMake = aaPrefs.carMake, marginsAtBottom = bottom) }) },
             )
             AppLog.i("BRIDGE звук по USB: ${if (aaPrefs.usbAudio) "включён (решение по FEATURE_CONFIG ГУ)" else "выключен в UI"}")
             AppLog.i("BRIDGE: AA cert=${loaded.creds.certSet}, grace=${BridgeHost.GRACE_MS} мс")

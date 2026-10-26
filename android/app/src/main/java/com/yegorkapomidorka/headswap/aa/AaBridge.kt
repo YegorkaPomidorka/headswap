@@ -141,6 +141,9 @@ class AaBridgeCore(
 
     /** Ручной DPI интерфейса AA, снятый вместе с videoMode (AaDensity.AUTO = density режима). Только SDR, на кроп и тач не влияет. */
     @Volatile var densityOverride: Int = AaDensity.AUTO
+
+    /** SDR ушёл с полем по высоте целиком снизу (h529, ui_config): SPS-кроп режет только снизу. Снимается вместе с videoMode. */
+    @Volatile var marginsAtBottom = false
     private var transcoder: VideoTranscoder? = null
     private var encCsd: ByteArray? = null
     private var outGotIdr = false
@@ -782,7 +785,8 @@ class AaBridgeCore(
             if (!sps.contentEquals(spsCropSrc)) {
                 spsCropSrc = sps
                 spsCropDst = try {
-                    val r = SpsCrop.rewrite(sps, g.marginW / 2, g.marginW / 2, g.marginH / 2, g.marginH / 2)
+                    val r = if (marginsAtBottom) SpsCrop.rewrite(sps, g.marginW / 2, g.marginW / 2, 0, g.marginH)
+                    else SpsCrop.rewrite(sps, g.marginW / 2, g.marginW / 2, g.marginH / 2, g.marginH / 2)
                     if (r.after.visibleW != g.outW || r.after.visibleH != g.outH) {
                         throw SpsCrop.SpsException("видимая часть ${r.after.visibleW}x${r.after.visibleH}, ГУ ждёт ${g.outW}x${g.outH}")
                     }
