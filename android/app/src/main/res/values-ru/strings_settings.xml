@@ -135,8 +135,8 @@
     <string name="video_wide_2_1_sub">1280×640: родное разрешение экрана Octavia, без растяжения</string>
     <string name="video_wide_976_title">Широкий 2240×976 (VW Tiguan L Pro)</string>
     <string name="video_wide_976_sub">Широкая обрезка под окно CarLife на ГУ VW CNS3</string>
-    <string name="video_wide_976_qhd_title">Широкий 2240×976 из 1440p (VW, эксперимент)</string>
-    <string name="video_wide_976_qhd_sub">То же окно без растяжения: вырез из кадра 2560×1440 один к одному. Для кропа без перекодирования</string>
+    <string name="video_wide_836_title">Широкий 1920×836 (VW, эксперимент)</string>
+    <string name="video_wide_836_sub">Пропорция окна 2240×976 без растяжения на телефоне: растягивает ГУ. Для кропа без перекодирования</string>
 
     <!-- Частота музыки (MusicRate) -->
     <string name="mrate_auto">Авто</string>

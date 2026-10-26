@@ -114,10 +114,10 @@ enum class VideoMode(
     /** 2240×976 - окно CarLife на VW CNS3 (Tiguan L Pro, экран 2240×1260 с полосами штатного ГУ): из кадра AA 1920×1080 вырезается центральная полоса 1920×836 и масштабируется ×1,167. */
     WIDE_976(R.string.video_wide_976_title, R.string.video_wide_976_sub, "1920x1080", 0, 244, 160, 2240, 976, 8_000_000),
     /**
-     * 2240×976 без масштаба (h529, VW BT 1420 Павла): из кадра AA 2560×1440 вырезается 2240×976 один к одному, годится для
-     * SPS-кропа в прямом проброске. density 187: та же раскладка в dp, что у WIDE_976 (2240 px / 1,167 px на dp ≈ 1920 dp).
+     * 1920×836 - окно VW BT 1420 (2240×976) той же пропорции, но без масштаба (h529, Павел): из кадра AA 1920×1080 вырезается
+     * полоса 1920×836 один к одному, годится для SPS-кропа; до окна 2240×976 растягивает сама ГУ.
      */
-    WIDE_976_QHD(R.string.video_wide_976_qhd_title, R.string.video_wide_976_qhd_sub, "2560x1440", 320, 464, 187, 2240, 976, 8_000_000);
+    WIDE_836(R.string.video_wide_836_title, R.string.video_wide_836_sub, "1920x1080", 0, 244, 160, 1920, 836, 6_000_000);
 
     override val aaW: Int = aaResolution.substringBefore('x').toInt()
     override val aaH: Int = aaResolution.substringAfter('x').toInt()
