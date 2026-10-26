@@ -8,8 +8,8 @@
     <string name="dev_section_sps_crop">Кроп видео (эксперимент, с перезапуска сервера ГУ)</string>
     <string name="dev_sps_crop_title">Кроп без перекодирования</string>
     <string name="dev_sps_crop_sub">Широкие режимы в прямом пробросе: поля отрезает декодер ГУ (кроп в SPS H.264). Картинка сплющена или съехала — ГУ так не умеет</string>
-    <string name="dev_sps_crop_bottom_title">Поля снизу</string>
-    <string name="dev_sps_crop_bottom_sub">Android Auto рисует интерфейс в верху кадра, всё поле уходит вниз. Для ГУ, которые режут только снизу (картинка съезжала вниз)</string>
+    <string name="dev_sps_crop_bottom_title">Поля справа и снизу</string>
+    <string name="dev_sps_crop_bottom_sub">Android Auto рисует интерфейс в левом верхнем углу, поля уходят вправо и вниз. Для ГУ, которые режут только справа и снизу (картинка съезжала вниз или влево)</string>
     <string name="dev_section_meta">Метаданные на ГУ (с переподключения USB)</string>
     <string name="dev_meta_music_title">Музыка</string>
     <string name="dev_meta_music_sub">Трек, обложка и прогресс: MEDIA_INFO / MEDIA_PROGRESS_BAR</string>

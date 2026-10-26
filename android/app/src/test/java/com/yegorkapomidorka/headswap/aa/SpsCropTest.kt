@@ -122,6 +122,18 @@ class SpsCropTest {
         assertTrue(sdr, sdr.contains("5a07" + "0a05" + "0800" + "10e802"))
         val plain = h(AapMessages.serviceDiscoveryResponse(VideoMode.WIDE_HD.sdOptions(false)).payload)
         assertFalse(plain, plain.contains("5a070a05"))
+        // WIDE_MID (CX-5 G6S) из 1920x1080: поля 192 справа и 432 снизу, legacy-поля нулевые
+        val mid = h(AapMessages.serviceDiscoveryResponse(VideoMode.WIDE_MID.sdOptions(false, marginsAtBottom = true)).payload)
+        assertTrue(mid, mid.contains("0803100218002000"))
+        assertTrue(mid, mid.contains("5a0c" + "0a0a" + "0800" + "10b003" + "1800" + "20c001"))
+    }
+
+    @Test
+    fun rightAndBottomCropWideMid() {
+        val r = SpsCrop.rewrite(x264High, 0, 192, 0, 432)
+        assertEquals(SpsCrop.Info(1920, 1088, 0, 192, 0, 440, 2, 2), r.after)
+        assertEquals(1728 to 648, r.after.visibleW to r.after.visibleH)
+        assertEquals(r.after, SpsCrop.parse(r.sps))
     }
 
     @Test

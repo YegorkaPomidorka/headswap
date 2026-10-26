@@ -865,9 +865,9 @@ class BridgeService : Service() {
             core.videoMode = mode
             core.densityOverride = densityOverride
             // h529: поля снизу только для SPS-кропа в прямом проброске; транскодер режет центр и с ними не совместим
-            val bottom = !aaPrefs.transcode && aaPrefs.spsCrop && aaPrefs.spsCropBottom && mode.spsCropable && mode.marginH > 0
+            val bottom = !aaPrefs.transcode && aaPrefs.spsCrop && aaPrefs.spsCropBottom && mode.spsCropable
             core.marginsAtBottom = bottom
-            if (bottom) AppLog.i("BRIDGE SPS-кроп: поле ${mode.marginH} px целиком снизу (ui_config.margins), интерфейс в верху кадра")
+            if (bottom) AppLog.i("BRIDGE SPS-кроп: поля ${mode.marginW} px справа и ${mode.marginH} px снизу (ui_config.margins), интерфейс в левом верхнем углу")
             core.expectFeatureConfig = true
             if (chosen != mode) AppLog.i("BRIDGE видео-режим ${chosen.label} недоступен без перекодирования, использую ${mode.label}")
             // аудио-синки (MEDIA/SPEECH) объявляются в момент запроса телефона, когда уже известно решение по звуку
