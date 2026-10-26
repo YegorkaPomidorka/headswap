@@ -24,6 +24,7 @@ class VideoModeTest {
             VideoMode.WIDE_640 to Row("1920x1080", 0, 440, 160, 1920, 640, 6_000_000),
             VideoMode.WIDE_2_1 to Row("1280x720", 0, 80, 160, 1280, 640, 4_000_000),
             VideoMode.WIDE_976 to Row("1920x1080", 0, 244, 160, 2240, 976, 8_000_000),
+            VideoMode.WIDE_976_QHD to Row("2560x1440", 320, 464, 187, 2240, 976, 8_000_000),
         )
         assertEquals(expected.keys, VideoMode.values().toSet())
         for ((m, r) in expected) {
@@ -136,7 +137,7 @@ class VideoModeTest {
         assertTrue(c640.needsTranscode)
         assertEquals("1920×640", c640.outLabel)
         assertEquals(VideoMode.WIDE_640, VideoMode.parse("WIDE_640"))
-        assertEquals(listOf(VideoMode.WIDE, VideoMode.WIDE_MID, VideoMode.WIDE_HD, VideoMode.WIDE_640, VideoMode.WIDE_2_1, VideoMode.WIDE_976), VideoMode.values().takeLast(6))
+        assertEquals(listOf(VideoMode.WIDE, VideoMode.WIDE_MID, VideoMode.WIDE_HD, VideoMode.WIDE_640, VideoMode.WIDE_2_1, VideoMode.WIDE_976, VideoMode.WIDE_976_QHD), VideoMode.values().takeLast(7))
     }
 
     @Test

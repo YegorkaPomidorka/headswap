@@ -143,6 +143,8 @@ class SpsCropTest {
             assertSame(m, m.effective(transcode = false, spsCrop = true))
             assertSame(VideoMode.R720, m.effective(transcode = false, spsCrop = false))
         }
+        assertTrue(VideoMode.WIDE_976_QHD.spsCropable)
+        assertSame(VideoMode.WIDE_976_QHD, VideoMode.WIDE_976_QHD.effective(transcode = false, spsCrop = true))
         assertFalse(VideoMode.WIDE_976.spsCropable)
         assertSame(VideoMode.R720, VideoMode.WIDE_976.effective(transcode = false, spsCrop = true))
         assertFalse(VideoMode.R1080.spsCropable)

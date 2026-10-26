@@ -112,7 +112,12 @@ enum class VideoMode(
     /** 1280×640 - экран Skoda Octavia A8 Pro (ГУ SKODA CNS3 просит 1280×640, h292): из кадра AA 1280×720 вырезается центральная полоса 1280×640, 1:1. */
     WIDE_2_1(R.string.video_wide_2_1_title, R.string.video_wide_2_1_sub, "1280x720", 0, 80, 160, 1280, 640, 4_000_000),
     /** 2240×976 - окно CarLife на VW CNS3 (Tiguan L Pro, экран 2240×1260 с полосами штатного ГУ): из кадра AA 1920×1080 вырезается центральная полоса 1920×836 и масштабируется ×1,167. */
-    WIDE_976(R.string.video_wide_976_title, R.string.video_wide_976_sub, "1920x1080", 0, 244, 160, 2240, 976, 8_000_000);
+    WIDE_976(R.string.video_wide_976_title, R.string.video_wide_976_sub, "1920x1080", 0, 244, 160, 2240, 976, 8_000_000),
+    /**
+     * 2240×976 без масштаба (h529, VW BT 1420 Павла): из кадра AA 2560×1440 вырезается 2240×976 один к одному, годится для
+     * SPS-кропа в прямом проброске. density 187: та же раскладка в dp, что у WIDE_976 (2240 px / 1,167 px на dp ≈ 1920 dp).
+     */
+    WIDE_976_QHD(R.string.video_wide_976_qhd_title, R.string.video_wide_976_qhd_sub, "2560x1440", 320, 464, 187, 2240, 976, 8_000_000);
 
     override val aaW: Int = aaResolution.substringBefore('x').toInt()
     override val aaH: Int = aaResolution.substringAfter('x').toInt()
