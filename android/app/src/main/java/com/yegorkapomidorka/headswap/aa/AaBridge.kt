@@ -1,6 +1,7 @@
 package com.yegorkapomidorka.headswap.aa
 
 import com.yegorkapomidorka.headswap.AnnexB
+import com.yegorkapomidorka.headswap.Hex
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executor
 import java.util.concurrent.ExecutorService
@@ -152,6 +153,12 @@ class AaBridgeCore(
      * картинки AA, без перекодирования и без цикла VideoFocus. 0 - выкл. Ставит BridgeService на старте CarLife-сессии.
      */
     @Volatile var idrSpliceMs = 0L
+
+    /** Варианты своего IDR для поиска задержки на ГУ (раздел для разработчиков); по умолчанию как в PR #115. */
+    @Volatile var tuning = SpliceTuning()
+
+    /** Часы телефона для метки времени в кадре ([SpliceTuning.stamp]); тесты подменяют. */
+    var wallMs: () -> Long = { System.currentTimeMillis() }
 
     /** Декодер опорных картинок для своего IDR (MediaCodec, ставит BridgeService); null - вставки нет. */
     @Volatile var refDecoderFactory: ((RefPictureSink) -> RefPictureDecoder?)? = null
@@ -402,6 +409,7 @@ class AaBridgeCore(
         h295LastTouchAt = NEVER
         sessionKickDone = false
         spliceCancel("новая CarLife-сессия")
+        latStats.resetSession()
         mediaRateLogged = MEDIA_RATE
         mediaChunkLogged = CarlifeAudio.MAX_CHUNK
         voiceChunkLogged = CarlifeAudio.MAX_CHUNK
@@ -802,13 +810,39 @@ class AaBridgeCore(
      * Зовётся только из ветки без транскодера, поэтому срабатывает и при откате с несозданного транскодера.
      */
     private fun spsCrop(au: ByteArray): ByteArray {
-        if (videoMode.crop.isNone) return au
+        val vui = tuning.lowDelayVui
+        if (videoMode.crop.isNone && !vui) return au
         return SpsCrop.mapSps(au) { sps ->
-            if (!sps.contentEquals(spsCropSrc)) {
+            if (!sps.contentEquals(spsCropSrc) || vui != spsCropVui) {
                 spsCropSrc = sps
-                spsCropDst = cropSps(sps, "")
+                spsCropVui = vui
+                val cropped = if (videoMode.crop.isNone) sps else cropSps(sps, "")
+                spsCropDst = if (vui && cropped != null) lowDelaySps(cropped) else cropped
             }
             spsCropDst ?: sps
+        }
+    }
+
+    private var spsCropVui = false
+
+    /** [SpliceTuning.lowDelayVui]: SPS к ГУ с max_num_reorder_frames = 0; не разобрался - как есть. */
+    private fun lowDelaySps(sps: ByteArray): ByteArray = try {
+        SpsVui.lowDelay(sps).also { if (!it.contentEquals(sps)) logSps("к ГУ (VUI без переупорядочивания)", it) }
+    } catch (e: RuntimeException) {
+        log("BRIDGE VUI: !!!!!! SPS не разобрался (${e.message}), уходит как есть", true)
+        sps
+    }
+
+    /** SPS из AU в лог: POC, опорные кадры, VUI (bitstream_restriction решает, держит ли декодер ГУ кадры в DPB). */
+    private fun logSps(who: String, au: ByteArray) {
+        for (nal in IdrSplicer.nals(au)) {
+            if (nal[0].toInt() and 0x1F != 7) continue
+            val d = try {
+                SpsVui.parse(nal).toString()
+            } catch (e: RuntimeException) {
+                "не разобрался: ${e.message}"
+            }
+            log("BRIDGE SPS $who: $d (${Hex.compact(nal, 48)})", true)
         }
     }
 
@@ -1490,6 +1524,7 @@ class AaBridgeCore(
         aaVideoSeen = true
         aaConfig = AnnexB.normalize(annexB)
         log("BRIDGE AA CODEC_CONFIG ${annexB.size} Б nal=${AnnexB.nalTypes(aaConfig!!)}", true)
+        logSps("AA", aaConfig!!)
         if (carlifeStarted) transcoder?.feedConfig(aaConfig!!)
         splicer?.onConfig(aaConfig!!)
         refDecoder?.feedConfig(aaConfig!!)
@@ -1525,8 +1560,21 @@ class AaBridgeCore(
             feedTranscoder(t, b, types, ptsUs)
             return
         }
+        if (spliceOn && tuning.replace && spliceReplaceNow(b, types)) return
         passthroughFrame(b, types)
         if (spliceOn) spliceRequest(fromFrame = true)
+    }
+
+    /**
+     * [SpliceTuning.replace]: пора свой IDR и AA шлёт кадры - этот кадр не уходит, свой IDR из его картинки уйдёт вместо него.
+     * Без этого IDR идёт лишним кадром после своей картинки: ГУ, которая показывает кадры с постоянной частотой, копит его.
+     */
+    private fun spliceReplaceNow(b: ByteArray, types: List<Int>): Boolean {
+        if (!gotIdr || 5 in types || splicePendingSeq != 0L) return false
+        spliceRequest(fromFrame = true)
+        if (splicePendingSeq == 0L || !spliceHold || splicePendingSeq != spliceLastSeq) return false
+        spliceReplaced = b
+        return true
     }
 
     private fun passthroughFrame(b: ByteArray, types: List<Int>) {
@@ -1553,6 +1601,7 @@ class AaBridgeCore(
             sent++
             idrSent++
             lastIdrSentMs = clockMs()
+            latStats.sent(lastIdrSentMs, own = false)
             // h529 (Vezel): первый IDR AA сразу за IDR заглушки ГУ иногда теряет, и экран чёрный до следующего IDR AA (~60 с).
             // Лог 211335: так и без кропа (R1080), поэтому повторный IDR во всех режимах passthrough и на всех ГУ,
             // но один раз за CarLife-сессию: после PAUSE/START он дал бы лишнюю встряску (0,9 с стоп-кадра)
@@ -1583,6 +1632,7 @@ class AaBridgeCore(
             return
         }
         sent++
+        latStats.sent(clockMs(), own = false)
         if (5 in types) {
             idrSent++
             lastIdrSentMs = clockMs()
@@ -1610,6 +1660,7 @@ class AaBridgeCore(
         if (!carlifeStarted) return
         val now = clockMs()
         if (spliceOn) spliceTick(now)
+        latStats.logIfDue(now)
         h295GiveUp(now)
         if (spsCropKickAt != NEVER && now >= spsCropKickAt && spliceKickNeeded(now)) {
             spsCropKickAt = NEVER
@@ -1661,11 +1712,17 @@ class AaBridgeCore(
     private var spliceNotBefore = NEVER                // следующая попытка не раньше (после отказа, пропуска, таймаута)
     private var spliceBlockLogged: String? = null
     private val spliceHeld = ArrayList<ByteArray>()     // кадры AA, пришедшие, пока собирается свой IDR (spliceHold)
+    private var spliceReplaced: ByteArray? = null       // кадр AA, вместо которого уйдёт свой IDR (SpliceTuning.replace), уже через splicer
+    @Volatile private var spliceStamp: String? = null    // метка времени в собираемом IDR (SpliceTuning.stamp)
+    private var spliceStampAt = 0L                     // когда снята картинка с меткой (wallMs)
+    private val guModel = GuQueueModel()
+    private val latStats = LatencyStats()
     private var spliceLastSentAt = NEVER               // когда свой IDR последний раз ушёл на ГУ
     private var spliceMisses = 0                       // картинка не пришла из декодера, подряд
     private var spliceDisabled: String? = null          // вставка невозможна до конца AA-сессии (причина)
     private var aaFrameGapMs = Long.MAX_VALUE          // пауза перед последним кадром AA
     private var builder: IdrBuilder? = null
+    private var builderTuning: SpliceTuning? = null    // варианты, с которыми собран builder: сменились - новый
     private val spliceStats = SpliceStats()
 
     /** Нить сборки своего IDR; null - своя, создаётся при первой сборке. Тесты ставят исполнитель в той же нити. */
@@ -1792,13 +1849,20 @@ class AaBridgeCore(
                 return
             }
             spliceBuilding = true
-            val b = builder ?: IdrBuilder(spliceSlicePool ?: newSlicePool(), SPLICE_SLICES).also { builder = it }
+            val t = tuning
+            val b = builder?.takeIf { builderTuning == t } ?: newBuilder(t).also {
+                builder = it
+                builderTuning = t
+            }
             val exec = spliceExecutor ?: newBuildThread()
-            Triple(job, b, exec) to pic
+            BuildTask(job, b, exec, pic, if (t.stamp) visibleCrop() else null)
         }
-        val (job, b, exec) = task.first
+        val job = task.job
+        val b = task.builder
         // копия: в фоне декодер может писать в тот же буфер следующую картинку (тогда этот IDR и так устареет)
-        val pic = task.second.copy()
+        val pic = task.pic.copy()
+        task.stampCrop?.let { stampPicture(pic, it) }
+        val exec = task.exec
         exec.execute {
             val t0 = clockMs()
             val r = try {
@@ -1809,6 +1873,36 @@ class AaBridgeCore(
             }
             spliceComplete(job, r, clockMs() - t0)
         }
+    }
+
+    private class BuildTask(
+        val job: IdrSplicer.Job, val builder: IdrBuilder, val exec: Executor, val pic: IdrSplice.Picture, val stampCrop: SpsCrop.Info?,
+    )
+
+    private fun newBuilder(t: SpliceTuning): IdrBuilder {
+        val pool = spliceSlicePool ?: newSlicePool()
+        return if (t.light) IdrBuilder(pool, t.slices, SpliceTuning.LIGHT_TARGET_BYTES, SpliceTuning.LIGHT_MIN_QP, SpliceTuning.LIGHT_START_QP)
+        else IdrBuilder(pool, t.slices)
+    }
+
+    /** Кроп SPS, с которым кадр уходит в ГУ (кроп AA и SPS-кроп моста); под блокировкой ядра: spsCrop держит кэш. */
+    private fun visibleCrop(): SpsCrop.Info? = try {
+        aaConfig?.let { cfg -> IdrSplicer.nals(spsCrop(cfg)).firstOrNull { it[0].toInt() and 0x1F == 7 }?.let { SpsCrop.parse(it) } }
+    } catch (e: Exception) {
+        null
+    }
+
+    /** Метка времени в правом верхнем углу видимой части кадра (за вычетом кропа SPS к ГУ). */
+    private fun stampPicture(pic: IdrSplice.Picture, crop: SpsCrop.Info) {
+        val at = wallMs()
+        val text = FrameStamp.text(at)
+        val (bw, _) = FrameStamp.size(text)
+        val x = (pic.width - crop.right - bw - 16) / 16 * 16
+        val y = (crop.top + 31) / 16 * 16
+        if (FrameStamp.draw(pic, x, y, text)) {
+            spliceStamp = text
+            spliceStampAt = at
+        } else spliceStamp = null
     }
 
     private fun newBuildThread(): Executor =
@@ -1841,7 +1935,12 @@ class AaBridgeCore(
     private fun spliceSend(sp: IdrSplicer, job: IdrSplicer.Job, r: IdrSplice.Result, buildMs: Long, now: Long) {
         // SPS/PPS через раз: Honda после сброса ждёт их в кадре (h295), Java-ГУ CarLife в сбросе берёт только голый IDR
         val cfg = aaConfig
-        val glued = sp.spliced % 2 == 0L && cfg != null
+        val recovered = !gotIdr
+        val glued = cfg != null && when (tuning.sps) {
+            SpliceSps.ALTERNATE -> sp.spliced % 2 == 0L
+            SpliceSps.ALWAYS -> true
+            SpliceSps.NEVER -> recovered
+        }
         val payload = if (glued) spsCrop(AnnexB.glue(cfg!!, r.nal)) else r.nal
         if (!link.sendVideo(payload)) {
             log("BRIDGE свой IDR ${payload.size} Б не принят CarLife (очередь/закрыто)", true)
@@ -1850,7 +1949,11 @@ class AaBridgeCore(
         sp.commit(job)
         spliceStats.sent++
         spliceLastSentAt = now
-        val recovered = !gotIdr
+        val replaced = spliceReplaced != null
+        spliceReplaced = null                           // кадр AA этой картинки ГУ не получит: его место занял IDR
+        latStats.sent(now, own = true, replaced = replaced, holdMs = if (spliceHold) now - splicePendingAt else -1, held = spliceHeld.size)
+        spliceStamp?.let { log("BRIDGE метка ${it} в своём IDR #${sp.spliced} ушла в ГУ через ${wallMs() - spliceStampAt} мс после снимка", true) }
+        spliceStamp = null
         gotIdr = true
         waitSince = 0
         sent++
@@ -1859,7 +1962,8 @@ class AaBridgeCore(
         if (recovered || sp.spliced <= 5 || sp.spliced % 30 == 0L) {
             log("BRIDGE свой IDR #${sp.spliced}${if (recovered) " (ГУ была без IDR)" else ""}: ${payload.size} Б, " +
                 (if (r.qp < 0) "без потерь (PCM ${r.pcm})" else "QP ${r.qp}") + ", сборка $buildMs мс, " +
-                (if (spliceHold) "кадры AA ждали ${now - splicePendingAt} мс" else "в фоне") + ", ${if (glued) "с SPS/PPS" else "голый"}", true)
+                (if (spliceHold) "кадры AA ждали ${now - splicePendingAt} мс" else "в фоне") + ", ${if (glued) "с SPS/PPS" else "голый"}" +
+                (if (replaced) ", вместо кадра AA" else ""), true)
         }
     }
 
@@ -1869,6 +1973,12 @@ class AaBridgeCore(
         if (why != null) log("BRIDGE свой IDR отменён: $why", false)
         splicePendingSeq = 0
         spliceHold = false
+        spliceStamp = null
+        // кадр, вместо которого ждали IDR, уже прошёл через splicer: в ГУ как есть, раньше придержанных
+        spliceReplaced?.let { b ->
+            spliceReplaced = null
+            if (carlifeStarted) passthroughFrame(b, AnnexB.nalTypes(b))
+        }
         while (spliceHeld.isNotEmpty() && splicePendingSeq == 0L) aaFrame(spliceHeld.removeAt(0), 0)
     }
 
@@ -1877,6 +1987,8 @@ class AaBridgeCore(
         splicePendingSeq = 0
         spliceHold = false
         spliceHeld.clear()
+        spliceReplaced = null
+        spliceStamp = null
         splicer = null
         refDecoder?.stop()
         refDecoder = null
@@ -1889,6 +2001,57 @@ class AaBridgeCore(
         refPic = null
         refPicSeq = 0
         spliceBlockLogged = null
+    }
+
+    /**
+     * Поток в ГУ раз в [SPLICE_STATS_MS] (passthrough): кадры AA и свои IDR, сколько из них лишние (сверх кадров AA),
+     * придержка кадров AA и задержка модели ГУ с постоянной частотой показа ([GuQueueModel]). Для поиска накопления задержки.
+     */
+    private inner class LatencyStats {
+        private var aa = 0
+        private var own = 0
+        private var replaced = 0
+        private var holds = 0
+        private var holdSum = 0L
+        private var holdMax = 0L
+        private var heldMax = 0
+        private var extraTotal = 0L
+        private var since = NEVER
+
+        fun sent(now: Long, own: Boolean, replaced: Boolean = false, holdMs: Long = -1, held: Int = 0) {
+            if (own) {
+                this.own++
+                if (replaced) this.replaced++ else extraTotal++
+                if (holdMs >= 0) {
+                    holds++
+                    holdSum += holdMs
+                    holdMax = maxOf(holdMax, holdMs)
+                    heldMax = maxOf(heldMax, held)
+                }
+            } else aa++
+            guModel.onFrame(now)                    // IDR вместо кадра AA занимает его место, лишний - добавляет кадр
+        }
+
+        fun logIfDue(now: Long) {
+            if (since == NEVER) since = now
+            if (now - since < SPLICE_STATS_MS) return
+            val sec = (now - since) / 1000.0
+            if (aa + own > 0 && transcoder == null) {
+                log("BRIDGE поток в ГУ за ${sec.toInt()} с: кадров AA $aa (${"%.1f".format(aa / sec)} fps), своих IDR $own " +
+                    "(вместо кадра AA $replaced, лишних ${own - replaced}, лишних за сессию $extraTotal)" +
+                    (if (holds > 0) "; кадры AA ждали IDR ср ${holdSum / holds} мс, макс $holdMax мс, в пачке до $heldMax" else "") +
+                    "; модель ГУ ${guModel.fps} fps без пропусков: задержка сейчас ${guModel.delayMs(now)} мс, макс ${guModel.maxMs} мс" +
+                    (if (tuning.isDefault) "" else "; варианты: ${tuning.describe()}"), true)
+            }
+            aa = 0; own = 0; replaced = 0; holds = 0; holdSum = 0; holdMax = 0; heldMax = 0
+            guModel.resetMax()
+            since = now
+        }
+
+        fun resetSession() {
+            extraTotal = 0
+            guModel.reset()
+        }
     }
 
     /** Сводка своего IDR раз в [SPLICE_STATS_MS]: в лог попадает всё, а не каждая N-я строка. */

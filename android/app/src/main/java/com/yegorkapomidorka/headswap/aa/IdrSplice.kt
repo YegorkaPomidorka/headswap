@@ -583,8 +583,10 @@ class IdrBuilder(
     private val pool: java.util.concurrent.ExecutorService?,
     private val slices: Int,
     val target: Int = TARGET_BYTES,
+    private val minQp: Int = MIN_QP,
+    startQp: Int = START_QP,
 ) {
-    @Volatile var qp = START_QP
+    @Volatile var qp = maxOf(startQp, minQp)
         private set
 
     fun build(job: IdrSplicer.Job, pic: IdrSplice.Picture): IdrSplice.Result {
@@ -606,7 +608,7 @@ class IdrBuilder(
             val step = Math.ceil(6 * Math.log(nal.size.toDouble() / target) / Math.log(2.0)).toInt().coerceIn(2, 12)
             q = (q + step).coerceAtMost(MAX_QP)
         }
-        qp = if (nal.size < target / 2) (q - 2).coerceAtLeast(MIN_QP) else q
+        qp = if (nal.size < target / 2) (q - 2).coerceAtLeast(minQp) else q
         return IdrSplice.Result(nal, mbs, 0, q)
     }
 

@@ -604,17 +604,19 @@ class CarLifeSession(
      * по [AaBridgeCore.MAZDA_20622111_MAX_VIDEO_PACKET] байт, каждый отдельным VIDEO_DATA подряд (расчёт на то, что ГУ
      * склеивает поток перед декодером). Остальные ГУ получают кадр одним пакетом, как раньше.
      */
+    private fun videoTs(): Int = if (bridge.tuning.tsMs) unixMillis() else unixSeconds()
+
     private fun sendVideoData(data: ByteArray) {
         val max = AaBridgeCore.MAZDA_20622111_MAX_VIDEO_PACKET
         if (!bridge.huMazda20622111 || data.size <= max) {
-            send(Ch.VIDEO, Wire.dataInner(Msg.VIDEO_DATA, unixSeconds(), data))
+            send(Ch.VIDEO, Wire.dataInner(Msg.VIDEO_DATA, videoTs(), data))
             return
         }
         if (!splitLogged) {
             splitLogged = true
             AppLog.i("видео: Mazda 20622111, кадр ${data.size} Б режу на ${(data.size + max - 1) / max} VIDEO_DATA по ≤ $max Б")
         }
-        val ts = unixSeconds()
+        val ts = videoTs()
         var off = 0
         while (off < data.size) {
             val end = minOf(off + max, data.size)
@@ -1266,5 +1268,8 @@ class CarLifeSession(
 
         /** Поле time видеопакета: unix-секунды (Recorder.sendVideoData :930-962). */
         private fun unixSeconds() = (System.currentTimeMillis() / 1000).toInt()
+
+        /** Метка VIDEO_DATA в миллисекундах, как (int) System.currentTimeMillis() у CarProjection. */
+        private fun unixMillis() = System.currentTimeMillis().toInt()
     }
 }

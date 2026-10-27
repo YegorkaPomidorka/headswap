@@ -34,6 +34,7 @@ import com.yegorkapomidorka.headswap.aa.MicMode
 import com.yegorkapomidorka.headswap.aa.PhoneCall
 import com.yegorkapomidorka.headswap.aa.PhoneMicCapture
 import com.yegorkapomidorka.headswap.aa.RefDecoder
+import com.yegorkapomidorka.headswap.aa.SpliceTuning
 import com.yegorkapomidorka.headswap.aa.VideoGeometry
 import com.yegorkapomidorka.headswap.link.CarTransport
 import com.yegorkapomidorka.headswap.link.LinkSetupException
@@ -826,6 +827,12 @@ class BridgeService : Service() {
         if (h.core.idrSpliceMs != spliceMs) {
             AppLog.i("BRIDGE свой IDR в passthrough: ${if (spliceMs > 0) "раз в $spliceMs мс${if (transcode) " (сейчас перекодирование, не работает)" else ""}" else "выключен"}")
             h.core.idrSpliceMs = spliceMs
+        }
+        val tuning = aaPrefs.spliceTuning
+        if (h.core.tuning != tuning || !tuning.isDefault) {
+            val idle = spliceMs == 0L && tuning.copy(tsMs = false, lowDelayVui = false) != SpliceTuning()
+            AppLog.i("BRIDGE задержка ГУ, варианты: ${tuning.describe()}${if (idle) " (свой IDR выключен: работают только VUI и метка VIDEO_DATA)" else ""}")
+            h.core.tuning = tuning
         }
         if (wakeLock == null) {
             wakeLock = getSystemService(PowerManager::class.java)

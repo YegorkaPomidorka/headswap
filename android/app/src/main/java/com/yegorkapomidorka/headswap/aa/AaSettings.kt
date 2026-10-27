@@ -71,6 +71,38 @@ class AaPrefs(ctx: Context) {
         get() = sp.getBoolean("idrSpliceAir", false)
         set(v) = sp.edit().putBoolean("idrSpliceAir", v).apply()
 
+    /** Варианты своего IDR для поиска задержки на ГУ (docs/research/idr-latency.md). Читаются на старте CarLife-сессии. */
+    var spliceReplace: Boolean
+        get() = sp.getBoolean("spliceReplace", false)
+        set(v) = sp.edit().putBoolean("spliceReplace", v).apply()
+
+    var spliceSps: SpliceSps
+        get() = SpliceSps.parse(sp.getString("spliceSps", null))
+        set(v) = sp.edit().putString("spliceSps", v.name).apply()
+
+    var spliceLight: Boolean
+        get() = sp.getBoolean("spliceLight", false)
+        set(v) = sp.edit().putBoolean("spliceLight", v).apply()
+
+    var spliceSlices: Int
+        get() = sp.getInt("spliceSlices", AaBridgeCore.SPLICE_SLICES).takeIf { it in SpliceTuning.SLICE_CHOICES } ?: AaBridgeCore.SPLICE_SLICES
+        set(v) = sp.edit().putInt("spliceSlices", v).apply()
+
+    var spliceLowDelayVui: Boolean
+        get() = sp.getBoolean("spliceLowDelayVui", false)
+        set(v) = sp.edit().putBoolean("spliceLowDelayVui", v).apply()
+
+    var spliceStamp: Boolean
+        get() = sp.getBoolean("spliceStamp", false)
+        set(v) = sp.edit().putBoolean("spliceStamp", v).apply()
+
+    var videoTsMs: Boolean
+        get() = sp.getBoolean("videoTsMs", false)
+        set(v) = sp.edit().putBoolean("videoTsMs", v).apply()
+
+    val spliceTuning: SpliceTuning
+        get() = SpliceTuning(spliceReplace, spliceSps, spliceLight, spliceSlices, spliceLowDelayVui, spliceStamp, videoTsMs)
+
     /** Прямой проброс по воздуху: свой IDR с галкой воздуха, перекодирование в настройках выключено. */
     val airPassthrough: Boolean get() = idrSplice && idrSpliceAir && !transcode
 

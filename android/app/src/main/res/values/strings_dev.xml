@@ -16,6 +16,23 @@
     <string name="dev_idr_splice_air_title">Over Wi-Fi too</string>
     <string name="dev_idr_splice_air_sub">Direct passthrough with own keyframe over the air as well, without transcoding. The Android Auto bitrate is not adjusted: if the link drops, turn it off. Requires Transcoding off</string>
     <string name="dev_sps_crop_bottom_sub">Android Auto draws the interface in the top left corner, margins go to the right and bottom. For head units that crop only the right and bottom (picture shifted down or left)</string>
+    <string name="dev_section_latency">Head unit picture latency (diagnostics)</string>
+    <string name="dev_lat_replace_title">Keyframe instead of an AA frame</string>
+    <string name="dev_lat_replace_sub">The own keyframe takes the place of the Android Auto frame it is built from instead of being an extra frame after it. The head unit gets as many frames as AA sends</string>
+    <string name="dev_lat_light_title">Light keyframe</string>
+    <string name="dev_lat_light_sub">Up to 120 KB, QP from 24: faster to build and to decode on the head unit, static areas slightly softer</string>
+    <string name="dev_lat_vui_title">SPS without reordering</string>
+    <string name="dev_lat_vui_sub">max_num_reorder_frames = 0 in the SPS sent to the head unit: its decoder may output each frame right away instead of buffering</string>
+    <string name="dev_lat_stamp_title">Time stamp in the frame</string>
+    <string name="dev_lat_stamp_sub">Phone seconds in the top right corner of the own keyframe. Film the head unit screen together with the clock below: the difference is the latency</string>
+    <string name="dev_lat_ts_title">VIDEO_DATA time stamp in milliseconds</string>
+    <string name="dev_lat_ts_sub">Like CarProjection, instead of seconds. For head units that present frames by time stamp</string>
+    <string name="dev_lat_sps_head">SPS/PPS in the own keyframe</string>
+    <string name="dev_lat_sps_alternate">Every other one (current)</string>
+    <string name="dev_lat_sps_always">Always</string>
+    <string name="dev_lat_sps_never">Never (only when recovering)</string>
+    <string name="dev_lat_slices_head">Slices in the own keyframe</string>
+    <string name="dev_lat_clock_note">Phone clock to film next to the head unit screen (same format as the stamp in the frame). Everything here is read when connecting to the head unit</string>
     <string name="dev_section_meta">Metadata on the head unit (applies after USB reconnect)</string>
     <string name="dev_meta_music_title">Music</string>
     <string name="dev_meta_music_sub">Track, cover and progress: MEDIA_INFO / MEDIA_PROGRESS_BAR</string>
