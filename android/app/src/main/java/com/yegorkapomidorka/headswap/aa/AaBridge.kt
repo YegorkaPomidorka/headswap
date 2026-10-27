@@ -620,9 +620,9 @@ class AaBridgeCore(
     fun onHuStatistic(channel: String?) {
         if (channel == DESAY_G6S_CHANNEL) huDesayG6S = true
         if (channel == HONDA_20772121_CHANNEL) huHonda20772121 = true
-        if (channel == MAZDA_20622111_CHANNEL && !huMazda20622111) {
+        if ((channel == MAZDA_20622111_CHANNEL || channel == LGE_PIVI_21110001_CHANNEL) && !huMazda20622111) {
             huMazda20622111 = true
-            log("BRIDGE ГУ Mazda 20622111: VIDEO_DATA режу на куски ≤ $MAZDA_20622111_MAX_VIDEO_PACKET Б, потолок ${MAZDA_20622111_CEILING_BPS / 1000} кбит/с", true)
+            log("BRIDGE ГУ $channel (лимит пакета 16 КиБ): VIDEO_DATA режу на куски ≤ $MAZDA_20622111_MAX_VIDEO_PACKET Б, потолок ${MAZDA_20622111_CEILING_BPS / 1000} кбит/с", true)
         }
         if (channel == VW_20082120_CHANNEL || channel == VW_CNS3_20082122_CHANNEL || channel == VW_CNS3_20082134_CHANNEL ||
             channel == VW_CNS2_20082114_CHANNEL) huVw20082120 = true
@@ -1850,6 +1850,8 @@ class AaBridgeCore(
         const val HONDA_20772121_CHANNEL = "20772121"     // Honda Civic 11 2023 (Китай, h295): после камеры/меню ГУ не просит IDR
         /** Mazda Connect 2 (Китай, CarLife 1.0, HU_INFO из заглушек, h238/h359): VIDEO_DATA 16163 Б прошёл, 16518 и 19104 Б - ГУ перестала читать USB. */
         const val MAZDA_20622111_CHANNEL = "20622111"
+        /** LGE Pivi на QNX (Range Rover Evoque, протокол 4.1): VIDEO_DATA 14380 Б прошёл, 16719-23562 Б - ГУ перестала читать USB, EIO через 12 с. Лечим флагом Mazda 20622111. */
+        const val LGE_PIVI_21110001_CHANNEL = "21110001"
         const val MAZDA_20622111_MAX_VIDEO_PACKET = 15_000
         const val MAZDA_20622111_ART_BYTES = 12_000          // обложка в MEDIA_INFO: весь пакет должен остаться < 15000 Б
         const val MAZDA_20622111_CEILING_BPS = 1_500_000  // IDR поменьше на случай, если ГУ не склеивает куски
