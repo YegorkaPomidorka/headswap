@@ -185,6 +185,11 @@ class AaBridgeCore(
         private set
     @Volatile var huMazda20622111 = false      // Mazda Connect 2 из Китая (channel 20622111, h238/h359): VIDEO_DATA > ~16 КиБ вешает чтение USB
         private set
+    @Volatile var huLgePivi21110001 = false    // LGE Pivi (Evoque, h582): лимит пакета как у Mazda 20622111, но куски кадра не склеивает
+        private set
+
+    /** Потолок битрейта ГУ с лимитом пакета 16 КиБ: у LGE Pivi ниже, чтобы кадры не вылезали за лимит (их не режем, а выбрасываем). */
+    val packetLimitCeilingBps: Int get() = if (huLgePivi21110001) LGE_PIVI_21110001_CEILING_BPS else MAZDA_20622111_CEILING_BPS
     @Volatile var musicRateProvider: () -> MusicRate = { MusicRate.DEFAULT }
     private var resampler: MusicResampler? = null    // null при 48000: PCM идёт как есть
     private var mediaRateLogged = MEDIA_RATE
@@ -377,6 +382,7 @@ class AaBridgeCore(
         huPioneerRm56 = false                  // HU_INFO придёт заново в этой сессии
         huHonda20772121 = false                // HU_INFO / STATISTIC_INFO придут заново в этой сессии
         huMazda20622111 = false                // STATISTIC_INFO придёт заново в этой сессии
+        huLgePivi21110001 = false              // STATISTIC_INFO придёт заново в этой сессии
         huVwCns2Delphi = false                 // STATISTIC_INFO придёт заново в этой сессии
         vrReply = false
         touchDecimator.reset()
@@ -620,9 +626,14 @@ class AaBridgeCore(
     fun onHuStatistic(channel: String?) {
         if (channel == DESAY_G6S_CHANNEL) huDesayG6S = true
         if (channel == HONDA_20772121_CHANNEL) huHonda20772121 = true
-        if ((channel == MAZDA_20622111_CHANNEL || channel == LGE_PIVI_21110001_CHANNEL) && !huMazda20622111) {
+        if (channel == MAZDA_20622111_CHANNEL && !huMazda20622111) {
             huMazda20622111 = true
-            log("BRIDGE ГУ $channel (лимит пакета 16 КиБ): VIDEO_DATA режу на куски ≤ $MAZDA_20622111_MAX_VIDEO_PACKET Б, потолок ${MAZDA_20622111_CEILING_BPS / 1000} кбит/с", true)
+            log("BRIDGE ГУ Mazda 20622111: VIDEO_DATA режу на куски ≤ $MAZDA_20622111_MAX_VIDEO_PACKET Б, потолок ${MAZDA_20622111_CEILING_BPS / 1000} кбит/с", true)
+        }
+        if (channel == LGE_PIVI_21110001_CHANNEL && !huLgePivi21110001) {
+            huLgePivi21110001 = true
+            huMazda20622111 = true             // обложка ≤ 12 КБ и страховка в send() - как у Mazda
+            log("BRIDGE ГУ LGE Pivi 21110001: кадр > $MAZDA_20622111_MAX_VIDEO_PACKET Б выбрасываю и жду IDR, потолок ${LGE_PIVI_21110001_CEILING_BPS / 1000} кбит/с", true)
         }
         if (channel == VW_20082120_CHANNEL || channel == VW_CNS3_20082122_CHANNEL || channel == VW_CNS3_20082134_CHANNEL ||
             channel == VW_CNS2_20082114_CHANNEL) huVw20082120 = true
@@ -1850,8 +1861,12 @@ class AaBridgeCore(
         const val HONDA_20772121_CHANNEL = "20772121"     // Honda Civic 11 2023 (Китай, h295): после камеры/меню ГУ не просит IDR
         /** Mazda Connect 2 (Китай, CarLife 1.0, HU_INFO из заглушек, h238/h359): VIDEO_DATA 16163 Б прошёл, 16518 и 19104 Б - ГУ перестала читать USB. */
         const val MAZDA_20622111_CHANNEL = "20622111"
-        /** LGE Pivi на QNX (Range Rover Evoque, протокол 4.1): VIDEO_DATA 14380 Б прошёл, 16719-23562 Б - ГУ перестала читать USB, EIO через 12 с. Лечим флагом Mazda 20622111. */
+        /**
+         * LGE Pivi на QNX (Range Rover Evoque, протокол 4.1, h582): VIDEO_DATA 14380 Б прошёл, 16719-23562 Б - ГУ перестала
+         * читать USB, EIO через 12 с. Нарезка как у Mazda держит USB, но кадр из двух кусков ГУ декодирует как два - кубики.
+         */
         const val LGE_PIVI_21110001_CHANNEL = "21110001"
+        const val LGE_PIVI_21110001_CEILING_BPS = 1_000_000  // 1,5 Мбит/с давали P-кадры до 16 КБ
         const val MAZDA_20622111_MAX_VIDEO_PACKET = 15_000
         const val MAZDA_20622111_ART_BYTES = 12_000          // обложка в MEDIA_INFO: весь пакет должен остаться < 15000 Б
         const val MAZDA_20622111_CEILING_BPS = 1_500_000  // IDR поменьше на случай, если ГУ не склеивает куски

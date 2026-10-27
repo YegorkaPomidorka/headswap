@@ -549,7 +549,7 @@ class CarLifeSession(
             // Pioneer RM56E8B (h277), Mazda 20622111 (h359): и заглушка на USB не выше потолка ГУ (без setEncoderBitrate: тут держим srcLock)
             val stubBps = when {
                 bridge.huPioneerRm56 -> minOf(mode.bitrate, AaBridgeCore.PIONEER_RM56_CEILING_BPS)
-                bridge.huMazda20622111 -> minOf(mode.bitrate, AaBridgeCore.MAZDA_20622111_CEILING_BPS)
+                bridge.huMazda20622111 -> minOf(mode.bitrate, bridge.packetLimitCeilingBps)
                 else -> mode.bitrate
             }
             val s = VideoSource(pendingW, pendingH, pendingFps, if (air) bitratePolicy.current else stubBps, this)
@@ -568,7 +568,7 @@ class CarLifeSession(
     override fun sendVideo(payload: ByteArray): Boolean {
         if (closed.get() || paused) return false
         synchronized(videoLock) {
-            if (videoOverflow()) return false
+            if (videoOverflow() || tooBigForHu(payload)) return false
             lastVideoTx = SystemClock.elapsedRealtime()
             sendVideoData(withFixedSps(payload))
             return true
@@ -580,7 +580,7 @@ class CarLifeSession(
     override fun sendVideoTakeover(payload: ByteArray): Boolean {
         if (closed.get() || paused) return false
         synchronized(videoLock) {
-            if (videoOverflow()) return false
+            if (videoOverflow() || tooBigForHu(payload)) return false
             // под тем же замком, что и onFrame заглушки: после AA-IDR ни один её кадр уже не уйдёт
             acceptEncoder = false
             lastVideoTx = SystemClock.elapsedRealtime()
@@ -588,6 +588,19 @@ class CarLifeSession(
             return true
         }
     }
+
+    /**
+     * LGE Pivi 21110001 (h582): кадр больше лимита пакета ГУ не режем (куски она декодирует как отдельные кадры - кубики),
+     * а отказываем, как при переполнении очереди: мост выбросит кадр, запросит IDR и до него P не пошлёт.
+     */
+    private fun tooBigForHu(payload: ByteArray): Boolean {
+        if (!bridge.huLgePivi21110001 || payload.size <= AaBridgeCore.MAZDA_20622111_MAX_VIDEO_PACKET) return false
+        oversizeDropped++
+        if (oversizeDropped <= 3 || oversizeDropped % 50 == 0L)
+            AppLog.i("видео: LGE Pivi, кадр ${payload.size} Б больше лимита ГУ, выбрасываю и жду IDR (всего $oversizeDropped)")
+        return true
+    }
+    private var oversizeDropped = 0L
 
     /**
      * Mazda 20622111 (h238/h359): на VIDEO_DATA больше ~16 КиБ ГУ перестаёт читать USB целиком. Кадр режется на куски
@@ -713,7 +726,7 @@ class CarLifeSession(
     private fun applyMazda20622111Ceiling() {
         if (!bridge.huMazda20622111) return
         val old = bitratePolicy.current
-        if (!bitratePolicy.lowerCeiling(AaBridgeCore.MAZDA_20622111_CEILING_BPS)) return
+        if (!bitratePolicy.lowerCeiling(bridge.packetLimitCeilingBps)) return
         AppLog.i("Mazda 20622111: потолок битрейта ${bitratePolicy.ceilingBps / 1000} кбит/с")
         if (bitratePolicy.current != old) bridge.setEncoderBitrate(bitratePolicy.current)
     }
