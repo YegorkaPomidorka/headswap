@@ -667,16 +667,40 @@ class AaMetaTest {
     fun vwId6CrozzFlagByManufacturerAndChannelAsPair() {
         val r = Rig()
         r.core.onHuInfo("VW BT 9491", "VW BT 9491")
-        r.core.onHuStatistic("20082138")                       // канал h196 к имени 9491 - не пара
+        r.core.onHuStatistic("20082134")                       // чужой канал к имени 9491 - не пара
         assertTrue("имя и канал только парой", !r.core.huVw20082138)
         r.core.onHuStatistic("20082128")
         assertTrue(r.core.huVw20082138)
         r.core.onCarlifeClosed()
         r.core.attach(MetaLink())
         assertTrue("новая сессия - флаг заново", !r.core.huVw20082138)
-        r.core.onHuInfo("VW BT 1420", "VW BT 1420")             // Павел: не в списке, потолок не нужен
+        r.core.onHuInfo("VW BT 4370", "VW BT 4370")             // 20082128 - только пара с 9491
         r.core.onHuStatistic("20082128")
         assertTrue(!r.core.huVw20082138)
+    }
+
+    @Test
+    fun vwIdFlagForAnyNameOnChannel20082138() {
+        val r = Rig()
+        r.core.onHuStatistic("20082138")
+        assertTrue("без имени не знаем, не Павел ли", !r.core.huVw20082138)
+        r.core.onHuInfo("VW BT 4370", "VW BT 4370")             // ID. UNYX 2025, 26.10.2026
+        assertTrue(r.core.huVw20082138)
+    }
+
+    @Test
+    fun vwIdFlagByCarPresetWithoutHuMatch() {
+        val r = Rig()
+        r.core.carVwId = true
+        r.core.onHuInfo("VW BT 1420", "VW BT 1420")             // пресет выбран руками - сильнее опознания
+        r.core.onHuStatistic("20082138")
+        assertTrue(r.core.huVw20082138)
+        r.core.onCarlifeClosed()
+        r.core.attach(MetaLink())
+        r.core.carVwId = false
+        r.core.onHuInfo("Honda", "CR-V")
+        r.core.onHuStatistic("20772119")
+        assertTrue("без пресета чужая ГУ мимо", !r.core.huVw20082138)
     }
 
     @Test

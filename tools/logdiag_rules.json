@@ -425,6 +425,24 @@
       "suppresses": ["usb_unstable"]
     },
     {
+      "id": "vw_id_any_idr_limit",
+      "title": "VW ID рвёт кабель на больших ключевых кадрах",
+      "title_en": "VW ID drops the cable on large keyframes",
+      "phase": "drops",
+      "category": "our_bug_fixed",
+      "score": 75,
+      "fixed_in": "2.6.1",
+      "all": [["channel", "~", "^20082138$"], ["hu", "~", "VW BT (?!1420|1538)\\d"], ["eio_sessions", ">=", 2]],
+      "advice": "Магнитола рвёт USB на ключевых кадрах больше ~600 КиБ (режимы «Широкий 976» и 1080p). До обновления выберите разрешение 720p.",
+      "advice_en": "The head unit drops USB on keyframes larger than ~600 KiB (Wide 976 and 1080p modes). Until you update, choose the 720p resolution.",
+      "what": "Магнитола рвёт USB на ключевых кадрах больше ~600 КиБ.",
+      "what_en": "The head unit drops USB on keyframes larger than ~600 KiB.",
+      "steps": [
+        {"text": "Выберите в Headswap разрешение 720p", "text_en": "In Headswap choose the 720p resolution", "action": "video"}
+      ],
+      "suppresses": ["usb_unstable"]
+    },
+    {
       "id": "vw_id6_idr_limit",
       "title": "VW ID.6 рвёт кабель на больших ключевых кадрах",
       "title_en": "VW ID.6 drops the cable on large keyframes",
