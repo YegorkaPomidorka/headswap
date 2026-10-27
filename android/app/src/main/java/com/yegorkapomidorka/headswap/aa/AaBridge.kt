@@ -2,6 +2,8 @@ package com.yegorkapomidorka.headswap.aa
 
 import com.yegorkapomidorka.headswap.AnnexB
 import java.util.concurrent.CountDownLatch
+import java.util.concurrent.Executor
+import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import java.util.concurrent.ScheduledExecutorService
 import java.util.concurrent.TimeUnit
@@ -1471,7 +1473,7 @@ class AaBridgeCore(
         aaVideoSeen = true
         AaState.frames.incrementAndGet()
         AaState.bytes += annexB.size
-        if (splicePendingSeq != 0L) {
+        if (splicePendingSeq != 0L && spliceHold) {
             spliceHeld.add(annexB)              // свой IDR собирается из последней картинки: новые кадры ждут его
             return
         }
@@ -1487,7 +1489,9 @@ class AaBridgeCore(
         }
         val b = spliced ?: AnnexB.normalize(annexB)
         val types = AnnexB.nalTypes(b)
-        lastAaFrameAt = clockMs()
+        val frameAt = clockMs()
+        aaFrameGapMs = if (lastAaFrameAt > 0) frameAt - lastAaFrameAt else Long.MAX_VALUE
+        lastAaFrameAt = frameAt
         aaFrames++
         val t = transcoder
         if (t != null) {
@@ -1495,7 +1499,7 @@ class AaBridgeCore(
             return
         }
         passthroughFrame(b, types)
-        if (spliceOn) spliceRequest()
+        if (spliceOn) spliceRequest(fromFrame = true)
     }
 
     private fun passthroughFrame(b: ByteArray, types: List<Int>) {
@@ -1623,24 +1627,31 @@ class AaBridgeCore(
     @Volatile private var refOutSeq = 0L               // последняя картинка на выходе декодера (скопирована или нет)
     @Volatile private var refPic: IdrSplice.Picture? = null
     @Volatile private var refPicSeq = 0L
-    @Volatile private var splicePendingSeq = 0L        // ждём картинку этого номера для своего IDR; 0 - не ждём
+    @Volatile private var splicePendingSeq = 0L        // картинка для своего IDR: ждём её из декодера или собираем; 0 - нет
     private var splicePendingAt = 0L
+    private var spliceHold = false                     // кадры AA ждут IDR (AA шлёт кадры); иначе сборка в фоне
     private var spliceBuilding = false
     private var spliceNotBefore = NEVER                // следующая попытка не раньше (после отказа, пропуска, таймаута)
     private var spliceBlockLogged: String? = null
-    private var spliceBigLogged = 0
-    private val spliceHeld = ArrayList<ByteArray>()     // кадры AA, пришедшие, пока собирается свой IDR
+    private val spliceHeld = ArrayList<ByteArray>()     // кадры AA, пришедшие, пока собирается свой IDR (spliceHold)
     private var spliceLastSentAt = NEVER               // когда свой IDR последний раз ушёл на ГУ
-    private var spliceMisses = 0                       // таймаутов картинки подряд
+    private var spliceMisses = 0                       // картинка не пришла из декодера, подряд
     private var spliceDisabled: String? = null          // вставка невозможна до конца AA-сессии (причина)
+    private var aaFrameGapMs = Long.MAX_VALUE          // пауза перед последним кадром AA
+    private var builder: IdrBuilder? = null
+    private val spliceStats = SpliceStats()
+
+    /** Нить сборки своего IDR; null - своя, создаётся при первой сборке. Тесты ставят исполнитель в той же нити. */
+    var spliceExecutor: Executor? = null
+
+    /** Пул для слайсов IDR; null - свой на [SPLICE_SLICES] нитей. */
+    var spliceSlicePool: ExecutorService? = null
 
     private val spliceOn: Boolean get() = idrSpliceMs > 0 && !transcodeEnabled
 
     /** Свой IDR реально возможен: декодер уже отдал картинку, поток подходит. Тогда повторный IDR от AA (встряска) не нужен. */
     private val spliceWorks: Boolean
         get() = spliceOn && spliceDisabled == null && refDecoder != null && refPicSeq > 0 && splicer?.blocker() == null
-
-    private class SpliceJob(val seq: Long, val sp: IdrSplicer, val pic: IdrSplice.Picture)
 
     /** Кадр AA через splicer (frame_num/POC после своего IDR) и в декодер опорных картинок. */
     private fun spliceTrack(b: ByteArray): ByteArray {
@@ -1666,8 +1677,13 @@ class AaBridgeCore(
         return out
     }
 
-    /** Пора ли заменить последнюю картинку AA своим IDR: по периоду, а без IDR на ГУ - сразу (с паузой между попытками). */
-    private fun spliceRequest() {
+    /**
+     * Пора ли заменить последнюю картинку AA своим IDR: по периоду, а без IDR на ГУ - сразу (с паузой между попытками).
+     * IDR должен идти сразу за своей картинкой: иначе ГУ продолжит P-кадры AA от другого кадра и в движении поедет картинка.
+     * Поэтому, если AA шлёт кадры (пауза перед кадром меньше [SPLICE_QUIET_MS]), кадры ждут сборку (не дольше
+     * [SPLICE_HOLD_MAX_MS]); на статике IDR собирается в фоне, а пришедший за это время кадр делает его устаревшим.
+     */
+    private fun spliceRequest(fromFrame: Boolean) {
         if (splicePendingSeq != 0L || spliceDisabled != null || !carlifeStarted || active != Source.AA) return
         val sp = splicer ?: return
         if (refDecoder == null || sp.seq == 0L || sp.seq - refOutSeq > 2) return     // декодер отстал или ждёт IDR
@@ -1683,17 +1699,26 @@ class AaBridgeCore(
         }
         splicePendingSeq = sp.seq
         splicePendingAt = now
+        spliceHold = if (fromFrame) aaFrameGapMs < SPLICE_QUIET_MS else now - lastAaFrameAt < SPLICE_QUIET_MS
     }
 
     private fun spliceTick(now: Long) {
-        if (splicePendingSeq != 0L && !spliceBuilding && now - splicePendingAt > SPLICE_WAIT_MS) {
-            log("BRIDGE свой IDR: картинка #$splicePendingSeq не пришла из декодера за $SPLICE_WAIT_MS мс, пропускаю", true)
+        val seq = splicePendingSeq
+        if (seq != 0L && !spliceBuilding && refPicSeq != seq && now - splicePendingAt > SPLICE_WAIT_MS) {
+            log("BRIDGE свой IDR: картинка #$seq не пришла из декодера за $SPLICE_WAIT_MS мс, пропускаю", true)
+            spliceStats.noPicture++
             spliceNotBefore = now + SPLICE_RETRY_MS
             spliceCancel(null)
             if (++spliceMisses >= SPLICE_MAX_MISSES) spliceDisable("картинка из декодера не пришла $spliceMisses раз подряд")
-            return
+        } else if (seq != 0L && spliceHold && now - splicePendingAt > SPLICE_HOLD_MAX_MS) {
+            // сборка не успела: кадры AA уходят, IDR по готовности выбрасывается (splicePendingSeq сброшен)
+            spliceStats.holdTimeout++
+            spliceNotBefore = now + SPLICE_RETRY_MS
+            spliceCancel(null)
+        } else {
+            spliceRequest(fromFrame = false)
         }
-        spliceRequest()
+        spliceStats.logIfDue(now, builder?.qp)
     }
 
     override fun wantsRefPicture(seq: Long): Boolean {
@@ -1720,68 +1745,95 @@ class AaBridgeCore(
     override fun onRefPicture(seq: Long, pic: IdrSplice.Picture) {
         refPic = pic
         refPicSeq = seq
-        if (seq == splicePendingSeq) spliceRun()      // нить декодера: кадры AA ждут, новых картинок не будет
+        if (seq == splicePendingSeq) spliceRun()
     }
 
-    /** Собрать свой IDR, если картинка для него уже есть. Вне блокировки ядра; сборка 5-50 мс. */
+    /** Отдать сборку своего IDR на её нить, если картинка уже есть. Зовётся вне блокировки ядра. */
     private fun spliceRun() {
-        val job = synchronized(this) {
+        val task = synchronized(this) {
             val seq = splicePendingSeq
             val ready = refPicSeq == seq                // сначала номер, потом картинка: она не старше номера
             val pic = refPic
             val sp = splicer
-            if (seq == 0L || spliceBuilding || !ready || pic == null || sp == null) null
-            else {
-                spliceBuilding = true
-                SpliceJob(seq, sp, pic)
+            if (seq == 0L || spliceBuilding || !ready || pic == null || sp == null) return
+            val job = sp.prepare()
+            if (job == null || job.seq != seq) {
+                // в фоне: AA прислал кадр раньше, чем декодер отдал картинку
+                spliceStats.stale++
+                spliceNotBefore = clockMs() + SPLICE_RETRY_MS
+                spliceCancel(null)
+                return
             }
-        } ?: return
-        val t0 = clockMs()
-        val r = try {
-            job.sp.build(job.pic)
-        } catch (e: RuntimeException) {
-            log("BRIDGE свой IDR: !!!!!! сборка упала: ${e.javaClass.simpleName}: ${e.message}", true)
-            null
+            spliceBuilding = true
+            val b = builder ?: IdrBuilder(spliceSlicePool ?: newSlicePool(), SPLICE_SLICES).also { builder = it }
+            val exec = spliceExecutor ?: newBuildThread()
+            Triple(job, b, exec) to pic
         }
-        spliceComplete(job.seq, r, clockMs() - t0)
+        val (job, b, exec) = task.first
+        // копия: в фоне декодер может писать в тот же буфер следующую картинку (тогда этот IDR и так устареет)
+        val pic = task.second.copy()
+        exec.execute {
+            val t0 = clockMs()
+            val r = try {
+                b.build(job, pic)
+            } catch (e: RuntimeException) {
+                log("BRIDGE свой IDR: !!!!!! сборка упала: ${e.javaClass.simpleName}: ${e.message}", true)
+                null
+            }
+            spliceComplete(job, r, clockMs() - t0)
+        }
     }
 
+    private fun newBuildThread(): Executor =
+        Executors.newSingleThreadExecutor { r -> Thread(r, "aa-idr-build").also { it.isDaemon = true } }.also { spliceExecutor = it }
+
+    private fun newSlicePool(): ExecutorService =
+        Executors.newFixedThreadPool(SPLICE_SLICES) { r -> Thread(r, "aa-idr-slice").also { it.isDaemon = true } }.also { spliceSlicePool = it }
+
     @Synchronized
-    private fun spliceComplete(seq: Long, r: IdrSplice.Result?, buildMs: Long) {
+    private fun spliceComplete(job: IdrSplicer.Job, r: IdrSplice.Result?, buildMs: Long) {
         spliceBuilding = false
-        if (splicePendingSeq != seq) return            // отменён (CarLife/AA сменились), кадры уже отпущены
-        spliceMisses = 0
+        if (splicePendingSeq != job.seq) return        // отменён (держали дольше потолка, новая сессия): кадры уже отпущены
         val now = clockMs()
         spliceNotBefore = now + SPLICE_RETRY_MS
+        spliceMisses = 0
+        spliceStats.build(buildMs)
         val sp = splicer
-        if (r != null && sp != null && carlifeStarted && active == Source.AA) {
-            if (r.nal.size > SPLICE_MAX_BYTES) {
-                if (spliceBigLogged++ % 30 == 0) log("BRIDGE свой IDR ${r.nal.size} Б больше $SPLICE_MAX_BYTES Б (буфер ГУ), пропускаю (I16x16 ${r.i16}, PCM ${r.pcm})", true)
+        when {
+            r == null || sp == null || !carlifeStarted || active != Source.AA -> {}
+            sp.seq != job.seq -> spliceStats.stale++    // в фоне: пока собирали, AA прислал кадр
+            r.nal.size > SPLICE_MAX_BYTES -> {
+                spliceStats.big++
                 if (gotIdr) spliceNotBefore = now + idrSpliceMs      // картинка та же или похожая: не собирать каждую секунду
-            } else {
-                // SPS/PPS через раз: Honda после сброса ждёт их в кадре (h295), Java-ГУ CarLife в сбросе берёт только голый IDR
-                val cfg = aaConfig
-                val glued = sp.spliced % 2 == 0L && cfg != null
-                val payload = if (glued) spsCrop(AnnexB.glue(cfg!!, r.nal)) else r.nal
-                if (link.sendVideo(payload)) {
-                    sp.commit()
-                    spliceLastSentAt = now
-                    val recovered = !gotIdr
-                    gotIdr = true
-                    waitSince = 0
-                    sent++
-                    idrSent++
-                    lastIdrSentMs = now
-                    if (recovered || sp.spliced <= 5 || sp.spliced % 30 == 0L) {
-                        log("BRIDGE свой IDR #${sp.spliced}${if (recovered) " (ГУ была без IDR)" else ""}: ${payload.size} Б, " +
-                            "I16x16 ${r.i16} / PCM ${r.pcm}, сборка $buildMs мс, ${if (glued) "с SPS/PPS" else "голый"}, ждали ${now - splicePendingAt} мс", true)
-                    }
-                } else {
-                    log("BRIDGE свой IDR ${payload.size} Б не принят CarLife (очередь/закрыто)", true)
-                }
             }
+            else -> spliceSend(sp, job, r, buildMs, now)
         }
         spliceCancel(null)
+    }
+
+    private fun spliceSend(sp: IdrSplicer, job: IdrSplicer.Job, r: IdrSplice.Result, buildMs: Long, now: Long) {
+        // SPS/PPS через раз: Honda после сброса ждёт их в кадре (h295), Java-ГУ CarLife в сбросе берёт только голый IDR
+        val cfg = aaConfig
+        val glued = sp.spliced % 2 == 0L && cfg != null
+        val payload = if (glued) spsCrop(AnnexB.glue(cfg!!, r.nal)) else r.nal
+        if (!link.sendVideo(payload)) {
+            log("BRIDGE свой IDR ${payload.size} Б не принят CarLife (очередь/закрыто)", true)
+            return
+        }
+        sp.commit(job)
+        spliceStats.sent++
+        spliceLastSentAt = now
+        val recovered = !gotIdr
+        gotIdr = true
+        waitSince = 0
+        sent++
+        idrSent++
+        lastIdrSentMs = now
+        if (recovered || sp.spliced <= 5 || sp.spliced % 30 == 0L) {
+            log("BRIDGE свой IDR #${sp.spliced}${if (recovered) " (ГУ была без IDR)" else ""}: ${payload.size} Б, " +
+                (if (r.qp < 0) "без потерь (PCM ${r.pcm})" else "QP ${r.qp}") + ", сборка $buildMs мс, " +
+                (if (spliceHold) "кадры AA ждали ${now - splicePendingAt} мс" else "в фоне") + ", ${if (glued) "с SPS/PPS" else "голый"}", true)
+        }
     }
 
     /** Больше не ждём картинку: придержанные кадры AA уходят своим путём (могут снова встать в очередь за новым IDR). */
@@ -1789,12 +1841,14 @@ class AaBridgeCore(
         if (splicePendingSeq == 0L) return
         if (why != null) log("BRIDGE свой IDR отменён: $why", false)
         splicePendingSeq = 0
+        spliceHold = false
         while (spliceHeld.isNotEmpty() && splicePendingSeq == 0L) aaFrame(spliceHeld.removeAt(0), 0)
     }
 
     /** Новая AA-сессия: поток с нуля, декодер пересоздаётся. Придержанные кадры старого потока выбрасываются. */
     private fun spliceReset() {
         splicePendingSeq = 0
+        spliceHold = false
         spliceHeld.clear()
         splicer = null
         refDecoder?.stop()
@@ -1808,6 +1862,38 @@ class AaBridgeCore(
         refPic = null
         refPicSeq = 0
         spliceBlockLogged = null
+    }
+
+    /** Сводка своего IDR раз в [SPLICE_STATS_MS]: в лог попадает всё, а не каждая N-я строка. */
+    private inner class SpliceStats {
+        var sent = 0
+        var stale = 0
+        var big = 0
+        var holdTimeout = 0
+        var noPicture = 0
+        private var builds = 0
+        private var buildSum = 0L
+        private var buildMax = 0L
+        private var since = NEVER
+
+        fun build(ms: Long) {
+            builds++
+            buildSum += ms
+            buildMax = maxOf(buildMax, ms)
+        }
+
+        fun logIfDue(now: Long, qp: Int?) {
+            if (since == NEVER) since = now
+            if (now - since < SPLICE_STATS_MS) return
+            if (sent + stale + big + holdTimeout + noPicture > 0) {
+                log("BRIDGE свой IDR за ${(now - since) / 1000} с: ушло $sent, устарел (AA прислал кадр) $stale, больше $SPLICE_MAX_BYTES Б $big, " +
+                    "держали кадры дольше $SPLICE_HOLD_MAX_MS мс $holdTimeout, без картинки $noPicture; сборка " +
+                    (if (builds > 0) "ср ${buildSum / builds} мс, макс $buildMax мс" else "-") + (if (qp != null) ", QP $qp" else ""), true)
+            }
+            sent = 0; stale = 0; big = 0; holdTimeout = 0; noPicture = 0
+            builds = 0; buildSum = 0; buildMax = 0
+            since = now
+        }
     }
 
     // --- перекодирование ---
@@ -2184,7 +2270,11 @@ class AaBridgeCore(
 
         /** Свой IDR: не больше этого (буфер приёма C++-ГУ CarLife 600 КиБ, docs/carlife-protocol.md §6). */
         const val SPLICE_MAX_BYTES = 560_000
-        const val SPLICE_WAIT_MS = 300L          // картинку из декодера ждём не дольше, кадры AA всё это время придержаны
+        const val SPLICE_WAIT_MS = 300L          // картинку из декодера ждём не дольше
+        const val SPLICE_QUIET_MS = 200L         // пауза в кадрах AA, после которой IDR собирается в фоне, без держания кадров
+        const val SPLICE_HOLD_MAX_MS = 250L      // дольше кадры AA не держим: отпускаем, IDR по готовности выбрасывается
+        const val SPLICE_SLICES = 4              // слайсов в сжатом IDR: собираются параллельно
+        const val SPLICE_STATS_MS = 30_000L
         const val SPLICE_MAX_MISSES = 3          // таймаутов картинки подряд - вставка выключается до конца AA-сессии
         const val SPLICE_KICK_GRACE_MS = 1500L   // h529-повтор IDR от AA откладывается на столько, если свой IDR вот-вот уйдёт
         const val SPLICE_RETRY_MS = 1000L        // пауза между попытками (без IDR на ГУ, после отказа, пропуска, таймаута)

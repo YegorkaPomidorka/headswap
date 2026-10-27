@@ -10,6 +10,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.ByteArrayOutputStream
 import java.util.concurrent.CopyOnWriteArrayList
+import java.util.concurrent.Executor
 
 /**
  * Поток <name>_in.annexb: x264 Baseline, 12 кадров, 2 слайса на кадр, IDR только первый; слева testsrc2, справа заливка
@@ -164,6 +165,51 @@ class IdrSpliceTest {
         assertTrue(r2.nal.size >= w * h * 3 / 2)
     }
 
+    /**
+     * IDR со сжатием (цель 1500 Б, 2 слайса): idr_splice_lossy_out.annexb проверен ffmpeg (-err_detect explode): декодируется,
+     * наш IDR без деблокинга = реконструкция кодера бит-в-бит, кадры после IDR ~48 дБ к исходным.
+     */
+    @Test
+    fun lossyIdrMatchesFfmpegVerifiedStream() {
+        val sp = IdrSplicer()
+        val b = IdrBuilder(null, 2, 1500)
+        val out = ByteArrayOutputStream()
+        val (cfg, aus) = SpliceAssets.split()
+        sp.onConfig(cfg)
+        out.write(cfg)
+        for ((k, au) in aus.withIndex()) {
+            out.write(sp.process(au))
+            if (k > 0 && k % 5 == 0) {
+                val job = sp.prepare()!!
+                val r = b.build(job, SpliceAssets.picture(k))
+                assertEquals(22, r.qp)
+                out.write(r.nal)
+                sp.commit(job)
+            }
+        }
+        fun stream(x: ByteArray) = IdrSplicer.nals(x).filter { it[0].toInt() and 0x1F != 6 }.map { it.toList() }
+        val want = SpliceStream::class.java.getResourceAsStream("/aa/idr_splice_lossy_out.annexb")!!.readBytes()
+        assertEquals(stream(want), stream(out.toByteArray()))
+    }
+
+    @Test
+    fun builderRaisesQpWhenOverTargetAndKeepsLosslessWhenCheap() {
+        val (cfg, aus) = SpliceAssets.split()
+        val sp = IdrSplicer()
+        sp.onConfig(cfg)
+        sp.process(aus[0])
+        val pic = SpliceAssets.picture(0)
+        assertEquals(-1, IdrBuilder(null, 1).build(sp.prepare()!!, pic).qp)       // без потерь влезает в 300 КБ
+        val job = sp.prepare()!!
+        val atStart = IdrIntra.encode(pic, job.sps, job.pps, job.idrPicId, IdrBuilder.START_QP, 1, null).slices.sumOf { it.size + 4 }
+        assertTrue("$atStart Б", atStart > 600)
+        val tight = IdrBuilder(null, 1, 600)
+        val r = tight.build(job, pic)
+        assertTrue("QP ${r.qp}", r.qp > IdrBuilder.START_QP)
+        assertTrue("${r.nal.size} Б при QP ${r.qp}, на старте $atStart Б", r.nal.size < atStart)
+        assertEquals(r.qp, tight.qp)                            // следующий кадр начнёт с того же QP
+    }
+
     @Test
     fun manyReferenceFramesAreRefused() {
         val sp = IdrSplicer()
@@ -199,10 +245,14 @@ class IdrSpliceBridgeTest {
     private val logs = CopyOnWriteArrayList<String>()
     private val dec = FakeRefDecoder()
     private var factoryCalls = 0
+    /** Сборка своего IDR: по умолчанию сразу в той же нити; queueBuilds - в очередь, тест запускает её сам. */
+    private var queueBuilds = false
+    private val builds = ArrayList<Runnable>()
     private val core = AaBridgeCore({ l, _ -> logs.add(l) }, { now }).also {
         it.transcodeEnabled = false
         it.idrSpliceMs = 2000
         it.refDecoderFactory = { _ -> factoryCalls++; dec }
+        it.spliceExecutor = Executor { r -> if (queueBuilds) builds.add(r) else r.run() }
         it.attach(link)
     }
     private val split = SpliceAssets.split()
@@ -233,24 +283,68 @@ class IdrSpliceBridgeTest {
         assertEquals(listOf(1L, 2L, 3L, 4L), dec.fed)
         assertTrue(logs.toString(), logs.any { it.contains("свой IDR: включён") })
         passed(4)
-        now += 2000
-        core.onFrame(aus[4], 4)                                 // пора: картинка #5 станет нашим IDR
-        assertEquals(5, link.sent.size)
-        core.onFrame(aus[5], 5)                                 // придержан до IDR
-        assertEquals(5, link.sent.size)
-        assertEquals(5, dec.fed.size)                           // и в декодер пока не ушёл
-        decoded(5)
-        assertEquals(7, link.sent.size)
-        assertEquals(listOf(7, 8, 5), SpliceAssets.nalTypes(link.sent[5]))     // первый свой IDR - с SPS/PPS
-        assertFalse(aus[5].contentEquals(link.sent[6]))         // frame_num сдвинут
-        assertEquals(listOf(1, 1), SpliceAssets.nalTypes(link.sent[6]))
-        assertEquals(6, dec.fed.size)
-        assertTrue(logs.toString(), logs.any { it.contains("свой IDR #1") })
+        now = 1990
+        core.onFrame(aus[4], 4)                                 // ещё не пора
+        passed(5)
+        now = 2000
+        core.onFrame(aus[5], 5)                                 // AA шлёт кадры: картинка #6 станет нашим IDR, кадры ждут
+        assertEquals(6, link.sent.size)
+        core.onFrame(aus[6], 6)                                 // придержан до IDR
+        assertEquals(6, link.sent.size)
+        assertEquals(6, dec.fed.size)                           // и в декодер пока не ушёл
+        decoded(6)
+        assertEquals(8, link.sent.size)
+        assertEquals(listOf(7, 8, 5), SpliceAssets.nalTypes(link.sent[6]))     // первый свой IDR - с SPS/PPS
+        assertFalse(aus[6].contentEquals(link.sent[7]))         // frame_num сдвинут
+        assertEquals(listOf(1, 1), SpliceAssets.nalTypes(link.sent[7]))
+        assertEquals(7, dec.fed.size)
+        assertTrue(logs.toString(), logs.any { it.contains("свой IDR #1") && it.contains("кадры AA ждали") })
         // следующий - через 2 с, голый
-        now += 2000
-        core.onFrame(aus[6], 6)
-        decoded(7)
+        passed(7)
+        now = 3990
+        core.onFrame(aus[7], 7)
+        passed(8)
+        now = 4000
+        core.onFrame(aus[8], 8)
+        decoded(9)
         assertEquals(listOf(5), SpliceAssets.nalTypes(link.sent.last()))
+    }
+
+    /** Статика: IDR собирается в фоне, но AA прислал кадр раньше - IDR устарел и не уходит, кадры не держались. */
+    @Test
+    fun backgroundIdrIsDroppedWhenAaSendsFrameMeanwhile() {
+        startWith(3)
+        decoded(3)
+        queueBuilds = true
+        now = 2000; core.tick()                                 // экран стоит 2 с: сборка в фоне
+        assertEquals(1, builds.size)
+        core.onFrame(aus[3], 3)                                 // не придержан
+        assertEquals(4, link.sent.size)
+        builds.removeAt(0).run()
+        assertEquals(4, link.sent.size)                         // устаревший IDR не ушёл
+        assertArrayEquals(aus[3], link.sent.last())             // и frame_num не сдвигается
+        now = 32_000; core.tick()
+        assertTrue(logs.toString(), logs.any { it.contains("за 30 с") && it.contains("устарел (AA прислал кадр) 1") })
+    }
+
+    /** Сборка дольше потолка: кадры AA уходят как есть, готовый IDR выбрасывается. */
+    @Test
+    fun slowBuildReleasesHeldFrames() {
+        startWith(3)
+        passed(3)
+        now = 1990; core.onFrame(aus[3], 3)
+        passed(4)
+        now = 2000; core.onFrame(aus[4], 4)                      // кадры идут: держим
+        queueBuilds = true
+        core.onFrame(aus[5], 5)
+        decoded(5)
+        assertEquals(1, builds.size)
+        assertEquals(5, link.sent.size)
+        now = 2300; core.tick()
+        assertEquals(6, link.sent.size)
+        assertArrayEquals(aus[5], link.sent.last())
+        builds.removeAt(0).run()
+        assertEquals(6, link.sent.size)
     }
 
     @Test
@@ -295,11 +389,13 @@ class IdrSpliceBridgeTest {
     fun missingPictureReleasesHeldFrames() {
         startWith(3)
         passed(3)
-        now += 2000
+        now = 1990
         core.onFrame(aus[3], 3)
+        passed(4)
+        now = 2000
         core.onFrame(aus[4], 4)
         core.onFrame(aus[5], 5)
-        assertEquals(4, link.sent.size)
+        assertEquals(5, link.sent.size)
         now += 400; core.tick()
         assertEquals(6, link.sent.size)
         assertArrayEquals(aus[5], link.sent.last())              // нашего IDR не было: кадры как есть

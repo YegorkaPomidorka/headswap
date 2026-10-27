@@ -23,13 +23,16 @@ object IdrSplice {
 
     class Pps(
         val id: Int, val spsId: Int, val cabac: Boolean, val bottomPoc: Boolean, val sliceGroups: Int,
-        val initQp: Int, val dbkCtrl: Boolean, val redundant: Boolean,
+        val initQp: Int, val dbkCtrl: Boolean, val redundant: Boolean, val chromaQpOffset: Int = 0,
     )
 
     /** Картинка I420 кодированного размера (с полями под кроп SPS), строки без выравнивания. */
-    class Picture(val width: Int, val height: Int, val y: ByteArray, val u: ByteArray, val v: ByteArray)
+    class Picture(val width: Int, val height: Int, val y: ByteArray, val u: ByteArray, val v: ByteArray) {
+        fun copy() = Picture(width, height, y.copyOf(), u.copyOf(), v.copyOf())
+    }
 
-    class Result(val nal: ByteArray, val i16: Int, val pcm: Int)
+    /** Свой IDR: NAL-ы (Annex-B у [IdrSplicer.build], без старт-кода у buildIdr). qp = -1 - без потерь, иначе QP сжатия. */
+    class Result(val nal: ByteArray, val i16: Int, val pcm: Int, val qp: Int = -1)
 
     private val HIGH_PROFILES = setOf(100, 110, 122, 244, 44, 83, 86, 118, 128, 138, 139, 134, 135)
 
@@ -85,11 +88,12 @@ object IdrSplice {
         r.ue(); r.ue()                                  // num_ref_idx_l0/l1_default_active_minus1
         r.skip(3)                                       // weighted_pred_flag, weighted_bipred_idc
         val initQp = 26 + r.se()
-        r.se(); r.se()                                  // pic_init_qs, chroma_qp_index_offset
+        r.se()                                          // pic_init_qs
+        val cqp = r.se()
         val dbk = r.u(1) == 1
         r.skip(1)                                       // constrained_intra_pred_flag: у нас все макроблоки intra
         val redundant = r.u(1) == 1
-        return Pps(id, spsId, cabac, bottomPoc, groups, initQp, dbk, redundant)
+        return Pps(id, spsId, cabac, bottomPoc, groups, initQp, dbk, redundant, cqp)
     }
 
     /** Почему по этим SPS/PPS свой IDR не собрать; null - можно. */
@@ -104,6 +108,15 @@ object IdrSplice {
     }
 
     /** IDR (NAL без стартового кода, с эмуляцией) с картинкой pic; idrPicId меняется от IDR к IDR. */
+    /** Сколько макроблоков IDR без потерь уйдёт в I_PCM (остальные - I16x16 без остатка, по 2-3 байта). */
+    fun pcmCount(pic: Picture, sps: Sps): Int {
+        var n = 0
+        for (my in 0 until sps.hMbs) for (mx in 0 until sps.wMbs) {
+            if (Intra.luma16(pic, mx, my) < 0 || Intra.chroma(pic, mx, my) < 0) n++
+        }
+        return n
+    }
+
     fun buildIdr(pic: Picture, sps: Sps, pps: Pps, idrPicId: Int, useI16: Boolean = true): Result {
         require(pic.width == sps.codedW && pic.height == sps.codedH) { "картинка ${pic.width}x${pic.height}, в SPS ${sps.codedW}x${sps.codedH}" }
         val w = BitOut(sps.wMbs * sps.hMbs * 200 + 64)
@@ -289,7 +302,7 @@ object IdrSplice {
     }
 
     /** Запись битов в растущий буфер; PCM-байты на выровненной позиции копируются целиком. */
-    private class BitOut(cap: Int) {
+    internal class BitOut(cap: Int) {
         private var buf = ByteArray(cap)
         private var len = 0
         private var cur = 0
@@ -419,20 +432,41 @@ class IdrSplicer {
         return sps.codedW to sps.codedH
     }
 
-    /** Наш IDR с картинкой pic (декодированная последняя картинка AA), Annex-B с 4-байтным старт-кодом. Только при blocker() == null. */
-    fun build(pic: IdrSplice.Picture): IdrSplice.Result {
+    /** Снимок для сборки своего IDR на другой нити: параметры потока у картинки seq. */
+    class Job internal constructor(
+        val seq: Long, internal val sps: IdrSplice.Sps, internal val pps: IdrSplice.Pps,
+        internal val idrPicId: Int, internal val fn: Int, internal val poc: Int,
+    )
+
+    /** Снимок для последней картинки AA; null - вставка сейчас невозможна ([blocker]). */
+    fun prepare(): Job? {
+        if (blocker() != null) return null
         val pps = lastPps!!
-        val r = IdrSplice.buildIdr(pic, spsMap[pps.spsId]!!, pps, idrPicId and 0xFFFF)
+        return Job(seq, spsMap[pps.spsId]!!, pps, idrPicId and 0xFFFF, lastFn, lastPoc)
+    }
+
+    /** IDR без потерь с картинкой pic (декодированная последняя картинка AA), Annex-B. Только при blocker() == null. */
+    fun build(pic: IdrSplice.Picture): IdrSplice.Result {
+        val job = prepare()!!
+        val r = IdrSplice.buildIdr(pic, job.sps, job.pps, job.idrPicId)
         return IdrSplice.Result(START + r.nal, r.i16, r.pcm)
     }
 
     /** Наш IDR ушёл на ГУ вместо последней картинки: следующие кадры AA считаются от него. */
     fun commit() {
-        idrPicId++
+        commit(prepare()!!)
+    }
+
+    /**
+     * Наш IDR по снимку job ушёл на ГУ. Картинка job должна быть последней от AA (между ней и IDR кадров не было).
+     * job.fn/poc - исходные поля AA, поэтому повторный IDR той же картинки (статичный экран) даёт тот же сдвиг.
+     */
+    fun commit(job: Job) {
+        check(job.seq == seq) { "свой IDR #${job.seq} устарел: последняя картинка #$seq" }
+        idrPicId = job.idrPicId + 1
         spliced++
-        // lastFn/lastPoc - исходные поля AA, поэтому повторный IDR той же картинки (статичный экран) даёт тот же сдвиг
-        fnOff = lastFn
-        pocOff = lastPoc
+        fnOff = job.fn
+        pocOff = job.poc
     }
 
     private class Header(val firstMb: Int, val pps: IdrSplice.Pps, val fnPos: Int, val fn: Int, val pocPos: Int, val poc: Int)
@@ -537,4 +571,51 @@ interface RefPictureDecoder {
     fun feed(annexB: ByteArray, seq: Long)
 
     fun stop()
+}
+
+/**
+ * Сборка своего IDR по снимку [IdrSplicer.Job] на нити сборки. Если IDR без потерь (I_PCM / I16x16 без остатка) не больше
+ * [target] - он: картинка на ГУ бит-в-бит. Иначе сжатый ([IdrIntra]) на [slices] слайсах: QP от прошлого кадра,
+ * не влез - QP выше (до 3 попыток), сильно меньше цели - в следующий раз QP ниже. В статичных местах ГУ показывает
+ * картинку этого IDR до следующего IDR, поэтому QP держится низким, насколько позволяет размер.
+ */
+class IdrBuilder(
+    private val pool: java.util.concurrent.ExecutorService?,
+    private val slices: Int,
+    val target: Int = TARGET_BYTES,
+) {
+    @Volatile var qp = START_QP
+        private set
+
+    fun build(job: IdrSplicer.Job, pic: IdrSplice.Picture): IdrSplice.Result {
+        val sps = job.sps
+        val mbs = sps.wMbs * sps.hMbs
+        val pcm = IdrSplice.pcmCount(pic, sps)
+        if (pcm * PCM_BYTES + (mbs - pcm) * 3 + 64 <= target) {
+            val r = IdrSplice.buildIdr(pic, sps, job.pps, job.idrPicId)
+            return IdrSplice.Result(START + r.nal, r.i16, r.pcm)
+        }
+        var q = qp
+        var nal: ByteArray
+        var attempt = 0
+        while (true) {
+            val c = IdrIntra.encode(pic, sps, job.pps, job.idrPicId, q, slices, pool)
+            nal = IdrSplicer.join(c.slices)
+            if (nal.size <= target || ++attempt >= 3 || q >= MAX_QP) break
+            // размер падает примерно вдвое на +6 QP
+            val step = Math.ceil(6 * Math.log(nal.size.toDouble() / target) / Math.log(2.0)).toInt().coerceIn(2, 12)
+            q = (q + step).coerceAtMost(MAX_QP)
+        }
+        qp = if (nal.size < target / 2) (q - 2).coerceAtLeast(MIN_QP) else q
+        return IdrSplice.Result(nal, mbs, 0, q)
+    }
+
+    companion object {
+        const val TARGET_BYTES = 300_000        // с запасом до буфера ГУ (SPLICE_MAX_BYTES в мосте)
+        const val START_QP = 22
+        const val MIN_QP = 18
+        const val MAX_QP = 40
+        private const val PCM_BYTES = 388
+        private val START = byteArrayOf(0, 0, 0, 1)
+    }
 }
