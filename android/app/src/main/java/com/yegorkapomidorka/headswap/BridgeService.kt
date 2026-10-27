@@ -811,9 +811,12 @@ class BridgeService : Service() {
         }
         // на воздухе перекодирование обязательно: в passthrough битрейт не регулируется. Режим хоста не трогаем
         // (без перекодирования он уже R720, его можно перекодировать), хост не пересоздаём: сервер AA одноразовый.
-        // Старый режим живого хоста с кропом (WIDE*, R1024) в passthrough живёт только с SPS-кропом (h529): иначе перекодирование
+        // Старый режим живого хоста с кропом (WIDE*, R1024) в passthrough живёт только с SPS-кропом (h529): иначе перекодирование.
+        // Исключение - свой IDR с галкой «и по Wi-Fi» (эксперимент): битрейт AA как есть, ГУ восстанавливается нашим IDR
         val hostMode = h.core.videoMode
-        val transcode = aaPrefs.transcode || transport.caps == TransportCaps.TCP6 ||
+        val air = transport.caps == TransportCaps.TCP6
+        if (air && aaPrefs.airPassthrough) AppLog.i("BRIDGE видео: воздух, прямой проброс со своим IDR (эксперимент, битрейт не регулируется)")
+        val transcode = aaPrefs.transcode || (air && !aaPrefs.airPassthrough) ||
             (hostMode.needsTranscode && !(aaPrefs.spsCrop && hostMode.spsCropable))
         if (h.core.transcodeEnabled != transcode) {
             AppLog.i("BRIDGE видео: ${if (transcode) "перекодирование включаю принудительно (воздух или режим хоста ${h.core.videoMode.label})" else "кабель, возвращаю passthrough по настройке"}")
@@ -872,7 +875,7 @@ class BridgeService : Service() {
             core.videoMode = mode
             core.densityOverride = densityOverride
             // h529: поля справа/снизу только для SPS-кропа в прямом проброске по кабелю; на воздухе перекодирование принудительное, а транскодер режет центр
-            val bottom = !air && !aaPrefs.transcode && aaPrefs.spsCrop && aaPrefs.spsCropBottom && mode.spsCropable
+            val bottom = (!air || aaPrefs.airPassthrough) && !aaPrefs.transcode && aaPrefs.spsCrop && aaPrefs.spsCropBottom && mode.spsCropable
             core.marginsAtBottom = bottom
             if (bottom) AppLog.i("BRIDGE SPS-кроп: поля ${mode.marginW} px справа и ${mode.marginH} px снизу (ui_config.margins), интерфейс в левом верхнем углу")
             core.expectFeatureConfig = true
