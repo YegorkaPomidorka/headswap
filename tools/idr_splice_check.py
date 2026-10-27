@@ -160,7 +160,24 @@ def parse_sps(nal):
     s["h_mbs"] = r.ue() + 1
     s["frame_mbs_only"] = r.u(1)
     assert s["frame_mbs_only"] == 1
+    r.u(1)                              # direct_8x8_inference_flag
+    s["crop_pos"] = r.pos
+    s["crop"] = [r.ue() for _ in range(4)] if r.u(1) else [0, 0, 0, 0]
+    s["after_crop"] = r.pos
     return s
+
+
+def uncrop_sps(nal):
+    """SPS без кропа (как SpsCrop.uncrop): декодер отдаёт кадр кодированного размера со скрытыми, но опорными строками."""
+    s = parse_sps(nal)
+    if s["crop"] == [0, 0, 0, 0]:
+        return nal
+    rb = unescape(nal)
+    bits = [(rb[i >> 3] >> (7 - (i & 7))) & 1 for i in range(len(rb) * 8)]
+    stop = max(i for i, b in enumerate(bits) if b)
+    out = bits[:s["crop_pos"]] + [0] + bits[s["after_crop"]:stop] + [1]
+    out += [0] * (-len(out) % 8)
+    return escape(bytes(int("".join(map(str, out[i:i + 8])), 2) for i in range(0, len(out), 8)))
 
 
 def parse_pps(nal):
@@ -405,8 +422,11 @@ def _decode(path, out):
                     "-f", "rawvideo", "-pix_fmt", "yuv420p", out], check=True)
 
 
-def _md5(frames):
-    return [hashlib.md5(y.tobytes() + u.tobytes() + v.tobytes()).hexdigest() for y, u, v in frames]
+def _md5(path):
+    """md5 видимых кадров (с кропом SPS), как их покажет ГУ."""
+    r = subprocess.run(["ffmpeg", "-hide_banner", "-loglevel", "error", "-err_detect", "explode", "-i", path, "-f", "framemd5", "-"],
+                       check=True, capture_output=True, text=True)
+    return [line.split(",")[-1].strip() for line in r.stdout.splitlines() if line and not line.startswith("#")]
 
 
 def main():
@@ -421,15 +441,17 @@ def main():
     pps = next((parse_pps(n) for n in nals if n[0] & 0x1F == 8), None)
     if sps is None or pps is None:
         sys.exit("в потоке нет SPS/PPS")
-    print(f"SPS: profile_idc={sps['profile']} {sps['w_mbs'] * 16}x{sps['h_mbs'] * 16} poc_type={sps['poc_type']} "
+    print(f"SPS: profile_idc={sps['profile']} {sps['w_mbs'] * 16}x{sps['h_mbs'] * 16} кроп={sps['crop']} poc_type={sps['poc_type']} "
           f"log2_max_frame_num={sps['log2_fn']} max_num_ref_frames={sps['max_ref']}")
     print(f"PPS: {'CABAC' if pps['cabac'] else 'CAVLC'} deblocking_control={pps['dbk_ctrl']}")
     if pps["cabac"] or sps["max_ref"] > 1:
         print("!!! поток не подходит: приложение свой IDR в такой поток не вставит")
     w, h = sps["w_mbs"] * 16, sps["h_mbs"] * 16
     with tempfile.TemporaryDirectory() as tmp:
-        ref_yuv, out_h264, out_yuv = (os.path.join(tmp, n) for n in ("ref.yuv", "out.h264", "out.yuv"))
-        _decode(a.stream, ref_yuv)
+        ref_yuv, full_h264, out_h264 = (os.path.join(tmp, n) for n in ("ref.yuv", "full.h264", "out.h264"))
+        # картинки для своего IDR - кодированного размера, как у декодера телефона с SPS без кропа
+        open(full_h264, "wb").write(b"".join(b"\x00\x00\x00\x01" + (uncrop_sps(n) if n[0] & 0x1F == 7 else n) for n in nals))
+        _decode(full_h264, ref_yuv)
         ref = read_yuv(ref_yuv, w, h)
         spl, splices, _, _ = splice(data, ref, a.every, not a.pcm_only)
         open(out_h264, "wb").write(spl)
@@ -439,8 +461,7 @@ def main():
         big = sum(s > 560_000 for s in sizes)
         print(f"IDR вставлено {len(sizes)}: мин {min(sizes)} Б, среднее {sum(sizes) // len(sizes)} Б, макс {max(sizes)} Б, "
               f"больше 560 000 Б: {big}; I16x16 в среднем {sum(n for *_, n in splices) // len(splices)}/{sps['w_mbs'] * sps['h_mbs']}")
-        _decode(out_h264, out_yuv)
-        want, got = _md5(ref), _md5(read_yuv(out_yuv, w, h))
+        want, got = _md5(a.stream), _md5(out_h264)
         ok = sum(x == y for x, y in zip(want, got))
         print(f"склейка: кадров {len(got)}/{len(want)}, совпало {ok}")
         hdr = b"".join(b"\x00\x00\x00\x01" + n for n in nals if n[0] & 0x1F in (7, 8))
@@ -448,8 +469,7 @@ def main():
         for pic, off, _, _ in splices[:3]:
             late = os.path.join(tmp, "late.h264")
             open(late, "wb").write(hdr + spl[off:])
-            _decode(late, out_yuv)
-            tail = _md5(read_yuv(out_yuv, w, h))
+            tail = _md5(late)
             m = sum(x == y for x, y in zip(want[pic:], tail))
             late_ok = late_ok and m == len(want) - pic == len(tail)
             print(f"  вход с IDR вместо кадра {pic}: совпало {m} из {len(want) - pic}")

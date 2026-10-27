@@ -13,8 +13,10 @@ import java.util.concurrent.TimeUnit
 /**
  * AA H.264 -> MediaCodec без Surface -> YUV в память. Кадры идут в декодер в исходном виде (до правки frame_num).
  * Потерянный кадр (очередь полна, ошибка кодека) ломает опорную картинку, поэтому после потери до следующего IDR от AA
- * ничего не подаётся и не отдаётся. Картинка копируется в I420 кодированного размера (строки за кропом SPS тоже
- * опорные); не хватает строк в буфере вывода - вставка невозможна, причина в лог один раз.
+ * ничего не подаётся и не отдаётся. Картинка нужна кодированного размера: строки за кропом SPS тоже опорные, а декодер
+ * (Qualcomm, AA 1920x1080 = 1088 строк с кропом 8) отдаёт только видимые. Поэтому декодер получает SPS без кропа, и в
+ * CODEC_CONFIG, и внутри IDR от AA. Не вышло скопировать кадр целиком - вставка невозможна: мосту один раз
+ * [RefPictureSink.onRefUnavailable], декодер останавливается.
  */
 class RefDecoder(private val sink: RefPictureSink, private val log: (String) -> Unit) : RefPictureDecoder {
     private sealed class Item {
@@ -35,7 +37,7 @@ class RefDecoder(private val sink: RefPictureSink, private val log: (String) -> 
     private var pic: IdrSplice.Picture? = null
     private var codedW = 0
     private var codedH = 0
-    private var copyFailLogged = false
+    private var failed = false
     private var formatLogged = false
 
     init {
@@ -84,7 +86,7 @@ class RefDecoder(private val sink: RefPictureSink, private val log: (String) -> 
     }
 
     private fun onConfig(data: ByteArray) {
-        val (s, p) = H264Stream.spsPps(data)
+        val (s, p) = H264Stream.spsPps(uncropped(data))
         if (s != null) sps = s
         if (p != null) pps = p
     }
@@ -96,8 +98,9 @@ class RefDecoder(private val sink: RefPictureSink, private val log: (String) -> 
         }
         val idr = 5 in AnnexB.nalTypes(f.data)
         if (needIdr && !idr) return
+        val data = if (idr) uncropped(f.data) else f.data
         if (idr) {
-            val (s, p) = H264Stream.spsPps(f.data)
+            val (s, p) = H264Stream.spsPps(data)
             if (s != null) sps = s
             if (p != null) pps = p
             val cfg = (sps ?: return) + (pps ?: return)
@@ -115,15 +118,25 @@ class RefDecoder(private val sink: RefPictureSink, private val log: (String) -> 
             return
         }
         val buf = c.getInputBuffer(idx)!!
-        if (f.data.size > buf.capacity()) {
+        if (data.size > buf.capacity()) {
             c.queueInputBuffer(idx, 0, 0, 0, 0)
             needIdr = true
-            log("свой IDR: кадр ${f.data.size} Б больше входного буфера ${buf.capacity()} Б, жду IDR от AA")
+            log("свой IDR: кадр ${data.size} Б больше входного буфера ${buf.capacity()} Б, жду IDR от AA")
             return
         }
         buf.clear()
-        buf.put(f.data)
-        c.queueInputBuffer(idx, 0, f.data.size, f.seq, 0)
+        buf.put(data)
+        c.queueInputBuffer(idx, 0, data.size, f.seq, 0)
+    }
+
+    /** SPS в кадре или конфиге - без кропа (P-кадры AA SPS не несут). Не разобрался - как есть: копия кадра тогда не выйдет. */
+    private fun uncropped(au: ByteArray): ByteArray = SpsCrop.mapSps(AnnexB.normalize(au)) { sps ->
+        try {
+            SpsCrop.uncrop(sps)
+        } catch (e: SpsCrop.SpsException) {
+            log("свой IDR: кроп из SPS не снят (${e.message})")
+            sps
+        }
     }
 
     private fun create(s: ByteArray, p: ByteArray): Boolean {
@@ -173,7 +186,7 @@ class RefDecoder(private val sink: RefPictureSink, private val log: (String) -> 
             }
             if (idx < 0) return
             val seq = info.presentationTimeUs
-            if (info.size > 0 && !needIdr && sink.wantsRefPicture(seq)) {
+            if (info.size > 0 && !needIdr && !failed && sink.wantsRefPicture(seq)) {
                 val img = c.getOutputImage(idx)
                 val p = if (img != null) copy(img) else null
                 img?.close()
@@ -195,8 +208,10 @@ class RefDecoder(private val sink: RefPictureSink, private val log: (String) -> 
             copyPlane(pl[1], codedW / 2, codedH / 2, p.u) &&
             copyPlane(pl[2], codedW / 2, codedH / 2, p.v)
         if (!ok) {
-            if (!copyFailLogged) log("свой IDR: !!!!!! вывод декодера ${img.width}x${img.height} (format ${img.format}) не покрывает кодированный кадр ${codedW}x$codedH, вставка невозможна")
-            copyFailLogged = true
+            // вставка до конца AA-сессии невозможна: мост перестаёт ждать картинки, декодер больше не нужен
+            failed = true
+            running = false
+            sink.onRefUnavailable("вывод декодера ${img.width}x${img.height} (format ${img.format}) не покрывает кодированный кадр ${codedW}x$codedH")
             return null
         }
         return p

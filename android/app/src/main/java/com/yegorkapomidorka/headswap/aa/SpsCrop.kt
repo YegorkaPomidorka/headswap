@@ -58,6 +58,25 @@ object SpsCrop {
         return Result(addEmulationPrevention(w.toByteArray()), i, after)
     }
 
+    /**
+     * SPS без кропа: декодер отдаёт кадр кодированного размера (1920x1088 вместо 1920x1080). Декодирование кроп не меняет,
+     * поэтому картинка та же, плюс скрытые строки, а они тоже опорные (свой IDR, IdrSplice). Без кропа - тот же массив.
+     */
+    fun uncrop(nal: ByteArray): ByteArray {
+        val p = parseInternal(nal)
+        val r = BitReader(p.rbsp)
+        if (r.bitAt(p.cropFlagPos) == 0) return nal
+        val stop = r.lastOneBit() ?: throw SpsException("нет rbsp_stop_bit")
+        if (stop < p.afterCropPos) throw SpsException("rbsp_stop_bit внутри полей кропа")
+        val w = BitWriter()
+        w.copy(p.rbsp, 0, p.cropFlagPos)
+        w.bit(0)
+        w.copy(p.rbsp, p.afterCropPos, stop)
+        w.bit(1)
+        w.align()
+        return addEmulationPrevention(w.toByteArray())
+    }
+
     /** Применить transform к каждому SPS (тип 7) в access unit с 4-байтными стартовыми кодами; без SPS - тот же массив. */
     fun mapSps(au: ByteArray, transform: (ByteArray) -> ByteArray): ByteArray {
         val starts = ArrayList<Int>()

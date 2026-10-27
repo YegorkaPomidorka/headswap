@@ -523,6 +523,9 @@ interface RefPictureSink {
 
     /** Картинка seq кодированного размера; объект переиспользуется, после возврата его содержимое меняется. */
     fun onRefPicture(seq: Long, pic: IdrSplice.Picture)
+
+    /** Картинки не будет до конца AA-сессии (вывод декодера не покрывает кодированный кадр); зовётся один раз. */
+    fun onRefUnavailable(why: String)
 }
 
 /** Декодер потока AA для своего IDR в passthrough ([IdrSplice]); MediaCodec-реализация - RefDecoder. */

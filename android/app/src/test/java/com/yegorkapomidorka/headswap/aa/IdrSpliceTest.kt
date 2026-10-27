@@ -12,19 +12,21 @@ import java.io.ByteArrayOutputStream
 import java.util.concurrent.CopyOnWriteArrayList
 
 /**
- * Поток idr_splice_in.annexb: x264 Baseline 96x64, 12 кадров, 2 слайса на кадр, IDR только первый; слева testsrc2, справа заливка
- * (в нашем IDR и I_PCM, и I16x16). idr_splice_in.yuv - его кадры из ffmpeg (I420). idr_splice_out.annexb - тот же поток со
- * своим IDR после кадров 5 и 10; проверен ffmpeg (-err_detect explode, framemd5): 14 кадров = исходные с повтором 5 и 10,
- * и с нашего IDR при потерянном начале потока - те же кадры.
+ * Поток <name>_in.annexb: x264 Baseline, 12 кадров, 2 слайса на кадр, IDR только первый; слева testsrc2, справа заливка
+ * (в нашем IDR и I_PCM, и I16x16). <name>_in.yuv - его кадры из ffmpeg (I420) кодированного размера 96x64.
+ * <name>_out.annexb - тот же поток со своим IDR после кадров 5 и 10; проверен ffmpeg (-err_detect explode, framemd5):
+ * 14 кадров = исходные с повтором 5 и 10, и с нашего IDR при потерянном начале потока - те же кадры.
+ * idr_splice - 96x64 без кропа; idr_splice_crop - 96x56 с кропом 8 строк в SPS, как AA 1920x1080 (1088 строк): yuv снят
+ * ffmpeg с SPS без кропа (SpsCrop.uncrop), так же, как его получает декодер опорных картинок на телефоне.
  */
-object SpliceAssets {
-    const val W = 96
-    const val H = 64
-    val input: ByteArray by lazy { res("idr_splice_in.annexb") }
-    val output: ByteArray by lazy { res("idr_splice_out.annexb") }
-    private val yuv: ByteArray by lazy { res("idr_splice_in.yuv") }
+open class SpliceStream(private val name: String) {
+    val W = 96
+    val H = 64
+    val input: ByteArray by lazy { res("${name}_in.annexb") }
+    val output: ByteArray by lazy { res("${name}_out.annexb") }
+    private val yuv: ByteArray by lazy { res("${name}_in.yuv") }
 
-    private fun res(name: String) = SpliceAssets::class.java.getResourceAsStream("/aa/$name")!!.readBytes()
+    private fun res(file: String) = SpliceStream::class.java.getResourceAsStream("/aa/$file")!!.readBytes()
 
     fun picture(k: Int): IdrSplice.Picture {
         val fs = W * H * 3 / 2
@@ -51,21 +53,47 @@ object SpliceAssets {
     fun nalTypes(au: ByteArray) = IdrSplicer.nals(au).map { it[0].toInt() and 0x1F }
 }
 
+object SpliceAssets : SpliceStream("idr_splice")
+
+object CropSpliceAssets : SpliceStream("idr_splice_crop")
+
 class IdrSpliceTest {
     private fun hex(s: String) = ByteArray(s.length / 2) { s.substring(it * 2, it * 2 + 2).toInt(16).toByte() }
 
     @Test
-    fun spliceMatchesFfmpegVerifiedStream() {
+    fun spliceMatchesFfmpegVerifiedStream() = checkGolden(SpliceAssets)
+
+    /** Кроп в SPS: IDR из всех 64 строк (скрытые 8 тоже опорные), кроп для ГУ остаётся (ffmpeg видит 96x56). */
+    @Test
+    fun croppedSpliceMatchesFfmpegVerifiedStream() = checkGolden(CropSpliceAssets)
+
+    @Test
+    fun uncropRemovesOnlyCropping() {
+        val x264Baseline1080 = hex("6742c028d900780227e5c044000003000400000300f03c60c920")
+        assertEquals(SpsCrop.Info(1920, 1088, 0, 0, 0, 8, 2, 2), SpsCrop.parse(x264Baseline1080))
+        val full = SpsCrop.uncrop(x264Baseline1080)
+        assertEquals(SpsCrop.Info(1920, 1088, 0, 0, 0, 0, 2, 2), SpsCrop.parse(full))
+        val a = IdrSplice.parseSps(x264Baseline1080)
+        val b = IdrSplice.parseSps(full)
+        assertEquals(listOf(a.log2Fn, a.pocType, a.maxRef, a.codedW, a.codedH), listOf(b.log2Fn, b.pocType, b.maxRef, b.codedW, b.codedH))
+        assertTrue(full === SpsCrop.uncrop(full))               // без кропа - тот же массив
+        val cropCfg = CropSpliceAssets.split().first
+        val spsNal = IdrSplicer.nals(cropCfg).first { it[0].toInt() and 0x1F == 7 }
+        assertEquals(8, SpsCrop.parse(spsNal).bottom)
+        assertEquals(0, SpsCrop.parse(SpsCrop.uncrop(spsNal)).bottom)
+    }
+
+    private fun checkGolden(assets: SpliceStream) {
         val sp = IdrSplicer()
         val out = ByteArrayOutputStream()
-        val (cfg, aus) = SpliceAssets.split()
+        val (cfg, aus) = assets.split()
         sp.onConfig(cfg)
         out.write(cfg)
         for ((k, au) in aus.withIndex()) {
             out.write(sp.process(au))
             if (k > 0 && k % 5 == 0) {
                 assertNull(sp.blocker())
-                val r = sp.build(SpliceAssets.picture(k))
+                val r = sp.build(assets.picture(k))
                 assertTrue("I16x16 ${r.i16}", r.i16 > 0)
                 assertTrue("PCM ${r.pcm}", r.pcm > 0)
                 out.write(r.nal)
@@ -73,7 +101,7 @@ class IdrSpliceTest {
             }
         }
         assertEquals(2, sp.spliced)
-        val want = SpliceAssets.output
+        val want = assets.output
         // SEI x264 в эталоне есть, в split() нет: сравниваем остальные NAL-ы
         fun stream(b: ByteArray) = IdrSplicer.nals(b).filter { it[0].toInt() and 0x1F != 6 }.map { it.toList() }
         assertEquals(stream(want), stream(out.toByteArray()))
@@ -228,6 +256,7 @@ class IdrSpliceBridgeTest {
     @Test
     fun staticScreenGetsIdrFromTick() {
         startWith(3)
+        val requests = core.keyframeRequests
         decoded(3)                                              // картинка последнего кадра уже есть
         now += 1000; core.tick()
         assertEquals(3, link.sent.size)
@@ -236,6 +265,8 @@ class IdrSpliceBridgeTest {
         assertEquals(5, SpliceAssets.nalTypes(link.sent.last()).last())
         now += 2000; core.tick()                                // экран всё ещё статичный: снова тот же кадр
         assertEquals(5, link.sent.size)
+        assertEquals(requests, core.keyframeRequests)            // повтор IDR от AA (h529) не понадобился
+        assertTrue(logs.toString(), logs.any { it.contains("от AA не нужен") })
         core.onFrame(aus[3], 3)
         assertEquals(6, link.sent.size)
         assertEquals(listOf(1, 1), SpliceAssets.nalTypes(link.sent.last()))
@@ -275,6 +306,48 @@ class IdrSpliceBridgeTest {
         assertTrue(logs.toString(), logs.any { it.contains("не пришла из декодера") })
     }
 
+    /** Поездка 27.10 (1080p, Qualcomm): копия кадра не вышла - кадры не держим, повтор IDR от AA как в h529. */
+    @Test
+    fun unavailablePictureDisablesSpliceAndKeepsAaKick() {
+        startWith(3)
+        val requests = core.keyframeRequests
+        core.onRefUnavailable("вывод декодера 1920x1080 не покрывает кодированный кадр 1920x1088")
+        assertTrue(dec.stopped)
+        assertTrue(logs.toString(), logs.any { it.contains("выключен до конца AA-сессии") })
+        passed(3)
+        now += 2000
+        core.onFrame(aus[3], 3)
+        core.onFrame(aus[4], 4)                                 // не придержан
+        assertEquals(5, link.sent.size)
+        core.tick()
+        assertEquals(requests + 1, core.keyframeRequests)       // h529: повторный IDR от AA через 2 с
+        now += 5000; core.tick()
+        assertEquals(5, link.sent.size)                         // своего IDR нет
+        assertEquals(1, factoryCalls)                           // декодер не пересоздаётся
+    }
+
+    @Test
+    fun repeatedMissingPicturesDisableSplice() {
+        startWith(3)
+        now = 2000
+        var k = 3
+        repeat(IdrSpliceBridgeTest.MISSES) {
+            passed(k.toLong())
+            now += 1000
+            core.onFrame(aus[k], k.toLong())                    // пора: ждём картинку, которой не будет
+            k++
+            now += 400; core.tick()
+        }
+        assertTrue(logs.toString(), logs.any { it.contains("выключен до конца AA-сессии") })
+        assertTrue(dec.stopped)
+        val sent = link.sent.size
+        passed(k.toLong())
+        now += 5000
+        core.onFrame(aus[k], k.toLong())
+        core.onFrame(aus[k + 1], (k + 1).toLong())
+        assertEquals(sent + 2, link.sent.size)                  // больше не держим
+    }
+
     @Test
     fun transcodeModeDoesNotSplice() {
         core.transcodeEnabled = true
@@ -290,5 +363,9 @@ class IdrSpliceBridgeTest {
         startWith(2)
         core.onAaEnded(true)
         assertTrue(dec.stopped)
+    }
+
+    companion object {
+        const val MISSES = AaBridgeCore.SPLICE_MAX_MISSES
     }
 }

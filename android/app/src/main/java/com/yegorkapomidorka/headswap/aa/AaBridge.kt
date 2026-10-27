@@ -787,6 +787,8 @@ class AaBridgeCore(
     }
 
     private var spsCropKickAt = NEVER              // h529: когда запросить повторный IDR после первого в CarLife-сессии
+    private var spsCropKickBase = NEVER            // когда ушёл тот первый IDR: свой IDR после него заменяет повтор
+    private var spsCropKickDeferred = false        // повтор уже отложен один раз в ожидании своего IDR
     private var sessionKickDone = false            // повторный IDR уже назначен в этой CarLife-сессии; после PAUSE/START мост и так шлёт цикл
     private var spsCropSrc: ByteArray? = null      // последний исходный SPS AA и его переписанная версия (null = не вышло)
     private var spsCropDst: ByteArray? = null
@@ -1523,9 +1525,12 @@ class AaBridgeCore(
             // h529 (Vezel): первый IDR AA сразу за IDR заглушки ГУ иногда теряет, и экран чёрный до следующего IDR AA (~60 с).
             // Лог 211335: так и без кропа (R1080), поэтому повторный IDR во всех режимах passthrough и на всех ГУ,
             // но один раз за CarLife-сессию: после PAUSE/START он дал бы лишнюю встряску (0,9 с стоп-кадра)
-            if (!sessionKickDone && !spliceWorks) {
+            // Со своим IDR повтор не нужен, но это решается в tick: здесь декодер ещё не выдал ни одной картинки
+            if (!sessionKickDone) {
                 sessionKickDone = true
                 spsCropKickAt = lastIdrSentMs + SPS_CROP_KICK_MS
+                spsCropKickBase = lastIdrSentMs
+                spsCropKickDeferred = false
             }
             h295IdrSeen(b, payload)
             if (active != Source.AA) {
@@ -1575,7 +1580,7 @@ class AaBridgeCore(
         val now = clockMs()
         if (spliceOn) spliceTick(now)
         h295GiveUp(now)
-        if (spsCropKickAt != NEVER && now >= spsCropKickAt) {
+        if (spsCropKickAt != NEVER && now >= spsCropKickAt && spliceKickNeeded(now)) {
             spsCropKickAt = NEVER
             lastKeyframeRequest = now
             keyframeRequests++
@@ -1590,6 +1595,24 @@ class AaBridgeCore(
             log("BRIDGE жду IDR от AA ${(now - waitSince) / 1000.0} с: запрашиваю ключевой кадр (VideoFocus NATIVE -> PROJECTED) #$keyframeRequests", true)
             peer?.requestKeyFrame()
         }
+    }
+
+    /**
+     * h529-повтор IDR от AA или свой IDR. Свой уже ушёл после первого IDR сессии - повтор не нужен. Вставка работает
+     * (декодер отдаёт картинки), но свой ещё не ушёл - ждём его ещё [SPLICE_KICK_GRACE_MS] один раз. Иначе - повтор как в h529.
+     */
+    private fun spliceKickNeeded(now: Long): Boolean {
+        if (spliceLastSentAt != NEVER && spliceLastSentAt > spsCropKickBase) {
+            log("BRIDGE повторный ключевой кадр от AA не нужен: свой IDR уже ушёл", true)
+            spsCropKickAt = NEVER
+            return false
+        }
+        if (spliceWorks && !spsCropKickDeferred) {
+            spsCropKickDeferred = true
+            spsCropKickAt = now + SPLICE_KICK_GRACE_MS
+            return false
+        }
+        return true
     }
 
     // --- свой IDR в passthrough (IdrSplice) ---
@@ -1607,11 +1630,15 @@ class AaBridgeCore(
     private var spliceBlockLogged: String? = null
     private var spliceBigLogged = 0
     private val spliceHeld = ArrayList<ByteArray>()     // кадры AA, пришедшие, пока собирается свой IDR
+    private var spliceLastSentAt = NEVER               // когда свой IDR последний раз ушёл на ГУ
+    private var spliceMisses = 0                       // таймаутов картинки подряд
+    private var spliceDisabled: String? = null          // вставка невозможна до конца AA-сессии (причина)
 
     private val spliceOn: Boolean get() = idrSpliceMs > 0 && !transcodeEnabled
 
-    /** Свой IDR реально возможен: декодер есть, поток подходит. Тогда повторный IDR от AA (встряска) не нужен. */
-    private val spliceWorks: Boolean get() = spliceOn && refDecoder != null && splicer?.blocker() == null
+    /** Свой IDR реально возможен: декодер уже отдал картинку, поток подходит. Тогда повторный IDR от AA (встряска) не нужен. */
+    private val spliceWorks: Boolean
+        get() = spliceOn && spliceDisabled == null && refDecoder != null && refPicSeq > 0 && splicer?.blocker() == null
 
     private class SpliceJob(val seq: Long, val sp: IdrSplicer, val pic: IdrSplice.Picture)
 
@@ -1641,7 +1668,7 @@ class AaBridgeCore(
 
     /** Пора ли заменить последнюю картинку AA своим IDR: по периоду, а без IDR на ГУ - сразу (с паузой между попытками). */
     private fun spliceRequest() {
-        if (splicePendingSeq != 0L || !carlifeStarted || active != Source.AA) return
+        if (splicePendingSeq != 0L || spliceDisabled != null || !carlifeStarted || active != Source.AA) return
         val sp = splicer ?: return
         if (refDecoder == null || sp.seq == 0L || sp.seq - refOutSeq > 2) return     // декодер отстал или ждёт IDR
         val now = clockMs()
@@ -1663,6 +1690,7 @@ class AaBridgeCore(
             log("BRIDGE свой IDR: картинка #$splicePendingSeq не пришла из декодера за $SPLICE_WAIT_MS мс, пропускаю", true)
             spliceNotBefore = now + SPLICE_RETRY_MS
             spliceCancel(null)
+            if (++spliceMisses >= SPLICE_MAX_MISSES) spliceDisable("картинка из декодера не пришла $spliceMisses раз подряд")
             return
         }
         spliceRequest()
@@ -1671,6 +1699,22 @@ class AaBridgeCore(
     override fun wantsRefPicture(seq: Long): Boolean {
         refOutSeq = seq
         return seq == spliceLastSeq
+    }
+
+    override fun onRefUnavailable(why: String) = synchronized(this) { spliceDisable(why) }
+
+    /**
+     * Вставка невозможна до конца AA-сессии: декодер стоп, кадры AA больше не придерживаются, повтор IDR от AA (h529)
+     * и цикл h295 работают как без галки. Сдвиг frame_num после уже ушедшего своего IDR держится до IDR от AA.
+     */
+    private fun spliceDisable(why: String) {
+        if (spliceDisabled != null) return
+        spliceDisabled = why
+        log("BRIDGE свой IDR: !!!!!! выключен до конца AA-сессии: $why", true)
+        refDecoder?.stop()
+        refDecoder = null
+        refDecoderFailed = true
+        spliceCancel(null)
     }
 
     override fun onRefPicture(seq: Long, pic: IdrSplice.Picture) {
@@ -1706,6 +1750,7 @@ class AaBridgeCore(
     private fun spliceComplete(seq: Long, r: IdrSplice.Result?, buildMs: Long) {
         spliceBuilding = false
         if (splicePendingSeq != seq) return            // отменён (CarLife/AA сменились), кадры уже отпущены
+        spliceMisses = 0
         val now = clockMs()
         spliceNotBefore = now + SPLICE_RETRY_MS
         val sp = splicer
@@ -1720,6 +1765,7 @@ class AaBridgeCore(
                 val payload = if (glued) spsCrop(AnnexB.glue(cfg!!, r.nal)) else r.nal
                 if (link.sendVideo(payload)) {
                     sp.commit()
+                    spliceLastSentAt = now
                     val recovered = !gotIdr
                     gotIdr = true
                     waitSince = 0
@@ -1754,6 +1800,9 @@ class AaBridgeCore(
         refDecoder?.stop()
         refDecoder = null
         refDecoderFailed = false
+        spliceDisabled = null
+        spliceMisses = 0
+        spliceLastSentAt = NEVER
         spliceLastSeq = 0
         refOutSeq = 0
         refPic = null
@@ -2136,6 +2185,8 @@ class AaBridgeCore(
         /** Свой IDR: не больше этого (буфер приёма C++-ГУ CarLife 600 КиБ, docs/carlife-protocol.md §6). */
         const val SPLICE_MAX_BYTES = 560_000
         const val SPLICE_WAIT_MS = 300L          // картинку из декодера ждём не дольше, кадры AA всё это время придержаны
+        const val SPLICE_MAX_MISSES = 3          // таймаутов картинки подряд - вставка выключается до конца AA-сессии
+        const val SPLICE_KICK_GRACE_MS = 1500L   // h529-повтор IDR от AA откладывается на столько, если свой IDR вот-вот уйдёт
         const val SPLICE_RETRY_MS = 1000L        // пауза между попытками (без IDR на ГУ, после отказа, пропуска, таймаута)
 
         /** h295: тач на ГУ 20772121 при IDR старше этого порога в passthrough - вероятно, ГУ сбросил декодер (камера/меню). */
