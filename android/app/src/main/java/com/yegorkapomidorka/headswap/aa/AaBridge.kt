@@ -786,26 +786,52 @@ class AaBridgeCore(
      * Зовётся только из ветки без транскодера, поэтому срабатывает и при откате с несозданного транскодера.
      */
     private fun spsCrop(au: ByteArray): ByteArray {
-        val g = videoMode
-        if (g.crop.isNone) return au
+        if (videoMode.crop.isNone) return au
         return SpsCrop.mapSps(au) { sps ->
             if (!sps.contentEquals(spsCropSrc)) {
                 spsCropSrc = sps
-                spsCropDst = try {
-                    val r = if (marginsAtBottom) SpsCrop.rewrite(sps, 0, g.marginW, 0, g.marginH)
-                    else SpsCrop.rewrite(sps, g.marginW / 2, g.marginW / 2, g.marginH / 2, g.marginH / 2)
-                    if (r.after.visibleW != g.outW || r.after.visibleH != g.outH) {
-                        throw SpsCrop.SpsException("видимая часть ${r.after.visibleW}x${r.after.visibleH}, ГУ ждёт ${g.outW}x${g.outH}")
-                    }
-                    log("BRIDGE SPS-кроп: ${r.before} -> ${r.after}, ${sps.size} -> ${r.sps.size} Б", true)
-                    r.sps
-                } catch (e: SpsCrop.SpsException) {
-                    log("BRIDGE SPS-кроп не применён (${e.message}), SPS ${sps.joinToString("") { "%02x".format(it) }} уходит как есть", true)
-                    null
-                }
+                spsCropDst = cropSps(sps, "")
             }
             spsCropDst ?: sps
         }
+    }
+
+    private fun cropSps(sps: ByteArray, who: String): ByteArray? {
+        val g = videoMode
+        return try {
+            val r = if (marginsAtBottom) SpsCrop.rewrite(sps, 0, g.marginW, 0, g.marginH)
+            else SpsCrop.rewrite(sps, g.marginW / 2, g.marginW / 2, g.marginH / 2, g.marginH / 2)
+            if (r.after.visibleW != g.outW || r.after.visibleH != g.outH) {
+                throw SpsCrop.SpsException("видимая часть ${r.after.visibleW}x${r.after.visibleH}, ГУ ждёт ${g.outW}x${g.outH}")
+            }
+            log("BRIDGE SPS-кроп$who: ${r.before} -> ${r.after}, ${sps.size} -> ${r.sps.size} Б", true)
+            r.sps
+        } catch (e: SpsCrop.SpsException) {
+            log("BRIDGE SPS-кроп$who не применён (${e.message}), SPS ${sps.joinToString("") { "%02x".format(it) }} уходит как есть", true)
+            null
+        }
+    }
+
+    /**
+     * Заглушка в passthrough с SPS-кропом кодируется в кадре AA (aaW×aaH) и режется тем же кропом (h529, Мазда 20622116):
+     * ГУ настраивает декодер по первому SPS после START и смену размера кадра посреди потока не переносит,
+     * после заглушки 1728x648 поток AA 1920x1088 шёл кашей из точек до следующего PAUSE/START.
+     */
+    val stubInAaGeometry: Boolean get() = !transcodeEnabled && !videoMode.crop.isNone
+
+    /** Левый верхний угол видимой части кадра AA при SPS-кропе: там заглушка рисует надпись. */
+    val spsCropOrigin: Pair<Int, Int> get() = if (marginsAtBottom) 0 to 0 else videoMode.marginW / 2 to videoMode.marginH / 2
+
+    private var stubCropSrc: ByteArray? = null     // то же, что spsCropSrc/Dst, для SPS энкодера заглушки (нить drain энкодера)
+    private var stubCropDst: ByteArray? = null
+
+    /** SPS энкодера заглушки с теми же полями, что у AA ([stubInAaGeometry]). */
+    fun stubSpsCrop(au: ByteArray): ByteArray = SpsCrop.mapSps(au) { sps ->
+        if (!sps.contentEquals(stubCropSrc)) {
+            stubCropSrc = sps
+            stubCropDst = cropSps(sps, " заглушки")
+        }
+        stubCropDst ?: sps
     }
 
     private fun h295IdrSeen(before: ByteArray, after: ByteArray) {
