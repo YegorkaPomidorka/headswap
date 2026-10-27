@@ -33,6 +33,7 @@ import com.yegorkapomidorka.headswap.aa.MetaRelay
 import com.yegorkapomidorka.headswap.aa.MicMode
 import com.yegorkapomidorka.headswap.aa.PhoneCall
 import com.yegorkapomidorka.headswap.aa.PhoneMicCapture
+import com.yegorkapomidorka.headswap.aa.RefDecoder
 import com.yegorkapomidorka.headswap.aa.VideoGeometry
 import com.yegorkapomidorka.headswap.link.CarTransport
 import com.yegorkapomidorka.headswap.link.LinkSetupException
@@ -818,6 +819,11 @@ class BridgeService : Service() {
             AppLog.i("BRIDGE видео: ${if (transcode) "перекодирование включаю принудительно (воздух или режим хоста ${h.core.videoMode.label})" else "кабель, возвращаю passthrough по настройке"}")
             h.core.transcodeEnabled = transcode
         }
+        val spliceMs = if (aaPrefs.idrSplice) IDR_SPLICE_MS else 0L
+        if (h.core.idrSpliceMs != spliceMs) {
+            AppLog.i("BRIDGE свой IDR в passthrough: ${if (spliceMs > 0) "раз в $spliceMs мс${if (transcode) " (сейчас перекодирование, не работает)" else ""}" else "выключен"}")
+            h.core.idrSpliceMs = spliceMs
+        }
         if (wakeLock == null) {
             wakeLock = getSystemService(PowerManager::class.java)
                 .newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "headswap:session")
@@ -862,6 +868,7 @@ class BridgeService : Service() {
             core.usbAudioEnabled = aaPrefs.usbAudio
             EqLive.settings = aaPrefs.eq
             core.transcodeEnabled = aaPrefs.transcode
+            core.refDecoderFactory = { sink -> RefDecoder(sink) { AppLog.i(it, false) } }
             core.videoMode = mode
             core.densityOverride = densityOverride
             // h529: поля справа/снизу только для SPS-кропа в прямом проброске по кабелю; на воздухе перекодирование принудительное, а транскодер режет центр
@@ -1008,6 +1015,7 @@ class BridgeService : Service() {
         /** Машина отключилась по Bluetooth (ACL_DISCONNECTED): через debounce снять ожидание. */
         const val ACTION_WIFI_B_AUTO_OFF = "com.yegorkapomidorka.headswap.WIFI_B_AUTO_OFF"
         private const val CHANNEL = "bridge"
+        private const val IDR_SPLICE_MS = 2000L             // период своего IDR в passthrough (настройка для разработчиков)
         private const val NOTIF_ID = 1
         private const val HINT_NOTIF_ID = 2
         private const val USB_TO_AIR_NOTIF_ID = 5

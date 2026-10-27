@@ -61,6 +61,11 @@ class AaPrefs(ctx: Context) {
         get() = sp.getBoolean("spsCropBottom", true)
         set(v) = sp.edit().putBoolean("spsCropBottom", v).apply()
 
+    /** Свой ключевой кадр раз в 2 с в passthrough (IdrSplice, раздел для разработчиков). Читается на старте CarLife-сессии. */
+    var idrSplice: Boolean
+        get() = sp.getBoolean("idrSplice", false)
+        set(v) = sp.edit().putBoolean("idrSplice", v).apply()
+
     /** Разрешение видео (имя VideoMode, по умолчанию 1280×720). Читается один раз на подключение. */
     var videoMode: VideoMode
         get() = VideoMode.parse(sp.getString("videoMode", VideoMode.DEFAULT.name))

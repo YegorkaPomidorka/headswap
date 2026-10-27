@@ -58,3 +58,14 @@ python -X utf8 tools/logdigest.py <архив.zip | папка | файл.log> [
 Дальше скаут грепает лог только в окнах вокруг времён из дайджеста.
 
 Тест: `python -X utf8 -m unittest tools/test_logdigest.py`
+
+## idr_splice_check.py — свой IDR на дампе AA
+
+Проверяет на записанном потоке H.264 от Android Auto (например, дамп `pc-headunit`) то же, что делает
+приложение с настройкой «Свой ключевой кадр раз в 2 с» (`aa/IdrSplice.kt`): подходит ли поток (CAVLC,
+`max_num_ref_frames = 1`), какого размера получаются IDR (лимит 560 000 Б) и совпадает ли картинка бит-в-бит
+после склейки и при входе с нашего IDR. Нужны numpy и ffmpeg.
+
+```
+python -X utf8 tools/idr_splice_check.py <дамп.h264> [--every 60] [--pcm-only]
+```

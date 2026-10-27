@@ -94,6 +94,11 @@ class DevScreen(host: MainActivity) : Screen(host) {
             )),
         )
 
+        body.addView(c.sectionTitle(c.getString(R.string.dev_section_idr_splice)))
+        body.addView(
+            group(listOf(row(c.getString(R.string.dev_idr_splice_title), c.getString(R.string.dev_idr_splice_sub), aa.idrSplice) { aa.idrSplice = it })),
+        )
+
         body.addView(c.sectionTitle(c.getString(R.string.dev_section_meta)))
         body.addView(
             group(listOf(

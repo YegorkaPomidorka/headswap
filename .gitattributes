@@ -5,3 +5,5 @@
 *.png binary
 *.jpg binary
 *.ttf binary
+*.annexb binary
+*.yuv binary
