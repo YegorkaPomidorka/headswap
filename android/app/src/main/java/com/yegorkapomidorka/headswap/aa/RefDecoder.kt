@@ -157,6 +157,9 @@ class RefDecoder(private val sink: RefPictureSink, private val log: (String) -> 
             f.setInteger(MediaFormat.KEY_COLOR_FORMAT, MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420Flexible)
             f.setInteger(MediaFormat.KEY_MAX_INPUT_SIZE, 1024 * 1024)
             if (Build.VERSION.SDK_INT >= 30) f.setInteger(MediaFormat.KEY_LOW_LATENCY, 1)
+            // Qualcomm без них держит последний кадр до следующего входа (realme h588): на статичном экране AA молчит, картинки нет.
+            // Чужой декодер незнакомые ключи пропускает
+            for (k in QTI_LOW_LATENCY) f.setInteger(k, 1)
             val c = MediaCodec.createDecoderByType(MIME)
             try {
                 c.configure(f, null, null, 0)
@@ -167,7 +170,14 @@ class RefDecoder(private val sink: RefPictureSink, private val log: (String) -> 
             }
             codec = c
             formatLogged = false
-            log("свой IDR: декодер опорных картинок ${c.name} ${codedW}x$codedH")
+            val vendor = if (Build.VERSION.SDK_INT >= 31) {
+                try {
+                    c.supportedVendorParameters.filter { it in QTI_LOW_LATENCY }.ifEmpty { listOf("нет") }.joinToString()
+                } catch (_: Exception) {
+                    "?"
+                }
+            } else "?"
+            log("свой IDR: декодер опорных картинок ${c.name} ${codedW}x$codedH, низкая задержка Qualcomm: $vendor")
             true
         } catch (e: Exception) {
             log("свой IDR: !!!!!! декодер не создан: ${e.javaClass.simpleName}: ${e.message}")
@@ -253,6 +263,7 @@ class RefDecoder(private val sink: RefPictureSink, private val log: (String) -> 
 
     companion object {
         private const val MIME = "video/avc"
+        private val QTI_LOW_LATENCY = listOf("vendor.qti-ext-dec-low-latency.enable", "vendor.qti-ext-dec-picture-order.enable")
         private const val QUEUE = 120
         private const val INPUT_WAIT_US = 50_000L
         private val LOST = ByteArray(0)
