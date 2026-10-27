@@ -764,6 +764,7 @@ class AaBridgeCore(
         h295LastTouchAt = now
         if (act != AapMessages.TOUCH_DOWN) return
         if (!huHonda20772121 || transcoder != null || !carlifeStarted || !gotIdr) return
+        if (spliceWorks) return     // свой IDR и так раз в 2 с, цикл NATIVE -> PROJECTED только дёргает картинку под пальцем
         val sinceIdr = now - lastIdrSentMs
         if (sinceIdr <= H295_IDR_STALE_MS || sinceTouch < H295_TOUCH_IDLE_MS || now - h295LastTrigger < H295_TRIGGER_MIN_MS) return
         h295LastTrigger = now
