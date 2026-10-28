@@ -72,7 +72,7 @@ class RefDecoder(private val sink: RefPictureSink, private val log: (String) -> 
             while (running) {
                 when (val item = queue.poll(5, TimeUnit.MILLISECONDS)) {
                     is Item.Config -> onConfig(item.data)
-                    is Item.Frame -> onFrame(item)
+                    is Item.Frame -> onFrame(item, info)
                     Item.Stop -> break
                     null -> {}
                 }
@@ -91,7 +91,7 @@ class RefDecoder(private val sink: RefPictureSink, private val log: (String) -> 
         if (p != null) pps = p
     }
 
-    private fun onFrame(f: Item.Frame) {
+    private fun onFrame(f: Item.Frame, info: MediaCodec.BufferInfo) {
         if (f.data === LOST) {
             needIdr = true
             return
@@ -111,12 +111,21 @@ class RefDecoder(private val sink: RefPictureSink, private val log: (String) -> 
             needIdr = false
         }
         val c = codec ?: return
-        val idx = c.dequeueInputBuffer(INPUT_WAIT_US)
+        // Декодер иногда замирает на десятки-сотни мс (realme h588). Сброс до IDR от AA - это до минуты без своего IDR,
+        // поэтому ждём буфер, разгружая выход; кадры AA тем временем копятся в очереди
+        val t0 = System.nanoTime()
+        var idx = c.dequeueInputBuffer(INPUT_WAIT_US)
+        while (idx < 0 && running && System.nanoTime() - t0 < INPUT_GIVEUP_NS) {
+            drain(info)
+            idx = c.dequeueInputBuffer(INPUT_WAIT_US)
+        }
+        val waitedMs = (System.nanoTime() - t0) / 1_000_000
         if (idx < 0) {
             needIdr = true
-            log("свой IDR: нет входного буфера декодера, жду IDR от AA")
+            log("свой IDR: нет входного буфера декодера $waitedMs мс, жду IDR от AA")
             return
         }
+        if (waitedMs >= INPUT_SLOW_LOG_MS) log("свой IDR: входной буфер декодера ждали $waitedMs мс")
         val buf = c.getInputBuffer(idx)!!
         if (data.size > buf.capacity()) {
             c.queueInputBuffer(idx, 0, 0, 0, 0)
@@ -266,6 +275,8 @@ class RefDecoder(private val sink: RefPictureSink, private val log: (String) -> 
         private val QTI_LOW_LATENCY = listOf("vendor.qti-ext-dec-low-latency.enable", "vendor.qti-ext-dec-picture-order.enable")
         private const val QUEUE = 120
         private const val INPUT_WAIT_US = 50_000L
+        private const val INPUT_GIVEUP_NS = 2_000_000_000L   // дольше - очередь (120 кадров, ~4 с) всё равно переполнится
+        private const val INPUT_SLOW_LOG_MS = 200L
         private val LOST = ByteArray(0)
     }
 }
