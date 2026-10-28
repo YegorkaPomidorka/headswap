@@ -181,7 +181,7 @@ class CarLifeSession(
             } catch (_: java.util.concurrent.RejectedExecutionException) {   // сессия уже закрывается
             }
         }
-        AppLog.i("звонки: ${if (callsOn) "слежу, сообщаю ГУ (MODULE_STATUS PHONE + TELE_STATE)" else "не слежу (нет READ_PHONE_STATE)"}")
+        AppLog.i("звонки: ${if (callsOn) "слежу (VW CNS2 Delphi: сообщаю ГУ MODULE_STATUS PHONE + TELE_STATE)" else "не слежу (нет READ_PHONE_STATE)"}")
     }
 
     /** Нить cl-sched. Последнее состояние звонка, отправленное ГУ. */
@@ -201,6 +201,10 @@ class CarLifeSession(
         callState = state
         if (!matchSent) {
             AppLog.i("звонки: state=$state до рукопожатия, ГУ не сообщаю")
+            return
+        }
+        if (!bridge.huVwCns2Delphi) {       // h428-путь проверен только под задачу h425; другим ГУ звонок не сообщаем
+            AppLog.i("звонки: state=$state, ГУ не VW CNS2 Delphi, не сообщаю")
             return
         }
         when (state) {
