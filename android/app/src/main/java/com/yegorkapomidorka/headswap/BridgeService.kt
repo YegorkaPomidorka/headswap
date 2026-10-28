@@ -34,7 +34,6 @@ import com.yegorkapomidorka.headswap.aa.MicMode
 import com.yegorkapomidorka.headswap.aa.PhoneCall
 import com.yegorkapomidorka.headswap.aa.PhoneMicCapture
 import com.yegorkapomidorka.headswap.aa.RefDecoder
-import com.yegorkapomidorka.headswap.aa.SpliceTuning
 import com.yegorkapomidorka.headswap.aa.VideoGeometry
 import com.yegorkapomidorka.headswap.link.CarTransport
 import com.yegorkapomidorka.headswap.link.LinkSetupException
@@ -798,7 +797,7 @@ class BridgeService : Service() {
             AppLog.i("BRIDGE: видео-режим/DPI сменился (DPI ${h.core.densityOverride} -> $wantDensity, 0 = авто), применится после перезапуска сервера ГУ")
         }
         if (h == null || h.isDead) {
-            h = createHost(aaPrefs, chosenGeometry, wantMode, wantDensity, previous = h, air = transport.caps == TransportCaps.TCP6)
+            h = createHost(aaPrefs, chosenGeometry, wantMode, wantDensity, previous = h)
             host = h
             if (h == null) {
                 // нет сертификата head unit или мост не собрался: причина уже в AaState.setupError, USB-сессию не открываем
@@ -810,25 +809,23 @@ class BridgeService : Service() {
         } else {
             AppLog.i("BRIDGE: AA-хост уже есть, переиспользую (grace=${h.isInGrace})")
         }
-        // на воздухе перекодирование обязательно: в passthrough битрейт не регулируется. Режим хоста не трогаем
-        // (без перекодирования он уже R720, его можно перекодировать), хост не пересоздаём: сервер AA одноразовый.
-        // Старый режим живого хоста с кропом (WIDE*, R1024) в passthrough живёт только с SPS-кропом (h529): иначе перекодирование.
-        // Исключение - свой IDR с галкой «и по Wi-Fi» (эксперимент): битрейт AA как есть, ГУ восстанавливается нашим IDR
+        // перекодирование - по настройке; прямой проброс по воздуху тоже разрешён: битрейт AA не регулируется, ГУ восстанавливается
+        // нашим IDR. Режим хоста не трогаем (без перекодирования он уже R720, его можно перекодировать), хост не пересоздаём:
+        // сервер AA одноразовый. Старый режим живого хоста с кропом (WIDE*, R1024) в passthrough живёт только с SPS-кропом (h529):
+        // иначе перекодирование.
         val hostMode = h.core.videoMode
-        val air = transport.caps == TransportCaps.TCP6
-        if (air && aaPrefs.airPassthrough) AppLog.i("BRIDGE видео: воздух, прямой проброс со своим IDR (эксперимент, битрейт не регулируется)")
-        val transcode = aaPrefs.transcode || (air && !aaPrefs.airPassthrough) ||
-            (hostMode.needsTranscode && !(aaPrefs.spsCrop && hostMode.spsCropable))
+        val transcode = aaPrefs.transcode || (hostMode.needsTranscode && !(aaPrefs.spsCrop && hostMode.spsCropable))
         if (h.core.transcodeEnabled != transcode) {
-            AppLog.i("BRIDGE видео: ${if (transcode) "перекодирование включаю принудительно (воздух или режим хоста ${h.core.videoMode.label})" else "кабель, возвращаю passthrough по настройке"}")
+            AppLog.i("BRIDGE видео: ${if (transcode) "перекодирование включаю принудительно (режим хоста ${h.core.videoMode.label})" else "возвращаю passthrough по настройке"}")
             h.core.transcodeEnabled = transcode
         }
-        val spliceMs = if (aaPrefs.idrSplice) IDR_SPLICE_MS else 0L
-        if (h.core.idrSpliceMs != spliceMs) {
-            AppLog.i("BRIDGE свой IDR в passthrough: ${if (spliceMs > 0) "раз в $spliceMs мс${if (transcode) " (сейчас перекодирование, не работает)" else ""}" else "выключен"}")
-            h.core.idrSpliceMs = spliceMs
+        if (!transcode && transport.caps == TransportCaps.TCP6) AppLog.i("BRIDGE видео: воздух, прямой проброс со своим IDR (битрейт не регулируется)")
+        // свой IDR только в passthrough: при перекодировании его нет
+        val spliceMs = if (transcode) 0L else IDR_SPLICE_MS
+        if (h.core.spliceMs != spliceMs) {
+            AppLog.i("BRIDGE свой IDR в passthrough: ${if (spliceMs > 0) "раз в $spliceMs мс" else "выключен (перекодирование)"}")
+            h.core.spliceMs = spliceMs
         }
-        h.core.tuning = SpliceTuning()
         if (wakeLock == null) {
             wakeLock = getSystemService(PowerManager::class.java)
                 .newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "headswap:session")
@@ -846,7 +843,7 @@ class BridgeService : Service() {
     }
 
     /** Новый AA-хост: ядро, коннектор, сертификаты. null = мост не поднялся (причина в AaState.setupError). */
-    private fun createHost(aaPrefs: AaPrefs, chosen: VideoGeometry, mode: VideoGeometry, densityOverride: Int, previous: BridgeHost?, air: Boolean = false): BridgeHost? {
+    private fun createHost(aaPrefs: AaPrefs, chosen: VideoGeometry, mode: VideoGeometry, densityOverride: Int, previous: BridgeHost?): BridgeHost? {
         return try {
             val loaded = AaCreds.load(this, aaPrefs.certSet)
             AaState.setupError = null
@@ -876,8 +873,8 @@ class BridgeService : Service() {
             core.refDecoderFactory = { sink -> RefDecoder(sink) { AppLog.i(it, false) } }
             core.videoMode = mode
             core.densityOverride = densityOverride
-            // h529: поля справа/снизу только для SPS-кропа в прямом проброске по кабелю; на воздухе перекодирование принудительное, а транскодер режет центр
-            val bottom = (!air || aaPrefs.airPassthrough) && !aaPrefs.transcode && aaPrefs.spsCrop && aaPrefs.spsCropBottom && mode.spsCropable
+            // h529: поля справа/снизу только для SPS-кропа в прямом проброске; транскодер режет центр
+            val bottom = !aaPrefs.transcode && aaPrefs.spsCrop && aaPrefs.spsCropBottom && mode.spsCropable
             core.marginsAtBottom = bottom
             if (bottom) AppLog.i("BRIDGE SPS-кроп: поля ${mode.marginW} px справа и ${mode.marginH} px снизу (ui_config.margins), интерфейс в левом верхнем углу")
             core.expectFeatureConfig = true
@@ -1020,7 +1017,7 @@ class BridgeService : Service() {
         /** Машина отключилась по Bluetooth (ACL_DISCONNECTED): через debounce снять ожидание. */
         const val ACTION_WIFI_B_AUTO_OFF = "com.yegorkapomidorka.headswap.WIFI_B_AUTO_OFF"
         private const val CHANNEL = "bridge"
-        private const val IDR_SPLICE_MS = 2000L             // период своего IDR в passthrough (настройка для разработчиков)
+        private const val IDR_SPLICE_MS = 2000L             // период своего IDR в passthrough
         private const val NOTIF_ID = 1
         private const val HINT_NOTIF_ID = 2
         private const val USB_TO_AIR_NOTIF_ID = 5

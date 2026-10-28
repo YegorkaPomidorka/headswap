@@ -250,8 +250,8 @@ class IdrSpliceBridgeTest {
     private val builds = ArrayList<Runnable>()
     private val core = AaBridgeCore({ l, _ -> logs.add(l) }, { now }).also {
         it.transcodeEnabled = false
-        it.idrSpliceMs = 2000
-        it.tuning = SpliceTuning(drop = 0)                      // тесты PR #115: без выброса кадра перед IDR
+        it.spliceMs = 2000
+        it.spliceDrop = 0                                       // тесты PR #115: без выброса кадра перед IDR
         it.refDecoderFactory = { _ -> factoryCalls++; dec }
         it.spliceExecutor = Executor { r -> if (queueBuilds) builds.add(r) else r.run() }
         it.attach(link)
@@ -288,16 +288,16 @@ class IdrSpliceBridgeTest {
         core.onFrame(aus[4], 4)                                 // ещё не пора
         passed(5)
         now = 2000
-        core.onFrame(aus[5], 5)                                 // AA шлёт кадры: картинка #6 станет нашим IDR, кадры ждут
-        assertEquals(6, link.sent.size)
+        core.onFrame(aus[5], 5)                                 // AA шлёт кадры: картинка #6 станет нашим IDR вместо этого кадра
+        assertEquals(5, link.sent.size)
         core.onFrame(aus[6], 6)                                 // придержан до IDR
-        assertEquals(6, link.sent.size)
-        assertEquals(6, dec.fed.size)                           // и в декодер пока не ушёл
+        assertEquals(5, link.sent.size)
+        assertEquals(6, dec.fed.size)                           // в декодер пока не ушёл
         decoded(6)
-        assertEquals(8, link.sent.size)
-        assertEquals(listOf(7, 8, 5), SpliceAssets.nalTypes(link.sent[6]))     // первый свой IDR - с SPS/PPS
-        assertFalse(aus[6].contentEquals(link.sent[7]))         // frame_num сдвинут
-        assertEquals(listOf(1, 1), SpliceAssets.nalTypes(link.sent[7]))
+        assertEquals(7, link.sent.size)
+        assertEquals(listOf(7, 8, 5), SpliceAssets.nalTypes(link.sent[5]))     // первый свой IDR - с SPS/PPS
+        assertFalse(aus[6].contentEquals(link.sent[6]))         // frame_num сдвинут
+        assertEquals(listOf(1, 1), SpliceAssets.nalTypes(link.sent[6]))
         assertEquals(7, dec.fed.size)
         assertTrue(logs.toString(), logs.any { it.contains("свой IDR #1") && it.contains("кадры AA ждали") })
         // следующий - через 2 с, голый
@@ -335,12 +335,12 @@ class IdrSpliceBridgeTest {
         passed(3)
         now = 1990; core.onFrame(aus[3], 3)
         passed(4)
-        now = 2000; core.onFrame(aus[4], 4)                      // кадры идут: держим
+        now = 2000; core.onFrame(aus[4], 4)                      // кадры идут: заменяемый
         queueBuilds = true
         core.onFrame(aus[5], 5)
         decoded(5)
         assertEquals(1, builds.size)
-        assertEquals(5, link.sent.size)
+        assertEquals(4, link.sent.size)
         now = 2300; core.tick()
         assertEquals(6, link.sent.size)
         assertArrayEquals(aus[5], link.sent.last())
@@ -396,7 +396,7 @@ class IdrSpliceBridgeTest {
         now = 2000
         core.onFrame(aus[4], 4)
         core.onFrame(aus[5], 5)
-        assertEquals(5, link.sent.size)
+        assertEquals(4, link.sent.size)
         now += 400; core.tick()
         assertEquals(6, link.sent.size)
         assertArrayEquals(aus[5], link.sent.last())              // нашего IDR не было: кадры как есть

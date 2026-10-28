@@ -10,11 +10,6 @@
     <string name="dev_sps_crop_title">Crop without transcoding</string>
     <string name="dev_sps_crop_sub">Wide modes in direct passthrough: the head unit decoder cuts the margins (H.264 SPS cropping). If the picture is squashed or shifted, the head unit does not support it</string>
     <string name="dev_sps_crop_bottom_title">Margins at the right and bottom</string>
-    <string name="dev_section_idr_splice">Keyframe in direct passthrough (experiment)</string>
-    <string name="dev_idr_splice_title">Own keyframe every 2 s</string>
-    <string name="dev_idr_splice_sub">The phone decodes the Android Auto picture and sends the head unit a lossless keyframe of it. The picture comes back within 2 s after the reverse camera or the car menu, even if the head unit sends no pause/start. Larger traffic over USB</string>
-    <string name="dev_idr_splice_air_title">Over Wi-Fi too</string>
-    <string name="dev_idr_splice_air_sub">Direct passthrough with own keyframe over the air as well, without transcoding. The Android Auto bitrate is not adjusted: if the link drops, turn it off. Requires Transcoding off</string>
     <string name="dev_sps_crop_bottom_sub">Android Auto draws the interface in the top left corner, margins go to the right and bottom. For head units that crop only the right and bottom (picture shifted down or left)</string>
     <string name="dev_section_meta">Metadata on the head unit (applies after USB reconnect)</string>
     <string name="dev_meta_music_title">Music</string>

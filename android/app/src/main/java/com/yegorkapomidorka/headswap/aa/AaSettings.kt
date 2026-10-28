@@ -61,19 +61,6 @@ class AaPrefs(ctx: Context) {
         get() = sp.getBoolean("spsCropBottom", true)
         set(v) = sp.edit().putBoolean("spsCropBottom", v).apply()
 
-    /** Свой ключевой кадр раз в 2 с в passthrough (IdrSplice, раздел для разработчиков). Читается на старте CarLife-сессии. */
-    var idrSplice: Boolean
-        get() = sp.getBoolean("idrSplice", false)
-        set(v) = sp.edit().putBoolean("idrSplice", v).apply()
-
-    /** К [idrSplice]: прямой проброс и по воздуху, без принудительного перекодирования. Читается на старте CarLife-сессии. */
-    var idrSpliceAir: Boolean
-        get() = sp.getBoolean("idrSpliceAir", false)
-        set(v) = sp.edit().putBoolean("idrSpliceAir", v).apply()
-
-    /** Прямой проброс по воздуху: свой IDR с галкой воздуха, перекодирование в настройках выключено. */
-    val airPassthrough: Boolean get() = idrSplice && idrSpliceAir && !transcode
-
     /** Разрешение видео (имя VideoMode, по умолчанию 1280×720). Читается один раз на подключение. */
     var videoMode: VideoMode
         get() = VideoMode.parse(sp.getString("videoMode", VideoMode.DEFAULT.name))
