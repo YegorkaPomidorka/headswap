@@ -28,6 +28,7 @@ import com.yegorkapomidorka.headswap.aa.AaPrefs
 import com.yegorkapomidorka.headswap.aa.AaState
 import com.yegorkapomidorka.headswap.aa.AapOptions
 import com.yegorkapomidorka.headswap.aa.BridgeHost
+import com.yegorkapomidorka.headswap.aa.CarPreset
 import com.yegorkapomidorka.headswap.aa.EqLive
 import com.yegorkapomidorka.headswap.aa.MetaRelay
 import com.yegorkapomidorka.headswap.aa.MicMode
@@ -826,6 +827,7 @@ class BridgeService : Service() {
             AppLog.i("BRIDGE свой IDR в passthrough: ${if (spliceMs > 0) "раз в $spliceMs мс" else "выключен (перекодирование)"}")
             h.core.spliceMs = spliceMs
         }
+        h.core.carVwId = aaPrefs.carPreset == CarPreset.VW_ID_UNYX
         if (wakeLock == null) {
             wakeLock = getSystemService(PowerManager::class.java)
                 .newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "headswap:session")
