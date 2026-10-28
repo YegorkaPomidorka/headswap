@@ -1,0 +1,15 @@
+09:00:00.321 WL link begin transport=wifi-b bind=0.0.0.0 ACCESS_LOCAL_NETWORK="n/a(api 33)" t=0
+09:00:00.321 сервис: wifi-b, слушаю 6 портов на 0.0.0.0, жду ГУ 600 с
+09:00:00.327 WL net no-lan hint="хотспот выключен или нет подходящего интерфейса" t=6
+09:00:46.449 WL net iface-up iface="wlan1 10.176.113.58/24" t=46127
+09:00:46.451 WL udp beacon-first iface="wlan1 10.176.113.58/24" to=10.176.113.255 t=46130
+09:01:00.961 BT carlife: ГУ подключилась по Bluetooth (spp, HU)
+09:01:01.295 WL bt rx type=WIRELESS_INFO len=4 wirelessType=2(p2p) wifiFreq=1 t=61974
+09:01:01.385 WL p2p start bySsid=false peerName=true freq=- t=62064
+09:01:01.386 Wi-Fi Direct: вхожу в группу ГУ (по имени пира)
+09:01:01.410 WL p2p discover res=fail reason=busy n=1 hotspot=false t=62089
+09:01:14.574 WL p2p discover res=fail reason=busy n=1 hotspot=false t=75253
+09:01:27.980 WL p2p discover res=fail reason=busy n=1 hotspot=false t=88659
+09:01:41.389 WL p2p discover res=fail reason=busy n=1 hotspot=false t=102068
+09:02:10.003 WL p2p discover res=fail reason=busy n=2 hotspot=false t=130662
+09:02:25.008 WL p2p discover res=fail reason=busy n=3 hotspot=false t=145667

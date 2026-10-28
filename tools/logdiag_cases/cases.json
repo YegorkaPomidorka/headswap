@@ -13,5 +13,11 @@
   {"log": "works.log", "version": "2.4.4", "notes": ["works"], "top": null,
    "facts": {"frames_max": 44000, "aa_video_max": 44000, "hu": "Desay SV Automotive G6S"}},
   {"log": "no_gms.log", "version": "2.4.4", "top": "no_gms", "not": ["aa_no_video"],
-   "facts": {"no_gms": 3, "aa_video_max": 0}}
+   "facts": {"no_gms": 3, "aa_video_max": 0}},
+  {"log": "p2p_hotspot_wlan1.log", "version": "2.6.0", "top": "p2p_hotspot_busy",
+   "facts": {"m.p2p_busy": 0, "m.p2p_busy_reason": 6, "m.hotspot_iface": 1}},
+  {"log": "p2p_hotspot_busy_new.log", "version": "2.6.0", "top": "p2p_hotspot_busy",
+   "facts": {"m.p2p_busy": 1, "m.hotspot_iface": 0}},
+  {"log": "p2p_busy_no_hotspot.log", "version": "2.6.0", "not": ["p2p_hotspot_busy"],
+   "facts": {"m.p2p_busy_reason": 3, "m.hotspot_iface": 0}}
 ]
