@@ -100,8 +100,12 @@ class AaPrefs(ctx: Context) {
         get() = sp.getBoolean("videoTsMs", false)
         set(v) = sp.edit().putBoolean("videoTsMs", v).apply()
 
+    var spliceDrop: Int
+        get() = sp.getInt("spliceDrop", 0).takeIf { it in SpliceTuning.DROP_CHOICES } ?: 0
+        set(v) = sp.edit().putInt("spliceDrop", v).apply()
+
     val spliceTuning: SpliceTuning
-        get() = SpliceTuning(spliceReplace, spliceSps, spliceLight, spliceSlices, spliceLowDelayVui, spliceStamp, videoTsMs)
+        get() = SpliceTuning(spliceReplace, spliceSps, spliceLight, spliceSlices, spliceLowDelayVui, spliceStamp, videoTsMs, spliceDrop)
 
     /** Прямой проброс по воздуху: свой IDR с галкой воздуха, перекодирование в настройках выключено. */
     val airPassthrough: Boolean get() = idrSplice && idrSpliceAir && !transcode

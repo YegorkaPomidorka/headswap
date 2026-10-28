@@ -118,6 +118,7 @@ class LatencyLabTest {
     fun tuningDescribe() {
         assertTrue(SpliceTuning().isDefault)
         assertEquals("как в PR #115", SpliceTuning().describe())
+        assertEquals("IDR вместо 2 кадров AA (выброс 1)", SpliceTuning(replace = true, drop = 1).describe())
         val d = SpliceTuning(replace = true, sps = SpliceSps.ALWAYS, slices = 2).describe()
         assertTrue(d, d.contains("вместо кадра AA") && d.contains("всегда") && d.contains("слайсов 2"))
     }
@@ -217,6 +218,45 @@ class IdrSpliceTuningTest {
         assertArrayEquals(aus[5], link.sent[5])
         builds.removeAt(0).run()
         assertEquals(6, link.sent.size)                         // опоздавший IDR не уходит
+    }
+
+    /** Выброс 1: кадр перед картинкой IDR не уходит, IDR встаёт вместо двух кадров AA - в ГУ на кадр меньше. */
+    @Test
+    fun dropSendsIdrInPlaceOfTwoAaFrames() {
+        core.tuning = SpliceTuning(drop = 1)
+        startWith(4)
+        core.tick()
+        passed(4)
+        now = 1990; core.onFrame(aus[4], 4)
+        passed(5)
+        now = 2000; core.onFrame(aus[5], 5)                     // выброшен
+        assertEquals(5, link.sent.size)
+        passed(6)
+        core.onFrame(aus[6], 6)                                 // заменяемый
+        core.onFrame(aus[7], 7)                                 // придержан
+        assertEquals(5, link.sent.size)
+        decoded(7)
+        assertEquals(7, link.sent.size)                         // 8 кадров AA, в ГУ 7: IDR вместо кадров 6 и 7
+        assertEquals(listOf(7, 8, 5), SpliceAssets.nalTypes(link.sent[5]))
+        assertEquals(listOf(1, 1), SpliceAssets.nalTypes(link.sent[6]))
+        assertTrue(logs.toString(), logs.any { it.contains("свой IDR #1") && it.contains("вместо 2 кадров AA") })
+        now = 31_000; core.tick()
+        assertTrue(logs.toString(), logs.any { it.contains("выброшено кадров AA 1 (за сессию 1), выброс отменён 0") })
+    }
+
+    /** Выброс начат, а AA замолчал: выброшенный кадр уходит как был. */
+    @Test
+    fun dropFlushesWhenAaStops() {
+        core.tuning = SpliceTuning(drop = 1)
+        startWith(4)
+        passed(4)
+        now = 1990; core.onFrame(aus[4], 4)
+        passed(5)
+        now = 2000; core.onFrame(aus[5], 5)
+        assertEquals(5, link.sent.size)
+        now = 2300; core.tick()
+        assertEquals(6, link.sent.size)
+        assertArrayEquals(aus[5], link.sent[5])
     }
 
     /** Статика (кадр после паузы) - сборка в фоне, кадр уходит сразу и в режиме замены. */

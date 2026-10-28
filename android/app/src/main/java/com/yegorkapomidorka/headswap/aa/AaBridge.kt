@@ -1560,7 +1560,7 @@ class AaBridgeCore(
             feedTranscoder(t, b, types, ptsUs)
             return
         }
-        if (spliceOn && tuning.replace && spliceReplaceNow(b, types)) return
+        if (spliceOn && tuning.replacing && spliceReplaceNow(b, types)) return
         passthroughFrame(b, types)
         if (spliceOn) spliceRequest(fromFrame = true)
     }
@@ -1568,13 +1568,41 @@ class AaBridgeCore(
     /**
      * [SpliceTuning.replace]: пора свой IDR и AA шлёт кадры - этот кадр не уходит, свой IDR из его картинки уйдёт вместо него.
      * Без этого IDR идёт лишним кадром после своей картинки: ГУ, которая показывает кадры с постоянной частотой, копит его.
+     * [SpliceTuning.drop]: в движении ещё drop кадров перед картинкой IDR не уходят ([spliceDropped]), IDR встаёт вместо
+     * всех; не вышло (статика, отказ, таймаут) - они уходят как были, раньше остальных.
      */
     private fun spliceReplaceNow(b: ByteArray, types: List<Int>): Boolean {
-        if (!gotIdr || 5 in types || splicePendingSeq != 0L) return false
+        if (!gotIdr || 5 in types || splicePendingSeq != 0L) {
+            spliceFlushDropped()
+            return false
+        }
+        if (spliceDropped.size < tuning.drop) {
+            if (spliceDropped.isEmpty()) {
+                if (aaFrameGapMs >= SPLICE_QUIET_MS || !spliceDue(clockMs())) return false
+                spliceDroppedAt = clockMs()
+            } else if (aaFrameGapMs >= SPLICE_QUIET_MS) {
+                spliceFlushDropped()
+                return false
+            }
+            spliceDropped.add(b)
+            return true
+        }
         spliceRequest(fromFrame = true)
-        if (splicePendingSeq == 0L || !spliceHold || splicePendingSeq != spliceLastSeq) return false
+        if (splicePendingSeq == 0L || !spliceHold || splicePendingSeq != spliceLastSeq) {
+            spliceFlushDropped()
+            return false
+        }
         spliceReplaced = b
         return true
+    }
+
+    /** Выброшенные под свой IDR кадры AA всё-таки уходят в ГУ (IDR не будет): по порядку, они уже прошли splicer. */
+    private fun spliceFlushDropped() {
+        if (spliceDropped.isEmpty()) return
+        val frames = ArrayList(spliceDropped)
+        spliceDropped.clear()
+        latStats.dropUndone++
+        if (carlifeStarted) for (f in frames) passthroughFrame(f, AnnexB.nalTypes(f))
     }
 
     private fun passthroughFrame(b: ByteArray, types: List<Int>) {
@@ -1713,6 +1741,8 @@ class AaBridgeCore(
     private var spliceBlockLogged: String? = null
     private val spliceHeld = ArrayList<ByteArray>()     // кадры AA, пришедшие, пока собирается свой IDR (spliceHold)
     private var spliceReplaced: ByteArray? = null       // кадр AA, вместо которого уйдёт свой IDR (SpliceTuning.replace), уже через splicer
+    private val spliceDropped = ArrayList<ByteArray>()  // кадры AA перед картинкой своего IDR, которые он заменит (SpliceTuning.drop), уже через splicer
+    private var spliceDroppedAt = 0L
     @Volatile private var spliceStamp: String? = null    // метка времени в собираемом IDR (SpliceTuning.stamp)
     private var spliceStampAt = 0L                     // когда снята картинка с меткой (wallMs)
     private val guModel = GuQueueModel()
@@ -1768,25 +1798,35 @@ class AaBridgeCore(
      * [SPLICE_HOLD_MAX_MS]); на статике IDR собирается в фоне, а пришедший за это время кадр делает его устаревшим.
      */
     private fun spliceRequest(fromFrame: Boolean) {
-        if (splicePendingSeq != 0L || spliceDisabled != null || !carlifeStarted || active != Source.AA) return
-        val sp = splicer ?: return
-        if (refDecoder == null || sp.seq == 0L || sp.seq - refOutSeq > 2) return     // декодер отстал или ждёт IDR
+        if (spliceDropped.isNotEmpty() && !fromFrame) return     // выброс начат: IDR соберётся из следующего кадра AA
         val now = clockMs()
-        if (now < spliceNotBefore) return
-        if (gotIdr && now - lastIdrSentMs < idrSpliceMs) return
-        val why = sp.blocker()
-        if (why != null) {
-            if (why != spliceBlockLogged) log("BRIDGE свой IDR невозможен: $why", true)
-            spliceBlockLogged = why
-            spliceNotBefore = now + SPLICE_RETRY_MS
-            return
-        }
+        if (!spliceDue(now)) return
+        val sp = splicer ?: return
         splicePendingSeq = sp.seq
         splicePendingAt = now
         spliceHold = if (fromFrame) aaFrameGapMs < SPLICE_QUIET_MS else now - lastAaFrameAt < SPLICE_QUIET_MS
     }
 
+    /** Пора собирать свой IDR: период прошёл, декодер не отстал, поток подходит. */
+    private fun spliceDue(now: Long): Boolean {
+        if (splicePendingSeq != 0L || spliceDisabled != null || !carlifeStarted || active != Source.AA) return false
+        val sp = splicer ?: return false
+        if (refDecoder == null || sp.seq == 0L || sp.seq - refOutSeq > 2) return false     // декодер отстал или ждёт IDR
+        if (now < spliceNotBefore) return false
+        if (gotIdr && now - lastIdrSentMs < idrSpliceMs) return false
+        val why = sp.blocker()
+        if (why != null) {
+            if (why != spliceBlockLogged) log("BRIDGE свой IDR невозможен: $why", true)
+            spliceBlockLogged = why
+            spliceNotBefore = now + SPLICE_RETRY_MS
+            return false
+        }
+        return true
+    }
+
     private fun spliceTick(now: Long) {
+        // выброс начат, а следующего кадра AA нет (экран встал): выброшенные уходят, на статике очередь ГУ уходит и так
+        if (spliceDropped.isNotEmpty() && now - spliceDroppedAt > SPLICE_QUIET_MS) spliceFlushDropped()
         val seq = splicePendingSeq
         if (seq != 0L && !spliceBuilding && refPicSeq != seq && now - splicePendingAt > SPLICE_WAIT_MS) {
             log("BRIDGE свой IDR: картинка #$seq не пришла из декодера за $SPLICE_WAIT_MS мс, пропускаю", true)
@@ -1951,7 +1991,9 @@ class AaBridgeCore(
         spliceLastSentAt = now
         val replaced = spliceReplaced != null
         spliceReplaced = null                           // кадр AA этой картинки ГУ не получит: его место занял IDR
-        latStats.sent(now, own = true, replaced = replaced, holdMs = if (spliceHold) now - splicePendingAt else -1, held = spliceHeld.size)
+        val dropped = spliceDropped.size
+        spliceDropped.clear()                           // и кадры перед ней (SpliceTuning.drop)
+        latStats.sent(now, own = true, replaced = replaced, holdMs = if (spliceHold) now - splicePendingAt else -1, held = spliceHeld.size, dropped = dropped)
         spliceStamp?.let { log("BRIDGE метка ${it} в своём IDR #${sp.spliced} ушла в ГУ через ${wallMs() - spliceStampAt} мс после снимка", true) }
         spliceStamp = null
         gotIdr = true
@@ -1963,17 +2005,21 @@ class AaBridgeCore(
             log("BRIDGE свой IDR #${sp.spliced}${if (recovered) " (ГУ была без IDR)" else ""}: ${payload.size} Б, " +
                 (if (r.qp < 0) "без потерь (PCM ${r.pcm})" else "QP ${r.qp}") + ", сборка $buildMs мс, " +
                 (if (spliceHold) "кадры AA ждали ${now - splicePendingAt} мс" else "в фоне") + ", ${if (glued) "с SPS/PPS" else "голый"}" +
-                (if (replaced) ", вместо кадра AA" else ""), true)
+                (if (!replaced) "" else if (dropped == 0) ", вместо кадра AA" else ", вместо ${dropped + 1} кадров AA"), true)
         }
     }
 
     /** Больше не ждём картинку: придержанные кадры AA уходят своим путём (могут снова встать в очередь за новым IDR). */
     private fun spliceCancel(why: String?) {
-        if (splicePendingSeq == 0L) return
+        if (splicePendingSeq == 0L) {
+            spliceFlushDropped()
+            return
+        }
         if (why != null) log("BRIDGE свой IDR отменён: $why", false)
         splicePendingSeq = 0
         spliceHold = false
         spliceStamp = null
+        spliceFlushDropped()
         // кадр, вместо которого ждали IDR, уже прошёл через splicer: в ГУ как есть, раньше придержанных
         spliceReplaced?.let { b ->
             spliceReplaced = null
@@ -1988,6 +2034,7 @@ class AaBridgeCore(
         spliceHold = false
         spliceHeld.clear()
         spliceReplaced = null
+        spliceDropped.clear()
         spliceStamp = null
         splicer = null
         refDecoder?.stop()
@@ -2016,12 +2063,17 @@ class AaBridgeCore(
         private var holdMax = 0L
         private var heldMax = 0
         private var extraTotal = 0L
+        private var dropped = 0
+        private var droppedTotal = 0L
+        var dropUndone = 0                          // выброс начат, но IDR не ушёл: кадры отправлены как были
         private var since = NEVER
 
-        fun sent(now: Long, own: Boolean, replaced: Boolean = false, holdMs: Long = -1, held: Int = 0) {
+        fun sent(now: Long, own: Boolean, replaced: Boolean = false, holdMs: Long = -1, held: Int = 0, dropped: Int = 0) {
             if (own) {
                 this.own++
                 if (replaced) this.replaced++ else extraTotal++
+                this.dropped += dropped
+                droppedTotal += dropped
                 if (holdMs >= 0) {
                     holds++
                     holdSum += holdMs
@@ -2039,17 +2091,19 @@ class AaBridgeCore(
             if (aa + own > 0 && transcoder == null) {
                 log("BRIDGE поток в ГУ за ${sec.toInt()} с: кадров AA $aa (${"%.1f".format(aa / sec)} fps), своих IDR $own " +
                     "(вместо кадра AA $replaced, лишних ${own - replaced}, лишних за сессию $extraTotal)" +
+                    (if (tuning.drop > 0) "; выброшено кадров AA $dropped (за сессию $droppedTotal), выброс отменён $dropUndone раз" else "") +
                     (if (holds > 0) "; кадры AA ждали IDR ср ${holdSum / holds} мс, макс $holdMax мс, в пачке до $heldMax" else "") +
                     "; модель ГУ ${guModel.fps} fps без пропусков: задержка сейчас ${guModel.delayMs(now)} мс, макс ${guModel.maxMs} мс" +
                     (if (tuning.isDefault) "" else "; варианты: ${tuning.describe()}"), true)
             }
-            aa = 0; own = 0; replaced = 0; holds = 0; holdSum = 0; holdMax = 0; heldMax = 0
+            aa = 0; own = 0; replaced = 0; holds = 0; holdSum = 0; holdMax = 0; heldMax = 0; dropped = 0; dropUndone = 0
             guModel.resetMax()
             since = now
         }
 
         fun resetSession() {
             extraTotal = 0
+            droppedTotal = 0
             guModel.reset()
         }
     }

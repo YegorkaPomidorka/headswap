@@ -62,6 +62,7 @@ class DevScreen(host: MainActivity) : Screen(host) {
     private val touchDecimationRows = LinkedHashMap<TouchDecimation, RadioRow>()
     private val spliceSpsRows = LinkedHashMap<SpliceSps, RadioRow>()
     private val spliceSliceRows = LinkedHashMap<Int, RadioRow>()
+    private val spliceDropRows = LinkedHashMap<Int, RadioRow>()
 
     /** AVC-энкодеры телефона (null = список получить не удалось, тогда размер не проверяем). Список не меняется, считаем один раз. */
     private val avcEncoders: List<MediaCodecInfo.VideoCapabilities>? by lazy {
@@ -116,6 +117,17 @@ class DevScreen(host: MainActivity) : Screen(host) {
                 row(c.getString(R.string.dev_lat_stamp_title), c.getString(R.string.dev_lat_stamp_sub), aa.spliceStamp) { aa.spliceStamp = it },
                 row(c.getString(R.string.dev_lat_ts_title), c.getString(R.string.dev_lat_ts_sub), aa.videoTsMs) { aa.videoTsMs = it },
             )),
+        )
+        body.addView(c.text(c.getString(R.string.dev_lat_drop_head), 14f, 600, c.clr(R.color.on2)), lp(WRAP, WRAP).margins(c, 8, 8, 8, 0))
+        for ((n, res) in listOf(0 to R.string.dev_lat_drop_0, 1 to R.string.dev_lat_drop_1, 2 to R.string.dev_lat_drop_2)) {
+            val row = RadioRow(c, c.getString(res), "") { setSpliceDrop(n) }
+            spliceDropRows[n] = row
+            body.addView(row.view, lp(MATCH, WRAP))
+        }
+        refreshSpliceDrop()
+        body.addView(
+            c.text(c.getString(R.string.dev_lat_drop_note), 13f, 400, c.clr(R.color.on2)),
+            lp(WRAP, WRAP).margins(c, 8, 2, 8, 0),
         )
         body.addView(c.text(c.getString(R.string.dev_lat_sps_head), 14f, 600, c.clr(R.color.on2)), lp(WRAP, WRAP).margins(c, 8, 8, 8, 0))
         for ((m, res) in listOf(
@@ -310,6 +322,15 @@ class DevScreen(host: MainActivity) : Screen(host) {
 
     private fun refreshSpliceSlices() {
         for ((n, row) in spliceSliceRows) row.setSelected(aa.spliceSlices == n)
+    }
+
+    private fun setSpliceDrop(n: Int) {
+        aa.spliceDrop = n
+        refreshSpliceDrop()
+    }
+
+    private fun refreshSpliceDrop() {
+        for ((n, row) in spliceDropRows) row.setSelected(aa.spliceDrop == n)
     }
 
     /** Крупные часы телефона в формате метки в кадре ([FrameStamp.text]), обновляются каждый кадр экрана, пока он виден. */
