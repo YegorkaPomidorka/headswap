@@ -39,11 +39,19 @@ interface VideoGeometry {
         get() = if (marginW == 0 && marginH == 0) VideoCrop.NONE
         else VideoCrop(marginW / 2f / aaW, marginH / 2f / aaH, 1f - marginW / 2f / aaW, 1f - marginH / 2f / aaH)
 
-    /** Кроп возможен только при перекодировании: в passthrough WIDE недоступен. */
+    /** Кроп транскодером: в passthrough WIDE доступен только через SPS-кроп ([spsCropable]). */
     val needsTranscode: Boolean get() = !crop.isNone
 
-    /** Геометрия, которая реально применится при данном переключателе перекодирования. */
-    fun effective(transcode: Boolean): VideoGeometry = if (!transcode && needsTranscode) VideoMode.R720 else this
+    /**
+     * Поля можно отрезать в passthrough правкой SPS (h529): область интерфейса 1:1 с кадром ГУ, без масштаба,
+     * и половина каждого поля кратна единице кропа 4:2:0 (2 px).
+     */
+    val spsCropable: Boolean
+        get() = !crop.isNone && outW == aaW - marginW && outH == aaH - marginH && (marginW / 2) % 2 == 0 && (marginH / 2) % 2 == 0
+
+    /** Геометрия, которая реально применится при данном переключателе перекодирования и SPS-кропе (эксперимент h529). */
+    fun effective(transcode: Boolean, spsCrop: Boolean = false): VideoGeometry =
+        if (!transcode && needsTranscode && !(spsCrop && spsCropable)) VideoMode.R720 else this
 
     /** Метка выхода для UI: «1280×720». */
     val outLabel: String get() = "${outW}×$outH"
@@ -68,9 +76,9 @@ interface VideoGeometry {
     fun densityFor(densityOverride: Int): Int = if (densityOverride == AaDensity.AUTO) density else densityOverride
 
     /** Опции SDR для AA этой геометрии; densityOverride - ручной DPI интерфейса AA (AaDensity.AUTO = density режима). */
-    fun sdOptions(fullAudio: Boolean, densityOverride: Int = AaDensity.AUTO, carMake: String? = null) = AapSdOptions(
+    fun sdOptions(fullAudio: Boolean, densityOverride: Int = AaDensity.AUTO, carMake: String? = null, marginsAtBottom: Boolean = false) = AapSdOptions(
         resolution = aaResolution, density = densityFor(densityOverride), marginW = marginW, marginH = marginH, fullAudio = fullAudio,
-        carMake = carMake,
+        carMake = carMake, marginsAtBottom = marginsAtBottom,
     )
 
     /** Строка для лога. */
@@ -94,7 +102,6 @@ enum class VideoMode(
     R1024(R.string.video_r1024_title, R.string.video_r1024_sub, "1280x720", 256, 120, 160, 1024, 600, 2_000_000),
     R720(R.string.video_r720_title, R.string.video_r720_sub, "1280x720", 0, 0, 160, 1280, 720, 4_000_000),
     R1080(R.string.video_r1080_title, R.string.video_r1080_sub, "1920x1080", 0, 0, 240, 1920, 1080, 8_000_000),
-    R1440(R.string.video_r1440_title, R.string.video_r1440_sub, "2560x1440", 0, 0, 320, 2560, 1440, 12_000_000),
     WIDE(R.string.video_wide_title, R.string.video_wide_sub, "1280x720", 0, 240, 160, 1280, 480, 4_000_000),
     /** 1728×648 - нативный экран Desay SV G6S (Мазда): из кадра AA 1920×1080 вырезается центр, поля по обеим осям. */
     WIDE_MID(R.string.video_wide_mid_title, R.string.video_wide_mid_sub, "1920x1080", 192, 432, 160, 1728, 648, 5_000_000),
@@ -104,14 +111,20 @@ enum class VideoMode(
     /** 1280×640 - экран Skoda Octavia A8 Pro (ГУ SKODA CNS3 просит 1280×640, h292): из кадра AA 1280×720 вырезается центральная полоса 1280×640, 1:1. */
     WIDE_2_1(R.string.video_wide_2_1_title, R.string.video_wide_2_1_sub, "1280x720", 0, 80, 160, 1280, 640, 4_000_000),
     /** 2240×976 - окно CarLife на VW CNS3 (Tiguan L Pro, экран 2240×1260 с полосами штатного ГУ): из кадра AA 1920×1080 вырезается центральная полоса 1920×836 и масштабируется ×1,167. */
-    WIDE_976(R.string.video_wide_976_title, R.string.video_wide_976_sub, "1920x1080", 0, 244, 160, 2240, 976, 8_000_000);
+    WIDE_976(R.string.video_wide_976_title, R.string.video_wide_976_sub, "1920x1080", 0, 244, 160, 2240, 976, 8_000_000),
+    /**
+     * 1920×836 - окно VW BT 1420 (2240×976) той же пропорции, но без масштаба (h529, Павел): из кадра AA 1920×1080 вырезается
+     * полоса 1920×836 один к одному, годится для SPS-кропа; до окна 2240×976 растягивает сама ГУ.
+     */
+    WIDE_836(R.string.video_wide_836_title, R.string.video_wide_836_sub, "1920x1080", 0, 244, 160, 1920, 836, 6_000_000);
 
     override val aaW: Int = aaResolution.substringBefore('x').toInt()
     override val aaH: Int = aaResolution.substringAfter('x').toInt()
     override val label: String get() = name
 
-    /** Режим, который реально применится при данном переключателе перекодирования. */
-    override fun effective(transcode: Boolean): VideoMode = if (!transcode && needsTranscode) R720 else this
+    /** Режим, который реально применится при данном переключателе перекодирования и SPS-кропе. */
+    override fun effective(transcode: Boolean, spsCrop: Boolean): VideoMode =
+        if (!transcode && needsTranscode && !(spsCrop && spsCropable)) R720 else this
 
     /**
      * Строка для лога: «видео-режим WIDE: AA 1280x720 margins 0x240 density 160, CarLife 1280x480, кроп v 0.167..0.833».
@@ -242,7 +255,7 @@ object AaDensity {
 
     /**
      * Шаг «-»/«+» в UI. Из авто - на ближайшее значение сетки строго ниже/выше density режима
-     * (у R1440 авто 320 выше максимума, поэтому «+» оттуда ничего не даёт, «-» ставит 280).
+     * (если авто выше максимума сетки, «+» ничего не даёт, «-» ставит максимум).
      * На краю сетки остаётся как было.
      */
     fun step(current: Int, auto: Int, up: Boolean): Int {

@@ -121,8 +121,6 @@
     <string name="video_r720_sub">Подходит большинству ГУ</string>
     <string name="video_r1080_title">1920×1080</string>
     <string name="video_r1080_sub">Чётче, но тяжелее для телефона и ГУ</string>
-    <string name="video_r1440_title">2560×1440 (экспериментальный)</string>
-    <string name="video_r1440_sub">Android Auto может не отдать видео в 1440p — тогда чёрный экран, вернитесь на 1920×1080</string>
     <string name="video_wide_title">Широкий 8:3 (обрезка)</string>
     <string name="video_wide_sub">Для вытянутых экранов: 1280×480, крупно</string>
     <string name="video_wide_mid_title">Широкий 8:3 средний (Mazda CX-5)</string>
@@ -135,6 +133,8 @@
     <string name="video_wide_2_1_sub">1280×640: родное разрешение экрана Octavia, без растяжения</string>
     <string name="video_wide_976_title">Широкий 2240×976 (VW Tiguan L Pro)</string>
     <string name="video_wide_976_sub">Широкая обрезка под окно CarLife на ГУ VW CNS3</string>
+    <string name="video_wide_836_title">Широкий 1920×836 (VW, эксперимент)</string>
+    <string name="video_wide_836_sub">Пропорция окна 2240×976 без растяжения на телефоне: растягивает ГУ. Для кропа без перекодирования</string>
 
     <!-- Частота музыки (MusicRate) -->
     <string name="mrate_auto">Авто</string>

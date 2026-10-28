@@ -2,6 +2,7 @@ package com.yegorkapomidorka.headswap
 
 import android.os.Build
 import android.os.SystemClock
+import android.graphics.Rect
 import com.yegorkapomidorka.headswap.aa.AaBridgeCore
 import com.yegorkapomidorka.headswap.aa.CarlifeAudio
 import com.yegorkapomidorka.headswap.aa.AaTranscoder
@@ -107,6 +108,7 @@ class CarLifeSession(
     private var videoInited = false
     private var source: VideoSource? = null
     @Volatile private var csd: ByteArray? = null
+    @Volatile private var stubCropped = false      // заглушка в кадре AA, её SPS режется как у AA (h529)
     @Volatile private var csdPending = true
     @Volatile private var paused = false
 
@@ -552,12 +554,21 @@ class CarLifeSession(
                 bridge.huMazda20622111 -> minOf(mode.bitrate, AaBridgeCore.MAZDA_20622111_CEILING_BPS)
                 else -> mode.bitrate
             }
-            val s = VideoSource(pendingW, pendingH, pendingFps, if (air) bitratePolicy.current else stubBps, this)
+            // h529: в passthrough с SPS-кропом заглушка в кадре AA с теми же полями, ГУ не видит смены размера на AA.
+            // На воздухе тоже: с галкой «И по Wi-Fi» там passthrough (stubInAaGeometry сам проверяет перекодирование)
+            stubCropped = bridge.stubInAaGeometry
+            val s = if (stubCropped) {
+                val (x, y) = bridge.spsCropOrigin
+                VideoSource(mode.aaW, mode.aaH, pendingFps, stubBps, this, Rect(x, y, x + mode.outW, y + mode.outH))
+            } else {
+                VideoSource(pendingW, pendingH, pendingFps, if (air) bitratePolicy.current else stubBps, this)
+            }
             s.banner = text
             try {
                 s.start()
                 source = s
-                AppLog.i("BRIDGE заглушка: энкодер ${s.encoderName} ${pendingW}x$pendingH, текст '$text'")
+                AppLog.i("BRIDGE заглушка: энкодер ${s.encoderName} ${s.width}x${s.height}" +
+                    (if (stubCropped) " (кадр AA, SPS-кроп до ${mode.outW}x${mode.outH})" else "") + ", текст '$text'")
             } catch (e: Exception) {
                 AppLog.e("не удалось запустить энкодер заглушки", e)
                 s.stop()
@@ -1037,6 +1048,7 @@ class CarLifeSession(
             val c = csd
             if (csdPending && c != null && !AnnexB.startsWithSps(data)) payload = AnnexB.glue(c, data)
             csdPending = false
+            if (stubCropped) payload = bridge.stubSpsCrop(payload)
         }
         lastVideoTx = SystemClock.elapsedRealtime()
         sendVideoData(withFixedSps(payload))

@@ -228,7 +228,7 @@ object LogShare {
             appendLine("Аптайм: ${SystemClock.elapsedRealtime() / 1000} с")
             appendLine()
             appendLine("Настройки моста")
-            appendLine("  видео: ${if (aa.transcode) "перекодирование" else "passthrough"}")
+            appendLine("  видео: ${if (aa.transcode) "перекодирование" else "passthrough"}${if (aa.spsCrop) ", SPS-кроп" else ""}")
             appendLine("  разрешение видео: выбрано ${aa.videoGeometry.label}, в сессии: ${CarLifeState.videoMode?.describe(CarLifeState.densityOverride) ?: "сессии не было"}")
             appendLine("  масштаб интерфейса AA: ${if (aa.aaDensity == AaDensity.AUTO) "авто" else "${aa.aaDensity} dpi"}")
             appendLine("  частота кадров: ${aa.fpsSetting.name}")
