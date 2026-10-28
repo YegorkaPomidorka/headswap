@@ -266,6 +266,12 @@ class AaBridgeCore(
 
     private val ttsStopTimer = AudioTimer()
 
+    /** h425: Delphi глотает TTS_INIT в одну миллисекунду с NAVI=1; речь копится, INIT уходит через [TTS_INIT_AFTER_NAVI_MS]. */
+    private val ttsInitTimer = AudioTimer()
+    private val ttsPending = ArrayList<ByteArray>()
+    private var ttsPendingChan = 0
+    private var ttsPendingStop = false          // AA STOP пришёл, пока речь ждала INIT: повторить после выдачи
+
     /** h425: VW CNS2 Delphi копит MOVE ~190 мс и шлёт пачкой; раздаём пачку равномерно. Только при [huVwCns2Delphi]. */
     private val touchPacer = TouchBurstPacer(clockMs, audioSched) { a, x, y, px, py -> dispatchTouch(a, x, y, px, py) }
     @Volatile private var touchPacerLogged = false
@@ -988,6 +994,7 @@ class AaBridgeCore(
             return
         }
         val call = if (huVwCns2Delphi) phoneCallProvider() else PhoneCall.IDLE
+        if (code == HARD_KEY_MEDIA_STOP) muteMediaOnCall("ГУ прислало keycode=$code")
         val android = delphiKey(code, call) ?: HARD_KEY_TO_ANDROID[code]
         if (call == PhoneCall.ACTIVE && code == HARD_KEY_SEEK_SUB) {
             log("BRIDGE руль keycode=$code: идёт звонок, назад не шлю", true)
@@ -1089,6 +1096,7 @@ class AaBridgeCore(
     override fun onAudioStart(chan: Int) {
         log("BRIDGE AA audio START ch$chan (${AapMessages.channelName(chan)}) -> CarLife ${carlifeChannel(chan)?.let { chName(it) } ?: "не пересылается"}", true)
         if (carlifeChannel(chan) == CarlifeAudio.CH_MEDIA) releaseHuPause("AA MEDIA START")
+        if (carlifeChannel(chan) == CarlifeAudio.CH_TTS) ttsPendingStop = false
         if (carlifeChannel(chan) == CarlifeAudio.CH_TTS && ttsStopTimer.cancel()) {
             log("BRIDGE TTS STOP отменён: SPEECH START до истечения ${TTS_STOP_DELAY_MS} мс, INIT не повторяю", true)
         }
@@ -1133,6 +1141,18 @@ class AaBridgeCore(
                     naviSent = true
                     naviRaised()
                     log("BRIDGE CarLife MODULE_STATUS NAVI=1 (перед TTS INIT)", true)
+                }
+            }
+            if (ch == CarlifeAudio.CH_TTS && huVwCns2Delphi && naviSent) {
+                val wait = TTS_INIT_AFTER_NAVI_MS - (clockMs() - naviRaisedAt)
+                if (ttsInitTimer.pending || wait > 0) {
+                    if (!ttsInitTimer.pending) {
+                        log("BRIDGE TTS INIT через $wait мс после NAVI=1 (h425), речь коплю", true)
+                        ttsInitTimer.start(wait) { flushTtsPending() }
+                    }
+                    ttsPendingChan = chan
+                    ttsPending.add(pcm.copyOf())
+                    return
                 }
             }
             if (!link.sendAudio(ch, CarlifeAudio.initType(ch), CarlifeAudio.initBody(rate, channels, 16))) {
@@ -1213,6 +1233,11 @@ class AaBridgeCore(
     override fun onAudioStop(chan: Int) {
         val ch = carlifeChannel(chan) ?: return
         log("BRIDGE AA audio STOP ch$chan", true)
+        if (ch == CarlifeAudio.CH_TTS && ttsInitTimer.pending) {
+            ttsPendingStop = true
+            log("BRIDGE TTS STOP после выдачи накопленной речи (${ttsPending.sumOf { it.size }} Б)", true)
+            return
+        }
         if (vrReply && ch == CarlifeAudio.CH_TTS) {
             vrReply = false
             link.sendAudio(CarlifeAudio.CH_VR, CarlifeAudio.VR_STOP, ByteArray(0))
@@ -1360,6 +1385,23 @@ class AaBridgeCore(
         log("BRIDGE TTS пре-ролл $ms мс тишины (${zeros.size} Б) после INIT", true)
     }
 
+    /** Таймер [ttsInitTimer] истёк: накопленная речь идёт обычным путём (INIT, пре-ролл, данные), затем отложенный STOP. */
+    private fun flushTtsPending() {
+        val chunks = ttsPending.toList()
+        ttsPending.clear()
+        val stop = ttsPendingStop
+        ttsPendingStop = false
+        log("BRIDGE TTS: выдаю накопленную речь ${chunks.sumOf { it.size }} Б (${chunks.size} пакетов)", true)
+        for (c in chunks) onAudioData(ttsPendingChan, c, 0)
+        if (stop) onAudioStop(ttsPendingChan)
+    }
+
+    private fun dropTtsPending() {
+        ttsInitTimer.cancel()
+        ttsPending.clear()
+        ttsPendingStop = false
+    }
+
     /** Фактический TTS_STOP (таймер debounce); после него MEDIA-пакеты ждут ещё MEDIA_AFTER_TTS_MS. */
     private fun ttsStopNow() {
         stopAudio(CarlifeAudio.CH_TTS)
@@ -1371,6 +1413,22 @@ class AaBridgeCore(
                 if (audioInited[CarlifeAudio.CH_MEDIA] == true) pauseMedia("отложенная пауза после TTS")
             }
         }
+    }
+
+    /**
+     * VW CNS2 Delphi (h425): на входящем ГУ уходит в свой звонок и перестаёт брать MEDIA. Хвост музыки AA (~3 с до
+     * MEDIA_STOP) забивал общий USB-поток: видео и звук стояли ~20 с, иногда EIO. Если музыка на паузе заранее,
+     * проблемы нет (Дмитрий, лог 24.10 22:13). Поэтому при звонке сразу MEDIA PAUSE и хвост не пересылаем до play AA.
+     */
+    @Synchronized
+    private fun muteMediaOnCall(why: String) {
+        if (!huVwCns2Delphi || huPausedAa || !carlifeStarted) return
+        val call = phoneCallProvider()
+        if (call == PhoneCall.IDLE) return
+        huPausedAa = true
+        resumeOnHuMusic = false
+        log("BRIDGE звонок ${call.name} ($why): MEDIA на паузу, хвост музыки AA не пересылаю (h425)", true)
+        requestMediaPause("звонок на телефоне")
     }
 
     /** Пускать ли MEDIA_DATA дальше; нет = данные отброшены (голос / ждём INIT после TTS). */
@@ -1400,7 +1458,10 @@ class AaBridgeCore(
     /** Плеер AA сменил состояние (ch9). MUSIC по нему - только когда звук не по USB: иначе им владеет MEDIA INIT/PAUSE. */
     private fun musicByState(playing: Boolean) {
         if (playing) releaseHuPause("AA заиграл")
-        else log("BRIDGE AA плеер остановился: наш KEYCODE $KEYCODE_MEDIA_PAUSE ${ago(lastPauseKeyMs)}, ввод пользователя ${ago(lastUserInputMs)}, BT HFP ${ago(lastHfpConnectMs)}", true)
+        else {
+            log("BRIDGE AA плеер остановился: наш KEYCODE $KEYCODE_MEDIA_PAUSE ${ago(lastPauseKeyMs)}, ввод пользователя ${ago(lastUserInputMs)}, BT HFP ${ago(lastHfpConnectMs)}", true)
+            muteMediaOnCall("плеер AA остановился")
+        }
         if (audioViaUsb || !MODULE_MUSIC_ENABLED || !carlifeStarted) return
         if (link.sendModuleStatus(CarlifeAudio.MODULE_MUSIC, if (playing) 1 else 0)) {
             log("BRIDGE CarLife MODULE_STATUS MUSIC=${if (playing) 1 else 0} (плеер AA, звук не по USB)", true)
@@ -1438,7 +1499,10 @@ class AaBridgeCore(
     }
 
     private fun stopAudio(ch: Int) {
-        if (ch == CarlifeAudio.CH_TTS) ttsStopTimer.cancel()
+        if (ch == CarlifeAudio.CH_TTS) {
+            ttsStopTimer.cancel()
+            dropTtsPending()
+        }
         val wasInited = audioInited[ch] == true
         if (wasInited || (ch == CarlifeAudio.CH_MEDIA && mediaPaused)) {
             audioInited[ch] = false
@@ -1470,6 +1534,7 @@ class AaBridgeCore(
     private fun resetAudio() {
         audioInited.clear()
         ttsStopTimer.cancel()
+        dropTtsPending()
         mediaReleaseTimer.cancel()
         naviSent = false
         naviEndPending = false
@@ -2379,6 +2444,8 @@ class AaBridgeCore(
          * 400 мс взяты без измерений (шипение начала подсказки на CNS3), длительность подбирается настройкой [TtsPreroll].
          */
         const val TTS_PREROLL_MS = 400
+        /** h425 (лог 24.10 18:34:09): NAVI=1 и TTS_INIT в одну миллисекунду - первая подсказка сессии молчит. 300 мс без измерений. */
+        const val TTS_INIT_AFTER_NAVI_MS = 300L
         private const val TTS_BYTES_PER_SEC = 16000 * 2
         private const val TTS_PREROLL_CHUNK = 4096
         /** Авто-размер пакета речи на VW CNS2 Delphi (h425): заикание ответа ассистента ушло при MAX_CHUNK/10; AA отдаёт речь по 2048 Б. */
@@ -2396,6 +2463,8 @@ class AaBridgeCore(
         const val HARD_KEY_SEEK_ADD = 0x10
         /** VW CNS2 Delphi 20082114: удержание вперёд/назад приходит как keycode 0 (Дмитрий, 24.10). */
         const val HARD_KEY_SEEK_HOLD = 0
+        /** MEDIA_STOP с ГУ; Delphi шлёт его сам, когда уходит на свой звонок. */
+        const val HARD_KEY_MEDIA_STOP = 0x20
 
         /**
          * CarLife hard key (HUJ/CommonParams) -> Android KeyEvent; все значения есть в AapMessages.KEYCODES_SUPPORTED.
