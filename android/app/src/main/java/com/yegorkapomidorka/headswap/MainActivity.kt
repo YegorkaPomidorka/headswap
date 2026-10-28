@@ -104,6 +104,11 @@ class MainActivity : Activity() {
         if (savedInstanceState == null && !hadCmd) {
             Thread({ AaCreds.selfTest(this) }, "aa-selftest").start()
         }
+        // h428: состояние звонка сообщаем ГУ, как Baidu; на API 31+ для этого нужно READ_PHONE_STATE
+        if (savedInstanceState == null && UiPrefs(this).onboardingDone && Build.VERSION.SDK_INT >= 31 &&
+            checkSelfPermission(android.Manifest.permission.READ_PHONE_STATE) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+            requestPermissions(arrayOf(android.Manifest.permission.READ_PHONE_STATE), REQ_PHONE_STATE)
+        }
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -290,6 +295,7 @@ class MainActivity : Activity() {
     companion object {
         const val ACTION_PERMISSION = "com.yegorkapomidorka.headswap.USB_PERMISSION"
         private const val REQ_LOCAL_NETWORK = 37
+        private const val REQ_PHONE_STATE = 38
 
         /** adb shell am start -n com.yegorkapomidorka.headswap/.MainActivity --es cmd aa_selftest */
         const val EXTRA_CMD = "cmd"

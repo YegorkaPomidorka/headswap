@@ -8,6 +8,7 @@ import com.yegorkapomidorka.headswap.aa.CarlifeAudio
 import com.yegorkapomidorka.headswap.aa.AaTranscoder
 import com.yegorkapomidorka.headswap.aa.BitratePolicy
 import com.yegorkapomidorka.headswap.aa.BitrateProfile
+import com.yegorkapomidorka.headswap.aa.CallStateSource
 import com.yegorkapomidorka.headswap.aa.CarlifeLink
 import com.yegorkapomidorka.headswap.aa.FpsSetting
 import com.yegorkapomidorka.headswap.aa.IdrThrottle
@@ -57,6 +58,8 @@ class CarLifeSession(
     private val bridge: AaBridgeCore,
     /** Нагрев телефона: по нему перекодирование снижает fps и битрейт. */
     private val thermal: ThermalSource = ThermalSource.NONE,
+    /** Состояние звонка телефона: о нём сообщаем ГУ, как Baidu (h428). */
+    private val calls: CallStateSource = CallStateSource.NONE,
     /** Размер кадра из VIDEO_ENCODER_INIT ГУ (для подсказки «Как просит ГУ» в разделе для разработчиков). */
     private val onHuSize: (Int, Int) -> Unit = { _, _ -> },
     private val onClosed: (String) -> Unit,
@@ -172,6 +175,48 @@ class CarLifeSession(
         sched.scheduleWithFixedDelay({ tick() }, 1, 1, TimeUnit.SECONDS)
         sched.scheduleWithFixedDelay({ pauseHeartbeat() }, PAUSE_HEARTBEAT_MS, PAUSE_HEARTBEAT_MS, TimeUnit.MILLISECONDS)
         sched.scheduleWithFixedDelay({ adaptBitrate() }, 1000, BITRATE_POLL_MS, TimeUnit.MILLISECONDS)
+        val callsOn = calls.start { state ->
+            try {
+                sched.execute { onCallState(state) }
+            } catch (_: java.util.concurrent.RejectedExecutionException) {   // сессия уже закрывается
+            }
+        }
+        AppLog.i("звонки: ${if (callsOn) "слежу, сообщаю ГУ (MODULE_STATUS PHONE + TELE_STATE)" else "не слежу (нет READ_PHONE_STATE)"}")
+    }
+
+    /** Нить cl-sched. Последнее состояние звонка, отправленное ГУ. */
+    private var callState = CallStateSource.IDLE
+
+    /**
+     * Как Baidu PhoneManager.onCallStateChanged: RINGING - MODULE_STATUS PHONE=1 + TELE_STATE_CHANGE_INCOMING,
+     * OFFHOOK - PHONE=2 + OUTGOING, IDLE - PHONE=0 + IDLE + FOREGROUND. Номер в INCOMING не кладём (нет READ_CALL_LOG).
+     * Первое IDLE при подписке не шлём: PHONE=0 уже ушёл в стартовом списке модулей.
+     */
+    private fun onCallState(state: Int) {
+        if (closed.get() || state == callState) return
+        callState = state
+        if (!matchSent) {
+            AppLog.i("звонки: state=$state до рукопожатия, ГУ не сообщаю")
+            return
+        }
+        when (state) {
+            CallStateSource.RINGING -> {
+                AppLog.i("-> ГУ: звонок входящий: MODULE_STATUS PHONE=1 + TELE_STATE_CHANGE_INCOMING", true)
+                sendCmd(Msg.MODULE_STATUS, Msgs.moduleStatusSingle(MODULE_PHONE, 1))
+                sendCmd(Msg.TELE_STATE_CHANGE_INCOMING, null)
+            }
+            CallStateSource.OFFHOOK -> {
+                AppLog.i("-> ГУ: звонок разговор/исходящий: MODULE_STATUS PHONE=2 + TELE_STATE_CHANGE_OUTGOING", true)
+                sendCmd(Msg.MODULE_STATUS, Msgs.moduleStatusSingle(MODULE_PHONE, 2))
+                sendCmd(Msg.TELE_STATE_CHANGE_OUTGOING, null)
+            }
+            else -> {
+                AppLog.i("-> ГУ: звонок закончен: MODULE_STATUS PHONE=0 + TELE_STATE_CHANGE_IDLE + FOREGROUND", true)
+                sendCmd(Msg.MODULE_STATUS, Msgs.moduleStatusSingle(MODULE_PHONE, 0))
+                sendCmd(Msg.TELE_STATE_CHANGE_IDLE, null)
+                sendCmd(Msg.FOREGROUND, null)
+            }
+        }
     }
 
     fun close(reason: String) {
@@ -185,6 +230,7 @@ class CarLifeSession(
         }
         WLog.ev(WLog.LINK, "session-end", "transport" to transport.caps.kind, "aliveS" to (SystemClock.elapsedRealtime() - t0) / 1000, "why" to reason)
         logSummary(reason)
+        calls.stop()
         CarLifeState.status = "закрыто: $reason"
         try {
             sched.shutdownNow()
@@ -1263,6 +1309,9 @@ class CarLifeSession(
 
         /** moduleID голосового помощника в MODULE_STATUS (ModuleStatusManage: 4 = VR). */
         private const val MODULE_VR = 4
+
+        /** moduleID телефона в MODULE_STATUS (ModuleStatusManage: 1 = PHONE; 0 idle, 1 входящий, 2 исходящий/разговор). */
+        private const val MODULE_PHONE = 1
         private const val VR_ECHO_MS = 1500L
 
         /** Поле time видеопакета: unix-секунды (Recorder.sendVideoData :930-962). */
