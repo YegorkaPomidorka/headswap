@@ -193,7 +193,11 @@ class CarLifeSession(
      * Первое IDLE при подписке не шлём: PHONE=0 уже ушёл в стартовом списке модулей.
      */
     private fun onCallState(state: Int) {
-        if (closed.get() || state == callState) return
+        if (closed.get()) return
+        // h425: мост узнаёт о звонке первым и независимо от рукопожатия и дедупа ниже: на VW CNS2 Delphi хвост музыки
+        // надо гасить до того, как ГУ уйдёт в своё окно звонка; стартовое состояние новой сессии тоже должно дойти до моста
+        bridge.onPhoneCallState(state)
+        if (state == callState) return
         callState = state
         if (!matchSent) {
             AppLog.i("звонки: state=$state до рукопожатия, ГУ не сообщаю")
@@ -805,6 +809,12 @@ class CarLifeSession(
         val time = if (isData) (System.currentTimeMillis() and 0xFFFFFFFFL).toInt() else 0
         send(channel, Wire.dataInner(type, time, payload))
         return true
+    }
+
+    /** h425: хвост MEDIA_DATA, ещё не записанный в USB, выбрасываем (ГУ ушло в звонок и не читает). Очередь общая: другие каналы не трогаем. */
+    override fun dropQueuedMedia(): Int {
+        if (closed.get()) return 0
+        return transport.dropQueued(Ch.MEDIA) { it.size >= 12 && Wire.u32(it, 8) == CarlifeAudio.MEDIA_DATA }
     }
 
     /** MODULE_STATUS об одном модуле (NAVI перед TTS, MUSIC при MEDIA INIT/PAUSE), как Baidu ModuleStatusManage. */

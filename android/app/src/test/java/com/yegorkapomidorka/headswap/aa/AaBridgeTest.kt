@@ -64,6 +64,12 @@ class FakeLink : CarlifeLink {
     override fun goToDesktop() {
         desktops++
     }
+
+    @Volatile var mediaDrops = 0
+    override fun dropQueuedMedia(): Int {
+        mediaDrops++
+        return 0
+    }
 }
 
 class FakePeer : AaPeer {
@@ -850,6 +856,68 @@ class AaBridgeAudioTest {
         core.onAudioStart(AapMessages.CH_AUDIO_MEDIA)                               // после звонка AA заиграл снова
         core.onAudioData(AapMessages.CH_AUDIO_MEDIA, pcm(100), 3)
         assertEquals(listOf(0x30001, 0x30006, 0x30003, 0x30001, 0x30006), link.audio.map { it.type })
+    }
+
+    @Test
+    fun delphiTelephonyRingingPausesMediaAtOnce() {
+        // h425: телефония сообщает RINGING раньше, чем плеер AA сменит статус и AudioManager.mode станет RINGTONE
+        core.peer = FakePeer()
+        core.onHuStatistic("20082114")
+        core.onCarlifeStart()
+        core.onMediaStatus(AaMediaStatus(2, "YandexMusic", 10, null, null, null))
+        core.onAudioData(AapMessages.CH_AUDIO_MEDIA, pcm(100), 1)
+        core.onPhoneCallState(1)                                                    // RINGING, статус плеера не менялся, mode ещё NORMAL
+        core.onAudioData(AapMessages.CH_AUDIO_MEDIA, pcm(100), 2)                   // хвост буфера AA
+        core.onAudioData(AapMessages.CH_AUDIO_MEDIA, pcm(100), 3)
+        assertEquals(listOf(0x30001, 0x30006, 0x30003), link.audio.map { it.type })
+        assertEquals(1, link.mediaDrops)
+        assertTrue(logs.any { it.contains("BRIDGE звонок RINGING (телефония)") })
+    }
+
+    @Test
+    fun delphiTelephonyIdleReleasesPauseWhenPlayerPlaying() {
+        // звонок сбросили быстро, плеер AA не успел встать и события play не будет: паузу снимает конец звонка
+        core.peer = FakePeer()
+        core.onHuStatistic("20082114")
+        core.onCarlifeStart()
+        core.onMediaStatus(AaMediaStatus(2, "YandexMusic", 10, null, null, null))
+        core.onAudioData(AapMessages.CH_AUDIO_MEDIA, pcm(100), 1)
+        core.onPhoneCallState(1)
+        core.onAudioData(AapMessages.CH_AUDIO_MEDIA, pcm(100), 2)
+        core.onPhoneCallState(0)                                                    // IDLE, плеер всё это время playing
+        core.onAudioData(AapMessages.CH_AUDIO_MEDIA, pcm(100), 3)
+        assertEquals(listOf(0x30001, 0x30006, 0x30003, 0x30001, 0x30006), link.audio.map { it.type })
+        assertTrue(logs.any { it.contains("BRIDGE звонок закончен, плеер AA играет") })
+    }
+
+    @Test
+    fun delphiTelephonyIdleKeepsPauseWhenPlayerStopped() {
+        core.peer = FakePeer()
+        core.onHuStatistic("20082114")
+        core.onCarlifeStart()
+        core.onMediaStatus(AaMediaStatus(2, "YandexMusic", 10, null, null, null))
+        core.onAudioData(AapMessages.CH_AUDIO_MEDIA, pcm(100), 1)
+        core.onPhoneCallState(1)
+        core.onMediaStatus(AaMediaStatus(3, "YandexMusic", 10, null, null, null))   // плеер встал под рингтон
+        core.onPhoneCallState(0)
+        core.onAudioData(AapMessages.CH_AUDIO_MEDIA, pcm(100), 2)                   // хвост: плеер стоит, пауза держится
+        assertEquals(listOf(0x30001, 0x30006, 0x30003), link.audio.map { it.type })
+        core.onMediaStatus(AaMediaStatus(2, "YandexMusic", 10, null, null, null))   // пользователь снова запустил
+        core.onAudioData(AapMessages.CH_AUDIO_MEDIA, pcm(100), 3)
+        assertEquals(listOf(0x30001, 0x30006, 0x30003, 0x30001, 0x30006), link.audio.map { it.type })
+    }
+
+    @Test
+    fun telephonyRingingDoesNotTouchMediaOnOtherHu() {
+        core.peer = FakePeer()
+        core.onCarlifeStart()
+        core.onMediaStatus(AaMediaStatus(2, "YandexMusic", 10, null, null, null))
+        core.onAudioData(AapMessages.CH_AUDIO_MEDIA, pcm(100), 1)
+        core.onPhoneCallState(1)
+        core.onAudioData(AapMessages.CH_AUDIO_MEDIA, pcm(100), 2)
+        core.onPhoneCallState(0)
+        assertEquals(listOf(0x30001, 0x30006, 0x30006), link.audio.map { it.type })
+        assertEquals(0, link.mediaDrops)
     }
 
     @Test

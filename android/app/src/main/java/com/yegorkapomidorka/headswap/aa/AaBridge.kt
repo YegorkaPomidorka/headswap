@@ -66,6 +66,9 @@ interface CarlifeLink {
 
     /** CMD GO_TO_DESKTOP (0x10021): ГУ уходит на свой рабочий стол (плитка «Выйти» в AA). */
     fun goToDesktop() {}
+
+    /** Выбросить из очереди транспорта ещё не записанные MEDIA_DATA (INIT/PAUSE/STOP, видео, TTS и команды остаются); сколько выброшено. */
+    fun dropQueuedMedia(): Int = 0
 }
 
 /** Ссылка на мёртвую CarLife-сессию (USB оборван): всё отбрасывает. */
@@ -285,6 +288,7 @@ class AaBridgeCore(
     private var carlifePaused = false          // VIDEO_ENCODER_PAUSE после последнего START
     private var exitPending = false            // «Выйти» в AA: GO_TO_DESKTOP ушёл, ждём PAUSE от ГУ, чтобы отдать AA NATIVE
     private var huPausedAa = false             // плеер AA поставили на паузу, когда ГУ ушло на свой источник; MEDIA не пересылаем до play
+    private var callPausedAa = false           // huPausedAa поставил звонок (muteMediaOnCall), а не уход ГУ на радио: по концу звонка снимаем сами
     private var resumeOnHuMusic = false        // паузу поставили мы (127 при игравшем AA): на MUSIC=1 от ГУ можно вернуть play
     private var lastHuResumeMs = NEVER         // когда по MUSIC=1 от ГУ слали AA KEYCODE 126
     @Volatile private var lastUserInputMs = NEVER   // последний тач DOWN / клавиша / шайба / голос с ГУ
@@ -350,6 +354,12 @@ class AaBridgeCore(
     /** Состояние звонка на телефоне (AudioManager.mode): на [huVwCns2Delphi] перемотка руля на время звонка = принять/положить. */
     @Volatile var phoneCallProvider: () -> PhoneCall = { PhoneCall.IDLE }
 
+    /** Состояние звонка из TelephonyManager (CarLifeSession.onCallState); null = телефония не сообщала (нет READ_PHONE_STATE) - тогда [phoneCallProvider]. */
+    @Volatile private var telephonyCall: PhoneCall? = null
+
+    /** Звонок: телефония приоритетнее AudioManager.mode (RINGING приходит раньше, чем mode станет RINGTONE). */
+    private fun currentCall(): PhoneCall = telephonyCall ?: phoneCallProvider()
+
     /** Микрофон телефона (AudioRecord); null = нет. Один экземпляр на всё время: router вызывает start/stop по очереди. */
     @Volatile var phoneMic: PhoneMic? = null
 
@@ -391,10 +401,12 @@ class AaBridgeCore(
         carlifePaused = false
         exitPending = false
         huPausedAa = false
+        callPausedAa = false
+        telephonyCall = null                   // CarLifeSession.calls пришлёт текущее состояние заново
         resumeOnHuMusic = false
         lastHuResumeMs = NEVER
         gotIdr = false
-        huDesayG6S = false                     // HU_INFO / STATISTIC_INFO придут заново в этой сессии
+        huDesayG6S = false                    // HU_INFO / STATISTIC_INFO придут заново в этой сессии
         huVw20082120 = false                   // HU_INFO / STATISTIC_INFO придут заново в этой сессии
         huHonda = false                        // STATISTIC_INFO придёт заново в этой сессии
         huVwBt1420 = false                     // HU_INFO придёт заново в этой сессии
@@ -510,6 +522,7 @@ class AaBridgeCore(
             val p = peer
             if (huPausedAa && resumeOnHuMusic && p != null) {
                 huPausedAa = false
+                callPausedAa = false
                 resumeOnHuMusic = false
                 lastHuResumeMs = now
                 lastUserInputMs = now              // выбор источника на ГУ - ввод пользователя, BT-гард его не перебивает
@@ -552,6 +565,7 @@ class AaBridgeCore(
             return
         }
         huPausedAa = false
+        callPausedAa = false
         resumeOnHuMusic = false
         log("BRIDGE $why: MEDIA снова пересылаю", true)
     }
@@ -722,6 +736,8 @@ class AaBridgeCore(
         carlifeStarted = false
         exitPending = false
         gotIdr = false
+        telephonyCall = null                   // подписка на телефонию закрыта вместе с сессией
+        callPausedAa = false
         spliceCancel("CarLife закрыт")
         resetAudio()
         stopTranscoderAsync()
@@ -993,7 +1009,7 @@ class AaBridgeCore(
             p.sendRotary(delta)
             return
         }
-        val call = if (huVwCns2Delphi) phoneCallProvider() else PhoneCall.IDLE
+        val call = if (huVwCns2Delphi) currentCall() else PhoneCall.IDLE
         if (code == HARD_KEY_MEDIA_STOP) muteMediaOnCall("ГУ прислало keycode=$code")
         val android = delphiKey(code, call) ?: HARD_KEY_TO_ANDROID[code]
         if (call == PhoneCall.ACTIVE && code == HARD_KEY_SEEK_SUB) {
@@ -1423,12 +1439,50 @@ class AaBridgeCore(
     @Synchronized
     private fun muteMediaOnCall(why: String) {
         if (!huVwCns2Delphi || huPausedAa || !carlifeStarted) return
-        val call = phoneCallProvider()
+        val call = currentCall()
         if (call == PhoneCall.IDLE) return
+        muteMedia(call, why)
+    }
+
+    /** Ядро [muteMediaOnCall]: звонок уже признан; хвост MEDIA_DATA из очереди USB выбрасываем, пока он не забил ГУ. */
+    private fun muteMedia(call: PhoneCall, why: String) {
         huPausedAa = true
+        callPausedAa = true
         resumeOnHuMusic = false
-        log("BRIDGE звонок ${call.name} ($why): MEDIA на паузу, хвост музыки AA не пересылаю (h425)", true)
+        val dropped = link.dropQueuedMedia()
+        log("BRIDGE звонок ${call.name} ($why): MEDIA на паузу, хвост музыки AA не пересылаю, из очереди USB выброшено MEDIA_DATA: $dropped (h425)", true)
         requestMediaPause("звонок на телефоне")
+    }
+
+    /**
+     * Состояние звонка из TelephonyManager (CALL_STATE_*: 0 IDLE, 1 RINGING, 2 OFFHOOK), зовёт CarLifeSession раньше, чем
+     * сообщит звонок ГУ. На Delphi RINGING/OFFHOOK сразу глушит MEDIA, не дожидаясь смены плеера AA и AudioManager.mode.
+     * IDLE после нашей паузы по звонку: если плеер AA играет, паузу снимаем сами - события play может и не быть,
+     * когда звонок сбросили раньше, чем плеер встал.
+     */
+    @Synchronized
+    fun onPhoneCallState(state: Int) {
+        val call = when (state) {
+            CallStateSource.RINGING -> PhoneCall.RINGING
+            CallStateSource.OFFHOOK -> PhoneCall.ACTIVE
+            else -> PhoneCall.IDLE
+        }
+        val prev = telephonyCall
+        telephonyCall = call
+        if (prev == call) return
+        if (call != PhoneCall.IDLE) {
+            when {
+                !huVwCns2Delphi -> log("BRIDGE звонок ${call.name} (телефония): не VW CNS2 Delphi, MEDIA не трогаю", true)
+                !carlifeStarted -> log("BRIDGE звонок ${call.name} (телефония): CarLife ещё не START, гасить нечего", true)
+                huPausedAa -> log("BRIDGE звонок ${call.name} (телефония): MEDIA уже на паузе", true)
+                else -> muteMedia(call, "телефония")
+            }
+        } else if (callPausedAa) {
+            if (meta.playing) releaseHuPause("звонок закончен, плеер AA играет")
+            else log("BRIDGE звонок закончен: плеер AA стоит, MEDIA держу на паузе до play", true)
+        } else if (prev != null) {
+            log("BRIDGE звонок закончен (телефония): пауза MEDIA была не от звонка, не трогаю", false)
+        }
     }
 
     /** Пускать ли MEDIA_DATA дальше; нет = данные отброшены (голос / ждём INIT после TTS). */

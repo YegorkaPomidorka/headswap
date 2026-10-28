@@ -104,8 +104,9 @@ class MainActivity : Activity() {
         if (savedInstanceState == null && !hadCmd) {
             Thread({ AaCreds.selfTest(this) }, "aa-selftest").start()
         }
-        // h428: состояние звонка сообщаем ГУ, как Baidu; на API 31+ для этого нужно READ_PHONE_STATE
-        if (savedInstanceState == null && UiPrefs(this).onboardingDone && Build.VERSION.SDK_INT >= 31 &&
+        // h428: состояние звонка сообщаем ГУ, как Baidu; на API 31+ для этого нужно READ_PHONE_STATE.
+        // Не вместе с другим запросом в этом onCreate (cmd net_perm = ACCESS_LOCAL_NETWORK): второй одновременный Android молча отклоняет.
+        if (savedInstanceState == null && !hadCmd && !fromUsb && UiPrefs(this).onboardingDone && Build.VERSION.SDK_INT >= 31 &&
             checkSelfPermission(android.Manifest.permission.READ_PHONE_STATE) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
             requestPermissions(arrayOf(android.Manifest.permission.READ_PHONE_STATE), REQ_PHONE_STATE)
         }
@@ -157,6 +158,9 @@ class MainActivity : Activity() {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
         current()?.onPermissionResult()
         if (requestCode == REQ_LOCAL_NETWORK) AppLog.i("ACCESS_LOCAL_NETWORK: ${NetProbe.localNetworkGranted(this)}")
+        if (requestCode == REQ_PHONE_STATE) {
+            AppLog.i("звонки: READ_PHONE_STATE ${if (grantResults.firstOrNull() == android.content.pm.PackageManager.PERMISSION_GRANTED) "выдано" else "отказано"}")
+        }
     }
 
     @Deprecated("Deprecated in Java")
@@ -295,7 +299,7 @@ class MainActivity : Activity() {
     companion object {
         const val ACTION_PERMISSION = "com.yegorkapomidorka.headswap.USB_PERMISSION"
         private const val REQ_LOCAL_NETWORK = 37
-        private const val REQ_PHONE_STATE = 38
+        private const val REQ_PHONE_STATE = 40      // 38 - диалог CDM (CarPairing), 39 - BLUETOOTH_CONNECT
 
         /** adb shell am start -n com.yegorkapomidorka.headswap/.MainActivity --es cmd aa_selftest */
         const val EXTRA_CMD = "cmd"
