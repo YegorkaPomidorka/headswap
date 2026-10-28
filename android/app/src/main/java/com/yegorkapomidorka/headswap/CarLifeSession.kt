@@ -692,7 +692,7 @@ class CarLifeSession(
         if (!bridge.huVw20082138) return
         val old = bitratePolicy.current
         if (!bitratePolicy.lowerCeiling(VW_20082138_CEILING_BPS)) return
-        AppLog.i("VW 20082138: потолок битрейта ${bitratePolicy.ceilingBps / 1000} кбит/с (лимит размера IDR)")
+        AppLog.i("VW ID: потолок битрейта ${bitratePolicy.ceilingBps / 1000} кбит/с (лимит размера IDR)")
         if (bitratePolicy.current != old) bridge.setEncoderBitrate(bitratePolicy.current)
     }
 
@@ -736,7 +736,7 @@ class CarLifeSession(
         val old = bitratePolicy.current
         if (!bitratePolicy.lowerCeiling(maxOf(VW_20082138_MIN_BPS, (bitratePolicy.ceilingBps * 0.75).toInt()))) return
         vwIdrCutMs = now
-        AppLog.i("VW 20082138: IDR $size Б > $VW_20082138_IDR_LIMIT, потолок битрейта -> ${bitratePolicy.ceilingBps}")
+        AppLog.i("VW ID: IDR $size Б > $VW_20082138_IDR_LIMIT, потолок битрейта -> ${bitratePolicy.ceilingBps}")
         if (bitratePolicy.current != old) bridge.setEncoderBitrate(bitratePolicy.current)
     }
 

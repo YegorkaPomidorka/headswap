@@ -28,6 +28,7 @@ import com.yegorkapomidorka.headswap.aa.AaPrefs
 import com.yegorkapomidorka.headswap.aa.AaState
 import com.yegorkapomidorka.headswap.aa.AapOptions
 import com.yegorkapomidorka.headswap.aa.BridgeHost
+import com.yegorkapomidorka.headswap.aa.CarPreset
 import com.yegorkapomidorka.headswap.aa.EqLive
 import com.yegorkapomidorka.headswap.aa.MetaRelay
 import com.yegorkapomidorka.headswap.aa.MicMode
@@ -816,6 +817,7 @@ class BridgeService : Service() {
             AppLog.i("BRIDGE видео: ${if (transcode) "перекодирование включаю принудительно (воздух или режим хоста ${h.core.videoMode.label})" else "кабель, возвращаю passthrough по настройке"}")
             h.core.transcodeEnabled = transcode
         }
+        h.core.carVwId = aaPrefs.carPreset == CarPreset.VW_ID_UNYX
         if (wakeLock == null) {
             wakeLock = getSystemService(PowerManager::class.java)
                 .newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "headswap:session")
