@@ -554,8 +554,9 @@ class CarLifeSession(
                 bridge.huMazda20622111 -> minOf(mode.bitrate, AaBridgeCore.MAZDA_20622111_CEILING_BPS)
                 else -> mode.bitrate
             }
-            // h529: в passthrough с SPS-кропом заглушка в кадре AA с теми же полями, ГУ не видит смены размера на AA
-            stubCropped = !air && bridge.stubInAaGeometry
+            // h529: в passthrough с SPS-кропом заглушка в кадре AA с теми же полями, ГУ не видит смены размера на AA.
+            // На воздухе тоже: с галкой «И по Wi-Fi» там passthrough (stubInAaGeometry сам проверяет перекодирование)
+            stubCropped = bridge.stubInAaGeometry
             val s = if (stubCropped) {
                 val (x, y) = bridge.spsCropOrigin
                 VideoSource(mode.aaW, mode.aaH, pendingFps, stubBps, this, Rect(x, y, x + mode.outW, y + mode.outH))
