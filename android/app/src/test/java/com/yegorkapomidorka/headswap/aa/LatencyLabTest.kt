@@ -117,9 +117,9 @@ class LatencyLabTest {
     @Test
     fun tuningDescribe() {
         assertTrue(SpliceTuning().isDefault)
-        assertEquals("как в PR #115", SpliceTuning().describe())
+        assertEquals("по умолчанию (IDR вместо 2 кадров AA)", SpliceTuning().describe())
         assertEquals("IDR вместо 2 кадров AA (выброс 1)", SpliceTuning(replace = true, drop = 1).describe())
-        val d = SpliceTuning(replace = true, sps = SpliceSps.ALWAYS, slices = 2).describe()
+        val d = SpliceTuning(replace = true, drop = 0, sps = SpliceSps.ALWAYS, slices = 2).describe()
         assertTrue(d, d.contains("вместо кадра AA") && d.contains("всегда") && d.contains("слайсов 2"))
     }
 }
@@ -135,6 +135,7 @@ class IdrSpliceTuningTest {
     private val core = AaBridgeCore({ l, _ -> logs.add(l) }, { now }).also {
         it.transcodeEnabled = false
         it.idrSpliceMs = 2000
+        it.tuning = SpliceTuning(drop = 0)                      // тесты вариантов исходят из PR #115; выброс - по умолчанию, проверяется явно
         it.refDecoderFactory = { _ -> dec }
         it.spliceExecutor = Executor { r -> if (queueBuilds) builds.add(r) else r.run() }
         it.attach(link)
@@ -186,7 +187,7 @@ class IdrSpliceTuningTest {
 
     @Test
     fun replaceSendsIdrInPlaceOfAaFrame() {
-        core.tuning = SpliceTuning(replace = true)
+        core.tuning = SpliceTuning(replace = true, drop = 0)
         val before = runToSplice()
         assertEquals(5, before)                                 // кадр 6 не ушёл: его место займёт IDR
         assertEquals(7, link.sent.size)                         // кадров в ГУ столько же, сколько от AA
@@ -201,7 +202,7 @@ class IdrSpliceTuningTest {
     /** IDR не успел: кадр, вместо которого его ждали, уходит первым, за ним придержанные. */
     @Test
     fun replaceReleasesReplacedFrameFirstWhenIdrIsLate() {
-        core.tuning = SpliceTuning(replace = true)
+        core.tuning = SpliceTuning(replace = true, drop = 0)
         startWith(3)
         passed(3)
         now = 1990; core.onFrame(aus[3], 3)
@@ -223,7 +224,7 @@ class IdrSpliceTuningTest {
     /** Выброс 1: кадр перед картинкой IDR не уходит, IDR встаёт вместо двух кадров AA - в ГУ на кадр меньше. */
     @Test
     fun dropSendsIdrInPlaceOfTwoAaFrames() {
-        core.tuning = SpliceTuning(drop = 1)
+        core.tuning = SpliceTuning()
         startWith(4)
         core.tick()
         passed(4)
@@ -262,7 +263,7 @@ class IdrSpliceTuningTest {
     /** Статика (кадр после паузы) - сборка в фоне, кадр уходит сразу и в режиме замены. */
     @Test
     fun replaceKeepsBackgroundBuildAfterPause() {
-        core.tuning = SpliceTuning(replace = true)
+        core.tuning = SpliceTuning(replace = true, drop = 0)
         startWith(3)
         passed(3)
         queueBuilds = true
@@ -274,14 +275,14 @@ class IdrSpliceTuningTest {
 
     @Test
     fun spsNeverSendsBareIdr() {
-        core.tuning = SpliceTuning(sps = SpliceSps.NEVER)
+        core.tuning = SpliceTuning(sps = SpliceSps.NEVER, drop = 0)
         runToSplice()
         assertEquals(listOf(5), SpliceAssets.nalTypes(link.sent[6]))
     }
 
     @Test
     fun spsAlwaysGluesEveryIdr() {
-        core.tuning = SpliceTuning(sps = SpliceSps.ALWAYS)
+        core.tuning = SpliceTuning(sps = SpliceSps.ALWAYS, drop = 0)
         runToSplice()
         assertEquals(listOf(7, 8, 5), SpliceAssets.nalTypes(link.sent[6]))
         passed(7)
@@ -297,7 +298,7 @@ class IdrSpliceTuningTest {
     /** Метка в кадре 96x64 не помещается: IDR уходит без неё, сборка не падает. */
     @Test
     fun stampSkippedOnTinyPicture() {
-        core.tuning = SpliceTuning(stamp = true)
+        core.tuning = SpliceTuning(stamp = true, drop = 0)
         core.wallMs = { 123_450L }
         runToSplice()
         assertEquals(8, link.sent.size)
@@ -306,7 +307,7 @@ class IdrSpliceTuningTest {
 
     @Test
     fun lightAndSlicesStillSplice() {
-        core.tuning = SpliceTuning(light = true, slices = 1, lowDelayVui = true)
+        core.tuning = SpliceTuning(light = true, slices = 1, lowDelayVui = true, drop = 0)
         runToSplice()
         assertEquals(8, link.sent.size)
         assertEquals(5, SpliceAssets.nalTypes(link.sent[6]).last())

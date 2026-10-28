@@ -33,14 +33,14 @@ data class SpliceTuning(
      * Сколько кадров AA перед картинкой своего IDR не уходит в ГУ (в движении): IDR встаёт вместо drop + 1 кадров AA,
      * очередь ГУ с постоянной частотой показа укорачивается на drop кадров. P-кадр после IDR ссылается только на его картинку.
      */
-    val drop: Int = 0,
+    val drop: Int = 1,
 ) {
     val isDefault: Boolean get() = this == SpliceTuning()
 
     /** IDR встаёт на место кадра AA: сам по себе ([replace]) или с выбросом кадров перед ним ([drop]). */
     val replacing: Boolean get() = replace || drop > 0
 
-    fun describe(): String = if (isDefault) "как в PR #115" else buildList {
+    fun describe(): String = if (isDefault) "по умолчанию (IDR вместо 2 кадров AA)" else buildList {
         if (drop > 0) add("IDR вместо ${drop + 1} кадров AA (выброс $drop)")
         else if (replace) add("IDR вместо кадра AA")
         if (sps != SpliceSps.ALTERNATE) add("SPS/PPS ${sps.label}")
@@ -56,7 +56,6 @@ data class SpliceTuning(
         const val LIGHT_MIN_QP = 24
         const val LIGHT_START_QP = 26
         val SLICE_CHOICES = listOf(1, 2, 4, 8)
-        val DROP_CHOICES = listOf(0, 1, 2)
     }
 }
 

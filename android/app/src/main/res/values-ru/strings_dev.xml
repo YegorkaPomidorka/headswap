@@ -15,29 +15,6 @@
     <string name="dev_idr_splice_air_title">И по Wi-Fi</string>
     <string name="dev_idr_splice_air_sub">По воздуху тоже прямой проброс со своим ключевым кадром, без перекодирования. Битрейт Android Auto не регулируется: если связь рвётся, выключите. Нужен выключенный «Перекодирование»</string>
     <string name="dev_sps_crop_bottom_sub">Android Auto рисует интерфейс в левом верхнем углу, поля уходят вправо и вниз. Для ГУ, которые режут только справа и снизу (картинка съезжала вниз или влево)</string>
-    <string name="dev_section_latency">Задержка картинки на ГУ (поиск причины)</string>
-    <string name="dev_lat_replace_title">Ключевой кадр вместо кадра AA</string>
-    <string name="dev_lat_replace_sub">Свой ключевой кадр уходит на место кадра Android Auto, с которого собран, а не лишним кадром после него. Кадров в ГУ столько же, сколько от AA</string>
-    <string name="dev_lat_light_title">Лёгкий ключевой кадр</string>
-    <string name="dev_lat_light_sub">До 120 КБ, QP от 24: быстрее сборка и декодирование на ГУ, статичные места чуть мыльнее</string>
-    <string name="dev_lat_vui_title">SPS без переупорядочивания</string>
-    <string name="dev_lat_vui_sub">В SPS к ГУ max_num_reorder_frames = 0: декодер ГУ может выводить кадр сразу, не копить в буфере</string>
-    <string name="dev_lat_stamp_title">Метка времени в кадре</string>
-    <string name="dev_lat_stamp_sub">Секунды телефона в правом верхнем углу своего ключевого кадра. Снимите экран ГУ вместе с часами ниже: разница показаний = задержка</string>
-    <string name="dev_lat_ts_title">Метка VIDEO_DATA в миллисекундах</string>
-    <string name="dev_lat_ts_sub">Как у CarProjection, вместо секунд. Для ГУ, которая показывает кадры по меткам</string>
-    <string name="dev_lat_drop_head">Выброс кадров AA перед своим ключевым кадром</string>
-    <string name="dev_lat_drop_0">Нет (как сейчас)</string>
-    <string name="dev_lat_drop_1">1 кадр: ключевой кадр вместо 2 кадров AA</string>
-    <string name="dev_lat_drop_2">2 кадра: ключевой кадр вместо 3 кадров AA</string>
-    <string name="dev_lat_drop_note">Только пока картинка движется. В ГУ уходит меньше кадров, чем шлёт AA, и очередь у ГУ с постоянной частотой показа сокращается. Цена — небольшой рывок прокрутки карты раз в 2 с. Включает «Ключевой кадр вместо кадра AA»</string>
-    <string name="dev_lat_sps_head">SPS/PPS в своём ключевом кадре</string>
-    <string name="dev_lat_sps_alternate">Через раз (как сейчас)</string>
-    <string name="dev_lat_sps_always">Всегда</string>
-    <string name="dev_lat_sps_never">Никогда (только при восстановлении)</string>
-    <string name="dev_lat_slices_head">Слайсов в своём ключевом кадре</string>
-    <string name="dev_lat_slices_note">Слайсы собираются параллельно: больше — быстрее на телефоне, меньше — проще декодеру некоторых ГУ. По умолчанию 4</string>
-    <string name="dev_lat_clock_note">Часы телефона для съёмки рядом с экраном ГУ (тот же формат, что метка в кадре). Всё здесь читается при подключении к ГУ</string>
     <string name="dev_section_meta">Метаданные на ГУ (с переподключения USB)</string>
     <string name="dev_meta_music_title">Музыка</string>
     <string name="dev_meta_music_sub">Трек, обложка и прогресс: MEDIA_INFO / MEDIA_PROGRESS_BAR</string>

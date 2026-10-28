@@ -29,10 +29,7 @@ import com.yegorkapomidorka.headswap.aa.AaPrefs
 import com.yegorkapomidorka.headswap.aa.AaState
 import com.yegorkapomidorka.headswap.aa.CustomResError
 import com.yegorkapomidorka.headswap.aa.CustomVideoMode
-import com.yegorkapomidorka.headswap.aa.FrameStamp
 import com.yegorkapomidorka.headswap.aa.MediaChunk
-import com.yegorkapomidorka.headswap.aa.SpliceSps
-import com.yegorkapomidorka.headswap.aa.SpliceTuning
 import com.yegorkapomidorka.headswap.aa.TouchDecimation
 import com.yegorkapomidorka.headswap.aa.TtsPreroll
 import com.yegorkapomidorka.headswap.aa.VoiceChunk
@@ -60,9 +57,6 @@ class DevScreen(host: MainActivity) : Screen(host) {
     private val voiceChunkRows = LinkedHashMap<VoiceChunk, RadioRow>()
     private val ttsPrerollRows = LinkedHashMap<TtsPreroll, RadioRow>()
     private val touchDecimationRows = LinkedHashMap<TouchDecimation, RadioRow>()
-    private val spliceSpsRows = LinkedHashMap<SpliceSps, RadioRow>()
-    private val spliceSliceRows = LinkedHashMap<Int, RadioRow>()
-    private val spliceDropRows = LinkedHashMap<Int, RadioRow>()
 
     /** AVC-энкодеры телефона (null = список получить не удалось, тогда размер не проверяем). Список не меняется, считаем один раз. */
     private val avcEncoders: List<MediaCodecInfo.VideoCapabilities>? by lazy {
@@ -106,55 +100,6 @@ class DevScreen(host: MainActivity) : Screen(host) {
                 row(c.getString(R.string.dev_idr_splice_title), c.getString(R.string.dev_idr_splice_sub), aa.idrSplice) { aa.idrSplice = it },
                 row(c.getString(R.string.dev_idr_splice_air_title), c.getString(R.string.dev_idr_splice_air_sub), aa.idrSpliceAir) { aa.idrSpliceAir = it },
             )),
-        )
-
-        body.addView(c.sectionTitle(c.getString(R.string.dev_section_latency)))
-        body.addView(
-            group(listOf(
-                row(c.getString(R.string.dev_lat_replace_title), c.getString(R.string.dev_lat_replace_sub), aa.spliceReplace) { aa.spliceReplace = it },
-                row(c.getString(R.string.dev_lat_light_title), c.getString(R.string.dev_lat_light_sub), aa.spliceLight) { aa.spliceLight = it },
-                row(c.getString(R.string.dev_lat_vui_title), c.getString(R.string.dev_lat_vui_sub), aa.spliceLowDelayVui) { aa.spliceLowDelayVui = it },
-                row(c.getString(R.string.dev_lat_stamp_title), c.getString(R.string.dev_lat_stamp_sub), aa.spliceStamp) { aa.spliceStamp = it },
-                row(c.getString(R.string.dev_lat_ts_title), c.getString(R.string.dev_lat_ts_sub), aa.videoTsMs) { aa.videoTsMs = it },
-            )),
-        )
-        body.addView(c.text(c.getString(R.string.dev_lat_drop_head), 14f, 600, c.clr(R.color.on2)), lp(WRAP, WRAP).margins(c, 8, 8, 8, 0))
-        for ((n, res) in listOf(0 to R.string.dev_lat_drop_0, 1 to R.string.dev_lat_drop_1, 2 to R.string.dev_lat_drop_2)) {
-            val row = RadioRow(c, c.getString(res), "") { setSpliceDrop(n) }
-            spliceDropRows[n] = row
-            body.addView(row.view, lp(MATCH, WRAP))
-        }
-        refreshSpliceDrop()
-        body.addView(
-            c.text(c.getString(R.string.dev_lat_drop_note), 13f, 400, c.clr(R.color.on2)),
-            lp(WRAP, WRAP).margins(c, 8, 2, 8, 0),
-        )
-        body.addView(c.text(c.getString(R.string.dev_lat_sps_head), 14f, 600, c.clr(R.color.on2)), lp(WRAP, WRAP).margins(c, 8, 8, 8, 0))
-        for ((m, res) in listOf(
-            SpliceSps.ALTERNATE to R.string.dev_lat_sps_alternate,
-            SpliceSps.ALWAYS to R.string.dev_lat_sps_always,
-            SpliceSps.NEVER to R.string.dev_lat_sps_never,
-        )) {
-            val row = RadioRow(c, c.getString(res), "") { setSpliceSps(m) }
-            spliceSpsRows[m] = row
-            body.addView(row.view, lp(MATCH, WRAP))
-        }
-        refreshSpliceSps()
-        body.addView(c.text(c.getString(R.string.dev_lat_slices_head), 14f, 600, c.clr(R.color.on2)), lp(WRAP, WRAP).margins(c, 8, 8, 8, 0))
-        for (n in SpliceTuning.SLICE_CHOICES) {
-            val row = RadioRow(c, n.toString(), "") { setSpliceSlices(n) }
-            spliceSliceRows[n] = row
-            body.addView(row.view, lp(MATCH, WRAP))
-        }
-        refreshSpliceSlices()
-        body.addView(
-            c.text(c.getString(R.string.dev_lat_slices_note), 13f, 400, c.clr(R.color.on2)),
-            lp(WRAP, WRAP).margins(c, 8, 2, 8, 0),
-        )
-        body.addView(stampClock(), lp(MATCH, WRAP).margins(c, 0, 8))
-        body.addView(
-            c.text(c.getString(R.string.dev_lat_clock_note), 13f, 400, c.clr(R.color.on2)),
-            lp(WRAP, WRAP).margins(c, 8, 0, 8, 0),
         )
 
         body.addView(c.sectionTitle(c.getString(R.string.dev_section_meta)))
@@ -304,58 +249,6 @@ class DevScreen(host: MainActivity) : Screen(host) {
         )
 
         view = scaffold(c, c.getString(R.string.dev_title), { host.back() }, body)
-    }
-
-    private fun setSpliceSps(m: SpliceSps) {
-        aa.spliceSps = m
-        refreshSpliceSps()
-    }
-
-    private fun refreshSpliceSps() {
-        for ((m, row) in spliceSpsRows) row.setSelected(aa.spliceSps == m)
-    }
-
-    private fun setSpliceSlices(n: Int) {
-        aa.spliceSlices = n
-        refreshSpliceSlices()
-    }
-
-    private fun refreshSpliceSlices() {
-        for ((n, row) in spliceSliceRows) row.setSelected(aa.spliceSlices == n)
-    }
-
-    private fun setSpliceDrop(n: Int) {
-        aa.spliceDrop = n
-        refreshSpliceDrop()
-    }
-
-    private fun refreshSpliceDrop() {
-        for ((n, row) in spliceDropRows) row.setSelected(aa.spliceDrop == n)
-    }
-
-    /** Крупные часы телефона в формате метки в кадре ([FrameStamp.text]), обновляются каждый кадр экрана, пока он виден. */
-    private fun stampClock(): TextView {
-        val c = ctx
-        return c.text("", 44f, 600, c.clr(R.color.on), monospace = true).apply {
-            gravity = Gravity.CENTER
-            background = c.shape(c.clr(R.color.surf), 20)
-            pad(c, 16, 12, 16, 12)
-            val tick = object : Runnable {
-                override fun run() {
-                    text = FrameStamp.text(System.currentTimeMillis())
-                    if (isAttachedToWindow) postOnAnimation(this)
-                }
-            }
-            addOnAttachStateChangeListener(object : View.OnAttachStateChangeListener {
-                override fun onViewAttachedToWindow(v: View) {
-                    postOnAnimation(tick)
-                }
-
-                override fun onViewDetachedFromWindow(v: View) {
-                    removeCallbacks(tick)
-                }
-            })
-        }
     }
 
     private fun setMediaChunk(m: MediaChunk) {

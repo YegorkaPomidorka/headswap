@@ -251,6 +251,7 @@ class IdrSpliceBridgeTest {
     private val core = AaBridgeCore({ l, _ -> logs.add(l) }, { now }).also {
         it.transcodeEnabled = false
         it.idrSpliceMs = 2000
+        it.tuning = SpliceTuning(drop = 0)                      // тесты PR #115: без выброса кадра перед IDR
         it.refDecoderFactory = { _ -> factoryCalls++; dec }
         it.spliceExecutor = Executor { r -> if (queueBuilds) builds.add(r) else r.run() }
         it.attach(link)
