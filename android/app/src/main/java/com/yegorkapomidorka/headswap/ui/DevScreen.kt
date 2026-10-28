@@ -90,7 +90,6 @@ class DevScreen(host: MainActivity) : Screen(host) {
         body.addView(
             group(listOf(
                 row(c.getString(R.string.dev_sps_crop_title), c.getString(R.string.dev_sps_crop_sub), aa.spsCrop) { aa.spsCrop = it },
-                row(c.getString(R.string.dev_sps_crop_bottom_title), c.getString(R.string.dev_sps_crop_bottom_sub), aa.spsCropBottom) { aa.spsCropBottom = it },
             )),
         )
 

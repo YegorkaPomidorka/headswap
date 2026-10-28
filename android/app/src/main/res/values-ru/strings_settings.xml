@@ -121,8 +121,6 @@
     <string name="video_r720_sub">Подходит большинству ГУ</string>
     <string name="video_r1080_title">1920×1080</string>
     <string name="video_r1080_sub">Чётче, но тяжелее для телефона и ГУ</string>
-    <string name="video_r1440_title">2560×1440 (экспериментальный)</string>
-    <string name="video_r1440_sub">Android Auto может не отдать видео в 1440p — тогда чёрный экран, вернитесь на 1920×1080</string>
     <string name="video_wide_title">Широкий 8:3 (обрезка)</string>
     <string name="video_wide_sub">Для вытянутых экранов: 1280×480, крупно</string>
     <string name="video_wide_mid_title">Широкий 8:3 средний (Mazda CX-5)</string>

@@ -121,8 +121,6 @@
     <string name="video_r720_sub">Fits most head units</string>
     <string name="video_r1080_title">1920×1080</string>
     <string name="video_r1080_sub">Sharper, but heavier for the phone and head unit</string>
-    <string name="video_r1440_title">2560×1440 (experimental)</string>
-    <string name="video_r1440_sub">Android Auto may refuse 1440p video — black screen then, switch back to 1920×1080</string>
     <string name="video_wide_title">Wide 8:3 (crop)</string>
     <string name="video_wide_sub">For wide screens: 1280×480, larger</string>
     <string name="video_wide_mid_title">Wide 8:3 medium (Mazda CX-5)</string>

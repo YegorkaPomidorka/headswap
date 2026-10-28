@@ -17,7 +17,6 @@ class VideoModeTest {
             VideoMode.R1024 to Row("1280x720", 256, 120, 160, 1024, 600, 2_000_000),
             VideoMode.R720 to Row("1280x720", 0, 0, 160, 1280, 720, 4_000_000),
             VideoMode.R1080 to Row("1920x1080", 0, 0, 240, 1920, 1080, 8_000_000),
-            VideoMode.R1440 to Row("2560x1440", 0, 0, 320, 2560, 1440, 12_000_000),
             VideoMode.WIDE to Row("1280x720", 0, 240, 160, 1280, 480, 4_000_000),
             VideoMode.WIDE_MID to Row("1920x1080", 192, 432, 160, 1728, 648, 5_000_000),
             VideoMode.WIDE_HD to Row("1920x1080", 0, 360, 160, 1920, 720, 6_000_000),
@@ -156,7 +155,7 @@ class VideoModeTest {
     }
 
     @Test
-    fun wide976AndR1440() {
+    fun wide976() {
         val k = VideoMode.WIDE_976
         assertEquals(122f / 1080f, k.crop.v0, 1e-6f)
         assertEquals(958f / 1080f, k.crop.v1, 1e-6f)
@@ -170,11 +169,9 @@ class VideoModeTest {
         assertEquals(0 to 0, k.mapTouch(0, 0))
         assertEquals(1919 to 835, k.mapTouch(2239, 975))
         assertEquals("2240×976", k.outLabel)
-        assertTrue(VideoMode.R1440.crop.isNone)
-        assertFalse(VideoMode.R1440.needsTranscode)
-        assertEquals(7 to 9, VideoMode.R1440.mapTouch(7, 9))
-        assertEquals(VideoMode.R1440, VideoMode.parse("R1440"))
         assertEquals(VideoMode.WIDE_976, VideoMode.parse("WIDE_976"))
+        // убранный режим из старых prefs - режим по умолчанию
+        assertEquals(VideoMode.DEFAULT, VideoMode.parse("R1440"))
     }
 
     @Test
@@ -196,8 +193,6 @@ class VideoModeTest {
     fun sdrOtherModes() {
         val r1080 = hex(M.serviceDiscoveryResponse(VideoMode.R1080.sdOptions(false)).payload)
         assertTrue(r1080, r1080.contains("0803100218002000" + "28f001"))      // res=3, margins 0, density 240
-        val r1440 = hex(M.serviceDiscoveryResponse(VideoMode.R1440.sdOptions(false)).payload)
-        assertTrue(r1440, r1440.contains("0804100218002000" + "28c002"))      // res=4, margins 0, density 320
         val wide976 = hex(M.serviceDiscoveryResponse(VideoMode.WIDE_976.sdOptions(false)).payload)
         assertTrue(wide976, wide976.contains("08031002180020f401" + "28a001"))   // res=3, margin_h 244 (f4 01), density 160 (a0 01)
         val r800 = hex(M.serviceDiscoveryResponse(VideoMode.R800.sdOptions(false)).payload)
@@ -298,7 +293,7 @@ class VideoModeTest {
         assertEquals(180, AaDensity.step(AaDensity.AUTO, 160, up = true))
         assertEquals(140, AaDensity.step(AaDensity.AUTO, 160, up = false))
         assertEquals(100, AaDensity.step(AaDensity.AUTO, 120, up = false))
-        assertEquals(280, AaDensity.step(AaDensity.AUTO, 320, up = false))      // R1440: авто выше максимума
+        assertEquals(280, AaDensity.step(AaDensity.AUTO, 320, up = false))      // авто выше максимума сетки
         assertEquals(AaDensity.AUTO, AaDensity.step(AaDensity.AUTO, 320, up = true))
         // на краях стоим
         assertEquals(280, AaDensity.step(280, 160, up = true))

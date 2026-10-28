@@ -876,7 +876,7 @@ class BridgeService : Service() {
             core.videoMode = mode
             core.densityOverride = densityOverride
             // h529: поля справа/снизу только для SPS-кропа в прямом проброске; транскодер режет центр
-            val bottom = !aaPrefs.transcode && aaPrefs.spsCrop && aaPrefs.spsCropBottom && mode.spsCropable
+            val bottom = !aaPrefs.transcode && aaPrefs.spsCrop && mode.spsCropable
             core.marginsAtBottom = bottom
             if (bottom) AppLog.i("BRIDGE SPS-кроп: поля ${mode.marginW} px справа и ${mode.marginH} px снизу (ui_config.margins), интерфейс в левом верхнем углу")
             core.expectFeatureConfig = true

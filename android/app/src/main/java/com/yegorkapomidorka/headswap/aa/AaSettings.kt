@@ -56,11 +56,6 @@ class AaPrefs(ctx: Context) {
         get() = sp.getBoolean("spsCrop", false)
         set(v) = sp.edit().putBoolean("spsCrop", v).apply()
 
-    /** К SPS-кропу: поле по высоте целиком снизу (ui_config AA), для декодеров, которые режут только снизу (Vezel). */
-    var spsCropBottom: Boolean
-        get() = sp.getBoolean("spsCropBottom", true)
-        set(v) = sp.edit().putBoolean("spsCropBottom", v).apply()
-
     /** Разрешение видео (имя VideoMode, по умолчанию 1280×720). Читается один раз на подключение. */
     var videoMode: VideoMode
         get() = VideoMode.parse(sp.getString("videoMode", VideoMode.DEFAULT.name))
