@@ -171,8 +171,47 @@ class BridgeService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         // startForegroundService требует startForeground в течение 5 с, делаем сразу
         val n = HeadswapNotification.build(this, CHANNEL, NOTIF_ID)
+        if (intent == null) {
+            // процесс убит системой (LMK посреди сессии по воздуху, h610), Android поднял сервис по START_STICKY
+            try {
+                startForegroundTyped(n)
+            } catch (e: Exception) {
+                AppLog.e("сервис: перезапуск системой, foreground не дали", e)
+                WLog.ev(WLog.TRIGGER, "sticky-fail", "err" to e.javaClass.simpleName)
+                stopSelf()
+                return START_NOT_STICKY
+            }
+            onStickyRestart()
+            return stickiness()
+        }
         startForegroundTyped(n)
+        command(intent)
+        return stickiness()
+    }
 
+    /**
+     * Беспровод или авторежим включён: после убийства процесса Android перезапустит сервис ([onStickyRestart]).
+     * Сам ACL_CONNECTED не придёт - Bluetooth машины не рвался, и без этого воздух не поднимался до следующей поездки (h610).
+     */
+    private fun stickiness() = if ((wifiBMode || autoMode) && !stopRequested) START_STICKY else START_NOT_STICKY
+
+    /** Перезапуск после убийства процесса: состояние потеряно; выбранная машина рядом по Bluetooth - ждём её, как по ACL_CONNECTED. */
+    private fun onStickyRestart() {
+        AppLog.i("сервис: перезапущен системой после убийства процесса")
+        val mac = CarProfile(this).btMac
+        if (!BuildConfig.WIRELESS_BETA || mac == null) {
+            WLog.ev(WLog.TRIGGER, "sticky-restart", "resume" to false, "why" to "no-car")
+            finish()
+            return
+        }
+        CarBtState.check(this, mac) { near ->
+            WLog.ev(WLog.TRIGGER, "sticky-restart", "near" to near)
+            if (session != null || wifiBMode || stopRequested) return@check      // пока проверяли, пришла команда (ACL, кабель, Стоп)
+            if (near) onCarAuto() else if (host == null && !linkWaiting) finish()
+        }
+    }
+
+    private fun command(intent: Intent?) {
         if (intent?.action == ACTION_STOP) {
             AppLog.i("сервис: стоп по команде")
             stopRequested = true
@@ -192,20 +231,20 @@ class BridgeService : Service() {
                 val h = host
                 if (h != null) h.shutdown("стоп пользователем") else finish()
             }
-            return START_NOT_STICKY
+            return
         }
         // автостарт по Bluetooth машины: обрабатываем до проверки session, при идущей сессии нужен только флаг
         if (intent?.action == ACTION_WIFI_B_AUTO) {
             onCarAuto()
-            return START_NOT_STICKY
+            return
         }
         if (intent?.action == ACTION_WIFI_B_AUTO_OFF) {
             onCarAutoOff()
-            return START_NOT_STICKY
+            return
         }
         if (session != null) {
             AppLog.i("сервис: сессия уже идёт, повторный старт игнорирую")
-            return START_NOT_STICKY
+            return
         }
 
         // только debug-сборка: вместо USB-аксессуара TCP к эмулятору ГУ на ПК (adb reverse), в release port() всегда null
@@ -225,26 +264,26 @@ class BridgeService : Service() {
                     }
                 }
             }, "debug-tcp").start()
-            return START_NOT_STICKY
+            return
         }
 
         // только debug-сборка: беспроводной формат, 6 TCP-сокетов на 127.0.0.1 (adb forward), ГУ подключается сама
         if (DebugTransport.tcp6(intent)) {
             startTcp6Debug(DebugTransport.tcp6Bind(intent))
-            return START_NOT_STICKY
+            return
         }
         // беспровод, ветка B (хотспот телефона + маяк): кнопка в настройках бета-сборки или debug-вход
         if (intent?.action == ACTION_WIFI_B || DebugTransport.wifiB(intent)) {
             if (!BuildConfig.WIRELESS_BETA && !DebugTransport.wifiB(intent)) {
                 AppLog.i("сервис: беспровод в этой сборке выключен")
                 failStart()
-                return START_NOT_STICKY
+                return
             }
             if (wifiBMode && linkWaiting && !stopRequested) {
                 // повторное нажатие, ожидание уже идёт: счётчики accept/TARGET_INFO не сбрасываем (иначе ложный bt-hint, h126)
                 autoStarted = false
                 WLog.ev(WLog.TRIGGER, "manual-mark", "why" to "waiting")
-                return START_NOT_STICKY
+                return
             }
             wifiBMode = true
             autoStarted = false      // ручной запуск: уход машины по Bluetooth его не гасит
@@ -252,7 +291,7 @@ class BridgeService : Service() {
             beginWait()
             startWifiB()
             btProbe.start()      // после WLog.begin в startWifiB: t= в строках WL bt от начала попытки
-            return START_NOT_STICKY
+            return
         }
 
         val usb = getSystemService(UsbManager::class.java)
@@ -261,13 +300,13 @@ class BridgeService : Service() {
             AppLog.i("сервис: аксессуара нет, останавливаюсь")
             CarLifeState.status = "аксессуара нет"
             failStart()
-            return START_NOT_STICKY
+            return
         }
         if (!usb.hasPermission(acc)) {
             AppLog.i("сервис: нет разрешения на аксессуар, останавливаюсь")
             CarLifeState.status = "нет разрешения на аксессуар"
             failStart()
-            return START_NOT_STICKY
+            return
         }
         val pfd = try {
             usb.openAccessory(acc)
@@ -279,7 +318,7 @@ class BridgeService : Service() {
             AppLog.i("сервис: openAccessory вернул null")
             CarLifeState.status = "openAccessory: ошибка"
             failStart()
-            return START_NOT_STICKY
+            return
         }
         AppLog.i("сервис: аксессуар открыт: ${MainActivity.describe(acc)}")
         if (wifiBMode || pendingTcp6 != null) {
@@ -296,7 +335,6 @@ class BridgeService : Service() {
             pendingTcp6?.abort()
         }
         startSession(StreamTransport.fromPfd(pfd, TransportCaps.USB_AOA, MainActivity.describe(acc)))
-        return START_NOT_STICKY
     }
 
     /** debug tcp6: слушать 6 портов на loopback, ждать ГУ (pc-headunit --transport tcp6), затем обычная сессия. */
