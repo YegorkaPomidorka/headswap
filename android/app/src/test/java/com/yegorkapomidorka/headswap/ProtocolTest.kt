@@ -756,7 +756,7 @@ class ProtocolTest {
 
     @Test
     fun writeWholeIsHeaderPlusOneBody() {
-        // Mobis CCNC (h242test3): как Baidu, тело одним write любого размера
+        // Mobis CCNC (h242): как Baidu, тело одним write любого размера
         val big = Wire.dataInner(Msg.VIDEO_DATA, 0, ByteArray(40000) { 1 })
         val w = Wire.writeWhole(Ch.VIDEO, big)
         assertEquals(2, w.size)

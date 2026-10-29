@@ -312,7 +312,7 @@ object Wire {
 
     /**
      * Запись как у Baidu (AoaWriteTransport :73-85, AOAConnectManager :177-190): 8 байт заголовка одним write,
-     * весь inner одним write любого размера. Для ГУ Mobis CCNC (h242test3).
+     * весь inner одним write любого размера. Для ГУ Mobis CCNC (h242).
      */
     fun writeWhole(chan: Int, inner: ByteArray): List<ByteArray> =
         if (inner.isEmpty()) listOf(outerHeader(chan, 0)) else listOf(outerHeader(chan, inner.size), inner)

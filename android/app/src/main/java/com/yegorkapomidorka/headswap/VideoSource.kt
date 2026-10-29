@@ -61,7 +61,7 @@ class VideoSource(
         var s: Surface? = null
         try {
             if (baidu) {
-                // формат Baidu (h242test3): с level 256, при отказе без него, дальше обычная лесенка
+                // формат Baidu (h242): с level 256, при отказе без него, дальше обычная лесенка
                 var done = false
                 for (withLevel in listOf(true, false)) {
                     try {

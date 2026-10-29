@@ -118,18 +118,20 @@ class AaBridgeCoreTest {
 
     @Test
     fun mobisFlagFromHuInfoOrChannelForcesTranscode() {
-        // h242test3: Tucson (Mobis CCNC) опознаётся по HU_INFO, запасной признак - канал 20022188
+        // h242: Tucson (Mobis CCNC) опознаётся по HU_INFO, запасной признак - канал 20022188
         assertFalse(core.huMobisNx4c)
         core.onHuInfo("Samsung", "SM-A", "a", "exynos")
         core.onHuStatistic("20082122")
+        assertFalse(core.huMobisNx4c)
+        core.onHuInfo("Mobis", "AVN5", "other", "OTHER")      // другое ГУ Mobis по производителю не включает флаг
         assertFalse(core.huMobisNx4c)
         core.transcodeEnabled = false
         core.onHuInfo("Mobis", "CCNC", "NX4C", "CCNC")
         assertTrue(core.huMobisNx4c)
         assertTrue(core.transcodeEnabled)
-        assertEquals(1, logs.count { it == "MOBIS h242test3: режим Baidu включён" })
+        assertEquals(1, logs.count { it == "MOBIS CCNC: режим Baidu включён" })
         core.onHuStatistic("20022188")                        // повторно не пишет строку
-        assertEquals(1, logs.count { it == "MOBIS h242test3: режим Baidu включён" })
+        assertEquals(1, logs.count { it == "MOBIS CCNC: режим Baidu включён" })
         core.attach(link)
         assertFalse(core.huMobisNx4c)
         core.onHuStatistic("20022188")

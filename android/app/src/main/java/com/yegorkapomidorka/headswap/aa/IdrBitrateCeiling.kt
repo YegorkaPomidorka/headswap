@@ -5,7 +5,7 @@ import kotlin.math.min
 import kotlin.math.roundToInt
 
 /**
- * Битрейт энкодера по размеру ключевых кадров (Hyundai Tucson, Mobis CCNC, h242test4): на карте с движением IDR от
+ * Битрейт энкодера по размеру ключевых кадров (Hyundai Tucson, Mobis CCNC, h242): на карте с движением IDR от
  * c2.qti.avc.encoder (VBR, 3,84 Мбит/с) рос каждую секунду 200 -> 712 КБ, и после ~600 КБ ГУ уходила в цикл
  * «повтор VIDEO_ENCODER_START -> EIO». IDR больше [limitBytes] - битрейт ×[downFactor] (не ниже [minBps]), и так на
  * каждый такой IDR; [calmCount] IDR подряд меньше [calmBytes] - обратно ×[upFactor] (не выше [maxBps]).

@@ -113,13 +113,13 @@ class CarLifeSession(
     @Volatile private var csdPending = true
     @Volatile private var paused = false
 
-    // Mobis CCNC (h242test3)
+    // Mobis CCNC (h242)
     private var mobisApplied = false                    // нить чтения: реакции флага уже включены
     private var mobisMicScheduled = false
     @Volatile private var huFeatureItems: List<Pair<String, Int>>? = null
     private var mobisBeatLogged = false
     private var mobisAdaptLogged = false
-    // потолок размера IDR (h242test4): у транскодера и заглушки свой, каждый ведёт битрейт своего энкодера
+    // потолок размера IDR (h242): у транскодера и заглушки свой, каждый ведёт битрейт своего энкодера
     private val mobisAaCeiling = IdrBitrateCeiling(AaBridgeCore.MOBIS_BITRATE)
     private val mobisStubCeiling = IdrBitrateCeiling(AaBridgeCore.MOBIS_BITRATE)
 
@@ -335,7 +335,7 @@ class CarLifeSession(
                 CarLifeState.auth = "HU_AUTHEN_REQUEST пришёл, ${if (v2) "2.0;" else "не 2.0;"}"
                 // как Baidu 8.6.7 (PrivateKeyManager.encryptContentProcess): сразу по запросу подпись приватным ключом Baidu,
                 // для "2.0;" md5-код от MD_INFO; MD_AUTHEN_RESULT{true} по-прежнему уходит после STATISTIC_INFO
-                // Mobis CCNC (h242test3) шлёт "1": у Baidu versionVerify падает на substring(-1), ответа нет вовсе - делаем так же
+                // Mobis CCNC (h242) шлёт "1": у Baidu versionVerify падает на substring(-1), ответа нет вовсе - делаем так же
                 val baiduSilent = bridge.huMobisNx4c && rndStr != null && !HuAuth.isV2Branch(rndStr) && !rndStr.contains('_')
                 val enc = if (rndStr == null || baiduSilent) null else try {
                     HuAuth.encryptValue(rndStr, mdInfoKey)
@@ -504,7 +504,7 @@ class CarLifeSession(
         }
         // размер задаёт видео-режим (по умолчанию 1280x720 fps 30: ГУ Honda принимает и показывает целиком, проверено в машине)
         val (w, h, why) = Triple(mode.outW, mode.outH, "мост: режим ${mode.label}")
-        // Mobis CCNC (h242test3): INIT_DONE с тем fps, что просила ГУ, а энкодер Baidu при этом идёт на 20 fps
+        // Mobis CCNC (h242): INIT_DONE с тем fps, что просила ГУ, а энкодер Baidu при этом идёт на 20 fps
         val mobis = bridge.huMobisNx4c
         val fps = if (mobis) (if (rf in 1..30) rf else Handshake.DEFAULT_FPS) else Handshake.chooseFps(cfg.fpsSetting, rf, huMaxFps())
         pendingW = w
@@ -540,7 +540,7 @@ class CarLifeSession(
     }
 
     /**
-     * Mobis CCNC (h242test3): реакции режима Baidu, которым нужен флаг ещё до STATISTIC_INFO. Флаг приходит по HU_INFO
+     * Mobis CCNC (h242): реакции режима Baidu, которым нужен флаг ещё до STATISTIC_INFO. Флаг приходит по HU_INFO
      * (запасной признак - канал в STATISTIC_INFO), поэтому зовётся после обоих. Один раз за сессию.
      */
     private fun applyMobis() {
@@ -833,7 +833,7 @@ class CarLifeSession(
     private fun huMaxFps(): Int? = if (bridge.huPioneerRm56) AaBridgeCore.PIONEER_RM56_MAX_FPS else null
 
     /**
-     * Mobis CCNC (h242test4): ГУ уходит в цикл START -> EIO на IDR > ~600 КБ, а IDR qti VBR на движении растёт каждую
+     * Mobis CCNC (h242): ГУ уходит в цикл START -> EIO на IDR > ~600 КБ, а IDR qti VBR на движении растёт каждую
      * секунду (200 -> 712 КБ при 3,84 Мбит/с). Каждый IDR > 300 КБ режет битрейт энкодера ×0,7 (пол 1 Мбит/с), несколько
      * маленьких подряд возвращают его ×1,15 ([IdrBitrateCeiling]). [apply] применяет новый битрейт к энкодеру-источнику.
      */
@@ -1243,7 +1243,7 @@ class CarLifeSession(
     }
 
     /**
-     * Mobis CCNC (h242test3): как Baidu (Recorder.sendEmptyPacketForeground, VideoOutputThread :404-410, :545-581) -
+     * Mobis CCNC (h242): как Baidu (Recorder.sendEmptyPacketForeground, VideoOutputThread :404-410, :545-581) -
      * после START и пока нет PAUSE, если VIDEO_DATA не уходил >= 200 мс, шлём пустой VIDEO_DATA (длина 0, time = unix-секунды)
      * и повторяем каждые 200 мс тишины. Включая промежуток между START и первым IDR (lastVideoTx ставит onVideoStart).
      * Не VIDEO_HEARTBEAT 0x20002. На PAUSE работает прежний [pauseHeartbeat].

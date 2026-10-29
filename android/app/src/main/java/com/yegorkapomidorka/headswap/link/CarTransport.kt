@@ -42,7 +42,7 @@ interface CarTransport {
     )
 
     /**
-     * Запись как у Baidu: 8 байт внешнего заголовка одним write, весь inner одним write (h242test3, Mobis CCNC).
+     * Запись как у Baidu: 8 байт внешнего заголовка одним write, весь inner одним write (h242, Mobis CCNC).
      * Нужна только потоку с внешним заголовком; транспорты без него игнорируют.
      */
     fun setWholeWrites(on: Boolean) {}
