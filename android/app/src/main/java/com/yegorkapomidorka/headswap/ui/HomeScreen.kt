@@ -207,6 +207,7 @@ class HomeScreen(host: MainActivity) : Screen(host) {
             val b = when (o) {
                 OutlineAction.STOP -> c.outlineButton(c.getString(R.string.home_btn_stop), R.drawable.ic_stop).apply { setOnClickListener { Actions.stopBridge(c) } }
                 OutlineAction.OPEN_AA -> c.outlineButton(c.getString(R.string.home_btn_open_aa), R.drawable.ic_open).apply { setOnClickListener { Actions.openAaSettings(c) } }
+                OutlineAction.NOTIF_ACCESS -> c.outlineButton(c.getString(R.string.home_btn_notif_access), R.drawable.ic_open).apply { setOnClickListener { Actions.openNotificationAccess(c) } }
             }
             footer.addView(b)
         }

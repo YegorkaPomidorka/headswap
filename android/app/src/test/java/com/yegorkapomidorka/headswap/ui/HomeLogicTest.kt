@@ -1,6 +1,7 @@
 package com.yegorkapomidorka.headswap.ui
 
 import com.yegorkapomidorka.headswap.R
+import com.yegorkapomidorka.headswap.aa.AaServerWatch
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
@@ -10,7 +11,7 @@ class HomeLogicTest {
         running: Boolean = false,
         status: String = "не запущено",
         protocol: Boolean = false,
-        serverUp: Boolean = false,
+        serverRunning: Boolean? = null,
         ended: Boolean = false,
         graceLeft: Int = -1,
         usbAudio: Boolean = true,
@@ -20,7 +21,7 @@ class HomeLogicTest {
         hangs: Int = 0,
         worked: Boolean = false,
     ) = Inputs(
-        running, status, protocol, serverUp, ended, graceLeft, 8, usbAudio, setupError, wireless = wireless,
+        running, status, protocol, serverRunning, ended, graceLeft, 8, usbAudio, setupError, wireless = wireless,
         refusedForMs = refusedMs, versionHangs = hangs, serverWorked = worked,
     )
 
@@ -30,12 +31,13 @@ class HomeLogicTest {
         val s = HomeLogic.compute(inp(setupError = err))
         assertEquals(Phase.ERROR, s.phase)
         assertEquals(err, s.sub)
-        assertEquals(Phase.WAITING, HomeLogic.compute(inp(serverUp = true)).phase)
+        assertEquals(Phase.WAITING, HomeLogic.compute(inp(serverRunning = true)).phase)
     }
 
     @Test
     fun offWhenNothingStarted() {
-        val s = HomeLogic.compute(inp())
+        // уведомление AA есть и сервера в нём нет: точно не запущен
+        val s = HomeLogic.compute(inp(serverRunning = false))
         assertEquals(Phase.OFF, s.phase)
         assertEquals(PrimaryAction.START_SERVER, s.primary)
         assertEquals(StageState.TODO, s.stages[0].second.first)
@@ -48,9 +50,67 @@ class HomeLogicTest {
 
     @Test
     fun waitingWhenServerStarted() {
-        val s = HomeLogic.compute(inp(serverUp = true))
+        val s = HomeLogic.compute(inp(serverRunning = true))
         assertEquals(Phase.WAITING, s.phase)
+        assertEquals(UiText.res(R.string.home_title_ready), s.title)
         assertEquals(OutlineAction.OPEN_AA, s.outline)
+    }
+
+    @Test
+    fun unknownWithoutNotificationAccess() {
+        // слушателя уведомлений нет: не утверждаем ни «запущен», ни «не запущен»
+        val s = HomeLogic.compute(inp(serverRunning = null))
+        assertEquals(Phase.OFF, s.phase)
+        assertEquals(Tone.PRI, s.tone)
+        assertEquals(HeroIcon.POWER, s.icon)
+        assertEquals(UiText.res(R.string.home_title_unknown), s.title)
+        assertEquals(UiText.res(R.string.home_sub_unknown), s.sub)
+        assertEquals(StageState.PEND to UiText.res(R.string.home_stage_unknown), s.stages[0].second)
+        assertEquals(PrimaryAction.START_SERVER, s.primary)
+        assertEquals(OutlineAction.NOTIF_ACCESS, s.outline)
+        assertEquals(false, s.showChain)
+        assertEquals(UiText.res(R.string.notif_server_unknown), s.notifText)
+    }
+
+    @Test
+    fun parkedTextDependsOnServerNotification() {
+        // уведомление подтверждает сервер: прежний текст про фон
+        val up = HomeLogic.compute(inp(ended = true, serverRunning = true))
+        assertEquals(Phase.PARKED, up.phase)
+        assertEquals(UiText.res(R.string.home_sub_parked), up.sub)
+        assertEquals(UiText.res(R.string.notif_parked), up.notifText)
+        // доступа нет: нейтральный текст
+        val unknown = HomeLogic.compute(inp(ended = true, serverRunning = null))
+        assertEquals(Phase.PARKED, unknown.phase)
+        assertEquals(UiText.res(R.string.home_sub_parked_unknown), unknown.sub)
+        assertEquals(UiText.res(R.string.notif_parked_unknown), unknown.notifText)
+        // сервер остановили: «Запустите сервер ГУ»
+        val down = HomeLogic.compute(inp(ended = true, serverRunning = false))
+        assertEquals(Phase.OFF, down.phase)
+        assertEquals(UiText.res(R.string.home_title_off), down.title)
+    }
+
+    @Test
+    fun shortRefusalIsConnectingWhenNotificationSaysRunning() {
+        val status = "мост: жду сервер ГУ AA"
+        val up = HomeLogic.compute(inp(running = true, status = status, protocol = true, serverRunning = true))
+        assertEquals(Phase.WAITING, up.phase)
+        assertEquals(UiText.res(R.string.home_title_connecting), up.title)
+        // без уведомления прежнее «Запустите сервер ГУ»
+        val unknown = HomeLogic.compute(inp(running = true, status = status, protocol = true, serverRunning = null))
+        assertEquals(Phase.OFF, unknown.phase)
+        assertEquals(UiText.res(R.string.home_title_off), unknown.title)
+    }
+
+    @Test
+    fun serverNotificationNeedsPackageChannelAndForegroundFlag() {
+        val fg = android.app.Notification.FLAG_FOREGROUND_SERVICE
+        val ok = AaServerWatch.isServerNotification(AaServerWatch.GEARHEAD, AaServerWatch.CHANNEL, fg or android.app.Notification.FLAG_NO_CLEAR)
+        assertEquals(true, ok)
+        assertEquals(false, AaServerWatch.isServerNotification("com.other.app", AaServerWatch.CHANNEL, fg))
+        assertEquals(false, AaServerWatch.isServerNotification(AaServerWatch.GEARHEAD, "other_channel", fg))
+        assertEquals(false, AaServerWatch.isServerNotification(AaServerWatch.GEARHEAD, null, fg))
+        assertEquals(false, AaServerWatch.isServerNotification(AaServerWatch.GEARHEAD, AaServerWatch.CHANNEL, android.app.Notification.FLAG_NO_CLEAR))
     }
 
     @Test
@@ -92,7 +152,7 @@ class HomeLogicTest {
     @Test
     fun parkedAfterSessionEnded() {
         // мост сам штатно закрыл установленную сессию: «Машина отключена», сервер ГУ в фоне «работает», без «проверяю» и кнопок
-        val s = HomeLogic.compute(inp(ended = true))
+        val s = HomeLogic.compute(inp(ended = true, serverRunning = true))
         assertEquals(Phase.PARKED, s.phase)
         assertEquals(Tone.PRI, s.tone)
         assertEquals(HeroIcon.CAR, s.icon)
@@ -106,7 +166,7 @@ class HomeLogicTest {
         assertEquals(UiText.res(R.string.home_stage_hu_parked), s.stages[1].second.second)
         assertEquals(UiText.res(R.string.notif_parked), s.notifText)
         // отказы и зависания прошлых подключений PARKED не меняют: SERVER_DOWN только при живом мосте
-        val stale = HomeLogic.compute(inp(ended = true, refusedMs = 60_000, hangs = 3, worked = true))
+        val stale = HomeLogic.compute(inp(ended = true, serverRunning = true, refusedMs = 60_000, hangs = 3, worked = true))
         assertEquals(Phase.PARKED, stale.phase)
     }
 
@@ -156,7 +216,7 @@ class HomeLogicTest {
     @Test
     fun serverDownOnlyWhileBridgeAttemptsAndNotOnceConnected() {
         // моста нет (кабеля нет): прошлые отказы ничего не значат
-        assertEquals(Phase.OFF, HomeLogic.compute(inp(refusedMs = 60_000, hangs = 3, worked = true)).phase)
+        assertEquals(Phase.OFF, HomeLogic.compute(inp(serverRunning = false, refusedMs = 60_000, hangs = 3, worked = true)).phase)
         // сессия идёт: обычное «Всё работает», даже если счётчики ещё не обнулились
         val connected = HomeLogic.compute(inp(running = true, status = "мост: AA -> CarLife", refusedMs = 60_000, hangs = 3, worked = true))
         assertEquals(Phase.CONNECTED, connected.phase)

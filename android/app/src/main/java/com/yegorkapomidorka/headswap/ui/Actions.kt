@@ -2,13 +2,16 @@ package com.yegorkapomidorka.headswap.ui
 
 import android.Manifest
 import android.app.PendingIntent
+import android.content.ActivityNotFoundException
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.hardware.usb.UsbManager
+import android.os.Build
 import android.os.Handler
 import android.os.Looper
+import android.provider.Settings
 import android.widget.Toast
 import com.yegorkapomidorka.headswap.MainActivity
 import com.yegorkapomidorka.headswap.AppLocale
@@ -17,6 +20,7 @@ import com.yegorkapomidorka.headswap.BridgeService
 import com.yegorkapomidorka.headswap.CarLifeState
 import com.yegorkapomidorka.headswap.R
 import com.yegorkapomidorka.headswap.aa.AaCreds
+import com.yegorkapomidorka.headswap.aa.AaNotifListener
 import com.yegorkapomidorka.headswap.aa.AaServerCheck
 import com.yegorkapomidorka.headswap.aa.ManualServerCheck
 import com.yegorkapomidorka.headswap.aa.PhoneMicCapture
@@ -68,7 +72,6 @@ object Actions {
 
     fun stopBridge(ctx: Context) {
         AppLog.i("кнопка Стоп")
-        HeadswapStatus.markUserStop()
         ctx.startForegroundService(Intent(ctx, BridgeService::class.java).setAction(BridgeService.ACTION_STOP))
     }
 
@@ -95,8 +98,34 @@ object Actions {
     }
 
     /**
+     * Доступ к уведомлениям для статуса сервера ГУ. На Android 13+ у APK не из магазина переключатель может быть серым
+     * («ограниченные настройки»), поэтому сразу подсказываем, как его разрешить.
+     */
+    fun openNotificationAccess(c: Context) {
+        val list = Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                val detail = Intent(Settings.ACTION_NOTIFICATION_LISTENER_DETAIL_SETTINGS)
+                    .putExtra(Settings.EXTRA_NOTIFICATION_LISTENER_COMPONENT_NAME, ComponentName(c, AaNotifListener::class.java).flattenToString())
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                try {
+                    c.startActivity(detail)
+                } catch (e: ActivityNotFoundException) {
+                    c.startActivity(list)
+                }
+            } else {
+                c.startActivity(list)
+            }
+            AppLog.i("открыт доступ к уведомлениям")
+            Toast.makeText(c, AppLocale.wrap(c).getString(R.string.notif_access_hint), Toast.LENGTH_LONG).show()
+        } catch (e: Exception) {
+            AppLog.e("не открыть доступ к уведомлениям", e)
+        }
+    }
+
+    /**
      * Кнопка «Открыть Android Auto» на главном экране и в онбординге: сервер ГУ включает пользователь сам
-     * (⋮ → «Вкл. сервер головного устр-ва»), поэтому только отмечаем запрос и открываем настройки AA.
+     * (⋮ → «Вкл. сервер головного устр-ва»), поэтому только снимаем «Машина отключена» и открываем настройки AA.
      */
     fun startServerFromUi(ctx: Context) {
         HeadswapStatus.markServerRequested()

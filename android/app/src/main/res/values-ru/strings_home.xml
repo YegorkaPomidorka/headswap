@@ -9,6 +9,7 @@
     <string name="home_title_parked">Машина отключена</string>
     <string name="home_title_server_down">Сервер ГУ не отвечает</string>
     <string name="home_title_ready">Готов к поездке</string>
+    <string name="home_title_unknown">Проверьте сервер ГУ</string>
 
     <!-- Главный экран: подзаголовки -->
     <string name="home_err_no_cert">Нет сертификата head unit: положите cert.pem и key.pem в app/src/main/assets/aa/jvc/ (см. README)</string>
@@ -22,6 +23,8 @@
     <string name="home_sub_parked">Сервер ГУ остался работать в фоне. В следующей поездке просто подключите кабель.</string>
     <string name="home_sub_server_down">Android закрыл сервер ГУ. Включите его снова: Android Auto → ⋮ → «Вкл. сервер головного устр-ва».</string>
     <string name="home_sub_ready">Подключите телефон к магнитоле кабелем.</string>
+    <string name="home_sub_unknown">Headswap не видит, запущен ли сервер. В Android Auto → ⋮: если есть «Остановить сервер ГУ» — он запущен, если «Вкл. сервер головного устр-ва» — включите. Чтобы Headswap видел сам, разрешите доступ к уведомлениям.</string>
+    <string name="home_sub_parked_unknown">Следующая поездка — подключите кабель. Если Android Auto не появится, проверьте сервер ГУ: Android Auto → ⋮.</string>
 
     <!-- Главный экран: как запустить сервер ГУ (жирное - то, что нажать) -->
     <string name="home_chain_label">Как запустить сервер ГУ</string>
@@ -50,11 +53,14 @@
     <string name="home_stage_no_answer">не отвечает</string>
     <string name="home_stage_started">запущен</string>
     <string name="home_stage_wait_cable">ждём кабель</string>
+    <string name="home_stage_unknown">не проверен</string>
 
     <!-- Главный экран: элементы -->
     <string name="home_settings">Настройки</string>
     <string name="home_btn_stop">Остановить</string>
     <string name="home_btn_open_aa">Открыть настройки AA</string>
+    <string name="home_btn_notif_access">Показывать статус сервера</string>
+    <string name="notif_access_hint">Включите переключатель Headswap. Если он серый (Android 13+, APK не из магазина): «О приложении» → ⋮ → «Разрешить ограниченные настройки».</string>
     <string name="home_grace_waiting">Жду переподключения</string>
     <string name="home_grace_left">ещё %1$d с</string>
 
@@ -68,6 +74,8 @@
     <string name="notif_parked">Сервер ГУ работает в фоне</string>
     <string name="notif_server_down">Android закрыл сервер ГУ · включите его снова</string>
     <string name="notif_server_started">Сервер ГУ запущен</string>
+    <string name="notif_parked_unknown">Машина отключена</string>
+    <string name="notif_server_unknown">Проверьте, что сервер ГУ запущен</string>
 
     <!-- Иллюстрации онбординга (нарисованные макеты системного UI) -->
     <string name="mock_aa_version">Версия</string>
