@@ -118,10 +118,10 @@ class VideoModeTest {
         assertEquals(57 to 661, VideoMode.WIDE_HD.mapTouch(57, 661))
         assertEquals(180f / 1080f, VideoMode.WIDE_HD.crop.v0, 1e-6f)
         assertEquals(900f / 1080f, VideoMode.WIDE_HD.crop.v1, 1e-6f)
-        // h521: поля внизу (SPS-кроп), а перекодирование принудительное - транскодер режет верхние 720 строк
+        // h521: поля внизу (SPS-кроп), а перекодирование принудительное - транскодер режет верхние 720 строк (v вверх)
         val bottom = VideoMode.WIDE_HD.cropFor(marginsAtBottom = true)
-        assertEquals(0f, bottom.v0, 1e-6f)
-        assertEquals(720f / 1080f, bottom.v1, 1e-6f)
+        assertEquals(360f / 1080f, bottom.v0, 1e-6f)
+        assertEquals(1f, bottom.v1, 1e-6f)
         assertEquals(VideoMode.WIDE_HD.crop, VideoMode.WIDE_HD.cropFor(marginsAtBottom = false))
         assertTrue(VideoMode.R720.cropFor(marginsAtBottom = true).isNone)
         val mid = VideoMode.WIDE_MID
