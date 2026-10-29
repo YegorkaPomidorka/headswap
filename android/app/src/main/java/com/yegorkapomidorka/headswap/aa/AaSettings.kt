@@ -114,7 +114,7 @@ class AaPrefs(ctx: Context) {
 
     /** Текущие значения настроек, которые выставляет выбор машины. */
     val carSettings: CarSettings
-        get() = CarSettings(transcode, videoMode, aaDensity, fpsSetting, musicRate)
+        get() = CarSettings(transcode, videoMode, aaDensity, fpsSetting, musicRate, spsCrop)
 
     /** Выбрать машину и записать её рекомендованные настройки. */
     fun applyCar(p: CarPreset) {
@@ -126,6 +126,7 @@ class AaPrefs(ctx: Context) {
             .putInt("aaDensity", s.aaDensity)
             .putString("fpsSetting", s.fps.name)
             .putString("musicRate", s.musicRate.name)
+            .putBoolean("spsCrop", s.spsCrop)
             .apply()
     }
 

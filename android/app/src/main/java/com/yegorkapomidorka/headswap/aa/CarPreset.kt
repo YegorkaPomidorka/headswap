@@ -9,6 +9,8 @@ data class CarSettings(
     val aaDensity: Int = AaDensity.AUTO,
     val fps: FpsSetting = FpsSetting.DEFAULT,
     val musicRate: MusicRate = MusicRate.DEFAULT,
+    /** Широкий режим без перекодирования: поля AA справа/снизу и SPS-кроп (h529). */
+    val spsCrop: Boolean = false,
 )
 
 /** Корейские ГУ слабые: на 30 кадрах и 48 кГц рвут USB, советуем 15 кадров, 32 кГц (h139, h218, h260). */
@@ -53,7 +55,8 @@ enum class CarPreset(val titleRes: Int, val settings: CarSettings = CarSettings(
     SKODA_KAMIQ_GT_2021(R.string.car_skoda_kamiq_gt_2021),
     /** CNS3 просит 2:1, 1280×640 (h292); на 1080p виснет (h305). */
     SKODA_OCTAVIA_PRO(R.string.car_skoda_octavia_pro, CarSettings(videoMode = VideoMode.WIDE_2_1)),
-    TOYOTA_COROLLA_CROSS_2024(R.string.car_toyota_corolla_cross_2024),
+    /** HSAE 21070007, 1920×720 (h420): энкодер Xiaomi на 1920×720 падает, ГУ игнорирует кроп SPS и берёт верхние 720 строк - прямой проброс с полями снизу. */
+    TOYOTA_COROLLA_CROSS_2024(R.string.car_toyota_corolla_cross_2024, CarSettings(transcode = false, videoMode = VideoMode.WIDE_HD, spsCrop = true)),
     TOYOTA_LEVIN(R.string.car_toyota_levin),
     /** Китай: 1920×1080, 30 кадров (Егор, 18.10). */
     VW_BORA_2021(R.string.car_vw_bora_2021, CarSettings(videoMode = VideoMode.R1080)),
