@@ -423,9 +423,12 @@ class IdrSpliceBridgeTest {
         assertEquals(1, factoryCalls)                           // декодер не пересоздаётся
     }
 
+    /** Поездка 28.10: декодер жив, телефон притормозил - три пропуска не выключают вставку, пауза 5 с и новая попытка. */
     @Test
-    fun repeatedMissingPicturesDisableSplice() {
+    fun repeatedMissingPicturesPauseSpliceThenRetry() {
         startWith(3)
+        decoded(3)                                              // картинка уже была: вставка работает
+        assertTrue(core.spliceWorks)
         now = 2000
         var k = 3
         repeat(IdrSpliceBridgeTest.MISSES) {
@@ -435,14 +438,107 @@ class IdrSpliceBridgeTest {
             k++
             now += 400; core.tick()
         }
-        assertTrue(logs.toString(), logs.any { it.contains("выключен до конца AA-сессии") })
-        assertTrue(dec.stopped)
+        assertTrue(logs.toString(), logs.any { it.contains("пауза ${AaBridgeCore.SPLICE_BACKOFF_MS} мс, потом снова") })
+        assertFalse(logs.toString(), logs.any { it.contains("выключен до конца AA-сессии") })
+        assertFalse(dec.stopped)
+        assertFalse(core.spliceWorks)                           // h529 и h295 - страховка на время паузы
+        // пауза: кадры не держим, свой IDR не пробуем
         val sent = link.sent.size
+        now += AaBridgeCore.SPLICE_BACKOFF_MS - 1000
         passed(k.toLong())
-        now += 5000
         core.onFrame(aus[k], k.toLong())
-        core.onFrame(aus[k + 1], (k + 1).toLong())
-        assertEquals(sent + 2, link.sent.size)                  // больше не держим
+        k++
+        assertEquals(sent + 1, link.sent.size)
+        assertFalse(core.spliceWorks)
+        // пауза кончилась: новая попытка, картинка пришла - IDR ушёл
+        passed(k.toLong())
+        now += 1300
+        core.onFrame(aus[k], k.toLong())
+        k++
+        decoded(k.toLong())
+        assertEquals(5, SpliceAssets.nalTypes(link.sent.last()).last())
+        assertTrue(core.spliceWorks)
+        assertEquals(1, factoryCalls)                           // декодер не пересоздавался
+    }
+
+    /** Пропуски идут и после паузы - вставка не выключается, а снова берёт паузу. */
+    @Test
+    fun missesAfterPauseStartNewPause() {
+        startWith(3)
+        decoded(3)
+        now = 2000
+        var k = 3
+        repeat(2) {
+            repeat(IdrSpliceBridgeTest.MISSES) {
+                passed(k.toLong())
+                now += 1000
+                core.onFrame(aus[k], k.toLong())
+                k++
+                now += 400; core.tick()
+            }
+            now += AaBridgeCore.SPLICE_BACKOFF_MS
+        }
+        assertEquals(2, logs.count { it.contains("потом снова") })
+        assertTrue(logs.toString(), logs.last { it.contains("потом снова") }.contains("пауз за сессию 2"))
+        assertFalse(logs.toString(), logs.any { it.contains("выключен до конца AA-сессии") })
+    }
+
+    /** Декодер встал (AA шлёт кадры, вывода нет): перезапуск, до IDR от AA вставки нет, потом снова работает. */
+    @Test
+    fun stalledDecoderIsRestarted() {
+        now = 1000
+        startWith(3)
+        decoded(3)
+        assertTrue(core.spliceWorks)
+        var k = 3
+        repeat(2) {                                             // отставание 1 и 2 кадра - ещё нормально
+            now += 1000
+            core.onFrame(aus[k], k.toLong()); k++
+            core.tick()
+        }
+        repeat(3) {                                             // отставание больше 2: отсчёт со второго из них
+            now += 1000
+            core.onFrame(aus[k], k.toLong()); k++
+            core.tick()
+            assertFalse(logs.toString(), logs.any { it.contains("декодер встал") })
+        }
+        assertFalse(dec.stopped)
+        now += 1000
+        core.onFrame(aus[k], k.toLong()); k++
+        core.tick()
+        assertTrue(logs.toString(), logs.any { it.contains("декодер встал") && it.contains("перезапускаю") })
+        assertTrue(dec.stopped)
+        assertFalse(core.spliceWorks)
+        assertFalse(logs.toString(), logs.any { it.contains("выключен до конца AA-сессии") })
+        assertEquals(1, factoryCalls)
+        // следующий кадр AA: новый декодер и CODEC_CONFIG в него
+        now += 1000
+        core.onFrame(aus[k], k.toLong()); k++
+        assertEquals(2, factoryCalls)
+        assertEquals(2, dec.configs.size)
+        assertFalse(core.spliceWorks)                           // ждёт IDR от AA, картинок нет
+        // новый декодер ждёт IDR: повторно не перезапускаем
+        repeat(2) {
+            now += 2000; core.tick()
+        }
+        assertEquals(1, logs.count { it.contains("декодер встал") })
+        assertEquals(2, factoryCalls)
+        decoded(k.toLong())                                     // дождался IDR, отдал картинку
+        assertTrue(core.spliceWorks)
+    }
+
+    /** Экран статичный, AA молчит, декодер держит последние кадры: это не стоп, не перезапускаем. */
+    @Test
+    fun silentAaDoesNotRestartDecoder() {
+        now = 1000
+        startWith(3)
+        decoded(3)
+        for (k in 3..5) core.onFrame(aus[k], k.toLong())        // декодер вывел только 3, держит остальные
+        repeat(12) {
+            now += 1000; core.tick()
+        }
+        assertFalse(logs.toString(), logs.any { it.contains("декодер встал") })
+        assertFalse(dec.stopped)
     }
 
     @Test
