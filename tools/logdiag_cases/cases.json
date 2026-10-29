@@ -19,5 +19,7 @@
   {"log": "p2p_hotspot_busy_new.log", "version": "2.6.0", "top": "p2p_hotspot_busy",
    "facts": {"m.p2p_busy": 1, "m.hotspot_iface": 0}},
   {"log": "p2p_busy_no_hotspot.log", "version": "2.6.0", "not": ["p2p_hotspot_busy"],
-   "facts": {"m.p2p_busy_reason": 3, "m.hotspot_iface": 0}}
+   "facts": {"m.p2p_busy_reason": 3, "m.hotspot_iface": 0}},
+  {"log": "miui_screen_off_kill.log", "version": "2.6.0", "has": ["process_killed"],
+   "facts": {"m.low_memory": 1}}
 ]

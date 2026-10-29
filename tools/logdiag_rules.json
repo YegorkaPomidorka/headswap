@@ -24,7 +24,7 @@
     "p2p_wifi_off": "Wi-Fi Direct: Wi-Fi на телефоне выключен",
     "p2p_join_timeout": "в группу ГУ не вошли",
     "p2p_group_lost": "группа ГУ распалась",
-    "low_memory": "EXIT прошлое завершение .*(LOW_MEMORY|SIGNALED status=9)",
+    "low_memory": "EXIT прошлое завершение .*(LOW_MEMORY|SIGNALED status=9|описание=(ScreenOffCPU|OneKeyClean))",
     "codec_fail": "configure уровня \\d не прошёл|ошибка транскодера",
     "abort": "Software caused connection abort",
     "no_route": "No route to host",
