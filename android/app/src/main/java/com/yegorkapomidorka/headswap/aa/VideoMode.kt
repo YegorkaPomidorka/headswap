@@ -39,6 +39,14 @@ interface VideoGeometry {
         get() = if (marginW == 0 && marginH == 0) VideoCrop.NONE
         else VideoCrop(marginW / 2f / aaW, marginH / 2f / aaH, 1f - marginW / 2f / aaW, 1f - marginH / 2f / aaH)
 
+    /**
+     * Кроп транскодера при данной раскладке полей AA. С SPS-кропом (h529) поля уходят вправо и вниз, интерфейс
+     * в левом верхнем углу; если перекодирование включилось принудительно (Mobis, Pioneer), центральная полоса
+     * [crop] отрезала бы верх интерфейса и оставила внизу чёрное поле (h521).
+     */
+    fun cropFor(marginsAtBottom: Boolean): VideoCrop =
+        if (!marginsAtBottom || crop.isNone) crop else VideoCrop(0f, 0f, 1f - marginW.toFloat() / aaW, 1f - marginH.toFloat() / aaH)
+
     /** Кроп транскодером: в passthrough WIDE доступен только через SPS-кроп ([spsCropable]). */
     val needsTranscode: Boolean get() = !crop.isNone
 

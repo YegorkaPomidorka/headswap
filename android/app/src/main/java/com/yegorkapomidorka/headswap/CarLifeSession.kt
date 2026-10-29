@@ -1009,7 +1009,7 @@ class CarLifeSession(
         AaTranscoder(
             mode.outW, mode.outH, thermalThrottle.capFps(if (mobis) AaBridgeCore.MOBIS_FPS else targetFps),
             if (mobis) mobisAaCeiling.current else bitratePolicy.current, out, { AppLog.i(it, false) },
-            srcWidth = mode.aaW, srcHeight = mode.aaH, crop = mode.crop, baidu = mobis,
+            srcWidth = mode.aaW, srcHeight = mode.aaH, crop = mode.cropFor(bridge.marginsAtBottom), baidu = mobis,
         ).also { it.start() }
     } catch (e: Exception) {
         AppLog.e("BRIDGE транскодер не создан", e)
