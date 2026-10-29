@@ -228,6 +228,9 @@ class ManualServerCheck(
 class ServerFailures(private val now: () -> Long = { System.nanoTime() / 1_000_000 }) {
     @Volatile private var refusedSince = NONE
 
+    /** Когда закончилась последняя установленная сессия (наш ByeBye или обрыв); NONE - в этом цикле такой не было. */
+    @Volatile private var lastEndAt = NONE
+
     /** Подряд принятых по TCP подключений без VERSION_RESPONSE. */
     @Volatile var versionHangs = 0
         private set
@@ -260,12 +263,26 @@ class ServerFailures(private val now: () -> Long = { System.nanoTime() / 1_000_0
         worked = true
     }
 
+    /** Установленная сессия закончилась (наш ByeBye или обрыв): ближайшие [RELISTEN_MS] отказ - норма, AA снова поднимает порт. */
+    fun onSessionEnded() {
+        lastEndAt = now()
+    }
+
+    /**
+     * Сервер отказывает, и это не окно [RELISTEN_MS] после закрытия нашей же сессии: на свежем старте моста отказ
+     * значит, что сервер не запущен. Запас на перезапуск порта нужен только сразу после своего ByeBye.
+     */
+    val refusedFresh: Boolean
+        get() = refusedSince != NONE && (lastEndAt == NONE || refusedSince - lastEndAt >= RELISTEN_MS)
+
     /**
      * Пора просить пользователя включить сервер (текст заглушки на ГУ): зависания подряд, отказ у сервера, который
-     * в этом процессе ещё не работал, или отказ дольше [START_HINT_REFUSED_MS] у работавшего (как HomeLogic.REFUSED_DOWN_MS).
+     * в этом процессе ещё не работал, отказ вне окна после закрытия своей сессии ([refusedFresh]) или отказ дольше
+     * [START_HINT_REFUSED_MS] у работавшего (как HomeLogic.REFUSED_DOWN_MS).
      */
     fun needsStart(): Boolean =
-        versionHangs >= START_HINT_HANGS || (refusedSince != NONE && (!worked || refusedForMs >= START_HINT_REFUSED_MS))
+        versionHangs >= START_HINT_HANGS ||
+            (refusedSince != NONE && (!worked || refusedFresh || refusedForMs >= START_HINT_REFUSED_MS))
 
     /** Любой другой исход (голый EOF, TLS и т.п.), начало и конец цикла коннектора. */
     fun reset() {
@@ -276,6 +293,7 @@ class ServerFailures(private val now: () -> Long = { System.nanoTime() / 1_000_0
     private companion object {
         const val NONE = Long.MIN_VALUE
         const val START_HINT_REFUSED_MS = 15_000L
+        const val RELISTEN_MS = 10_000L
         const val START_HINT_HANGS = 2
     }
 }

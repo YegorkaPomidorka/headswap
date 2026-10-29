@@ -64,6 +64,8 @@ class Inputs(
     val versionHangs: Int = 0,
     /** Хоть раз установилась настоящая AA-сессия: сервер ГУ работал. Без этого «не отвечает» не показываем (новичку - «Запустите сервер ГУ»). */
     val serverWorked: Boolean = false,
+    /** Отказ не в окне ~10 с после закрытия нашей сессии: на свежем старте моста сервер ГУ не запущен, ждать нечего. */
+    val refusedFresh: Boolean = false,
 )
 
 object HomeLogic {
@@ -136,9 +138,10 @@ object HomeLogic {
                 ),
             )
             serverDown -> serverDownState()
-            // сервер уже работал: короткий отказ после ByeBye - норма, пока AA снова слушает; ждём как обычное подключение
-            // уведомление AA говорит «запущен» - отказ тоже короткий, просто «Подключаюсь»
-            refused && !i.serverWorked && i.serverRunning != true -> state(
+            // «Запустите сервер ГУ» сразу, если сервер не работал, отказ не в окне после закрытия нашей сессии
+            // или уведомление AA говорит «остановлен». Короткий отказ после ByeBye у работавшего сервера - норма,
+            // пока AA снова слушает; ждём как обычное подключение. Уведомление «запущен» - тоже просто «Подключаюсь»
+            refused && i.serverRunning != true && (!i.serverWorked || i.refusedFresh || i.serverRunning == false) -> state(
                 Phase.OFF, Tone.PRI, HeroIcon.POWER, UiText.res(R.string.home_title_off),
                 UiText.res(R.string.home_sub_refused, TEXT_START_CHAIN),
                 listOf(
@@ -312,6 +315,7 @@ object HeadswapStatus {
             refusedForMs = AaState.serverFailures.refusedForMs,
             versionHangs = AaState.serverFailures.versionHangs,
             serverWorked = serverWorked,
+            refusedFresh = AaState.serverFailures.refusedFresh,
         )
     }
 

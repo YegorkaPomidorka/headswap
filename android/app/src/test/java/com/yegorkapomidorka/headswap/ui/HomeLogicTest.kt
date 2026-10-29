@@ -20,9 +20,10 @@ class HomeLogicTest {
         refusedMs: Long = 0,
         hangs: Int = 0,
         worked: Boolean = false,
+        refusedFresh: Boolean = false,
     ) = Inputs(
         running, status, protocol, serverRunning, ended, graceLeft, 8, usbAudio, setupError, wireless = wireless,
-        refusedForMs = refusedMs, versionHangs = hangs, serverWorked = worked,
+        refusedForMs = refusedMs, versionHangs = hangs, serverWorked = worked, refusedFresh = refusedFresh,
     )
 
     @Test
@@ -100,6 +101,27 @@ class HomeLogicTest {
         val unknown = HomeLogic.compute(inp(running = true, status = status, protocol = true, serverRunning = null))
         assertEquals(Phase.OFF, unknown.phase)
         assertEquals(UiText.res(R.string.home_title_off), unknown.title)
+    }
+
+    @Test
+    fun freshRefusalOnWorkedServerIsStartServerImmediately() {
+        val status = "мост: жду сервер ГУ AA"
+        // свежий старт моста: отказ не в окне после закрытия своей сессии - сервер не запущен, ждать нечего
+        val fresh = HomeLogic.compute(inp(running = true, status = status, protocol = true, worked = true, refusedFresh = true, refusedMs = 500))
+        assertEquals(Phase.OFF, fresh.phase)
+        assertEquals(UiText.res(R.string.home_title_off), fresh.title)
+        assertEquals(PrimaryAction.START_SERVER, fresh.primary)
+        // сразу после закрытия своей сессии отказ норма: «Подключаюсь»
+        val afterBye = HomeLogic.compute(inp(running = true, status = status, protocol = true, worked = true, refusedFresh = false, refusedMs = 500))
+        assertEquals(Phase.WAITING, afterBye.phase)
+        assertEquals(UiText.res(R.string.home_title_connecting), afterBye.title)
+        // уведомление AA говорит «остановлен»: просим запустить, даже внутри окна
+        val stopped = HomeLogic.compute(inp(running = true, status = status, protocol = true, worked = true, serverRunning = false, refusedFresh = false, refusedMs = 500))
+        assertEquals(Phase.OFF, stopped.phase)
+        assertEquals(UiText.res(R.string.home_title_off), stopped.title)
+        // уведомление говорит «запущен»: свежесть отказа не важна
+        val running = HomeLogic.compute(inp(running = true, status = status, protocol = true, worked = true, serverRunning = true, refusedFresh = true))
+        assertEquals(Phase.WAITING, running.phase)
     }
 
     @Test

@@ -194,6 +194,51 @@ class AaServerCheckTest {
         assertTrue("reset не забывает, что сервер работал", f.worked)
     }
 
+    @Test
+    fun refusalRightAfterOwnSessionEndIsNormalForWorkedServer() {
+        val clock = AtomicLong(0L)
+        val f = ServerFailures { clock.get() }
+        f.onEstablished()
+        f.onSessionEnded()
+        clock.set(3_000)
+        f.onRefused()
+        assertFalse("отказ через 3 с после своего ByeBye - AA ещё поднимает порт", f.refusedFresh)
+        assertFalse(f.needsStart())
+        clock.set(18_000)
+        assertTrue("дольше 15 с - всё равно просим запустить", f.needsStart())
+    }
+
+    @Test
+    fun refusalWithoutPrecedingOwnSessionEndIsFresh() {
+        val clock = AtomicLong(0L)
+        val f = ServerFailures { clock.get() }
+        assertFalse(f.refusedFresh)
+        f.onEstablished()
+        f.onRefused()
+        assertTrue(f.refusedFresh)
+        assertTrue("свежий старт моста: работавший сервер не ждём", f.needsStart())
+    }
+
+    @Test
+    fun refusalAfterRelistenWindowIsFresh() {
+        val clock = AtomicLong(0L)
+        val f = ServerFailures { clock.get() }
+        f.onEstablished()
+        f.onSessionEnded()
+        clock.set(12_000)
+        f.onRefused()
+        assertTrue(f.refusedFresh)
+        assertTrue(f.needsStart())
+        // окно переживает reset() цикла коннектора
+        val g = ServerFailures { clock.get() }
+        g.onEstablished()
+        g.onSessionEnded()
+        g.reset()
+        clock.set(14_000)
+        g.onRefused()
+        assertFalse(g.refusedFresh)
+    }
+
     // --- классификация итога настоящей пробы ---
 
     @Test
