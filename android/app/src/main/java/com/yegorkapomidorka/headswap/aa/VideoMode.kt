@@ -3,7 +3,7 @@ package com.yegorkapomidorka.headswap.aa
 import com.yegorkapomidorka.headswap.R
 import java.util.Locale
 
-/** Центральный прямоугольник исходного кадра в долях (u вправо, v вверх; кроп симметричный, поэтому ориентация v не важна). */
+/** Прямоугольник исходного кадра в долях (u вправо, v вверх: v=1 - верхняя строка кадра; у несимметричного кропа это важно). */
 data class VideoCrop(val u0: Float, val v0: Float, val u1: Float, val v1: Float) {
     val isNone: Boolean get() = this == NONE
 
@@ -42,10 +42,11 @@ interface VideoGeometry {
     /**
      * Кроп транскодера при данной раскладке полей AA. С SPS-кропом (h529) поля уходят вправо и вниз, интерфейс
      * в левом верхнем углу; если перекодирование включилось принудительно (Mobis, Pioneer), центральная полоса
-     * [crop] отрезала бы верх интерфейса и оставила внизу чёрное поле (h521).
+     * [crop] отрезала бы верх интерфейса и оставила внизу чёрное поле (h521). v в GL растёт вверх: верхние строки кадра -
+     * это v от marginH/aaH до 1 (h242test6 с v 0..0,667 вырезал нижнюю часть).
      */
     fun cropFor(marginsAtBottom: Boolean): VideoCrop =
-        if (!marginsAtBottom || crop.isNone) crop else VideoCrop(0f, 0f, 1f - marginW.toFloat() / aaW, 1f - marginH.toFloat() / aaH)
+        if (!marginsAtBottom || crop.isNone) crop else VideoCrop(0f, marginH.toFloat() / aaH, 1f - marginW.toFloat() / aaW, 1f)
 
     /** Кроп транскодером: в passthrough WIDE доступен только через SPS-кроп ([spsCropable]). */
     val needsTranscode: Boolean get() = !crop.isNone
