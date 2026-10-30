@@ -142,7 +142,7 @@
     <string name="video_wide_2_1_sub">1280×640: native resolution of the Octavia screen, no stretching</string>
     <string name="video_wide_976_title">Wide 2240×976 (VW Tiguan L Pro)</string>
     <string name="video_wide_976_sub">Wide crop scaled to the CarLife window of the VW CNS3 head unit</string>
-    <string name="video_wide_836_title">Wide 1920×836 (VW, experiment)</string>
+    <string name="video_wide_836_title">Wide 1920×836 (VW Tiguan L Pro, passthrough)</string>
     <string name="video_wide_836_sub">Aspect of the 2240×976 window without scaling on the phone: the head unit scales. For crop without transcoding</string>
 
     <!-- Music sample rate (MusicRate) -->
