@@ -190,7 +190,7 @@ object AaHold {
      * пауза `--ei gap_s`, потом сессия как у моста: видео, повтор раз в секунду до REJOIN_MAX_MS, держим hold_s, ByeBye.
      * Отвечает на вопрос, можно ли пробовать сервер при открытии экрана и не сломать следующую поездку.
      */
-    fun runGap(ctx: Context, first: String, gapS: Int, holdS: Int) {
+    fun runGap(ctx: Context, first: String, gapS: Int, holdS: Int, firstVideo: Boolean = true) {
         val app = ctx.applicationContext
         synchronized(idleLock) {
             if (running) {
@@ -202,7 +202,7 @@ object AaHold {
         }
         Thread({
             try {
-                gap(app, first, gapS * 1000L, holdS * 1000L)
+                gap(app, first, gapS * 1000L, holdS * 1000L, firstVideo)
             } catch (e: Throwable) {
                 AppLog.i("$TAG GAP ИТОГ: сбой ${e.javaClass.simpleName}: ${e.message}")
             } finally {
@@ -263,10 +263,10 @@ object AaHold {
         return Outcome(estMs >= 0, estMs, videoMs, s.stats.videoData, endReason.get())
     }
 
-    private fun gap(ctx: Context, first: String, gapMs: Long, holdMs: Long) {
+    private fun gap(ctx: Context, first: String, gapMs: Long, holdMs: Long, firstVideo: Boolean) {
         val prefs = AaPrefs(ctx)
         val sd = { VideoMode.DEFAULT.sdOptions(fullAudio = false, carMake = prefs.carMake) }
-        AppLog.i("$TAG GAP старт: первая=$first, пауза=${gapMs / 1000} с, держать=${holdMs / 1000} с")
+        AppLog.i("$TAG GAP старт: первая=$first видео=$firstVideo, пауза=${gapMs / 1000} с, держать=${holdMs / 1000} с")
         val firstRes = if (first == "probe") {
             val probe = AaSessionProbe(
                 loadCreds = { AaCreds.load(ctx, prefs.certSet).creds },
@@ -277,7 +277,7 @@ object AaHold {
             val r = probe.probeOnce()
             "проба $r за ${nowMs() - a0} мс ${probe.lastDetail}"
         } else {
-            val o = session(ctx, sd, holdMs, true, "first")
+            val o = session(ctx, sd, holdMs, firstVideo, "first")
             "сессия established=${o.established} за ${o.establishMs} мс, видео через ${o.firstVideoMs} мс, кадров ${o.videoFrames}, конец: ${o.reason}"
         }
         AppLog.i("$TAG GAP первая: $firstRes")

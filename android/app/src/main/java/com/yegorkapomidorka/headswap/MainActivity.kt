@@ -249,7 +249,7 @@ class MainActivity : Activity() {
                 )
                 // проба/сессия -> пауза -> сессия как у моста: --es first probe|hold --ei gap_s N --ei hold_s N
                 "aa_gap" -> AaHold.runGap(
-                    this, intent.getStringExtra("first") ?: "probe", intent.getIntExtra("gap_s", 5), intent.getIntExtra("hold_s", 15),
+                    this, intent.getStringExtra("first") ?: "probe", intent.getIntExtra("gap_s", 5), intent.getIntExtra("hold_s", 15), intent.getBooleanExtra("video", true),
                 )
                 "aa_hold_stop" ->AaHold.stop("команда aa_hold_stop")
                 // проба локальной сети для беспровода: маяк UDP 7999, ответчик 8999 (--ei seconds N --es to <ip>)
