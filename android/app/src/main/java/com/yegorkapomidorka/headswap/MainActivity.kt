@@ -104,12 +104,6 @@ class MainActivity : Activity() {
         if (savedInstanceState == null && !hadCmd) {
             Thread({ AaCreds.selfTest(this) }, "aa-selftest").start()
         }
-        // h428: состояние звонка сообщаем ГУ, как Baidu; на API 31+ для этого нужно READ_PHONE_STATE.
-        // Не вместе с другим запросом в этом onCreate (cmd net_perm = ACCESS_LOCAL_NETWORK): второй одновременный Android молча отклоняет.
-        if (savedInstanceState == null && !hadCmd && !fromUsb && UiPrefs(this).onboardingDone && Build.VERSION.SDK_INT >= 31 &&
-            checkSelfPermission(android.Manifest.permission.READ_PHONE_STATE) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
-            requestPermissions(arrayOf(android.Manifest.permission.READ_PHONE_STATE), REQ_PHONE_STATE)
-        }
     }
 
     override fun onNewIntent(intent: Intent) {

@@ -13,6 +13,13 @@ interface CallStateSource {
     }
 
     companion object {
+        /** API, с которого TelephonyCallback требует READ_PHONE_STATE; ниже PhoneStateListener работает без разрешения. */
+        const val PERMISSION_SDK = 31
+
+        /** Слушать ли телефонию: флажок «Сообщать ГУ о звонках» включён и (на API 31+) выдан READ_PHONE_STATE. */
+        fun shouldListen(enabled: Boolean, sdk: Int, permissionGranted: Boolean) =
+            enabled && (sdk < PERMISSION_SDK || permissionGranted)
+
         const val IDLE = 0
         const val RINGING = 1
         const val OFFHOOK = 2

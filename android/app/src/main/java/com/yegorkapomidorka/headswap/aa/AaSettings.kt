@@ -134,6 +134,11 @@ class AaPrefs(ctx: Context) {
         get() = sp.getBoolean("micVrStatus", true)
         set(v) = sp.edit().putBoolean("micVrStatus", v).apply()
 
+    /** Сообщать ГУ о звонках (TelephonyManager -> MODULE_STATUS PHONE + TELE_STATE); по умолчанию выкл. Читается на подключение. */
+    var callsToHu: Boolean
+        get() = sp.getBoolean("callsToHu", false)
+        set(v) = sp.edit().putBoolean("callsToHu", v).apply()
+
     /** Трек, обложка и прогресс из AA -> MEDIA_INFO / MEDIA_PROGRESS_BAR. Читается на подключение. */
     var metaMusic: Boolean
         get() = sp.getBoolean("metaMusic", true)
