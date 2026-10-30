@@ -1002,6 +1002,36 @@ class AaMetaTest {
     }
 
     @Test
+    fun vezelSoundKeyOffOnResumesAa() {
+        // Vezel (20832125): кнопка звука на ГУ - MUSIC=0, повторное нажатие - пачка MUSIC=1 (лог 30.10 11:10/11:26)
+        val r = Rig()
+        val peer = FakePeer()
+        r.core.peer = peer
+        r.core.onHuStatistic(AaBridgeCore.HONDA_20832125_CHANNEL)
+        r.start()
+        r.core.onMediaStatus(AaMeta.parseMediaStatus(status(2, 1))!!)
+        assertFalse(r.core.onCarlifeMusicControl(0))
+        assertEquals(listOf(127), peer.keys.toList())
+        r.now += 5000
+        assertTrue(r.core.onCarlifeMusicControl(1))
+        r.now += 100
+        assertTrue(r.core.onCarlifeMusicControl(1))
+        assertEquals("126 один раз", listOf(127, 126), peer.keys.toList())
+
+        // другая Honda без флага: как раньше, play не шлём
+        val q = Rig()
+        val qPeer = FakePeer()
+        q.core.peer = qPeer
+        q.core.onHuStatistic(AaBridgeCore.HONDA_20772121_CHANNEL)
+        q.start()
+        q.core.onMediaStatus(AaMeta.parseMediaStatus(status(2, 1))!!)
+        q.core.onCarlifeMusicControl(0)
+        q.now += 5000
+        assertFalse(q.core.onCarlifeMusicControl(1))
+        assertEquals(listOf(127), qPeer.keys.toList())
+    }
+
+    @Test
     fun g6sMusicOnWithoutOurPauseDoesNotPlay() {
         // свежая сессия: пачка MUSIC=1 через ~2 с после HU_INFO, паузы нашей нет (h33: радио не глушить)
         val r = Rig()
