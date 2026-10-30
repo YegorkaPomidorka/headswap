@@ -49,7 +49,7 @@ interface CarlifeLink {
      */
     fun requestMicRecord(start: Boolean): Boolean = false
 
-    /** Ключевой кадр энкодера (размер в байтах) ушёл в CarLife; зовётся только на ГУ с лимитом размера IDR (VW ID, h196). */
+    /** Ключевой кадр энкодера (размер в байтах) ушёл в CarLife; зовётся только на ГУ с лимитом размера IDR (VW ID, h196; Mobis CCNC, h242). */
     fun onEncodedKeyFrame(size: Int) {}
 
     /** Состояние видео-очереди (слив, бэклог, длина) для статистики моста; null = нет данных. */
@@ -209,6 +209,8 @@ class AaBridgeCore(
     @Volatile var huHonda20772121 = false      // Honda Civic 11 (channel 20772121, h295): после камеры/меню ГУ молча сбрасывает декодер, passthrough ждёт IDR
         private set
     @Volatile var huMazda20622111 = false      // Mazda Connect 2 из Китая (channel 20622111, h238/h359): VIDEO_DATA > ~16 КиБ вешает чтение USB
+        private set
+    @Volatile var huMobisNx4c = false          // Hyundai Tucson NX4 (Mobis CCNC, channel 20022188, h242): всё как у Baidu (запись AOA, keepalive, MIC, энкодер 20 fps)
         private set
     @Volatile var musicRateProvider: () -> MusicRate = { MusicRate.DEFAULT }
     private var resampler: MusicResampler? = null    // null при 48000: PCM идёт как есть
@@ -417,6 +419,7 @@ class AaBridgeCore(
         huPioneerRm56 = false                  // HU_INFO придёт заново в этой сессии
         huHonda20772121 = false                // HU_INFO / STATISTIC_INFO придут заново в этой сессии
         huMazda20622111 = false                // STATISTIC_INFO придёт заново в этой сессии
+        huMobisNx4c = false                    // HU_INFO / STATISTIC_INFO придут заново в этой сессии
         huVwCns2Delphi = false                 // STATISTIC_INFO придёт заново в этой сессии
         vrReply = false
         touchDecimator.reset()
@@ -632,7 +635,8 @@ class AaBridgeCore(
      * HU_INFO ГУ разобран: Desay G6S опознаём по производителю и модели (другие ГУ Desay SV под запрет не попадают),
      * Hyundai CN7 - по product.
      */
-    fun onHuInfo(manufacturer: String?, model: String?, product: String? = null) {
+    fun onHuInfo(manufacturer: String?, model: String?, product: String? = null, board: String? = null) {
+        if (board == MOBIS_BOARD || model == MOBIS_BOARD) enableMobisNx4c()
         if (manufacturer == DESAY_MANUFACTURER && model == DESAY_G6S_MODEL) huDesayG6S = true
         vwIdName = manufacturer
         if (manufacturer == VW_BT_1420_MANUFACTURER) huVwBt1420 = true
@@ -646,6 +650,21 @@ class AaBridgeCore(
                 transcodeEnabled = true
                 log("BRIDGE ГУ Pioneer RM56E8B: passthrough отключаю, перекодирование принудительно", true)
             }
+        }
+    }
+
+    /**
+     * Hyundai Tucson NX4 (Mobis CCNC, h242). Флаг включается как можно раньше (HU_INFO, запасной признак - канал
+     * STATISTIC_INFO), потому что часть реакций (запись AOA, auth, BT) нужна до STATISTIC_INFO. Прямой проброс под
+     * флагом не используем: энкодер Baidu (20 fps, VBR, 3,84 Мбит/с) есть только в перекодировании.
+     */
+    private fun enableMobisNx4c() {
+        if (huMobisNx4c) return
+        huMobisNx4c = true
+        log("MOBIS CCNC: режим Baidu включён", true)
+        if (!transcodeEnabled) {
+            transcodeEnabled = true
+            log("BRIDGE ГУ Mobis CCNC: passthrough отключаю, перекодирование принудительно", true)
         }
     }
 
@@ -675,6 +694,7 @@ class AaBridgeCore(
 
     /** STATISTIC_INFO ГУ разобран: запасной признак Desay G6S и признак VW 20082120 - канал сборки прошивки. */
     fun onHuStatistic(channel: String?) {
+        if (channel == MOBIS_NX4C_CHANNEL) enableMobisNx4c()
         if (channel == DESAY_G6S_CHANNEL) huDesayG6S = true
         if (channel == HONDA_20772121_CHANNEL || channel == HONDA_20832125_CHANNEL) huHonda20772121 = true
         if (channel == MAZDA_20622111_CHANNEL && !huMazda20622111) {
@@ -2325,7 +2345,7 @@ class AaBridgeCore(
                 log("BRIDGE IDR энкодера -> CarLife ${payload.size} Б nal=${AnnexB.nalTypes(payload)}", true)
             }
             AaState.status = "мост: AA -> CarLife (перекодирование)"
-            if (huVw20082138) link.onEncodedKeyFrame(payload.size)
+            if (huVw20082138 || huMobisNx4c) link.onEncodedKeyFrame(payload.size)
             return
         }
         if (!link.sendVideo(data)) {
@@ -2338,7 +2358,7 @@ class AaBridgeCore(
         sent++
         if (idr) idrSent++
         AaState.bridgeSent = sent
-        if (idr && huVw20082138) link.onEncodedKeyFrame(data.size)
+        if (idr && (huVw20082138 || huMobisNx4c)) link.onEncodedKeyFrame(data.size)
     }
 
     /**
@@ -2581,6 +2601,11 @@ class AaBridgeCore(
         /** ГУ VW ID с лимитом размера IDR: BT-имя (HU_INFO manufacturer) -> канал прошивки (STATISTIC_INFO); пара обязательна. */
         val VW_ID_IDR_LIMIT_HUS = mapOf(VW_20082128_MANUFACTURER to VW_20082128_CHANNEL)
         const val HYUNDAI_CN7_PRODUCT = "wp_cn7cpe_cn"    // HU_INFO.product Hyundai Elantra CN7 (h218): manufacturer QTI, model "sm6150_au for arm64"
+        /** Hyundai Tucson NX4 (Mobis CCNC, h242): HU_INFO board или model = "CCNC", запасной признак - STATISTIC_INFO channel 20022188; по одному производителю Mobis не включаем (другие ГУ Mobis). */
+        const val MOBIS_BOARD = "CCNC"
+        const val MOBIS_NX4C_CHANNEL = "20022188"
+        const val MOBIS_FPS = 20                          // Baidu MediaFormatUtils: frame-rate энкодера 20 при любом INIT_DONE
+        const val MOBIS_BITRATE = 3_840_000               // Baidu Recorder.getBitRate: ширина > 1280
         const val PIONEER_MANUFACTURER = "Pioneer"        // HU_INFO Pioneer RM56E8B (Dongfeng DF6, h277): manufacturer="Pioneer" model="RM56E8B"
         const val PIONEER_RM56_MODEL = "RM56E8B"
         const val PIONEER_RM56_CEILING_BPS = 800_000      // 4-5 Мбит/с рвут USB за 25-30 с, 2 Мбит/с - 195 с, 800 кбит/с - 1301 с; test1: 1 Мбит/с + музыка 32 кГц (~1 Мбит/с PCM) рвёт за 23-140 с

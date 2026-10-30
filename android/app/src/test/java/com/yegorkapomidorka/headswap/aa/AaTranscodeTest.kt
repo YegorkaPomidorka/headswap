@@ -83,6 +83,11 @@ class TranscodeLink : CarlifeLink {
         return ok
     }
 
+    val keySizes = CopyOnWriteArrayList<Int>()
+    override fun onEncodedKeyFrame(size: Int) {
+        keySizes.add(size)
+    }
+
     override fun sendAudio(channel: Int, type: Int, payload: ByteArray) = true
     override fun sendModuleStatus(module: Int, status: Int) = true
     override fun createTranscoder(out: TranscodeOutput): VideoTranscoder? {
@@ -125,6 +130,31 @@ class AaTranscodeCoreTest {
         // повторный START: тот же транскодер
         core.onCarlifeStart()
         assertEquals(1, link.created)
+    }
+
+    @Test
+    fun mobisReportsEncoderIdrSizesToLinkOthersDoNot() {
+        core.onHuInfo("Mobis", "CCNC", "NX4C", "CCNC")
+        core.onCarlifeStart()
+        core.onCodecConfig(aaCfg)
+        core.onEncoderConfig(encCfg)
+        core.onFrame(aaIdr, 1)
+        core.onEncoderFrame(encIdr, true)                      // первый IDR уходит с приклеенным SPS/PPS
+        assertEquals(listOf(encCfg.size + encIdr.size), link.keySizes.toList())
+        core.onEncoderFrame(encP, false)                       // P в потолок не идёт
+        core.onEncoderFrame(encIdr, true)
+        assertEquals(listOf(encCfg.size + encIdr.size, encIdr.size), link.keySizes.toList())
+    }
+
+    @Test
+    fun nonMobisNonVwDoesNotReportIdrSizes() {
+        core.onCarlifeStart()
+        core.onCodecConfig(aaCfg)
+        core.onEncoderConfig(encCfg)
+        core.onFrame(aaIdr, 1)
+        core.onEncoderFrame(encIdr, true)
+        core.onEncoderFrame(encIdr, true)
+        assertTrue(link.keySizes.isEmpty())
     }
 
     /** Довести до AA-видео в CarLife, затем PAUSE: выход энкодера отбрасывается (как sendVideo=false на паузе). */

@@ -73,6 +73,8 @@ object Msg {
     const val MD_AUTHEN_RESULT = 0x0001004B
     const val MD_FEATURE_CONFIG_REQUEST = 0x00010051
     const val HU_FEATURE_CONFIG_RESPONSE = 0x00018052
+    const val BT_START_IDENTIFY_REQ = 0x00018053
+    const val BT_IDENTIFY_RESULT_IND = 0x00010054
     const val ERROR_CODE = 0x00018055
     const val VIDEO_ENCODER_JPEG = 0x00018056
     const val VIDEO_ENCODER_JPEG_ACK = 0x00010057
@@ -177,8 +179,8 @@ object Msg {
         0x00018050 to "BT_HFP_STATUS_RESPONSE",
         MD_FEATURE_CONFIG_REQUEST to "MD_FEATURE_CONFIG_REQUEST",
         HU_FEATURE_CONFIG_RESPONSE to "HU_FEATURE_CONFIG_RESPONSE",
-        0x00018053 to "BT_START_IDENTIFY_REQ",
-        0x00010054 to "BT_IDENTIFY_RESULT_IND",
+        BT_START_IDENTIFY_REQ to "BT_START_IDENTIFY_REQ",
+        BT_IDENTIFY_RESULT_IND to "BT_IDENTIFY_RESULT_IND",
         ERROR_CODE to "ERROR_CODE",
         0x00018056 to "VIDEO_ENCODER_JPEG",
         0x00010057 to "VIDEO_ENCODER_JPEG_ACK",
@@ -310,6 +312,13 @@ object Wire {
         }
         return out
     }
+
+    /**
+     * Запись как у Baidu (AoaWriteTransport :73-85, AOAConnectManager :177-190): 8 байт заголовка одним write,
+     * весь inner одним write любого размера. Для ГУ Mobis CCNC (h242).
+     */
+    fun writeWhole(chan: Int, inner: ByteArray): List<ByteArray> =
+        if (inner.isEmpty()) listOf(outerHeader(chan, 0)) else listOf(outerHeader(chan, inner.size), inner)
 
     fun parseCmd(inner: ByteArray): CmdMsg? {
         if (inner.size < 8) return null
@@ -562,6 +571,9 @@ object Msgs {
     fun authenResponse(encryptValue: String) = PbWriter().string(1, encryptValue).toByteArray()
 
     fun authenRequest(random: String) = PbWriter().string(1, random).toByteArray()
+
+    /** CarlifeBTIdentifyResultInd {required int32 status=1; required string address=2} (Baidu BtHfpProtocolHelper :135-147). */
+    fun btIdentifyResult(status: Int, address: String) = PbWriter().int32(1, status).string(2, address).toByteArray()
 
     /** CarlifeTouchAction; pointerx/pointery (второй палец) optional, без них тело как у одного пальца. */
     fun touchAction(action: Int, x: Int, y: Int, pointerX: Int? = null, pointerY: Int? = null): ByteArray {

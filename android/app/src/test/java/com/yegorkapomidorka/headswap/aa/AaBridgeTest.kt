@@ -123,6 +123,31 @@ class AaBridgeCoreTest {
     private fun types(b: ByteArray) = AnnexB.nalTypes(b)
 
     @Test
+    fun mobisFlagFromHuInfoOrChannelForcesTranscode() {
+        // h242: Tucson (Mobis CCNC) опознаётся по HU_INFO, запасной признак - канал 20022188
+        assertFalse(core.huMobisNx4c)
+        core.onHuInfo("Samsung", "SM-A", "a", "exynos")
+        core.onHuStatistic("20082122")
+        assertFalse(core.huMobisNx4c)
+        core.onHuInfo("Mobis", "AVN5", "other", "OTHER")      // другое ГУ Mobis по производителю не включает флаг
+        assertFalse(core.huMobisNx4c)
+        core.transcodeEnabled = false
+        core.onHuInfo("Mobis", "CCNC", "NX4C", "CCNC")
+        assertTrue(core.huMobisNx4c)
+        assertTrue(core.transcodeEnabled)
+        assertEquals(1, logs.count { it == "MOBIS CCNC: режим Baidu включён" })
+        core.onHuStatistic("20022188")                        // повторно не пишет строку
+        assertEquals(1, logs.count { it == "MOBIS CCNC: режим Baidu включён" })
+        core.attach(link)
+        assertFalse(core.huMobisNx4c)
+        core.onHuStatistic("20022188")
+        assertTrue(core.huMobisNx4c)
+        core.attach(link)
+        core.onHuInfo(null, null, null, "CCNC")               // только board
+        assertTrue(core.huMobisNx4c)
+    }
+
+    @Test
     fun huThemeDrivesAaNightModeAndSurvivesPeerReconnect() {
         val p = FakePeer()
         core.peer = p
