@@ -19,10 +19,12 @@
     "tcp_timeout0": "WL tcp timeout ready=0/6",
     "p2p_no_perm": "Wi-Fi Direct: нет разрешения",
     "p2p_busy": "Wi-Fi Direct занят \\(BUSY\\)",
+    "p2p_busy_reason": "WL p2p discover res=fail reason=busy",
+    "hotspot_iface": "WL net iface-up iface=\"(swlan|ap|wlan[1-9])",
     "p2p_wifi_off": "Wi-Fi Direct: Wi-Fi на телефоне выключен",
     "p2p_join_timeout": "в группу ГУ не вошли",
     "p2p_group_lost": "группа ГУ распалась",
-    "low_memory": "EXIT прошлое завершение .*(LOW_MEMORY|SIGNALED status=9)",
+    "low_memory": "EXIT прошлое завершение .*(LOW_MEMORY|SIGNALED status=9|описание=(ScreenOffCPU|OneKeyClean))",
     "codec_fail": "configure уровня \\d не прошёл|ошибка транскодера",
     "abort": "Software caused connection abort",
     "no_route": "No route to host",
@@ -317,8 +319,9 @@
       "phase": "first_connect",
       "category": "user_setup",
       "score": 75,
-      "all": [["m.p2p_busy", ">=", 1]],
-      "evidence": ["p2p_busy"],
+      "all": [["m.p2p_busy_reason", ">=", 1]],
+      "any": [["m.p2p_busy", ">=", 1], ["m.hotspot_iface", ">=", 1]],
+      "evidence": ["p2p_busy", "p2p_busy_reason", "hotspot_iface"],
       "advice": "Для подключения по Wi-Fi Direct выключите на телефоне точку доступа: телефон не может держать их одновременно.",
       "advice_en": "To connect over Wi-Fi Direct, turn off the hotspot on the phone: it can't run both at the same time.",
       "what": "Телефон не может держать точку доступа и Wi-Fi Direct одновременно.",
@@ -421,6 +424,42 @@
       "steps": [
         {"text": "Включите перекодирование", "text_en": "Turn on Transcoding", "action": "video"},
         {"text": "В «Мой автомобиль» выберите свою модель VW ID", "text_en": "In \"My car\" pick your VW ID model", "action": "video"}
+      ],
+      "suppresses": ["usb_unstable"]
+    },
+    {
+      "id": "vw_id_any_idr_limit",
+      "title": "VW ID рвёт кабель на больших ключевых кадрах",
+      "title_en": "VW ID drops the cable on large keyframes",
+      "phase": "drops",
+      "category": "our_bug_fixed",
+      "score": 75,
+      "fixed_in": "2.6.1",
+      "all": [["channel", "~", "^20082138$"], ["hu", "~", "VW BT (?!1420|1538)\\d"], ["eio_sessions", ">=", 2]],
+      "advice": "Магнитола рвёт USB на ключевых кадрах больше ~600 КиБ (режимы «Широкий 976» и 1080p). До обновления выберите разрешение 720p.",
+      "advice_en": "The head unit drops USB on keyframes larger than ~600 KiB (Wide 976 and 1080p modes). Until you update, choose the 720p resolution.",
+      "what": "Магнитола рвёт USB на ключевых кадрах больше ~600 КиБ.",
+      "what_en": "The head unit drops USB on keyframes larger than ~600 KiB.",
+      "steps": [
+        {"text": "Выберите в Headswap разрешение 720p", "text_en": "In Headswap choose the 720p resolution", "action": "video"}
+      ],
+      "suppresses": ["usb_unstable"]
+    },
+    {
+      "id": "vw_id6_idr_limit",
+      "title": "VW ID.6 рвёт кабель на больших ключевых кадрах",
+      "title_en": "VW ID.6 drops the cable on large keyframes",
+      "phase": "drops",
+      "category": "our_bug_fixed",
+      "score": 75,
+      "fixed_in": "2.6.1",
+      "all": [["channel", "~", "^20082128$"], ["hu", "~", "9491"], ["eio_sessions", ">=", 2]],
+      "advice": "Магнитола «VW BT 9491» рвёт USB на ключевых кадрах больше ~600 КиБ (режимы «Широкий 976» и 1080p). До обновления выберите разрешение 720p.",
+      "advice_en": "The \"VW BT 9491\" head unit drops USB on keyframes larger than ~600 KiB (Wide 976 and 1080p modes). Until you update, choose the 720p resolution.",
+      "what": "Магнитола рвёт USB на ключевых кадрах больше ~600 КиБ.",
+      "what_en": "The head unit drops USB on keyframes larger than ~600 KiB.",
+      "steps": [
+        {"text": "Выберите в Headswap разрешение 720p", "text_en": "In Headswap choose the 720p resolution", "action": "video"}
       ],
       "suppresses": ["usb_unstable"]
     },

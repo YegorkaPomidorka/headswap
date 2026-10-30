@@ -12,6 +12,7 @@ import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.content.pm.ServiceInfo
 import android.hardware.usb.UsbManager
+import android.media.AudioManager
 import android.net.Network
 import android.os.Handler
 import android.os.IBinder
@@ -27,10 +28,13 @@ import com.yegorkapomidorka.headswap.aa.AaPrefs
 import com.yegorkapomidorka.headswap.aa.AaState
 import com.yegorkapomidorka.headswap.aa.AapOptions
 import com.yegorkapomidorka.headswap.aa.BridgeHost
+import com.yegorkapomidorka.headswap.aa.CarPreset
 import com.yegorkapomidorka.headswap.aa.EqLive
 import com.yegorkapomidorka.headswap.aa.MetaRelay
 import com.yegorkapomidorka.headswap.aa.MicMode
+import com.yegorkapomidorka.headswap.aa.PhoneCall
 import com.yegorkapomidorka.headswap.aa.PhoneMicCapture
+import com.yegorkapomidorka.headswap.aa.RefDecoder
 import com.yegorkapomidorka.headswap.aa.VideoGeometry
 import com.yegorkapomidorka.headswap.link.CarTransport
 import com.yegorkapomidorka.headswap.link.LinkSetupException
@@ -806,14 +810,24 @@ class BridgeService : Service() {
         } else {
             AppLog.i("BRIDGE: AA-хост уже есть, переиспользую (grace=${h.isInGrace})")
         }
-        // на воздухе перекодирование обязательно: в passthrough битрейт не регулируется. Режим хоста не трогаем
-        // (без перекодирования он уже R720, его можно перекодировать), хост не пересоздаём: сервер AA одноразовый.
-        // Старый режим живого хоста с кропом (WIDE*, R1024) в passthrough не живёт: перекодирование держим включённым
-        val transcode = aaPrefs.transcode || transport.caps == TransportCaps.TCP6 || h.core.videoMode.needsTranscode
+        // перекодирование - по настройке; прямой проброс по воздуху тоже разрешён: битрейт AA не регулируется, ГУ восстанавливается
+        // нашим IDR. Режим хоста не трогаем (без перекодирования он уже R720, его можно перекодировать), хост не пересоздаём:
+        // сервер AA одноразовый. Старый режим живого хоста с кропом (WIDE*, R1024) в passthrough живёт только с SPS-кропом (h529):
+        // если область масштабируется (WIDE_976, своё с растяжением) - перекодирование.
+        val hostMode = h.core.videoMode
+        val transcode = aaPrefs.transcode || (hostMode.needsTranscode && !hostMode.spsCropable)
         if (h.core.transcodeEnabled != transcode) {
-            AppLog.i("BRIDGE видео: ${if (transcode) "перекодирование включаю принудительно (воздух или режим хоста ${h.core.videoMode.label})" else "кабель, возвращаю passthrough по настройке"}")
+            AppLog.i("BRIDGE видео: ${if (transcode) "перекодирование включаю принудительно (режим хоста ${h.core.videoMode.label})" else "возвращаю passthrough по настройке"}")
             h.core.transcodeEnabled = transcode
         }
+        if (!transcode && transport.caps == TransportCaps.TCP6) AppLog.i("BRIDGE видео: воздух, прямой проброс со своим IDR (битрейт не регулируется)")
+        // свой IDR только в passthrough: при перекодировании его нет
+        val spliceMs = if (transcode) 0L else IDR_SPLICE_MS
+        if (h.core.spliceMs != spliceMs) {
+            AppLog.i("BRIDGE свой IDR в passthrough: ${if (spliceMs > 0) "раз в $spliceMs мс" else "выключен (перекодирование)"}")
+            h.core.spliceMs = spliceMs
+        }
+        h.core.carVwId = aaPrefs.carPreset == CarPreset.VW_ID_UNYX
         if (wakeLock == null) {
             wakeLock = getSystemService(PowerManager::class.java)
                 .newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "headswap:session")
@@ -841,6 +855,14 @@ class BridgeService : Service() {
             val log = { line: String, ui: Boolean -> AppLog.i(line, ui) }
             val core = AaBridgeCore(log, clockUs = { SystemClock.elapsedRealtimeNanos() / 1_000 })
             core.micModeProvider = { aaPrefs.micMode }
+            val audio = getSystemService(AudioManager::class.java)
+            core.phoneCallProvider = {
+                when (audio?.mode) {
+                    AudioManager.MODE_RINGTONE -> PhoneCall.RINGING
+                    AudioManager.MODE_IN_CALL -> PhoneCall.ACTIVE
+                    else -> PhoneCall.IDLE                  // IN_COMMUNICATION не берём: так же выглядит голос ассистента
+                }
+            }
             core.musicRateProvider = { aaPrefs.musicRate }
             core.mediaChunkProvider = { aaPrefs.mediaChunk }
             core.voiceChunkProvider = { aaPrefs.voiceChunk }
@@ -850,14 +872,19 @@ class BridgeService : Service() {
             core.usbAudioEnabled = aaPrefs.usbAudio
             EqLive.settings = aaPrefs.eq
             core.transcodeEnabled = aaPrefs.transcode
+            core.refDecoderFactory = { sink -> RefDecoder(sink) { AppLog.i(it, false) } }
             core.videoMode = mode
             core.densityOverride = densityOverride
+            // h529: поля справа/снизу только для SPS-кропа в прямом проброске; транскодер режет центр
+            val bottom = !aaPrefs.transcode && mode.spsCropable
+            core.marginsAtBottom = bottom
+            if (bottom) AppLog.i("BRIDGE SPS-кроп: поля ${mode.marginW} px справа и ${mode.marginH} px снизу (ui_config.margins), интерфейс в левом верхнем углу")
             core.expectFeatureConfig = true
             if (chosen != mode) AppLog.i("BRIDGE видео-режим ${chosen.label} недоступен без перекодирования, использую ${mode.label}")
             // аудио-синки (MEDIA/SPEECH) объявляются в момент запроса телефона, когда уже известно решение по звуку
             val conn = AaConnector(
                 core, loaded.creds, log,
-                options = { AapOptions(sdProvider = { mode.sdOptions(fullAudio = core.audioViaUsb, densityOverride = densityOverride, carMake = aaPrefs.carMake) }) },
+                options = { AapOptions(sdProvider = { mode.sdOptions(fullAudio = core.audioViaUsb, densityOverride = densityOverride, carMake = aaPrefs.carMake, marginsAtBottom = bottom) }) },
             )
             AppLog.i("BRIDGE звук по USB: ${if (aaPrefs.usbAudio) "включён (решение по FEATURE_CONFIG ГУ)" else "выключен в UI"}")
             AppLog.i("BRIDGE: AA cert=${loaded.creds.certSet}, grace=${BridgeHost.GRACE_MS} мс")
@@ -992,6 +1019,7 @@ class BridgeService : Service() {
         /** Машина отключилась по Bluetooth (ACL_DISCONNECTED): через debounce снять ожидание. */
         const val ACTION_WIFI_B_AUTO_OFF = "com.yegorkapomidorka.headswap.WIFI_B_AUTO_OFF"
         private const val CHANNEL = "bridge"
+        private const val IDR_SPLICE_MS = 2000L             // период своего IDR в passthrough
         private const val NOTIF_ID = 1
         private const val HINT_NOTIF_ID = 2
         private const val USB_TO_AIR_NOTIF_ID = 5

@@ -5,6 +5,7 @@ import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.Path
+import android.graphics.Rect
 import android.graphics.RectF
 import android.graphics.Typeface
 import android.media.MediaCodec
@@ -24,6 +25,8 @@ class VideoSource(
     private val fps: Int,
     private val bitrate: Int,
     private val listener: Listener,
+    /** Видимая часть кадра (SPS-кроп, h529): надпись рисуется только в ней, вне её фон. null = весь кадр. */
+    private val area: Rect? = null,
 ) {
     interface Listener {
         fun onConfig(csd: ByteArray)
@@ -199,12 +202,22 @@ class VideoSource(
     /** Текущий кадр заглушки в Bitmap: с него транскодер начинает зум-растворение в картинку AA. Любая нить. */
     fun snapshot(): Bitmap? {
         val msg = banner ?: return null
-        val bmp = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
-        drawBanner(Canvas(bmp), width, height, msg, framesRendered, Paint(text), Paint(fill))
+        val w = area?.width() ?: width
+        val h = area?.height() ?: height
+        val bmp = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+        drawBanner(Canvas(bmp), w, h, msg, framesRendered, Paint(text), Paint(fill))
         return bmp
     }
 
-    private fun drawBanner(c: Canvas, msg: String) = drawBanner(c, width, height, msg, framesRendered, text, fill)
+    private fun drawBanner(c: Canvas, msg: String) {
+        val a = area ?: return drawBanner(c, width, height, msg, framesRendered, text, fill)
+        c.drawColor(BG)
+        c.save()
+        c.translate(a.left.toFloat(), a.top.toFloat())
+        c.clipRect(0, 0, a.width(), a.height())
+        drawBanner(c, a.width(), a.height(), msg, framesRendered, text, fill)
+        c.restore()
+    }
 
     private fun drawBanner(c: Canvas, width: Int, height: Int, msg: String, n: Long, text: Paint, fill: Paint) {
         val w = width.toFloat()

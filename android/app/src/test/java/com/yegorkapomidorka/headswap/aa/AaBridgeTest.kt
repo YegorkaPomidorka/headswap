@@ -223,9 +223,58 @@ class AaBridgeCoreTest {
         assertEquals(2, peer.keyframes)
         core.onFrame(idr, 4)                                  // после IDR запросы прекращаются
         assertArrayEquals(cfg + idr, link.sent[2])
+        now += AaBridgeCore.SPS_CROP_KICK_MS + 10_000
+        core.tick()
+        assertEquals("повторный кадр h529 был на первом старте сессии, после второго START его нет", 2, peer.keyframes)
+        assertEquals(0, logs.count { it.contains("повторный ключевой кадр") })
+    }
+
+    @Test
+    fun noRepeatedKeyframeAfterPauseStartAndNewFirstIdr() {
+        val peer = FakePeer()
+        core.peer = peer
+        core.onCarlifeStart()
+        core.onCodecConfig(cfg)
+        core.onFrame(idr, 1)                                  // первый IDR сессии в now=0
+        now = AaBridgeCore.SPS_CROP_KICK_MS
+        core.tick()
+        assertEquals("повторный кадр на первом старте", 1, peer.keyframes)
+        now = 10_000
+        core.onCarlifePause()
+        core.onCarlifeStart()                                 // цикл NATIVE -> PROJECTED от самого START
+        assertEquals("START после PAUSE: цикл от START", 2, peer.keyframes)
+        core.onFrame(idr, 2)                                  // новый первый IDR после START
+        now += AaBridgeCore.SPS_CROP_KICK_MS + 10_000
+        core.tick()
+        assertEquals("повторного кадра после PAUSE/START нет", 2, peer.keyframes)
+        assertEquals(1, logs.count { it.contains("повторный ключевой кадр") })
+    }
+
+    @Test
+    fun repeatedKeyframeAgainOnNewCarlifeSession() {
+        val peer = FakePeer()
+        core.peer = peer
+        core.onCarlifeStart()
+        core.onCodecConfig(cfg)
+        core.onFrame(idr, 1)
+        now = AaBridgeCore.SPS_CROP_KICK_MS
+        core.tick()
+        assertEquals(1, peer.keyframes)
+        now = 20_000
+        core.attach(FakeLink())                               // USB вернулся при живой AA: новая CarLife-сессия
+        core.onCarlifeStart()
+        assertEquals("START новой сессии: цикл", 2, peer.keyframes)
+        core.onFrame(idr, 2)
+        now += AaBridgeCore.SPS_CROP_KICK_MS - 1
+        core.tick()
+        assertEquals("раньше 2000 мс повторного кадра нет", 2, peer.keyframes)
+        now += 1
+        core.tick()
+        assertEquals("на новой сессии повторный кадр снова есть", 3, peer.keyframes)
         now += 10_000
         core.tick()
-        assertEquals(2, peer.keyframes)
+        assertEquals("ровно один", 3, peer.keyframes)
+        assertEquals(2, logs.count { it.contains("повторный ключевой кадр") })
     }
 
     /** Passthrough, IDR ушёл в now=0, затем P-кадры; peer подключён. */
@@ -248,14 +297,16 @@ class AaBridgeCoreTest {
         core.onCarlifeTouch(0, 10, 10)
         assertEquals("тач ушёл в AA", 1, peer.touches.size)
         assertEquals("сразу полный цикл", 1, peer.keyframes)
-        assertTrue(logs.any { it.startsWith("BRIDGE h295: тач после 5000 мс без IDR, пауза в тачах ") && it.endsWith(" мс -> keyframe-цикл") })
+        assertTrue(logs.any { it == "BRIDGE h295: тач после 5000 мс без IDR, первый тач в сессии -> keyframe-цикл" })
         core.onFrame(p1, 3)                                   // gate открыт: P-кадр проходит
         assertEquals(sentBefore + 1, link.sent.size)
         assertArrayEquals(p1, link.sent.last())
         core.onTouch(0)                                       // второй DOWN ГУ (~2 мс): пауза в тачах ~0, триггера нет
         assertEquals(1, peer.keyframes)
-        core.tick()                                           // отдельного фолбэка нет
-        assertEquals(1, peer.keyframes)
+        core.tick()                                           // отдельного h295-фолбэка нет; тик отдаёт лишь повторный кадр h529 (с IDR в 0 прошло > 2 с)
+        assertEquals(2, peer.keyframes)
+        core.tick()
+        assertEquals("повторный кадр одноразовый", 2, peer.keyframes)
         now = 5400
         core.onFrame(idr, 4)                                  // IDR в обычной ветке (gate открыт), без takeover
         assertEquals(1, link.takeovers)
@@ -362,7 +413,30 @@ class AaBridgeCoreTest {
         core.onFrame(idr, 4)
         now = 20_000
         core.tick()
-        assertEquals("tick циклов не добавляет", 2, peer.keyframes)
+        assertEquals("tick добавляет только повторный кадр h529, h295-циклов не добавляет", 3, peer.keyframes)
+        core.tick()
+        assertEquals(3, peer.keyframes)
+    }
+
+    @Test
+    fun repeatedKeyframe2sAfterFirstIdrWithoutCrop() {
+        val peer = FakePeer()
+        core.peer = peer
+        core.onCarlifeStart()
+        core.onCodecConfig(cfg)
+        core.onFrame(idr, 1)                                  // passthrough без SPS-кропа (R1080), IDR в now=0
+        now = AaBridgeCore.SPS_CROP_KICK_MS - 1
+        core.tick()
+        assertEquals("раньше 2000 мс повторного кадра нет", 0, peer.keyframes)
+        assertTrue(logs.none { it.contains("повторный ключевой кадр") })
+        now = AaBridgeCore.SPS_CROP_KICK_MS
+        core.tick()
+        assertEquals(1, peer.keyframes)
+        assertEquals(1, logs.count { it.contains("повторный ключевой кадр") })
+        now += 10_000
+        core.tick()
+        assertEquals("одноразовый", 1, peer.keyframes)
+        assertEquals(1, logs.count { it.contains("повторный ключевой кадр") })
     }
 
     @Test
@@ -385,6 +459,8 @@ class AaBridgeCoreTest {
         assertTrue(core.huHonda20772121)
         core.attach(link)                                     // новая сессия сбрасывает флаг ГУ
         assertFalse(core.huHonda20772121)
+        core.onHuStatistic(AaBridgeCore.HONDA_20832125_CHANNEL) // Vezel: тот же обход после заднего хода
+        assertTrue(core.huHonda20772121)
     }
 
     private fun AaBridgeCore.onTouch(action: Int) = onCarlifeTouch(action, 10, 10)
@@ -556,6 +632,29 @@ class AaBridgeCoreTest {
         core.onCarlifeHardKey(16)                             // AA не подключён: игнор без исключений
         assertEquals(3, peer.keys.size)
         assertTrue(AaBridgeCore.HARD_KEY_TO_ANDROID.values.all { it in AapMessages.KEYCODES_SUPPORTED })
+    }
+
+    @Test
+    fun seekKeysAnswerCall() {
+        val peer = FakePeer()
+        core.peer = peer
+        var call = PhoneCall.RINGING
+        core.phoneCallProvider = { call }
+        core.onCarlifeHardKey(16)                             // чужое ГУ: перемотка как была
+        core.onCarlifeHardKey(0)                              // чужое ГУ: keycode 0 игнор
+        assertEquals(listOf(87), peer.keys.toList())
+        peer.keys.clear()
+        core.onHuStatistic("20082114")                        // VW CNS2 Delphi (Дмитрий)
+        core.onCarlifeHardKey(15)                             // звонит: назад (зелёная слева) = принять
+        core.onCarlifeHardKey(16)                             // звонит: вперёд (красная справа) = отклонить
+        call = PhoneCall.ACTIVE
+        core.onCarlifeHardKey(15)                             // разговор: назад глотаем
+        core.onCarlifeHardKey(16)                             // разговор: вперёд = положить трубку
+        call = PhoneCall.IDLE
+        core.onCarlifeHardKey(16)                             // без звонка снова перемотка
+        core.onCarlifeHardKey(0)                              // удержание перемотки = пауза/плей
+        assertEquals(listOf(5, 6, 6, 87, 85), peer.keys.toList())
+        assertTrue(logs.any { it.contains("руль keycode=15 -> AA KEYCODE 5 (звонок RINGING)") })
     }
 
     @Test

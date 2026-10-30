@@ -1,7 +1,10 @@
 package com.yegorkapomidorka.headswap.aa
 
 import com.yegorkapomidorka.headswap.AnnexB
+import com.yegorkapomidorka.headswap.Hex
 import java.util.concurrent.CountDownLatch
+import java.util.concurrent.Executor
+import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import java.util.concurrent.ScheduledExecutorService
 import java.util.concurrent.TimeUnit
@@ -75,6 +78,9 @@ private object NoLink : CarlifeLink {
     override fun goToDesktop() {}
 }
 
+/** Звонок на телефоне: IDLE — нет, RINGING — входящий звонит, ACTIVE — разговор (AudioManager MODE_IN_CALL). */
+enum class PhoneCall { IDLE, RINGING, ACTIVE }
+
 /**
  * Логика моста AA -> CarLife без Android и сокетов: приём видео от AA как AaVideoSink, правила первого
  * сообщения для CarLife (SPS+PPS+IDR в одном), переключение заглушка/AA, маппинг тачей, запрос ключевого кадра.
@@ -85,7 +91,7 @@ class AaBridgeCore(
     private val clockUs: () -> Long = { System.nanoTime() / 1_000 },
     micSchedule: ((Long, Runnable) -> MicTimerHandle)? = null,
     audioSchedule: ((Long, Runnable) -> MicTimerHandle)? = null,
-) : AaVideoSink, AaAudioSink, AaMicSink, AaMetaSink, TranscodeOutput {
+) : AaVideoSink, AaAudioSink, AaMicSink, AaMetaSink, TranscodeOutput, RefPictureSink {
     enum class Source { PLACEHOLDER, AA }
 
     @Volatile var peer: AaPeer? = null
@@ -138,6 +144,25 @@ class AaBridgeCore(
 
     /** Ручной DPI интерфейса AA, снятый вместе с videoMode (AaDensity.AUTO = density режима). Только SDR, на кроп и тач не влияет. */
     @Volatile var densityOverride: Int = AaDensity.AUTO
+
+    /** SDR ушёл с полями целиком справа и снизу (h529, ui_config): SPS-кроп режет только справа и снизу. Снимается вместе с videoMode. */
+    @Volatile var marginsAtBottom = false
+
+    /**
+     * Свой IDR в passthrough ([IdrSplice]): раз в столько мс ГУ получает ключевой кадр из декодированной на телефоне
+     * картинки AA, без перекодирования и без цикла VideoFocus. 0 - выкл. Ставит BridgeService на старте CarLife-сессии.
+     */
+    @Volatile var spliceMs = 0L
+
+    /**
+     * Сколько кадров AA перед картинкой своего IDR не уходит в ГУ (в движении): IDR встаёт вместо drop + 1 кадров AA,
+     * очередь ГУ с постоянной частотой показа укорачивается на drop кадров. P-кадр после IDR ссылается только на его картинку.
+     * Только для тестов: 0 - IDR встаёт вместо одного кадра AA, без выброса.
+     */
+    internal var spliceDrop = 1
+
+    /** Декодер опорных картинок для своего IDR (MediaCodec, ставит BridgeService); null - вставки нет. */
+    @Volatile var refDecoderFactory: ((RefPictureSink) -> RefPictureDecoder?)? = null
     private var transcoder: VideoTranscoder? = null
     private var encCsd: ByteArray? = null
     private var outGotIdr = false
@@ -172,7 +197,7 @@ class AaBridgeCore(
     private var vrReply = false                // поток ответа ассистента открыт в канале VR (VR_INIT ушёл)
     @Volatile var huVw20082120 = false        // VW (STATISTIC_INFO channel 20082120 h93, 20082122 h222): без heartbeat рвёт USB через 3,7-5,6 с PAUSE
         private set
-    @Volatile var huVw20082138 = false         // VW ID (channel 20082138, "VW BT 1538", h196): IDR > ~600 КиБ рвёт USB EIO
+    @Volatile var huVw20082138 = false         // VW ID (channel 20082138 кроме "VW BT 1420"; ID.6 Crozz: 20082128 + "VW BT 9491"; пресет ID. UNYX): IDR > ~600 КиБ рвёт USB EIO
         private set
     @Volatile var huHyundaiCn7 = false         // ГУ Hyundai CN7 (product wp_cn7cpe_cn, h218): в режиме «Авто» музыка 32 кГц с ресэмплом 48→32
         private set
@@ -316,6 +341,8 @@ class AaBridgeCore(
     // --- микрофон AA: запрос открыл телефон, звук берём у ГУ (CarLife VR) или с микрофона телефона ---
     /** Режим микрофона читается в момент каждого open: переключатель в UI действует сразу. */
     @Volatile var micModeProvider: () -> MicMode = { MicMode.AUTO }
+    /** Состояние звонка на телефоне (AudioManager.mode): на [huVwCns2Delphi] перемотка руля на время звонка = принять/положить. */
+    @Volatile var phoneCallProvider: () -> PhoneCall = { PhoneCall.IDLE }
 
     /** Микрофон телефона (AudioRecord); null = нет. Один экземпляр на всё время: router вызывает start/stop по очереди. */
     @Volatile var phoneMic: PhoneMic? = null
@@ -366,8 +393,8 @@ class AaBridgeCore(
         huHonda = false                        // STATISTIC_INFO придёт заново в этой сессии
         huVwBt1420 = false                     // HU_INFO придёт заново в этой сессии
         huVw20082138 = false                   // HU_INFO / STATISTIC_INFO придут заново в этой сессии
-        vwIdName = false
-        vwIdChannel = false
+        vwIdName = null
+        vwIdChannel = null
         huHyundaiCn7 = false                   // HU_INFO придёт заново в этой сессии
         huPioneerRm56 = false                  // HU_INFO придёт заново в этой сессии
         huHonda20772121 = false                // HU_INFO / STATISTIC_INFO придут заново в этой сессии
@@ -381,6 +408,9 @@ class AaBridgeCore(
         h295TouchAt = NEVER
         h295LastTrigger = NEVER
         h295LastTouchAt = NEVER
+        sessionKickDone = false
+        spliceCancel("новая CarLife-сессия")
+        latStats.resetSession()
         mediaRateLogged = MEDIA_RATE
         mediaChunkLogged = CarlifeAudio.MAX_CHUNK
         voiceChunkLogged = CarlifeAudio.MAX_CHUNK
@@ -424,6 +454,7 @@ class AaBridgeCore(
         }
         gotIdr = false
         h295TouchAt = NEVER
+        spsCropKickAt = NEVER
         waitSince = if (aaVideoSeen) clockMs() - KEYFRAME_WAIT_MS else 0L
         lastKeyframeRequest = NEVER
         log("BRIDGE CarLife START: источник=$active, AA видео ${if (aaVideoSeen) "идёт, запрашиваю ключевой кадр" else "ещё нет"}", true)
@@ -583,7 +614,7 @@ class AaBridgeCore(
      */
     fun onHuInfo(manufacturer: String?, model: String?, product: String? = null) {
         if (manufacturer == DESAY_MANUFACTURER && model == DESAY_G6S_MODEL) huDesayG6S = true
-        vwIdName = manufacturer == VW_20082138_MANUFACTURER
+        vwIdName = manufacturer
         if (manufacturer == VW_BT_1420_MANUFACTURER) huVwBt1420 = true
         updateVwId()
         if (product == HYUNDAI_CN7_PRODUCT) huHyundaiCn7 = true
@@ -598,23 +629,34 @@ class AaBridgeCore(
         }
     }
 
-    private var vwIdName = false               // HU_INFO manufacturer = BT-имя ГУ "VW BT 1538"
-    private var vwIdChannel = false            // STATISTIC_INFO channel = прошивка 20082138
+    private var vwIdName: String? = null       // HU_INFO manufacturer = BT-имя ГУ ("VW BT NNNN", цифры свои у каждой машины)
+    private var vwIdChannel: String? = null    // STATISTIC_INFO channel = прошивка ГУ
+
+    /** «Мой автомобиль» = VW ID. UNYX: потолок по размеру IDR и без опознания ГУ. BridgeService ставит на каждую сессию. */
+    @Volatile var carVwId = false
 
     /**
-     * VW ID (h196) - только прошивка 20082138 И BT-имя "VW BT 1538": тот же канал у VW BT 1420 (Павел), которому
-     * потолок 2 Мбит/с не нужен (8 Мбит/с по воздуху и USB без обрывов, лог 2026-10-16).
+     * VW ID - прошивка 20082138 с любым BT-именем, кроме VW BT 1420 (Павел: 8 Мбит/с по воздуху и USB без обрывов,
+     * лог 2026-10-16); имя ждём, чтобы отличить Павла. Встречались "VW BT 1538" (h196) и "VW BT 4370" (ID. UNYX, 26.10.2026).
+     * Прочие прошивки - строго парой из [VW_ID_IDR_LIMIT_HUS]: 20082128 + "VW BT 9491" (ID.6 Crozz, 24.10.2026).
+     * Пресет [carVwId] включает потолок сам.
      */
     private fun updateVwId() {
         val was = huVw20082138
-        huVw20082138 = vwIdName && vwIdChannel
-        if (huVw20082138 && !was) log("BRIDGE ГУ VW ID (20082138, VW BT 1538): потолок битрейта по размеру IDR", true)
+        val name = vwIdName
+        val channel = vwIdChannel
+        huVw20082138 = carVwId || (name != null && channel != null && name != VW_BT_1420_MANUFACTURER &&
+            (channel == VW_20082138_CHANNEL || channel == VW_ID_IDR_LIMIT_HUS[name]))
+        if (huVw20082138 && !was) {
+            val why = if (carVwId) "пресет VW ID. UNYX" else "$channel, $name"
+            log("BRIDGE ГУ VW ID ($why): потолок битрейта по размеру IDR", true)
+        }
     }
 
     /** STATISTIC_INFO ГУ разобран: запасной признак Desay G6S и признак VW 20082120 - канал сборки прошивки. */
     fun onHuStatistic(channel: String?) {
         if (channel == DESAY_G6S_CHANNEL) huDesayG6S = true
-        if (channel == HONDA_20772121_CHANNEL) huHonda20772121 = true
+        if (channel == HONDA_20772121_CHANNEL || channel == HONDA_20832125_CHANNEL) huHonda20772121 = true
         if (channel == MAZDA_20622111_CHANNEL && !huMazda20622111) {
             huMazda20622111 = true
             log("BRIDGE ГУ Mazda 20622111: VIDEO_DATA режу на куски ≤ $MAZDA_20622111_MAX_VIDEO_PACKET Б, потолок ${MAZDA_20622111_CEILING_BPS / 1000} кбит/с", true)
@@ -629,7 +671,7 @@ class AaBridgeCore(
             huHonda = true
             log("BRIDGE ГУ Honda (channel $channel): roadName под приборку, стрелки после SUBSCRIBE_START, перевзвод NAVI 0->1", true)
         }
-        vwIdChannel = channel == VW_20082138_CHANNEL
+        vwIdChannel = channel
         updateVwId()
     }
 
@@ -674,6 +716,7 @@ class AaBridgeCore(
         carlifeStarted = false
         exitPending = false
         gotIdr = false
+        spliceCancel("CarLife закрыт")
         resetAudio()
         stopTranscoderAsync()
         active = Source.PLACEHOLDER
@@ -736,23 +779,27 @@ class AaBridgeCore(
     @Synchronized
     private fun onHuTouch(act: Int) {
         val now = clockMs()
+        val firstTouch = h295LastTouchAt == NEVER
         val sinceTouch = now - h295LastTouchAt
         h295LastTouchAt = now
         if (act != AapMessages.TOUCH_DOWN) return
         if (!huHonda20772121 || transcoder != null || !carlifeStarted || !gotIdr) return
+        if (spliceWorks) return     // свой IDR и так раз в 2 с, цикл NATIVE -> PROJECTED только дёргает картинку под пальцем
         val sinceIdr = now - lastIdrSentMs
         if (sinceIdr <= H295_IDR_STALE_MS || sinceTouch < H295_TOUCH_IDLE_MS || now - h295LastTrigger < H295_TRIGGER_MIN_MS) return
         h295LastTrigger = now
         h295TouchAt = now
         lastKeyframeRequest = now
         keyframeRequests++
-        log("BRIDGE h295: тач после $sinceIdr мс без IDR, пауза в тачах $sinceTouch мс -> keyframe-цикл", true)
+        log("BRIDGE h295: тач после $sinceIdr мс без IDR, ${if (firstTouch) "первый тач в сессии" else "пауза в тачах $sinceTouch мс"} -> keyframe-цикл", true)
         peer?.requestKeyFrame()
     }
 
     /** h295: IDR после цикла так и не пришёл за [H295_WAIT_GIVEUP_MS] - не вешаем на него чужой IDR в логе и склейке. */
     private fun h295GiveUp(now: Long) {
-        if (h295TouchAt != NEVER && now - h295TouchAt > H295_WAIT_GIVEUP_MS) h295TouchAt = NEVER
+        if (h295TouchAt == NEVER || now - h295TouchAt <= H295_WAIT_GIVEUP_MS) return
+        log("BRIDGE h295: IDR после тача не пришёл за ${H295_WAIT_GIVEUP_MS / 1000} с", true)
+        h295TouchAt = NEVER
     }
 
     /** h295: IDR, которого ждали после тача, уходит с SPS/PPS из CODEC_CONFIG, если в кадре их нет. Иначе кадр как есть. */
@@ -760,6 +807,80 @@ class AaBridgeCore(
         if (h295TouchAt == NEVER || 5 !in types || (AnnexB.startsWithSps(b) && 8 in types)) return b
         val cfg = aaConfig ?: return b
         return AnnexB.glue(cfg, b)
+    }
+
+    private var spsCropKickAt = NEVER              // h529: когда запросить повторный IDR после первого в CarLife-сессии
+    private var spsCropKickBase = NEVER            // когда ушёл тот первый IDR: свой IDR после него заменяет повтор
+    private var spsCropKickDeferred = false        // повтор уже отложен один раз в ожидании своего IDR
+    private var sessionKickDone = false            // повторный IDR уже назначен в этой CarLife-сессии; после PAUSE/START мост и так шлёт цикл
+    private var spsCropSrc: ByteArray? = null      // последний исходный SPS AA и его переписанная версия (null = не вышло)
+    private var spsCropDst: ByteArray? = null
+
+    /**
+     * Passthrough с полями (WIDE*, R1024 при включённом SPS-кропе, h529): к кропу каждого SPS прибавляются поля AA,
+     * их отрезает декодер ГУ. Не разобрался SPS - уходит исходный (ГУ покажет кадр с полями), причина в логе один раз.
+     * Зовётся только из ветки без транскодера, поэтому срабатывает и при откате с несозданного транскодера.
+     */
+    private fun spsCrop(au: ByteArray): ByteArray {
+        if (videoMode.crop.isNone) return au
+        return SpsCrop.mapSps(au) { sps ->
+            if (!sps.contentEquals(spsCropSrc)) {
+                spsCropSrc = sps
+                spsCropDst = cropSps(sps, "")
+            }
+            spsCropDst ?: sps
+        }
+    }
+
+    /** SPS из AU в лог: POC, опорные кадры, VUI (bitstream_restriction решает, держит ли декодер ГУ кадры в DPB). */
+    private fun logSps(who: String, au: ByteArray) {
+        for (nal in IdrSplicer.nals(au)) {
+            if (nal[0].toInt() and 0x1F != 7) continue
+            val d = try {
+                SpsVui.parse(nal).toString()
+            } catch (e: RuntimeException) {
+                "не разобрался: ${e.message}"
+            }
+            log("BRIDGE SPS $who: $d (${Hex.compact(nal, 48)})", true)
+        }
+    }
+
+    private fun cropSps(sps: ByteArray, who: String): ByteArray? {
+        val g = videoMode
+        return try {
+            val r = if (marginsAtBottom) SpsCrop.rewrite(sps, 0, g.marginW, 0, g.marginH)
+            else SpsCrop.rewrite(sps, g.marginW / 2, g.marginW / 2, g.marginH / 2, g.marginH / 2)
+            if (r.after.visibleW != g.outW || r.after.visibleH != g.outH) {
+                throw SpsCrop.SpsException("видимая часть ${r.after.visibleW}x${r.after.visibleH}, ГУ ждёт ${g.outW}x${g.outH}")
+            }
+            log("BRIDGE SPS-кроп$who: ${r.before} -> ${r.after}, ${sps.size} -> ${r.sps.size} Б", true)
+            r.sps
+        } catch (e: SpsCrop.SpsException) {
+            log("BRIDGE SPS-кроп$who не применён (${e.message}), SPS ${sps.joinToString("") { "%02x".format(it) }} уходит как есть", true)
+            null
+        }
+    }
+
+    /**
+     * Заглушка в passthrough с SPS-кропом кодируется в кадре AA (aaW×aaH) и режется тем же кропом (h529, Мазда 20622116):
+     * ГУ настраивает декодер по первому SPS после START и смену размера кадра посреди потока не переносит,
+     * после заглушки 1728x648 поток AA 1920x1088 шёл кашей из точек до следующего PAUSE/START.
+     */
+    val stubInAaGeometry: Boolean get() = !transcodeEnabled && !videoMode.crop.isNone
+
+    /** Левый верхний угол видимой части кадра AA при SPS-кропе: там заглушка рисует надпись. */
+    val spsCropOrigin: Pair<Int, Int> get() = if (marginsAtBottom) 0 to 0 else videoMode.marginW / 2 to videoMode.marginH / 2
+
+    private var stubCropSrc: ByteArray? = null     // то же, что spsCropSrc/Dst, для SPS энкодера заглушки (нить drain энкодера)
+    private var stubCropDst: ByteArray? = null
+
+    /** SPS энкодера заглушки с теми же полями, что у AA ([stubInAaGeometry]). */
+    fun stubSpsCrop(au: ByteArray): ByteArray = SpsCrop.mapSps(au) { sps ->
+        if (!sps.contentEquals(stubCropSrc)) {
+            stubCropSrc = sps
+            stubCropDst = cropSps(sps, " заглушки")
+        }
+        stubCropDst ?: sps
     }
 
     private fun h295IdrSeen(before: ByteArray, after: ByteArray) {
@@ -866,7 +987,12 @@ class AaBridgeCore(
             p.sendRotary(delta)
             return
         }
-        val android = HARD_KEY_TO_ANDROID[code]
+        val call = if (huVwCns2Delphi) phoneCallProvider() else PhoneCall.IDLE
+        val android = delphiKey(code, call) ?: HARD_KEY_TO_ANDROID[code]
+        if (call == PhoneCall.ACTIVE && code == HARD_KEY_SEEK_SUB) {
+            log("BRIDGE руль keycode=$code: идёт звонок, назад не шлю", true)
+            return
+        }
         if (android == null) {
             log("BRIDGE руль keycode=$code: нет аналога в AA, игнор", true)
             return
@@ -877,8 +1003,24 @@ class AaBridgeCore(
             return
         }
         if (android == KEYCODE_SEARCH && voiceKeyBounce("руль keycode=$code")) return
-        log("BRIDGE руль keycode=$code -> AA KEYCODE $android", true)
+        val note = if (call != PhoneCall.IDLE) " (звонок ${call.name})" else ""
+        log("BRIDGE руль keycode=$code -> AA KEYCODE $android$note", true)
         p.sendKey(android)
+    }
+
+    /**
+     * На новых рулях VW нет кнопки трубки: пока звонит или идёт звонок, перемотка отвечает за звонок.
+     * Как на телефоне: зелёная слева, красная справа. Звонит: назад = принять (CALL), вперёд = отклонить (ENDCALL).
+     * Разговор: вперёд = положить трубку.
+     * Кнопки паузы тоже нет: удержание перемотки ГУ шлёт как keycode 0, вне звонка это пауза/плей.
+     * Только VW CNS2 Delphi 20082114 ([huVwCns2Delphi], Дмитрий); на прочих ГУ всё как было.
+     */
+    private fun delphiKey(code: Int, call: PhoneCall): Int? = when {
+        !huVwCns2Delphi -> null
+        call == PhoneCall.IDLE && code == HARD_KEY_SEEK_HOLD -> KEYCODE_MEDIA_PLAY_PAUSE
+        call == PhoneCall.RINGING && code == HARD_KEY_SEEK_SUB -> KEYCODE_CALL
+        call != PhoneCall.IDLE && code == HARD_KEY_SEEK_ADD -> KEYCODE_ENDCALL
+        else -> null
     }
 
     /**
@@ -910,6 +1052,7 @@ class AaBridgeCore(
     @Synchronized
     fun onAaConnecting() {
         resetTranscodeForAa()
+        spliceReset()
         gotIdr = false
         aaConfig = null
         aaVideoSeen = false
@@ -920,6 +1063,7 @@ class AaBridgeCore(
         meta.onAaEnded()
         stopAllAudio("AA завершился")
         resetTranscodeForAa()
+        spliceReset()
         val wasAa = active == Source.AA
         gotIdr = false
         aaConfig = null
@@ -1379,7 +1523,10 @@ class AaBridgeCore(
         aaVideoSeen = true
         aaConfig = AnnexB.normalize(annexB)
         log("BRIDGE AA CODEC_CONFIG ${annexB.size} Б nal=${AnnexB.nalTypes(aaConfig!!)}", true)
+        logSps("AA", aaConfig!!)
         if (carlifeStarted) transcoder?.feedConfig(aaConfig!!)
+        splicer?.onConfig(aaConfig!!)
+        refDecoder?.feedConfig(aaConfig!!)
     }
 
     @Synchronized
@@ -1387,32 +1534,90 @@ class AaBridgeCore(
         aaVideoSeen = true
         AaState.frames.incrementAndGet()
         AaState.bytes += annexB.size
+        if (splicePendingSeq != 0L && spliceHold) {
+            spliceHeld.add(annexB)              // свой IDR собирается из последней картинки: новые кадры ждут его
+            return
+        }
+        aaFrame(annexB, ptsUs)
+    }
+
+    private fun aaFrame(annexB: ByteArray, ptsUs: Long) {
+        // свой IDR: декодер опорных картинок и разбор заголовков видят каждый кадр AA, и до START тоже
+        val spliced = if (spliceOn) spliceTrack(AnnexB.normalize(annexB)) else null
         if (!carlifeStarted) {
             drop("CarLife ещё не прислал START")
             return
         }
-        val b = AnnexB.normalize(annexB)
+        val b = spliced ?: AnnexB.normalize(annexB)
         val types = AnnexB.nalTypes(b)
-        lastAaFrameAt = clockMs()
+        val frameAt = clockMs()
+        aaFrameGapMs = if (lastAaFrameAt > 0) frameAt - lastAaFrameAt else Long.MAX_VALUE
+        lastAaFrameAt = frameAt
         aaFrames++
         val t = transcoder
         if (t != null) {
             feedTranscoder(t, b, types, ptsUs)
             return
         }
+        if (spliceOn && spliceReplaceNow(b, types)) return
+        passthroughFrame(b, types)
+        if (spliceOn) spliceRequest(fromFrame = true)
+    }
+
+    /**
+     * Пора свой IDR и AA шлёт кадры - этот кадр не уходит, свой IDR из его картинки уйдёт вместо него.
+     * Без этого IDR идёт лишним кадром после своей картинки: ГУ, которая показывает кадры с постоянной частотой, копит его.
+     * В движении ещё [spliceDrop] кадров перед картинкой IDR не уходят ([spliceDropped]), IDR встаёт вместо
+     * всех; не вышло (статика, отказ, таймаут) - они уходят как были, раньше остальных.
+     */
+    private fun spliceReplaceNow(b: ByteArray, types: List<Int>): Boolean {
+        if (!gotIdr || 5 in types || splicePendingSeq != 0L) {
+            spliceFlushDropped()
+            return false
+        }
+        if (spliceDropped.size < spliceDrop) {
+            if (spliceDropped.isEmpty()) {
+                if (aaFrameGapMs >= SPLICE_QUIET_MS || !spliceDue(clockMs())) return false
+                spliceDroppedAt = clockMs()
+            } else if (aaFrameGapMs >= SPLICE_QUIET_MS) {
+                spliceFlushDropped()
+                return false
+            }
+            spliceDropped.add(b)
+            return true
+        }
+        spliceRequest(fromFrame = true)
+        if (splicePendingSeq == 0L || !spliceHold || splicePendingSeq != spliceLastSeq) {
+            spliceFlushDropped()
+            return false
+        }
+        spliceReplaced = b
+        return true
+    }
+
+    /** Выброшенные под свой IDR кадры AA всё-таки уходят в ГУ (IDR не будет): по порядку, они уже прошли splicer. */
+    private fun spliceFlushDropped() {
+        if (spliceDropped.isEmpty()) return
+        val frames = ArrayList(spliceDropped)
+        spliceDropped.clear()
+        latStats.dropUndone++
+        if (carlifeStarted) for (f in frames) passthroughFrame(f, AnnexB.nalTypes(f))
+    }
+
+    private fun passthroughFrame(b: ByteArray, types: List<Int>) {
         if (!gotIdr) {
             if (5 !in types) {
                 drop("P-кадр до IDR nal=$types")
                 return
             }
-            val payload = if (AnnexB.startsWithSps(b) && 8 in types) b else {
+            val payload = spsCrop(if (AnnexB.startsWithSps(b) && 8 in types) b else {
                 val cfg = aaConfig
                 if (cfg == null) {
                     drop("IDR без SPS/PPS и без CODEC_CONFIG")
                     return
                 }
                 AnnexB.glue(cfg, b)
-            }
+            })
             val takeover = active != Source.AA
             if (!(if (takeover) link.sendVideoTakeover(payload) else link.sendVideo(payload))) {
                 drop("первый IDR не принят CarLife (очередь/закрыто)")
@@ -1423,6 +1628,17 @@ class AaBridgeCore(
             sent++
             idrSent++
             lastIdrSentMs = clockMs()
+            latStats.sent(lastIdrSentMs, own = false)
+            // h529 (Vezel): первый IDR AA сразу за IDR заглушки ГУ иногда теряет, и экран чёрный до следующего IDR AA (~60 с).
+            // Лог 211335: так и без кропа (R1080), поэтому повторный IDR во всех режимах passthrough и на всех ГУ,
+            // но один раз за CarLife-сессию: после PAUSE/START он дал бы лишнюю встряску (0,9 с стоп-кадра)
+            // Со своим IDR повтор не нужен, но это решается в tick: здесь декодер ещё не выдал ни одной картинки
+            if (!sessionKickDone) {
+                sessionKickDone = true
+                spsCropKickAt = lastIdrSentMs + SPS_CROP_KICK_MS
+                spsCropKickBase = lastIdrSentMs
+                spsCropKickDeferred = false
+            }
             h295IdrSeen(b, payload)
             if (active != Source.AA) {
                 active = Source.AA
@@ -1434,7 +1650,7 @@ class AaBridgeCore(
             AaState.status = "мост: AA -> CarLife"
             return
         }
-        val out = h295Prepare(b, types)
+        val out = h295Prepare(b, types).let { if (5 in types) spsCrop(it) else it }
         if (!link.sendVideo(out)) {
             // кадр потерян: декодер ГУ поплывёт, ждём новый IDR
             gotIdr = false
@@ -1443,6 +1659,7 @@ class AaBridgeCore(
             return
         }
         sent++
+        latStats.sent(clockMs(), own = false)
         if (5 in types) {
             idrSent++
             lastIdrSentMs = clockMs()
@@ -1458,13 +1675,27 @@ class AaBridgeCore(
         if (dropLogged <= 3 || dropLogged % 100 == 0L) log("BRIDGE отброшен AA-кадр (#$dropped): $why", false)
     }
 
-    /** Раз в 0.5 с: ключевой кадр, если после START долго нет IDR. */
-    @Synchronized
+    /** Раз в 0.5 с: ключевой кадр, если после START долго нет IDR; свой IDR на статичном экране. */
     fun tick() {
+        tickLocked()
+        spliceRun()                                    // сборка IDR вне блокировки ядра
+    }
+
+    @Synchronized
+    private fun tickLocked() {
         logStats()
         if (!carlifeStarted) return
         val now = clockMs()
+        if (spliceOn) spliceTick(now)
+        latStats.logIfDue(now)
         h295GiveUp(now)
+        if (spsCropKickAt != NEVER && now >= spsCropKickAt && spliceKickNeeded(now)) {
+            spsCropKickAt = NEVER
+            lastKeyframeRequest = now
+            keyframeRequests++
+            log("BRIDGE повторный ключевой кадр через ${SPS_CROP_KICK_MS} мс после первого (ГУ могла потерять его на смене заглушка -> AA)", true)
+            peer?.requestKeyFrame()
+        }
         if (gotIdr || !aaVideoSeen) return
         if (waitSince == 0L) waitSince = now
         if (now - waitSince >= KEYFRAME_WAIT_MS && now - lastKeyframeRequest >= KEYFRAME_RETRY_MS) {
@@ -1472,6 +1703,394 @@ class AaBridgeCore(
             keyframeRequests++
             log("BRIDGE жду IDR от AA ${(now - waitSince) / 1000.0} с: запрашиваю ключевой кадр (VideoFocus NATIVE -> PROJECTED) #$keyframeRequests", true)
             peer?.requestKeyFrame()
+        }
+    }
+
+    /**
+     * h529-повтор IDR от AA или свой IDR. Свой уже ушёл после первого IDR сессии - повтор не нужен. Вставка работает
+     * (декодер отдаёт картинки), но свой ещё не ушёл - ждём его ещё [SPLICE_KICK_GRACE_MS] один раз. Иначе - повтор как в h529.
+     */
+    private fun spliceKickNeeded(now: Long): Boolean {
+        if (spliceLastSentAt != NEVER && spliceLastSentAt > spsCropKickBase) {
+            log("BRIDGE повторный ключевой кадр от AA не нужен: свой IDR уже ушёл", true)
+            spsCropKickAt = NEVER
+            return false
+        }
+        if (spliceWorks && !spsCropKickDeferred) {
+            spsCropKickDeferred = true
+            spsCropKickAt = now + SPLICE_KICK_GRACE_MS
+            return false
+        }
+        return true
+    }
+
+    // --- свой IDR в passthrough (IdrSplice) ---
+    private var splicer: IdrSplicer? = null
+    private var refDecoder: RefPictureDecoder? = null
+    private var refDecoderFailed = false
+    @Volatile private var spliceLastSeq = 0L           // номер последней картинки AA, прошедшей через splicer
+    @Volatile private var refOutSeq = 0L               // последняя картинка на выходе декодера (скопирована или нет)
+    @Volatile private var refPic: IdrSplice.Picture? = null
+    @Volatile private var refPicSeq = 0L
+    @Volatile private var splicePendingSeq = 0L        // картинка для своего IDR: ждём её из декодера или собираем; 0 - нет
+    private var splicePendingAt = 0L
+    private var spliceHold = false                     // кадры AA ждут IDR (AA шлёт кадры); иначе сборка в фоне
+    private var spliceBuilding = false
+    private var spliceNotBefore = NEVER                // следующая попытка не раньше (после отказа, пропуска, таймаута)
+    private var spliceBlockLogged: String? = null
+    private val spliceHeld = ArrayList<ByteArray>()     // кадры AA, пришедшие, пока собирается свой IDR (spliceHold)
+    private var spliceReplaced: ByteArray? = null       // кадр AA, вместо которого уйдёт свой IDR, уже через splicer
+    private val spliceDropped = ArrayList<ByteArray>()  // кадры AA перед картинкой своего IDR, которые он заменит (spliceDrop), уже через splicer
+    private var spliceDroppedAt = 0L
+    private val guModel = GuQueueModel()
+    private val latStats = LatencyStats()
+    private var spliceLastSentAt = NEVER               // когда свой IDR последний раз ушёл на ГУ
+    private var spliceMisses = 0                       // картинка не пришла из декодера, подряд
+    private var spliceDisabled: String? = null          // вставка невозможна до конца AA-сессии (причина)
+    private var aaFrameGapMs = Long.MAX_VALUE          // пауза перед последним кадром AA
+    private var builder: IdrBuilder? = null
+    private val spliceStats = SpliceStats()
+
+    /** Нить сборки своего IDR; null - своя, создаётся при первой сборке. Тесты ставят исполнитель в той же нити. */
+    var spliceExecutor: Executor? = null
+
+    /** Пул для слайсов IDR; null - свой на [SPLICE_SLICES] нитей. */
+    var spliceSlicePool: ExecutorService? = null
+
+    private val spliceOn: Boolean get() = spliceMs > 0 && !transcodeEnabled
+
+    /** Свой IDR реально возможен: декодер уже отдал картинку, поток подходит. Тогда повторный IDR от AA (встряска) не нужен. */
+    private val spliceWorks: Boolean
+        get() = spliceOn && spliceDisabled == null && refDecoder != null && refPicSeq > 0 && splicer?.blocker() == null
+
+    /** Кадр AA через splicer (frame_num/POC после своего IDR) и в декодер опорных картинок. */
+    private fun spliceTrack(b: ByteArray): ByteArray {
+        val sp = splicer ?: IdrSplicer().also { s ->
+            splicer = s
+            aaConfig?.let { s.onConfig(it) }
+        }
+        val out = sp.process(b)
+        spliceLastSeq = sp.seq
+        var d = refDecoder
+        if (d == null && !refDecoderFailed) {
+            d = refDecoderFactory?.invoke(this)
+            if (d == null) {
+                refDecoderFailed = true
+                log("BRIDGE свой IDR: декодера опорных картинок нет, вставка выключена", true)
+            } else {
+                refDecoder = d
+                aaConfig?.let { d.feedConfig(it) }
+                log("BRIDGE свой IDR: включён, раз в ${spliceMs} мс (passthrough)", true)
+            }
+        }
+        d?.feed(b, sp.seq)
+        return out
+    }
+
+    /**
+     * Пора ли заменить последнюю картинку AA своим IDR: по периоду, а без IDR на ГУ - сразу (с паузой между попытками).
+     * IDR должен идти сразу за своей картинкой: иначе ГУ продолжит P-кадры AA от другого кадра и в движении поедет картинка.
+     * Поэтому, если AA шлёт кадры (пауза перед кадром меньше [SPLICE_QUIET_MS]), кадры ждут сборку (не дольше
+     * [SPLICE_HOLD_MAX_MS]); на статике IDR собирается в фоне, а пришедший за это время кадр делает его устаревшим.
+     */
+    private fun spliceRequest(fromFrame: Boolean) {
+        if (spliceDropped.isNotEmpty() && !fromFrame) return     // выброс начат: IDR соберётся из следующего кадра AA
+        val now = clockMs()
+        if (!spliceDue(now)) return
+        val sp = splicer ?: return
+        splicePendingSeq = sp.seq
+        splicePendingAt = now
+        spliceHold = if (fromFrame) aaFrameGapMs < SPLICE_QUIET_MS else now - lastAaFrameAt < SPLICE_QUIET_MS
+    }
+
+    /** Пора собирать свой IDR: период прошёл, декодер не отстал, поток подходит. */
+    private fun spliceDue(now: Long): Boolean {
+        if (splicePendingSeq != 0L || spliceDisabled != null || !carlifeStarted || active != Source.AA) return false
+        val sp = splicer ?: return false
+        if (refDecoder == null || sp.seq == 0L || sp.seq - refOutSeq > 2) return false     // декодер отстал или ждёт IDR
+        if (now < spliceNotBefore) return false
+        if (gotIdr && now - lastIdrSentMs < spliceMs) return false
+        val why = sp.blocker()
+        if (why != null) {
+            if (why != spliceBlockLogged) log("BRIDGE свой IDR невозможен: $why", true)
+            spliceBlockLogged = why
+            spliceNotBefore = now + SPLICE_RETRY_MS
+            return false
+        }
+        return true
+    }
+
+    private fun spliceTick(now: Long) {
+        // выброс начат, а следующего кадра AA нет (экран встал): выброшенные уходят, на статике очередь ГУ уходит и так
+        if (spliceDropped.isNotEmpty() && now - spliceDroppedAt > SPLICE_QUIET_MS) spliceFlushDropped()
+        val seq = splicePendingSeq
+        if (seq != 0L && !spliceBuilding && refPicSeq != seq && now - splicePendingAt > SPLICE_WAIT_MS) {
+            log("BRIDGE свой IDR: картинка #$seq не пришла из декодера за $SPLICE_WAIT_MS мс, пропускаю", true)
+            spliceStats.noPicture++
+            spliceNotBefore = now + SPLICE_RETRY_MS
+            spliceCancel(null)
+            if (++spliceMisses >= SPLICE_MAX_MISSES) spliceDisable("картинка из декодера не пришла $spliceMisses раз подряд")
+        } else if (seq != 0L && spliceHold && now - splicePendingAt > SPLICE_HOLD_MAX_MS) {
+            // сборка не успела: кадры AA уходят, IDR по готовности выбрасывается (splicePendingSeq сброшен)
+            spliceStats.holdTimeout++
+            spliceNotBefore = now + SPLICE_RETRY_MS
+            spliceCancel(null)
+        } else {
+            spliceRequest(fromFrame = false)
+        }
+        spliceStats.logIfDue(now, builder?.qp)
+    }
+
+    override fun wantsRefPicture(seq: Long): Boolean {
+        refOutSeq = seq
+        return seq == spliceLastSeq
+    }
+
+    override fun onRefUnavailable(why: String) = synchronized(this) { spliceDisable(why) }
+
+    /**
+     * Вставка невозможна до конца AA-сессии: декодер стоп, кадры AA больше не придерживаются, повтор IDR от AA (h529)
+     * и цикл h295 работают как без галки. Сдвиг frame_num после уже ушедшего своего IDR держится до IDR от AA.
+     */
+    private fun spliceDisable(why: String) {
+        if (spliceDisabled != null) return
+        spliceDisabled = why
+        log("BRIDGE свой IDR: !!!!!! выключен до конца AA-сессии: $why", true)
+        refDecoder?.stop()
+        refDecoder = null
+        refDecoderFailed = true
+        spliceCancel(null)
+    }
+
+    override fun onRefPicture(seq: Long, pic: IdrSplice.Picture) {
+        refPic = pic
+        refPicSeq = seq
+        if (seq == splicePendingSeq) spliceRun()
+    }
+
+    /** Отдать сборку своего IDR на её нить, если картинка уже есть. Зовётся вне блокировки ядра. */
+    private fun spliceRun() {
+        val task = synchronized(this) {
+            val seq = splicePendingSeq
+            val ready = refPicSeq == seq                // сначала номер, потом картинка: она не старше номера
+            val pic = refPic
+            val sp = splicer
+            if (seq == 0L || spliceBuilding || !ready || pic == null || sp == null) return
+            val job = sp.prepare()
+            if (job == null || job.seq != seq) {
+                // в фоне: AA прислал кадр раньше, чем декодер отдал картинку
+                spliceStats.stale++
+                spliceNotBefore = clockMs() + SPLICE_RETRY_MS
+                spliceCancel(null)
+                return
+            }
+            spliceBuilding = true
+            val b = builder ?: IdrBuilder(spliceSlicePool ?: newSlicePool(), SPLICE_SLICES).also { builder = it }
+            val exec = spliceExecutor ?: newBuildThread()
+            BuildTask(job, b, exec, pic)
+        }
+        val job = task.job
+        val b = task.builder
+        // копия: в фоне декодер может писать в тот же буфер следующую картинку (тогда этот IDR и так устареет)
+        val pic = task.pic.copy()
+        val exec = task.exec
+        exec.execute {
+            val t0 = clockMs()
+            val r = try {
+                b.build(job, pic)
+            } catch (e: RuntimeException) {
+                log("BRIDGE свой IDR: !!!!!! сборка упала: ${e.javaClass.simpleName}: ${e.message}", true)
+                null
+            }
+            spliceComplete(job, r, clockMs() - t0)
+        }
+    }
+
+    private class BuildTask(val job: IdrSplicer.Job, val builder: IdrBuilder, val exec: Executor, val pic: IdrSplice.Picture)
+
+    private fun newBuildThread(): Executor =
+        Executors.newSingleThreadExecutor { r -> Thread(r, "aa-idr-build").also { it.isDaemon = true } }.also { spliceExecutor = it }
+
+    private fun newSlicePool(): ExecutorService =
+        Executors.newFixedThreadPool(SPLICE_SLICES) { r -> Thread(r, "aa-idr-slice").also { it.isDaemon = true } }.also { spliceSlicePool = it }
+
+    @Synchronized
+    private fun spliceComplete(job: IdrSplicer.Job, r: IdrSplice.Result?, buildMs: Long) {
+        spliceBuilding = false
+        if (splicePendingSeq != job.seq) return        // отменён (держали дольше потолка, новая сессия): кадры уже отпущены
+        val now = clockMs()
+        spliceNotBefore = now + SPLICE_RETRY_MS
+        spliceMisses = 0
+        spliceStats.build(buildMs)
+        val sp = splicer
+        when {
+            r == null || sp == null || !carlifeStarted || active != Source.AA -> {}
+            sp.seq != job.seq -> spliceStats.stale++    // в фоне: пока собирали, AA прислал кадр
+            r.nal.size > SPLICE_MAX_BYTES -> {
+                spliceStats.big++
+                if (gotIdr) spliceNotBefore = now + spliceMs      // картинка та же или похожая: не собирать каждую секунду
+            }
+            else -> spliceSend(sp, job, r, buildMs, now)
+        }
+        spliceCancel(null)
+    }
+
+    private fun spliceSend(sp: IdrSplicer, job: IdrSplicer.Job, r: IdrSplice.Result, buildMs: Long, now: Long) {
+        // SPS/PPS через раз: Honda после сброса ждёт их в кадре (h295), Java-ГУ CarLife в сбросе берёт только голый IDR
+        val cfg = aaConfig
+        val recovered = !gotIdr
+        val glued = cfg != null && sp.spliced % 2 == 0L
+        val payload = if (glued) spsCrop(AnnexB.glue(cfg!!, r.nal)) else r.nal
+        if (!link.sendVideo(payload)) {
+            log("BRIDGE свой IDR ${payload.size} Б не принят CarLife (очередь/закрыто)", true)
+            return
+        }
+        sp.commit(job)
+        spliceStats.sent++
+        spliceLastSentAt = now
+        val replaced = spliceReplaced != null
+        spliceReplaced = null                           // кадр AA этой картинки ГУ не получит: его место занял IDR
+        val dropped = spliceDropped.size
+        spliceDropped.clear()                           // и кадры перед ней (spliceDrop)
+        latStats.sent(now, own = true, replaced = replaced, holdMs = if (spliceHold) now - splicePendingAt else -1, held = spliceHeld.size, dropped = dropped)
+        gotIdr = true
+        waitSince = 0
+        sent++
+        idrSent++
+        lastIdrSentMs = now
+        if (recovered || sp.spliced <= 5 || sp.spliced % 30 == 0L) {
+            log("BRIDGE свой IDR #${sp.spliced}${if (recovered) " (ГУ была без IDR)" else ""}: ${payload.size} Б, " +
+                (if (r.qp < 0) "без потерь (PCM ${r.pcm})" else "QP ${r.qp}") + ", сборка $buildMs мс, " +
+                (if (spliceHold) "кадры AA ждали ${now - splicePendingAt} мс" else "в фоне") + ", ${if (glued) "с SPS/PPS" else "голый"}" +
+                (if (!replaced) "" else if (dropped == 0) ", вместо кадра AA" else ", вместо ${dropped + 1} кадров AA"), true)
+        }
+    }
+
+    /** Больше не ждём картинку: придержанные кадры AA уходят своим путём (могут снова встать в очередь за новым IDR). */
+    private fun spliceCancel(why: String?) {
+        if (splicePendingSeq == 0L) {
+            spliceFlushDropped()
+            return
+        }
+        if (why != null) log("BRIDGE свой IDR отменён: $why", false)
+        splicePendingSeq = 0
+        spliceHold = false
+        spliceFlushDropped()
+        // кадр, вместо которого ждали IDR, уже прошёл через splicer: в ГУ как есть, раньше придержанных
+        spliceReplaced?.let { b ->
+            spliceReplaced = null
+            if (carlifeStarted) passthroughFrame(b, AnnexB.nalTypes(b))
+        }
+        while (spliceHeld.isNotEmpty() && splicePendingSeq == 0L) aaFrame(spliceHeld.removeAt(0), 0)
+    }
+
+    /** Новая AA-сессия: поток с нуля, декодер пересоздаётся. Придержанные кадры старого потока выбрасываются. */
+    private fun spliceReset() {
+        splicePendingSeq = 0
+        spliceHold = false
+        spliceHeld.clear()
+        spliceReplaced = null
+        spliceDropped.clear()
+        splicer = null
+        refDecoder?.stop()
+        refDecoder = null
+        refDecoderFailed = false
+        spliceDisabled = null
+        spliceMisses = 0
+        spliceLastSentAt = NEVER
+        spliceLastSeq = 0
+        refOutSeq = 0
+        refPic = null
+        refPicSeq = 0
+        spliceBlockLogged = null
+    }
+
+    /**
+     * Поток в ГУ раз в [SPLICE_STATS_MS] (passthrough): кадры AA и свои IDR, сколько из них лишние (сверх кадров AA),
+     * придержка кадров AA и задержка модели ГУ с постоянной частотой показа ([GuQueueModel]). Для поиска накопления задержки.
+     */
+    private inner class LatencyStats {
+        private var aa = 0
+        private var own = 0
+        private var replaced = 0
+        private var holds = 0
+        private var holdSum = 0L
+        private var holdMax = 0L
+        private var heldMax = 0
+        private var extraTotal = 0L
+        private var dropped = 0
+        private var droppedTotal = 0L
+        var dropUndone = 0                          // выброс начат, но IDR не ушёл: кадры отправлены как были
+        private var since = NEVER
+
+        fun sent(now: Long, own: Boolean, replaced: Boolean = false, holdMs: Long = -1, held: Int = 0, dropped: Int = 0) {
+            if (own) {
+                this.own++
+                if (replaced) this.replaced++ else extraTotal++
+                this.dropped += dropped
+                droppedTotal += dropped
+                if (holdMs >= 0) {
+                    holds++
+                    holdSum += holdMs
+                    holdMax = maxOf(holdMax, holdMs)
+                    heldMax = maxOf(heldMax, held)
+                }
+            } else aa++
+            guModel.onFrame(now)                    // IDR вместо кадра AA занимает его место, лишний - добавляет кадр
+        }
+
+        fun logIfDue(now: Long) {
+            if (since == NEVER) since = now
+            if (now - since < SPLICE_STATS_MS) return
+            val sec = (now - since) / 1000.0
+            if (aa + own > 0 && transcoder == null) {
+                log("BRIDGE поток в ГУ за ${sec.toInt()} с: кадров AA $aa (${"%.1f".format(aa / sec)} fps), своих IDR $own " +
+                    "(вместо кадра AA $replaced, лишних ${own - replaced}, лишних за сессию $extraTotal)" +
+                    (if (spliceDrop > 0) "; выброшено кадров AA $dropped (за сессию $droppedTotal), выброс отменён $dropUndone раз" else "") +
+                    (if (holds > 0) "; кадры AA ждали IDR ср ${holdSum / holds} мс, макс $holdMax мс, в пачке до $heldMax" else "") +
+                    "; модель ГУ ${guModel.fps} fps без пропусков: задержка сейчас ${guModel.delayMs(now)} мс, макс ${guModel.maxMs} мс", true)
+            }
+            aa = 0; own = 0; replaced = 0; holds = 0; holdSum = 0; holdMax = 0; heldMax = 0; dropped = 0; dropUndone = 0
+            guModel.resetMax()
+            since = now
+        }
+
+        fun resetSession() {
+            extraTotal = 0
+            droppedTotal = 0
+            guModel.reset()
+        }
+    }
+
+    /** Сводка своего IDR раз в [SPLICE_STATS_MS]: в лог попадает всё, а не каждая N-я строка. */
+    private inner class SpliceStats {
+        var sent = 0
+        var stale = 0
+        var big = 0
+        var holdTimeout = 0
+        var noPicture = 0
+        private var builds = 0
+        private var buildSum = 0L
+        private var buildMax = 0L
+        private var since = NEVER
+
+        fun build(ms: Long) {
+            builds++
+            buildSum += ms
+            buildMax = maxOf(buildMax, ms)
+        }
+
+        fun logIfDue(now: Long, qp: Int?) {
+            if (since == NEVER) since = now
+            if (now - since < SPLICE_STATS_MS) return
+            if (sent + stale + big + holdTimeout + noPicture > 0) {
+                log("BRIDGE свой IDR за ${(now - since) / 1000} с: ушло $sent, устарел (AA прислал кадр) $stale, больше $SPLICE_MAX_BYTES Б $big, " +
+                    "держали кадры дольше $SPLICE_HOLD_MAX_MS мс $holdTimeout, без картинки $noPicture; сборка " +
+                    (if (builds > 0) "ср ${buildSum / builds} мс, макс $buildMax мс" else "-") + (if (qp != null) ", QP $qp" else ""), true)
+            }
+            sent = 0; stale = 0; big = 0; holdTimeout = 0; noPicture = 0
+            builds = 0; buildSum = 0; buildMax = 0
+            since = now
         }
     }
 
@@ -1770,6 +2389,13 @@ class AaBridgeCore(
         const val VOICE_KEY_DEBOUNCE_MS = 500L
         const val KEYCODE_MEDIA_PLAY = 126
         const val KEYCODE_MEDIA_PAUSE = 127
+        const val KEYCODE_MEDIA_PLAY_PAUSE = 85
+        const val KEYCODE_CALL = 5
+        const val KEYCODE_ENDCALL = 6
+        const val HARD_KEY_SEEK_SUB = 0x0F
+        const val HARD_KEY_SEEK_ADD = 0x10
+        /** VW CNS2 Delphi 20082114: удержание вперёд/назад приходит как keycode 0 (Дмитрий, 24.10). */
+        const val HARD_KEY_SEEK_HOLD = 0
 
         /**
          * CarLife hard key (HUJ/CommonParams) -> Android KeyEvent; все значения есть в AapMessages.KEYCODES_SUPPORTED.
@@ -1815,6 +2441,7 @@ class AaBridgeCore(
         fun isHondaChannel(channel: String?) =
             channel != null && channel.length == 8 && HONDA_CHANNEL_PREFIXES.any { channel.startsWith(it) }
         const val HONDA_20772121_CHANNEL = "20772121"     // Honda Civic 11 2023 (Китай, h295): после камеры/меню ГУ не просит IDR
+        const val HONDA_20832125_CHANNEL = "20832125"     // Honda Vezel (ГУ Егора): то же после заднего хода в passthrough, лог 26.10
         /** Mazda Connect 2 (Китай, CarLife 1.0, HU_INFO из заглушек, h238/h359): VIDEO_DATA 16163 Б прошёл, 16518 и 19104 Б - ГУ перестала читать USB. */
         const val MAZDA_20622111_CHANNEL = "20622111"
         const val MAZDA_20622111_MAX_VIDEO_PACKET = 15_000
@@ -1824,9 +2451,12 @@ class AaBridgeCore(
         const val VW_CNS3_20082122_CHANNEL = "20082122"   // VW CNS3 (Tharu и др.): рвёт USB через ~5,6 с PAUSE без heartbeat (h222)
         const val VW_CNS3_20082134_CHANNEL = "20082134"   // VW CNS3 Tiguan L Pro: рвёт CarLife по Wi-Fi через ~5,1-5,7 с PAUSE (h224)
         const val VW_CNS2_20082114_CHANNEL = "20082114"   // VW CNS2 Delphi (Tharu 2020): рвёт USB через 6-8 с PAUSE (h425)
-        const val VW_20082138_CHANNEL = "20082138"        // VW ID (h196): HU_INFO manufacturer=model="VW BT 1538"
+        const val VW_20082138_CHANNEL = "20082138"        // VW ID: HU_INFO manufacturer=model="VW BT 1538" (h196), "VW BT 4370" (ID. UNYX)
         const val VW_BT_1420_MANUFACTURER = "VW BT 1420"  // VW (Павел): HU_INFO manufacturer=model, канал 20082138
-        const val VW_20082138_MANUFACTURER = "VW BT 1538"
+        const val VW_20082128_CHANNEL = "20082128"        // VW ID.6 Crozz (24.10.2026): HU_INFO manufacturer=model="VW BT 9491", тот же лимит IDR
+        const val VW_20082128_MANUFACTURER = "VW BT 9491"
+        /** ГУ VW ID с лимитом размера IDR: BT-имя (HU_INFO manufacturer) -> канал прошивки (STATISTIC_INFO); пара обязательна. */
+        val VW_ID_IDR_LIMIT_HUS = mapOf(VW_20082128_MANUFACTURER to VW_20082128_CHANNEL)
         const val HYUNDAI_CN7_PRODUCT = "wp_cn7cpe_cn"    // HU_INFO.product Hyundai Elantra CN7 (h218): manufacturer QTI, model "sm6150_au for arm64"
         const val PIONEER_MANUFACTURER = "Pioneer"        // HU_INFO Pioneer RM56E8B (Dongfeng DF6, h277): manufacturer="Pioneer" model="RM56E8B"
         const val PIONEER_RM56_MODEL = "RM56E8B"
@@ -1836,7 +2466,19 @@ class AaBridgeCore(
         const val MEDIA_RATE_CN7 = 32000
         const val MEDIA_RATE_PIONEER_RM56 = 22050         // h277: музыка 32 кГц добавляла на USB ~1 Мбит/с, 22,05 кГц - вдвое меньше
         const val KEYFRAME_WAIT_MS = 1500L
+        const val SPS_CROP_KICK_MS = 2000L
         const val KEYFRAME_RETRY_MS = 4000L
+
+        /** Свой IDR: не больше этого (буфер приёма C++-ГУ CarLife 600 КиБ, docs/carlife-protocol.md §6). */
+        const val SPLICE_MAX_BYTES = 560_000
+        const val SPLICE_WAIT_MS = 300L          // картинку из декодера ждём не дольше
+        const val SPLICE_QUIET_MS = 200L         // пауза в кадрах AA, после которой IDR собирается в фоне, без держания кадров
+        const val SPLICE_HOLD_MAX_MS = 250L      // дольше кадры AA не держим: отпускаем, IDR по готовности выбрасывается
+        const val SPLICE_SLICES = 4              // слайсов в сжатом IDR: собираются параллельно
+        const val SPLICE_STATS_MS = 30_000L
+        const val SPLICE_MAX_MISSES = 3          // таймаутов картинки подряд - вставка выключается до конца AA-сессии
+        const val SPLICE_KICK_GRACE_MS = 1500L   // h529-повтор IDR от AA откладывается на столько, если свой IDR вот-вот уйдёт
+        const val SPLICE_RETRY_MS = 1000L        // пауза между попытками (без IDR на ГУ, после отказа, пропуска, таймаута)
 
         /** h295: тач на ГУ 20772121 при IDR старше этого порога в passthrough - вероятно, ГУ сбросил декодер (камера/меню). */
         const val H295_IDR_STALE_MS = 2500L
