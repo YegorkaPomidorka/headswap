@@ -60,7 +60,6 @@
 
     <!-- Главный экран: элементы -->
     <string name="home_settings">Настройки</string>
-    <string name="home_btn_stop">Остановить</string>
     <string name="home_btn_open_aa">Открыть настройки AA</string>
     <string name="home_grace_waiting">Жду переподключения</string>
     <string name="home_grace_left">ещё %1$d с</string>

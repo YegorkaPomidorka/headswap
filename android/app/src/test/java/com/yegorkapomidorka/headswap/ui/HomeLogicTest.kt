@@ -142,7 +142,7 @@ class HomeLogicTest {
     fun connectedFromBridgeStatus() {
         val s = HomeLogic.compute(inp(running = true, status = "мост: AA -> CarLife (перекодирование)"))
         assertEquals(Phase.CONNECTED, s.phase)
-        assertEquals(OutlineAction.STOP, s.outline)
+        assertNull(s.outline)
         assertEquals(UiText.raw("USB"), s.stages[4].second.second)
         assertEquals(UiText.res(R.string.notif_video_usb), s.notifText)
         val noAudio = HomeLogic.compute(inp(running = true, status = "мост: AA -> CarLife", usbAudio = false))

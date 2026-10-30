@@ -61,7 +61,6 @@
 
     <!-- Home screen: widgets -->
     <string name="home_settings">Settings</string>
-    <string name="home_btn_stop">Stop</string>
     <string name="home_btn_open_aa">Open Android Auto settings</string>
     <string name="home_grace_waiting">Waiting to reconnect</string>
     <string name="home_grace_left">%1$d s left</string>

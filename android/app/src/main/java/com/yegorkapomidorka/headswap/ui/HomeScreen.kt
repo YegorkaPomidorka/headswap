@@ -206,12 +206,8 @@ class HomeScreen(host: MainActivity) : Screen(host) {
         if (st.primary != null) {
             footer.addView(c.primaryButton(c.getString(R.string.action_open_aa), R.drawable.ic_open).apply { setOnClickListener { Actions.startServerFromUi(c) } })
         }
-        st.outline?.let { o ->
-            val b = when (o) {
-                OutlineAction.STOP -> c.outlineButton(c.getString(R.string.home_btn_stop), R.drawable.ic_stop).apply { setOnClickListener { Actions.stopBridge(c) } }
-                OutlineAction.OPEN_AA -> c.outlineButton(c.getString(R.string.home_btn_open_aa), R.drawable.ic_open).apply { setOnClickListener { Actions.openAaSettings(c) } }
-           }
-            footer.addView(b)
+        if (st.outline == OutlineAction.OPEN_AA) {
+            footer.addView(c.outlineButton(c.getString(R.string.home_btn_open_aa), R.drawable.ic_open).apply { setOnClickListener { Actions.openAaSettings(c) } })
         }
         if (st.logLink) {
             // «Отправить лог» живёт внутри самодиагностики: на главном одна понятная вторая кнопка

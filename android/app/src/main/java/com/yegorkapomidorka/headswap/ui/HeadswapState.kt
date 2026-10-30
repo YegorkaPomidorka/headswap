@@ -21,7 +21,7 @@ enum class HeroIcon { POWER, PLUG, CAR, CAR_USB, CAR_WIFI, REFRESH, ALERT }
 
 enum class PrimaryAction { START_SERVER }
 
-enum class OutlineAction { OPEN_AA, STOP }
+enum class OutlineAction { OPEN_AA }
 
 data class HomeState(
     val phase: Phase,
@@ -114,7 +114,7 @@ object HomeLogic {
                         StageState.PAUSE to UiText.res(R.string.home_stage_paused), StageState.PAUSE to UiText.res(R.string.home_stage_paused),
                         StageState.PAUSE to UiText.res(R.string.home_stage_paused),
                     ),
-                    outline = OutlineAction.STOP, graceLeft = left, graceTotal = total,
+                    graceLeft = left, graceTotal = total,
                     notifText = UiText.res(R.string.notif_reconnecting, left),
                 )
             }
@@ -130,7 +130,6 @@ object HomeLogic {
                     if (i.usbAudio) StageState.DONE to UiText.raw(if (i.wireless) "Wi-Fi" else "USB")
                     else StageState.PEND to UiText.res(R.string.home_stage_off),
                 ),
-                outline = OutlineAction.STOP,
                 notifText = UiText.res(
                     when {
                         !i.usbAudio -> R.string.notif_video
@@ -161,7 +160,6 @@ object HomeLogic {
                     if (i.protocolKnown) StageState.DONE to CARLIFE else StageState.ACTIVE to UiText.res(R.string.home_stage_handshake),
                     StageState.PEND to NONE, StageState.PEND to NONE, StageState.PEND to NONE,
                 ),
-                outline = OutlineAction.STOP,
                 notifText = UiText.res(R.string.notif_cable_waiting),
             )
             i.serverRunning == false -> offState()
