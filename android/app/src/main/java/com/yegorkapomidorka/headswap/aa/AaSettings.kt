@@ -11,6 +11,13 @@ import java.util.concurrent.atomic.AtomicLong
 class AaPrefs(ctx: Context) {
     private val sp: SharedPreferences = ctx.getSharedPreferences("aa", Context.MODE_PRIVATE)
 
+    init {
+        // 3.0.0-beta2: всем один раз прямой проброс; дальше выбор юзера не трогаем.
+        if (!sp.getBoolean("beta2DirectForced", false)) {
+            sp.edit().putBoolean("transcode", false).putBoolean("beta2DirectForced", true).apply()
+        }
+    }
+
     /** jvc (по умолчанию, принят AA 17.7 живьём) или hur. */
     var certSet: String
         get() = sp.getString("certSet", "jvc") ?: "jvc"
