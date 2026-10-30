@@ -45,7 +45,7 @@
 
     <string name="set_resolution">Разрешение видео</string>
     <string name="set_res_pick">Выбрать разрешение</string>
-    <string name="set_res_group_standard">Обычные 16:9</string>
+    <string name="set_res_group_standard">Обычные экраны</string>
     <string name="set_res_group_wide">Широкие экраны</string>
     <string name="set_res_ratio_wide_976">2,3:1</string>
     <string name="set_apply_next">Применится при следующем подключении.</string>

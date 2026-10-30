@@ -45,7 +45,7 @@
 
     <string name="set_resolution">Video resolution</string>
     <string name="set_res_pick">Choose resolution</string>
-    <string name="set_res_group_standard">Standard 16:9</string>
+    <string name="set_res_group_standard">Regular screens</string>
     <string name="set_res_group_wide">Wide screens</string>
     <string name="set_res_ratio_wide_976">2.3:1</string>
     <string name="set_apply_next">Applies on the next connection.</string>
