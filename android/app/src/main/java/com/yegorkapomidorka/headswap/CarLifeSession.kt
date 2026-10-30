@@ -943,7 +943,7 @@ class CarLifeSession(
         applyHuCeilings()
         AaTranscoder(
             mode.outW, mode.outH, thermalThrottle.capFps(targetFps), bitratePolicy.current, out, { AppLog.i(it, false) },
-            srcWidth = mode.aaW, srcHeight = mode.aaH, crop = mode.crop,
+            srcWidth = mode.aaW, srcHeight = mode.aaH, crop = mode.cropFor(bridge.marginsAtBottom),
         ).also { it.start() }
     } catch (e: Exception) {
         AppLog.e("BRIDGE транскодер не создан", e)
