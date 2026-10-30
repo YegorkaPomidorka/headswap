@@ -1,0 +1,5 @@
+09:00:00.321 WL link begin transport=wifi-b bind=0.0.0.0 ACCESS_LOCAL_NETWORK="n/a(api 33)" t=0
+09:01:00.961 BT carlife: ГУ подключилась по Bluetooth (spp, HU)
+09:01:01.386 Wi-Fi Direct: вхожу в группу ГУ (по имени пира)
+09:01:01.410 WL p2p discover res=fail reason=busy n=1 hotspot=true t=62089
+09:01:01.411 Wi-Fi Direct занят (BUSY): включена точка доступа на телефоне

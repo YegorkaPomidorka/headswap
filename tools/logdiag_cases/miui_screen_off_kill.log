@@ -1,0 +1,8 @@
+09:59:31.035 WL p2p joined iface="p2p0 192.168.43.39/24" t=11392
+09:59:32.367 сессия: старт
+09:59:32.383 == ВЕРСИЯ ПРОТОКОЛА ГУ: major=3 minor=0
+10:46:55.404 видео: отправлено кадров=85073 (ключевых=2837) байт=1070052333 heartbeat=0 сброшено=1 очередь=0 (+150 за 5с)
+10:47:02.425 лог: /storage/emulated/0/Android/data/com.yegorkapomidorka.headswap/files/headswap-20261029-104702.log
+10:47:02.439 EXIT прошлое завершение 2026-10-29 10:47:00.295: OTHER status=0 pid=11232 процесс=com.yegorkapomidorka.headswap важность=100 pss=77 МБ rss=119 МБ описание=ScreenOffCPU
+10:47:02.531 MainActivity.onCreate action=android.intent.action.MAIN SDK=33 Xiaomi 220333QNY
+10:51:03.097 кнопка «Ждать машину по Wi-Fi»

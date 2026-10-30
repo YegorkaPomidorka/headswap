@@ -20,6 +20,7 @@ import com.yegorkapomidorka.headswap.AppTheme
 import com.yegorkapomidorka.headswap.CarLifeState
 import com.yegorkapomidorka.headswap.MainActivity
 import com.yegorkapomidorka.headswap.R
+import com.yegorkapomidorka.headswap.aa.AaServerCheck
 import com.yegorkapomidorka.headswap.update.Updater
 
 /** Главный экран «Готов к поездке» (Main.dc.html): шесть состояний, этапы, кнопки; сверху плашка обновления. */
@@ -73,6 +74,7 @@ class HomeScreen(host: MainActivity) : Screen(host) {
     override fun onShow() {
         lastState = null
         updKey = null
+        AaServerCheck.wantAuto()       // открыли экран: проверяем сервер ГУ короткой сессией
         tick()
     }
 
@@ -91,6 +93,7 @@ class HomeScreen(host: MainActivity) : Screen(host) {
 
     override fun tick() {
         refreshUpdate()
+        AaServerCheck.autoTick(ctx)
         val st = HeadswapStatus.current(ctx)
         val wl = wirelessLine()
         if (st == lastState && wl == lastWireless) return
@@ -203,16 +206,16 @@ class HomeScreen(host: MainActivity) : Screen(host) {
         if (st.primary != null) {
             footer.addView(c.primaryButton(c.getString(R.string.action_open_aa), R.drawable.ic_open).apply { setOnClickListener { Actions.startServerFromUi(c) } })
         }
-        st.outline?.let { o ->
-            val b = when (o) {
-                OutlineAction.STOP -> c.outlineButton(c.getString(R.string.home_btn_stop), R.drawable.ic_stop).apply { setOnClickListener { Actions.stopBridge(c) } }
-                OutlineAction.OPEN_AA -> c.outlineButton(c.getString(R.string.home_btn_open_aa), R.drawable.ic_open).apply { setOnClickListener { Actions.openAaSettings(c) } }
-            }
-            footer.addView(b)
+        if (st.outline == OutlineAction.OPEN_AA) {
+            footer.addView(c.outlineButton(c.getString(R.string.home_btn_open_aa), R.drawable.ic_open).apply { setOnClickListener { Actions.openAaSettings(c) } })
         }
         if (st.logLink) {
             // «Отправить лог» живёт внутри самодиагностики: на главном одна понятная вторая кнопка
             footer.addView(c.tonalButton(c.getString(R.string.diag_home_btn)).apply { setOnClickListener { host.showDiag() } })
+        }
+        // настройки AA нужны не только для сервера ГУ: кнопка внизу в любом состоянии, если её уже нет (основная ведёт туда же)
+        if (st.primary == null && st.outline != OutlineAction.OPEN_AA) {
+            footer.addView(c.outlineButton(c.getString(R.string.home_btn_open_aa), R.drawable.ic_open).apply { setOnClickListener { Actions.openAaSettings(c) } })
         }
         if (st.phase == Phase.RECONNECTING) updateGrace(st)
     }

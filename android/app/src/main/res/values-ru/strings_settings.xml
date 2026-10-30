@@ -13,6 +13,8 @@
     <string name="set_sound">Звук</string>
     <string name="set_usb_audio_title">Звук через Headswap</string>
     <string name="set_usb_audio_sub">В динамики машины по кабелю или Wi-Fi. Выключено — по Bluetooth</string>
+    <string name="set_calls_title">Сообщать ГУ о звонках</string>
+    <string name="set_calls_sub">Нужно разрешение «Телефон»: Headswap узнаёт о входящем и сообщает машине, музыка на время звонка глушится</string>
 
     <string name="eq_title">Эквалайзер</string>
     <string name="eq_presets">Пресет</string>
@@ -35,11 +37,19 @@
 
     <string name="set_video">Видео</string>
     <string name="set_transcode_title">Перекодирование</string>
-    <string name="set_transcode_sub">Надёжнее · +60 мс</string>
+    <string name="set_transcode_desc">Смартфон сам перекодирует видео под экран ГУ: любое разрешение и частота кадров.</string>
+    <string name="set_transcode_plus">+ Стабильнее, подходит любой ГУ</string>
+    <string name="set_transcode_minus">− Нагрузка на телефон, расход батареи, задержка +60 мс</string>
     <string name="set_direct_title">Прямой проброс</string>
-    <string name="set_direct_sub">Быстрее · подходит не всем ГУ</string>
+    <string name="set_direct_desc">Видео АА уходит в ГУ как есть. Широкие экраны ГУ обрезает сама, без телефона.</string>
+    <string name="set_direct_plus">+ Меньше задержка, нагрев и расход батареи</string>
+    <string name="set_direct_minus">− Частота кадров не регулируется</string>
 
     <string name="set_resolution">Разрешение видео</string>
+    <string name="set_res_pick">Выбрать разрешение</string>
+    <string name="set_res_group_standard">Обычные экраны</string>
+    <string name="set_res_group_wide">Широкие экраны</string>
+    <string name="set_res_ratio_wide_976">2,3:1</string>
     <string name="set_apply_next">Применится при следующем подключении.</string>
     <string name="set_needs_transcode">Нужно перекодирование</string>
     <string name="set_custom_res_active">Действует своё разрешение %1$s (%2$s)</string>
@@ -48,6 +58,7 @@
     <string name="set_music_rate_note">Ниже частота — меньше нагрузка на USB и слабое ГУ, но хуже качество. Авто: 48 кГц, для ГУ Hyundai CN7 — 32 кГц. Применится при следующем подключении.</string>
     <string name="set_fps">Частота кадров</string>
     <string name="set_fps_note">Применится при следующем подключении. В прямом пробросе частота не регулируется.</string>
+    <string name="set_fps_direct">В прямом пробросе частоту задаёт Android Auto</string>
     <string name="set_aa_density">Масштаб интерфейса AA</string>
     <string name="set_aa_density_auto">Авто · %1$d dpi</string>
     <string name="set_aa_density_manual">%1$d dpi</string>
@@ -133,7 +144,7 @@
     <string name="video_wide_2_1_sub">1280×640: родное разрешение экрана Octavia, без растяжения</string>
     <string name="video_wide_976_title">Широкий 2240×976 (VW Tiguan L Pro)</string>
     <string name="video_wide_976_sub">Широкая обрезка под окно CarLife на ГУ VW CNS3</string>
-    <string name="video_wide_836_title">Широкий 1920×836 (VW, эксперимент)</string>
+    <string name="video_wide_836_title">Широкий 1920×836 (VW Tiguan L Pro, проброс)</string>
     <string name="video_wide_836_sub">Пропорция окна 2240×976 без растяжения на телефоне: растягивает ГУ. Для кропа без перекодирования</string>
 
     <!-- Частота музыки (MusicRate) -->
@@ -180,7 +191,6 @@
     <string name="wl_title">По воздуху</string>
     <string name="wl_note">Для машин с беспроводным CarLife. Включите точку доступа на телефоне, подключите к ней ГУ (в меню ГУ: Wi-Fi), откройте CarLife на ГУ и нажмите кнопку ниже. Кабель не нужен; если вставить кабель, побеждает USB.</string>
     <string name="wl_start">Ждать машину по Wi-Fi</string>
-    <string name="wl_stop">Остановить</string>
     <string name="wl_status_line">Состояние: %1$s</string>
     <string name="wl_off">выключено</string>
     <string name="wl_no_permission">Без разрешения “Устройства поблизости” машина не сможет подключиться по Wi-Fi</string>

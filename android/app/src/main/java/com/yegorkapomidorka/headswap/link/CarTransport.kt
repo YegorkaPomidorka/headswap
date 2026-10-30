@@ -59,6 +59,12 @@ interface CarTransport {
     /** Сообщений в очереди, где стоит канал chan (у потока одна общая очередь на все каналы). */
     fun queueSize(chan: Int): Int
 
+    /**
+     * Выбросить из очереди ещё не записанные inner канала chan, для которых [pred] истинен; сколько выброшено.
+     * Видео-счётчики не трогает (звук туда не входит). По умолчанию ничего не чистит.
+     */
+    fun dropQueued(chan: Int, pred: (ByteArray) -> Boolean): Int = 0
+
     val queuedVideoBytes: Long
     val queuedVideoFrames: Int
 

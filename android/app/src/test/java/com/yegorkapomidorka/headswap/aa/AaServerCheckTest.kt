@@ -194,6 +194,51 @@ class AaServerCheckTest {
         assertTrue("reset не забывает, что сервер работал", f.worked)
     }
 
+    @Test
+    fun refusalRightAfterOwnSessionEndIsNormalForWorkedServer() {
+        val clock = AtomicLong(0L)
+        val f = ServerFailures { clock.get() }
+        f.onEstablished()
+        f.onSessionEnded()
+        clock.set(3_000)
+        f.onRefused()
+        assertFalse("отказ через 3 с после своего ByeBye - AA ещё поднимает порт", f.refusedFresh)
+        assertFalse(f.needsStart())
+        clock.set(18_000)
+        assertTrue("дольше 15 с - всё равно просим запустить", f.needsStart())
+    }
+
+    @Test
+    fun refusalWithoutPrecedingOwnSessionEndIsFresh() {
+        val clock = AtomicLong(0L)
+        val f = ServerFailures { clock.get() }
+        assertFalse(f.refusedFresh)
+        f.onEstablished()
+        f.onRefused()
+        assertTrue(f.refusedFresh)
+        assertTrue("свежий старт моста: работавший сервер не ждём", f.needsStart())
+    }
+
+    @Test
+    fun refusalAfterRelistenWindowIsFresh() {
+        val clock = AtomicLong(0L)
+        val f = ServerFailures { clock.get() }
+        f.onEstablished()
+        f.onSessionEnded()
+        clock.set(12_000)
+        f.onRefused()
+        assertTrue(f.refusedFresh)
+        assertTrue(f.needsStart())
+        // окно переживает reset() цикла коннектора
+        val g = ServerFailures { clock.get() }
+        g.onEstablished()
+        g.onSessionEnded()
+        g.reset()
+        clock.set(14_000)
+        g.onRefused()
+        assertFalse(g.refusedFresh)
+    }
+
     // --- классификация итога настоящей пробы ---
 
     @Test
@@ -210,7 +255,7 @@ class AaServerCheckTest {
     @Test
     fun classifyHandshakeOutcomes() {
         val c = AaSessionProbe.Companion
-        assertEquals(ProbeResult.ALIVE, c.classify(null, true, true, "проба: SDR получен"))
+        assertEquals(ProbeResult.ALIVE, c.classify(null, true, true, "проба: сессия отработала"))
         assertEquals(ProbeResult.HUNG, c.classify(null, true, false, "нет VERSION_RESPONSE. Если соединение открыто, но тишина: сервер ГУ завис"))
         assertEquals(ProbeResult.HUNG, c.classify(null, true, false, "TLS handshake: таймаут"))
         assertEquals("сервер сразу закрыл соединение (h224): не утверждаем, что он умер", ProbeResult.ERROR, c.classify(null, true, false, "peer closed: телефон закрыл соединение (EOF)"))
@@ -223,7 +268,7 @@ class AaServerCheckTest {
 
     private fun probe(port: Int) = AaSessionProbe(
         loadCreds = { creds }, sd = { AapSdOptions() }, log = { l, _ -> logs.add(l) },
-        port = port, sdrWaitMs = 1500,
+        port = port, holdMs = 300,
     )
 
     @Test

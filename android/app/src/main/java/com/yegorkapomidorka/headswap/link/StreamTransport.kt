@@ -62,6 +62,16 @@ class StreamTransport(
     override val drainBytesPerSec: Double get() = drain.bytesPerSec
     override fun queueSize(chan: Int): Int = queue.size
 
+    override fun dropQueued(chan: Int, pred: (ByteArray) -> Boolean): Int {
+        var n = 0
+        queue.removeIf { o ->
+            val drop = o.chan == chan && o.chan != Ch.VIDEO && pred(o.inner)
+            if (drop) n++
+            drop
+        }
+        return n
+    }
+
     override fun start(
         sink: (chan: Int, inner: ByteArray) -> Unit,
         onWritten: (chan: Int, inner: ByteArray) -> Unit,
