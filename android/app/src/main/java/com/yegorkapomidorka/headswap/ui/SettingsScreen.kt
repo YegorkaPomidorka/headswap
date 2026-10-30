@@ -799,9 +799,7 @@ class SettingsSectionScreen(host: MainActivity, val section: SettingsSection) : 
         if (m == VideoMode.DEFAULT) return null
         val names = CarPreset.values().filter { it.settings.videoMode == m }.map { shortCarName(ctx.getString(it.titleRes)) }
         if (names.isEmpty()) return null
-        return names.groupBy({ it.substringBefore(' ') }, { it.substringAfter(' ', "") })
-            .map { (brand, models) -> listOf(brand, models.filter { it.isNotEmpty() }.distinct().joinToString(", ")).filter { it.isNotEmpty() }.joinToString(" ") }
-            .joinToString(", ")
+        return names.distinct().joinToString(", ")
     }
 
     /** Марка и модель без годов, поколений, рестайлов и двигателя: «Honda CR-V, 6 поколение, дорестайл» -> «Honda CR-V». */
