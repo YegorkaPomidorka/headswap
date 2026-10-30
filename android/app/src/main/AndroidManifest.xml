@@ -40,6 +40,8 @@
     <uses-permission android:name="android.permission.REQUEST_COMPANION_RUN_IN_BACKGROUND" />
     <!-- микрофон телефона как запасной источник звука для AA (режим «авто»/«телефон») -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <!-- h428: состояние звонка для ГУ (MODULE_STATUS PHONE / TELE_STATE), как Baidu -->
+    <uses-permission android:name="android.permission.READ_PHONE_STATE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
     <!-- онбординг: запрос исключения из оптимизации батареи (HyperOS убивает фон) -->
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />

@@ -13,6 +13,8 @@
     <string name="set_sound">Sound</string>
     <string name="set_usb_audio_title">Sound through Headswap</string>
     <string name="set_usb_audio_sub">To the car speakers over cable or Wi-Fi. Off: over Bluetooth</string>
+    <string name="set_calls_title">Tell the head unit about calls</string>
+    <string name="set_calls_sub">Needs the “Phone” permission: Headswap learns about an incoming call and tells the car, music is muted for the call</string>
 
     <string name="eq_title">Equalizer</string>
     <string name="eq_presets">Preset</string>

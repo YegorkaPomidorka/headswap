@@ -36,6 +36,7 @@ import com.yegorkapomidorka.headswap.R
 import com.yegorkapomidorka.headswap.aa.AaDensity
 import com.yegorkapomidorka.headswap.aa.AaPrefs
 import com.yegorkapomidorka.headswap.aa.CAR_MAKES
+import com.yegorkapomidorka.headswap.aa.CallStateSource
 import com.yegorkapomidorka.headswap.aa.CarPreset
 import com.yegorkapomidorka.headswap.aa.CustomVideoMode
 import com.yegorkapomidorka.headswap.aa.EQ_BAND_MAX
@@ -396,6 +397,8 @@ class SettingsSectionScreen(host: MainActivity, val section: SettingsSection) : 
     private var wlCarWarn: TextView? = null
     private var wlCarForget: View? = null
     private var wlAwaitingCarPermission = false
+    private var callsRow: ToggleRow? = null
+    private var callsAwaitingPermission = false
     private var wlCwLine: TextView? = null
     private var wlCwSsid: EditText? = null
     private var wlCwPass: EditText? = null
@@ -443,6 +446,7 @@ class SettingsSectionScreen(host: MainActivity, val section: SettingsSection) : 
 
     override fun onPermissionResult() {
         refreshMic()
+        onCallsPermissionResult()
         if (wlAwaitingPermission) {
             wlAwaitingPermission = false
             val lan = Build.VERSION.SDK_INT < 37 || NetProbe.localNetworkGranted(ctx) == "granted"
@@ -645,6 +649,8 @@ class SettingsSectionScreen(host: MainActivity, val section: SettingsSection) : 
         const val REQ_LOCAL_NETWORK = 37
         /** BLUETOOTH_CONNECT перед выбором машины (38 занят диалогом CDM, CarPairing.REQ_CAR_PAIR). */
         const val REQ_CAR_BT = 39
+        /** READ_PHONE_STATE при включении «Сообщать ГУ о звонках»; тот же код, что MainActivity.REQ_PHONE_STATE (лог результата). */
+        const val REQ_PHONE_STATE = 40
         /** Проверка Wi-Fi машины из настроек: сколько ждём одобрения и входа, и сколько держим сеть после входа. */
         const val CW_CHECK_TIMEOUT_MS = 60_000L
         const val CW_CHECK_HOLD_MS = 5_000L
@@ -1061,6 +1067,31 @@ class SettingsSectionScreen(host: MainActivity, val section: SettingsSection) : 
         }
         micNote = note("", R.color.warn)
         refreshMic()
+
+        callsRow = ToggleRow(c, c.getString(R.string.set_calls_title), c.getString(R.string.set_calls_sub), aa.callsToHu) { onCallsToggle(it) }
+        body.addView(callsRow!!.view, lp(MATCH, WRAP).margins(c, 0, 12, 0, 0))
+    }
+
+    /** Включение просит READ_PHONE_STATE (API 31+); результат - в onPermissionResult. */
+    private fun onCallsToggle(on: Boolean) {
+        aa.callsToHu = on
+        if (!on || callsPermissionGranted()) return
+        callsAwaitingPermission = true
+        host.requestPermissions(arrayOf(Manifest.permission.READ_PHONE_STATE), REQ_PHONE_STATE)
+    }
+
+    private fun callsPermissionGranted() =
+        Build.VERSION.SDK_INT < CallStateSource.PERMISSION_SDK ||
+            ctx.checkSelfPermission(Manifest.permission.READ_PHONE_STATE) == PackageManager.PERMISSION_GRANTED
+
+    /** Отказ в «Телефон»: флажок возвращаем в выкл. */
+    private fun onCallsPermissionResult() {
+        if (!callsAwaitingPermission) return
+        callsAwaitingPermission = false
+        if (callsPermissionGranted()) return
+        AppLog.i("звонки: READ_PHONE_STATE отказано, флажок «Сообщать ГУ о звонках» выключен")
+        aa.callsToHu = false
+        callsRow?.setChecked(false)
     }
 
     /** Строка «Эквалайзер · пресет ›» под «Звук по USB»: открывает экран EQ; без звука по USB затемнена. */

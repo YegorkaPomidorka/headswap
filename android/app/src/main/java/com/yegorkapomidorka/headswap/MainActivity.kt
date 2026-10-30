@@ -152,6 +152,9 @@ class MainActivity : Activity() {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
         current()?.onPermissionResult()
         if (requestCode == REQ_LOCAL_NETWORK) AppLog.i("ACCESS_LOCAL_NETWORK: ${NetProbe.localNetworkGranted(this)}")
+        if (requestCode == REQ_PHONE_STATE) {
+            AppLog.i("звонки: READ_PHONE_STATE ${if (grantResults.firstOrNull() == android.content.pm.PackageManager.PERMISSION_GRANTED) "выдано" else "отказано"}")
+        }
     }
 
     @Deprecated("Deprecated in Java")
@@ -290,6 +293,7 @@ class MainActivity : Activity() {
     companion object {
         const val ACTION_PERMISSION = "com.yegorkapomidorka.headswap.USB_PERMISSION"
         private const val REQ_LOCAL_NETWORK = 37
+        private const val REQ_PHONE_STATE = 40      // 38 - диалог CDM (CarPairing), 39 - BLUETOOTH_CONNECT
 
         /** adb shell am start -n com.yegorkapomidorka.headswap/.MainActivity --es cmd aa_selftest */
         const val EXTRA_CMD = "cmd"
