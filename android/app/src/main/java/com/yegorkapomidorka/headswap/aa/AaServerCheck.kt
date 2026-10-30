@@ -301,8 +301,8 @@ class ServerFailures(private val now: () -> Long = { System.nanoTime() / 1_000_0
 }
 
 /**
- * Проба сервера ГУ: кнопка в «Для разработчиков» (Actions.checkServer) и автопроба при открытии главного экрана,
- * если доступа к уведомлениям AA нет. Мост перед подключением ждёт конца идущей пробы.
+ * Проба сервера ГУ: кнопка в «Для разработчиков» (Actions.checkServer) и автопроба при открытии главного экрана.
+ * Мост перед подключением ждёт конца идущей пробы.
  */
 object AaServerCheck {
     @Volatile private var manual: ManualServerCheck? = null
@@ -311,7 +311,7 @@ object AaServerCheck {
     /** Сколько мост ждёт конец ручной пробы перед подключением. Попытка сама укладывается в ~35 с. */
     private const val AWAIT_MS = 45_000L
 
-    /** Повторно открытый экран чаще этого сервер не трогает: каждая проба - короткая сессия AA с видео. */
+    /** Повторно открытый экран чаще этого сервер не трогает: каждая проба - короткая сессия AA. */
     private const val AUTO_EVERY_MS = 15_000L
 
     /** Итог автопробы: true - сессия установилась, false - отказ или зависание, null - не проверяли, сбой или забыли. */
@@ -337,15 +337,11 @@ object AaServerCheck {
     }
 
     /**
-     * Тик главного экрана (main). Пробует, только если уведомление AA ничего не говорит, мост не идёт, USB не подключён
+     * Тик главного экрана (main). Пробует, только если мост не идёт, USB не подключён
      * и своя сессия моста закрылась не только что (иначе отказ - просто AA ещё не слушает порт).
      */
     fun autoTick(ctx: Context) {
         if (!autoWanted || autoBusy) return
-        if (AaServerWatch.running != null) {
-            autoWanted = false
-            return
-        }
         if (AaState.serverFailures.inRelistenWindow()) return
         val now = System.nanoTime() / 1_000_000
         if (autoAtMs != 0L && now - autoAtMs < AUTO_EVERY_MS) {

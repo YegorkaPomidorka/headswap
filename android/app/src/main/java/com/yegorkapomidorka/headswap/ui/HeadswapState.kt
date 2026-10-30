@@ -8,7 +8,6 @@ import com.yegorkapomidorka.headswap.R
 import com.yegorkapomidorka.headswap.aa.AaCreds
 import com.yegorkapomidorka.headswap.aa.AaPrefs
 import com.yegorkapomidorka.headswap.aa.AaServerCheck
-import com.yegorkapomidorka.headswap.aa.AaServerWatch
 import com.yegorkapomidorka.headswap.aa.AaState
 
 /** Сводка состояния для главного экрана и уведомления. Чистая логика без Android: считается из Inputs. */
@@ -22,7 +21,7 @@ enum class HeroIcon { POWER, PLUG, CAR, CAR_USB, CAR_WIFI, REFRESH, ALERT }
 
 enum class PrimaryAction { START_SERVER }
 
-enum class OutlineAction { OPEN_AA, STOP, NOTIF_ACCESS }
+enum class OutlineAction { OPEN_AA, STOP }
 
 data class HomeState(
     val phase: Phase,
@@ -46,7 +45,7 @@ class Inputs(
     val bridgeRunning: Boolean,
     val aaStatus: String,
     val protocolKnown: Boolean,
-    /** Сервер ГУ AA запущен: по его уведомлению или по автопробе при открытии экрана; null - не знаем. */
+    /** Сервер ГУ AA запущен по пробе при открытии экрана; null - не проверяли или проба не дала ответа. */
     val serverRunning: Boolean? = null,
     /** Подключённая сессия закончилась (обрыв USB или «Стоп»), AA закрыта штатно: сервер ГУ должен был остаться. */
     val ended: Boolean,
@@ -142,8 +141,8 @@ object HomeLogic {
             )
             serverDown -> serverDownState()
             // «Запустите сервер ГУ» сразу, если сервер не работал, отказ не в окне после закрытия нашей сессии
-            // или уведомление AA говорит «остановлен». Короткий отказ после ByeBye у работавшего сервера - норма,
-            // пока AA снова слушает; ждём как обычное подключение. Уведомление «запущен» - тоже просто «Подключаюсь»
+            // или проба сказала «отказ». Короткий отказ после ByeBye у работавшего сервера - норма,
+            // пока AA снова слушает; ждём как обычное подключение. Проба «запущен» - тоже просто «Подключаюсь»
             refused && i.serverRunning != true && (!i.serverWorked || i.refusedFresh || i.serverRunning == false) -> state(
                 Phase.OFF, Tone.PRI, HeroIcon.POWER, UiText.res(R.string.home_title_off),
                 UiText.res(R.string.home_sub_refused, TEXT_START_CHAIN),
@@ -186,12 +185,12 @@ object HomeLogic {
                 ),
                 notifText = UiText.res(R.string.home_title_checking),
             )
-            // ни уведомление, ни проба не сказали, запущен ли сервер ГУ
+            // проба не дала ответа или ещё не было: запущен ли сервер ГУ, не знаем
             else -> unknownState()
         }
     }
 
-    /** «Запустите сервер ГУ»: уведомление AA сервера не показывает. */
+    /** «Запустите сервер ГУ»: проба получила отказ или сервер завис. */
     private fun offState() = state(
         Phase.OFF, Tone.PRI, HeroIcon.POWER, UiText.res(R.string.home_title_off), TEXT_START_CHAIN,
         listOf(
@@ -202,20 +201,20 @@ object HomeLogic {
         notifText = UiText.res(R.string.notif_server_off),
     )
 
-    /** «Проверьте сервер ГУ»: нет доступа к уведомлениям AA, ни «запущен», ни «не запущен» не утверждаем. */
+    /** «Проверьте сервер ГУ»: проба не дала ответа, ни «запущен», ни «не запущен» не утверждаем. */
     private fun unknownState() = state(
         Phase.OFF, Tone.PRI, HeroIcon.POWER, UiText.res(R.string.home_title_unknown), UiText.res(R.string.home_sub_unknown),
         listOf(
             StageState.PEND to UiText.res(R.string.home_stage_unknown), StageState.PEND to NONE, StageState.PEND to NONE,
             StageState.PEND to NONE, StageState.PEND to NONE,
         ),
-        primary = PrimaryAction.START_SERVER, outline = OutlineAction.NOTIF_ACCESS,
+        primary = PrimaryAction.START_SERVER,
         notifText = UiText.res(R.string.notif_server_unknown),
     )
 
     /**
      * «Машина отключена»: мост сам штатно закрыл установленную сессию (ByeBye). Держится до нового кабеля.
-     * [serverKnownUp] - уведомление AA подтверждает, что сервер ГУ остался в фоне; иначе нейтральный текст.
+     * [serverKnownUp] - проба после поездки подтвердила, что сервер ГУ остался; иначе нейтральный текст.
      */
     private fun parkedState(serverKnownUp: Boolean) = state(
         Phase.PARKED, Tone.PRI, HeroIcon.CAR, UiText.res(R.string.home_title_parked),
@@ -267,7 +266,7 @@ object HeadswapStatus {
 
     private val graceRe = Regex("""жива\s+(\d+)\s*с""")
 
-    /** Пользователь нажал «Открыть Android Auto» (идёт включать сервер ГУ): снимаем «Машина отключена». Запущен ли сервер, говорит AaServerWatch. */
+    /** Пользователь нажал «Открыть Android Auto» (идёт включать сервер ГУ): снимаем «Машина отключена». Запущен ли сервер, скажет проба при возврате на экран. */
     fun markServerRequested() {
         ended = false
         AaServerCheck.forgetAuto()
@@ -316,7 +315,7 @@ object HeadswapStatus {
             bridgeRunning = running,
             aaStatus = st,
             protocolKnown = CarLifeState.protocol != "-",
-            serverRunning = AaServerWatch.running ?: AaServerCheck.autoRunning,
+            serverRunning = AaServerCheck.autoRunning,
             serverChecking = AaServerCheck.autoBusy,
             ended = ended,
             graceLeftS = left,

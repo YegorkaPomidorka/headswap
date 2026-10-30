@@ -1,7 +1,6 @@
 package com.yegorkapomidorka.headswap.ui
 
 import com.yegorkapomidorka.headswap.R
-import com.yegorkapomidorka.headswap.aa.AaServerWatch
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
@@ -52,7 +51,7 @@ class HomeLogicTest {
 
     @Test
     fun offWhenNothingStarted() {
-        // уведомление AA есть и сервера в нём нет: точно не запущен
+        // проба получила отказ: точно не запущен
         val s = HomeLogic.compute(inp(serverRunning = false))
         assertEquals(Phase.OFF, s.phase)
         assertEquals(PrimaryAction.START_SERVER, s.primary)
@@ -73,8 +72,8 @@ class HomeLogicTest {
     }
 
     @Test
-    fun unknownWithoutNotificationAccess() {
-        // слушателя уведомлений нет: не утверждаем ни «запущен», ни «не запущен»
+    fun unknownWhenProbeGaveNoAnswer() {
+        // проба не дала ответа (сбой или ещё не было): не утверждаем ни «запущен», ни «не запущен»
         val s = HomeLogic.compute(inp(serverRunning = null))
         assertEquals(Phase.OFF, s.phase)
         assertEquals(Tone.PRI, s.tone)
@@ -83,19 +82,19 @@ class HomeLogicTest {
         assertEquals(UiText.res(R.string.home_sub_unknown), s.sub)
         assertEquals(StageState.PEND to UiText.res(R.string.home_stage_unknown), s.stages[0].second)
         assertEquals(PrimaryAction.START_SERVER, s.primary)
-        assertEquals(OutlineAction.NOTIF_ACCESS, s.outline)
+        assertNull(s.outline)
         assertEquals(false, s.showChain)
         assertEquals(UiText.res(R.string.notif_server_unknown), s.notifText)
     }
 
     @Test
-    fun parkedTextDependsOnServerNotification() {
-        // уведомление подтверждает сервер: прежний текст про фон
+    fun parkedTextDependsOnServerProbe() {
+        // проба после поездки подтверждает сервер: прежний текст про фон
         val up = HomeLogic.compute(inp(ended = true, serverRunning = true))
         assertEquals(Phase.PARKED, up.phase)
         assertEquals(UiText.res(R.string.home_sub_parked), up.sub)
         assertEquals(UiText.res(R.string.notif_parked), up.notifText)
-        // доступа нет: нейтральный текст
+        // проба не дала ответа: нейтральный текст
         val unknown = HomeLogic.compute(inp(ended = true, serverRunning = null))
         assertEquals(Phase.PARKED, unknown.phase)
         assertEquals(UiText.res(R.string.home_sub_parked_unknown), unknown.sub)
@@ -107,12 +106,12 @@ class HomeLogicTest {
     }
 
     @Test
-    fun shortRefusalIsConnectingWhenNotificationSaysRunning() {
+    fun shortRefusalIsConnectingWhenProbeSaysRunning() {
         val status = "мост: жду сервер ГУ AA"
         val up = HomeLogic.compute(inp(running = true, status = status, protocol = true, serverRunning = true))
         assertEquals(Phase.WAITING, up.phase)
         assertEquals(UiText.res(R.string.home_title_connecting), up.title)
-        // без уведомления прежнее «Запустите сервер ГУ»
+        // без итога пробы прежнее «Запустите сервер ГУ»
         val unknown = HomeLogic.compute(inp(running = true, status = status, protocol = true, serverRunning = null))
         assertEquals(Phase.OFF, unknown.phase)
         assertEquals(UiText.res(R.string.home_title_off), unknown.title)
@@ -130,24 +129,13 @@ class HomeLogicTest {
         val afterBye = HomeLogic.compute(inp(running = true, status = status, protocol = true, worked = true, refusedFresh = false, refusedMs = 500))
         assertEquals(Phase.WAITING, afterBye.phase)
         assertEquals(UiText.res(R.string.home_title_connecting), afterBye.title)
-        // уведомление AA говорит «остановлен»: просим запустить, даже внутри окна
+        // проба сказала «отказ»: просим запустить, даже внутри окна
         val stopped = HomeLogic.compute(inp(running = true, status = status, protocol = true, worked = true, serverRunning = false, refusedFresh = false, refusedMs = 500))
         assertEquals(Phase.OFF, stopped.phase)
         assertEquals(UiText.res(R.string.home_title_off), stopped.title)
-        // уведомление говорит «запущен»: свежесть отказа не важна
+        // проба сказала «запущен»: свежесть отказа не важна
         val running = HomeLogic.compute(inp(running = true, status = status, protocol = true, worked = true, serverRunning = true, refusedFresh = true))
         assertEquals(Phase.WAITING, running.phase)
-    }
-
-    @Test
-    fun serverNotificationNeedsPackageChannelAndForegroundFlag() {
-        val fg = android.app.Notification.FLAG_FOREGROUND_SERVICE
-        val ok = AaServerWatch.isServerNotification(AaServerWatch.GEARHEAD, AaServerWatch.CHANNEL, fg or android.app.Notification.FLAG_NO_CLEAR)
-        assertEquals(true, ok)
-        assertEquals(false, AaServerWatch.isServerNotification("com.other.app", AaServerWatch.CHANNEL, fg))
-        assertEquals(false, AaServerWatch.isServerNotification(AaServerWatch.GEARHEAD, "other_channel", fg))
-        assertEquals(false, AaServerWatch.isServerNotification(AaServerWatch.GEARHEAD, null, fg))
-        assertEquals(false, AaServerWatch.isServerNotification(AaServerWatch.GEARHEAD, AaServerWatch.CHANNEL, android.app.Notification.FLAG_NO_CLEAR))
     }
 
     @Test

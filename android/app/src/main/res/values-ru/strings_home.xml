@@ -24,7 +24,7 @@
     <string name="home_sub_parked">Сервер ГУ остался работать в фоне. В следующей поездке просто подключите кабель.</string>
     <string name="home_sub_server_down">Android закрыл сервер ГУ. Включите его снова: Android Auto → ⋮ → «Вкл. сервер головного устр-ва».</string>
     <string name="home_sub_ready">Подключите телефон к магнитоле кабелем.</string>
-    <string name="home_sub_unknown">Headswap не видит, запущен ли сервер. В Android Auto → ⋮: если есть «Остановить сервер ГУ» — он запущен, если «Вкл. сервер головного устр-ва» — включите. Чтобы Headswap видел сам, разрешите доступ к уведомлениям.</string>
+    <string name="home_sub_unknown">Headswap не смог проверить сервер. В Android Auto → ⋮: если есть «Остановить сервер ГУ» — он запущен, если «Вкл. сервер головного устр-ва» — включите.</string>
     <string name="home_sub_checking">Пара секунд: Headswap коротко подключается к Android Auto.</string>
     <string name="home_sub_parked_unknown">Следующая поездка — подключите кабель. Если Android Auto не появится, проверьте сервер ГУ: Android Auto → ⋮.</string>
 
@@ -62,8 +62,6 @@
     <string name="home_settings">Настройки</string>
     <string name="home_btn_stop">Остановить</string>
     <string name="home_btn_open_aa">Открыть настройки AA</string>
-    <string name="home_btn_notif_access">Показывать статус сервера</string>
-    <string name="notif_access_hint">Включите переключатель Headswap. Если он серый (Android 13+, APK не из магазина): «О приложении» → ⋮ → «Разрешить ограниченные настройки».</string>
     <string name="home_grace_waiting">Жду переподключения</string>
     <string name="home_grace_left">ещё %1$d с</string>
 

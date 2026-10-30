@@ -2598,11 +2598,8 @@ class AaConnector(
                 s.connected && endReason.startsWith(AapSession.NO_VERSION_RESPONSE_REASON) -> failures.onNoVersionResponse()
                 else -> failures.reset()
             }
-            // на ГУ «Запустите сервер ГУ» только когда он правда не отвечает; короткий отказ после ByeBye - «Подключаю».
-            // Уведомление AA говорит «остановлен» - отказ настоящий, ждать нечего
-            if (failures.needsStart() ||
-                (!s.connected && endReason.startsWith(REFUSED_REASON) && AaServerWatch.running == false)
-            ) core.showStatus(AaBridgeCore.TEXT_START_SERVER)
+            // на ГУ «Запустите сервер ГУ» только когда он правда не отвечает; короткий отказ после ByeBye - «Подключаю»
+            if (failures.needsStart()) core.showStatus(AaBridgeCore.TEXT_START_SERVER)
             if (!s.connected) {
                 if (!unavailableLogged) {
                     log("BRIDGE сервер ГУ Android Auto недоступен (connection refused), повторяю каждые ${retryMs / 1000.0} с", true)
