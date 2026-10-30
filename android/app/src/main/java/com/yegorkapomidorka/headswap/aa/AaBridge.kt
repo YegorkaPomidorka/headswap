@@ -2589,7 +2589,11 @@ class AaConnector(
             core.peer = null
             current = null
             when {
-                s.established -> if (!establishedNoted) failures.onEstablished()
+                s.established -> {
+                    if (!establishedNoted) failures.onEstablished()
+                    // сессия закончилась: ближайшие секунды отказ порта - норма, AA его снова поднимает
+                    failures.onSessionEnded()
+                }
                 !s.connected && endReason.startsWith(REFUSED_REASON) -> failures.onRefused()
                 s.connected && endReason.startsWith(AapSession.NO_VERSION_RESPONSE_REASON) -> failures.onNoVersionResponse()
                 else -> failures.reset()

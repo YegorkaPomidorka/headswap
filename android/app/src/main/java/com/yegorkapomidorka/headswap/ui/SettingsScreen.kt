@@ -457,7 +457,7 @@ class SettingsSectionScreen(host: MainActivity, val section: SettingsSection) : 
 
     override fun onActivityResultDone() = refreshWireless()
 
-    /** Беспровод (бета): пояснение, старт/стоп, выбор машины для автостарта по Bluetooth, отчёт. */
+    /** Беспровод (бета): пояснение, старт, выбор машины для автостарта по Bluetooth, отчёт. */
     private fun wirelessCard(): View {
         val c = ctx
         val card = c.vbox(8).apply {
@@ -471,8 +471,6 @@ class SettingsSectionScreen(host: MainActivity, val section: SettingsSection) : 
         // высота кнопок задаётся явно (как на других экранах): pill с WRAP сжимается до высоты текста
         card.addView(c.primaryButton(c.getString(R.string.wl_start), heightDp = 60, sp = 17f).apply { setOnClickListener { onWirelessStart() } },
             lp(MATCH, c.dp(60)).apply { topMargin = c.dp(4) })
-        card.addView(c.outlineButton(c.getString(R.string.wl_stop), heightDp = 56, sp = 16f).apply { setOnClickListener { Actions.stopBridge(c) } },
-            lp(MATCH, c.dp(56)))
         // выбор машины: дальше при её Bluetooth-подключении ожидание по Wi-Fi стартует само
         wlCarLine = c.text("", 15f, 500).also { card.addView(it, lp(MATCH, WRAP).apply { topMargin = c.dp(8) }) }
         card.addView(c.text(c.getString(R.string.wl_car_note), 13f, 400, c.clr(R.color.on2)), lp(MATCH, WRAP))
