@@ -30,7 +30,8 @@ class CarPresetTest {
     @Test
     fun allPresetsTranscodeAt15Fps() {
         for (p in CarPreset.values()) {
-            assertEquals(p.name, true, p.settings.transcode)
+            // Corolla Cross (h420): энкодер Xiaomi падает на 1920×720, прямой проброс с SPS-кропом
+            assertEquals(p.name, p != CarPreset.TOYOTA_COROLLA_CROSS_2024, p.settings.transcode)
             assertEquals(p.name, FpsSetting.FPS15, p.settings.fps)
         }
     }

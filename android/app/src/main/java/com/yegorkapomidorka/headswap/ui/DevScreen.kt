@@ -86,13 +86,6 @@ class DevScreen(host: MainActivity) : Screen(host) {
             group(listOf(row(c.getString(R.string.dev_mic_vr_title), c.getString(R.string.dev_mic_vr_sub), aa.micVrStatus) { aa.micVrStatus = it })),
         )
 
-        body.addView(c.sectionTitle(c.getString(R.string.dev_section_sps_crop)))
-        body.addView(
-            group(listOf(
-                row(c.getString(R.string.dev_sps_crop_title), c.getString(R.string.dev_sps_crop_sub), aa.spsCrop) { aa.spsCrop = it },
-            )),
-        )
-
         body.addView(c.sectionTitle(c.getString(R.string.dev_section_meta)))
         body.addView(
             group(listOf(
