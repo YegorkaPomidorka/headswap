@@ -7,6 +7,11 @@
 - Never message, build for, or act on another ticket's user (e.g. h319/@olya1305 vs h295) unless explicitly told to.
 - If the user says stop or do nothing, stop all actions immediately.
 
+### Research before building
+- Default for a new ticket: collect ALL logs, photos and videos, then analyze and report a diagnosis.
+- Do NOT build test APKs (hNNNtestN) or start implementing until the user explicitly says to build.
+- Before adding a new video mode or fix, check existing branches, commits and open PRs for overlap (`git log --all --oneline | grep -i <keyword>`, `gh pr list`).
+
 ## Как изменения попадают в main
 
 Репозиторий github.com/YegorkaPomidorka/headswap, владелец Егор. Порядок всегда один:
