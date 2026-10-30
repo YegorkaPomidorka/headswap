@@ -918,8 +918,8 @@ class SettingsSectionScreen(host: MainActivity, val section: SettingsSection) : 
                 gravity = Gravity.CENTER_HORIZONTAL
                 addView(View(c).apply { background = c.shape(0, 3, fg2, 1.5f) },
                     LinearLayout.LayoutParams(c.dp(36), c.dp(36f * h / w)))
-                addView(c.text(ratioOf(m), 10f, 400, fg2))
-            }, LinearLayout.LayoutParams(c.dp(40), WRAP))
+                addView(c.text(ratioOf(m), 10f, 400, fg2).apply { gravity = Gravity.CENTER_HORIZONTAL }, lp(MATCH, WRAP))
+            }, LinearLayout.LayoutParams(c.dp(40), WRAP).apply { gravity = Gravity.CENTER_VERTICAL })
             addView(c.vbox(2).apply {
                 addView(c.text(label, 16f, 600, fg))
                 addView(c.text(if (blocked) c.getString(R.string.set_needs_transcode) else subOf(m), 13f, 400, fg2).apply {
