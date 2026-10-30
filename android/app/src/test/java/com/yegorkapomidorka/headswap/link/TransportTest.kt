@@ -91,6 +91,27 @@ class TransportTest {
     }
 
     @Test
+    fun streamDropQueuedRemovesOnlyMatchingMediaData() {
+        // писатель не запущен: всё лежит в очереди. h425: из неё уходит только MEDIA_DATA, остальное на месте
+        val out = RecordingOut()
+        val t = StreamTransport(BlockingIn(), out, TransportCaps.USB_AOA, "test", clock = clock)
+        val data = Wire.dataInner(0x00030006, 1, ByteArray(4096))
+        val pause = Wire.dataInner(0x00030003, 0, ByteArray(0))
+        val tts = Wire.dataInner(0x00040006, 1, ByteArray(512))
+        val video = Wire.dataInner(Msg.VIDEO_DATA, 7, ByteArray(1000))
+        t.send(Ch.MEDIA, data)
+        t.send(Ch.VIDEO, video)
+        t.send(Ch.MEDIA, data)
+        t.send(4, tts)
+        t.send(Ch.MEDIA, pause)
+        val dropped = t.dropQueued(Ch.MEDIA) { it.size >= 12 && Wire.u32(it, 8) == 0x00030006 }
+        assertEquals(2, dropped)
+        assertEquals(3, t.queueSize(Ch.MEDIA))
+        assertEquals(1, t.queuedVideoFrames)
+        t.close()
+    }
+
+    @Test
     fun streamReadsFramesAndReportsEof() {
         val pin = PipedInputStream(1 shl 16)
         val pout = PipedOutputStream(pin)

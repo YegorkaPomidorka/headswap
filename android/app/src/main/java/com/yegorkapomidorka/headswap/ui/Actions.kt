@@ -68,7 +68,6 @@ object Actions {
 
     fun stopBridge(ctx: Context) {
         AppLog.i("кнопка Стоп")
-        HeadswapStatus.markUserStop()
         ctx.startForegroundService(Intent(ctx, BridgeService::class.java).setAction(BridgeService.ACTION_STOP))
     }
 
@@ -96,7 +95,7 @@ object Actions {
 
     /**
      * Кнопка «Открыть Android Auto» на главном экране и в онбординге: сервер ГУ включает пользователь сам
-     * (⋮ → «Вкл. сервер головного устр-ва»), поэтому только отмечаем запрос и открываем настройки AA.
+     * (⋮ → «Вкл. сервер головного устр-ва»), поэтому только снимаем «Машина отключена» и открываем настройки AA.
      */
     fun startServerFromUi(ctx: Context) {
         HeadswapStatus.markServerRequested()

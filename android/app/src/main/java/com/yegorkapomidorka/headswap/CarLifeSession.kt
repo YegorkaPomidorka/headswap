@@ -8,8 +8,10 @@ import com.yegorkapomidorka.headswap.aa.CarlifeAudio
 import com.yegorkapomidorka.headswap.aa.AaTranscoder
 import com.yegorkapomidorka.headswap.aa.BitratePolicy
 import com.yegorkapomidorka.headswap.aa.BitrateProfile
+import com.yegorkapomidorka.headswap.aa.CallStateSource
 import com.yegorkapomidorka.headswap.aa.CarlifeLink
 import com.yegorkapomidorka.headswap.aa.FpsSetting
+import com.yegorkapomidorka.headswap.aa.IdrBitrateCeiling
 import com.yegorkapomidorka.headswap.aa.IdrThrottle
 import com.yegorkapomidorka.headswap.aa.CarlifeMediaInfo
 import com.yegorkapomidorka.headswap.aa.LinkVideoStats
@@ -57,6 +59,8 @@ class CarLifeSession(
     private val bridge: AaBridgeCore,
     /** Нагрев телефона: по нему перекодирование снижает fps и битрейт. */
     private val thermal: ThermalSource = ThermalSource.NONE,
+    /** Состояние звонка телефона: о нём сообщаем ГУ, как Baidu (h428). */
+    private val calls: CallStateSource = CallStateSource.NONE,
     /** Размер кадра из VIDEO_ENCODER_INIT ГУ (для подсказки «Как просит ГУ» в разделе для разработчиков). */
     private val onHuSize: (Int, Int) -> Unit = { _, _ -> },
     private val onClosed: (String) -> Unit,
@@ -111,6 +115,16 @@ class CarLifeSession(
     @Volatile private var stubCropped = false      // заглушка в кадре AA, её SPS режется как у AA (h529)
     @Volatile private var csdPending = true
     @Volatile private var paused = false
+
+    // Mobis CCNC (h242)
+    private var mobisApplied = false                    // нить чтения: реакции флага уже включены
+    private var mobisMicScheduled = false
+    @Volatile private var huFeatureItems: List<Pair<String, Int>>? = null
+    private var mobisBeatLogged = false
+    private var mobisAdaptLogged = false
+    // потолок размера IDR (h242): у транскодера и заглушки свой, каждый ведёт битрейт своего энкодера
+    private val mobisAaCeiling = IdrBitrateCeiling(AaBridgeCore.MOBIS_BITRATE)
+    private val mobisStubCeiling = IdrBitrateCeiling(AaBridgeCore.MOBIS_BITRATE)
 
     // находки для итогового резюме
     private var huVersion = "-"
@@ -172,6 +186,57 @@ class CarLifeSession(
         sched.scheduleWithFixedDelay({ tick() }, 1, 1, TimeUnit.SECONDS)
         sched.scheduleWithFixedDelay({ pauseHeartbeat() }, PAUSE_HEARTBEAT_MS, PAUSE_HEARTBEAT_MS, TimeUnit.MILLISECONDS)
         sched.scheduleWithFixedDelay({ adaptBitrate() }, 1000, BITRATE_POLL_MS, TimeUnit.MILLISECONDS)
+        sched.scheduleWithFixedDelay({ mobisKeepalive() }, MOBIS_KEEPALIVE_POLL_MS, MOBIS_KEEPALIVE_POLL_MS, TimeUnit.MILLISECONDS)
+        val callsOn = calls.start { state ->
+            try {
+                sched.execute { onCallState(state) }
+            } catch (_: java.util.concurrent.RejectedExecutionException) {   // сессия уже закрывается
+            }
+        }
+        AppLog.i("звонки: ${if (callsOn) "слежу (VW CNS2 Delphi: сообщаю ГУ MODULE_STATUS PHONE + TELE_STATE)" else "не слежу (флажок выкл или нет READ_PHONE_STATE)"}")
+    }
+
+    /** Нить cl-sched. Последнее состояние звонка, отправленное ГУ. */
+    private var callState = CallStateSource.IDLE
+
+    /**
+     * Как Baidu PhoneManager.onCallStateChanged: RINGING - MODULE_STATUS PHONE=1 + TELE_STATE_CHANGE_INCOMING,
+     * OFFHOOK - PHONE=2 + OUTGOING, IDLE - PHONE=0 + IDLE + FOREGROUND. Номер в INCOMING не кладём (нет READ_CALL_LOG).
+     * Первое IDLE при подписке не шлём: PHONE=0 уже ушёл в стартовом списке модулей.
+     */
+    private fun onCallState(state: Int) {
+        if (closed.get()) return
+        // h425: мост узнаёт о звонке первым и независимо от рукопожатия и дедупа ниже: на VW CNS2 Delphi хвост музыки
+        // надо гасить до того, как ГУ уйдёт в своё окно звонка; стартовое состояние новой сессии тоже должно дойти до моста
+        bridge.onPhoneCallState(state)
+        if (state == callState) return
+        callState = state
+        if (!matchSent) {
+            AppLog.i("звонки: state=$state до рукопожатия, ГУ не сообщаю")
+            return
+        }
+        if (!bridge.huVwCns2Delphi) {       // h428-путь проверен только под задачу h425; другим ГУ звонок не сообщаем
+            AppLog.i("звонки: state=$state, ГУ не VW CNS2 Delphi, не сообщаю")
+            return
+        }
+        when (state) {
+            CallStateSource.RINGING -> {
+                AppLog.i("-> ГУ: звонок входящий: MODULE_STATUS PHONE=1 + TELE_STATE_CHANGE_INCOMING", true)
+                sendCmd(Msg.MODULE_STATUS, Msgs.moduleStatusSingle(MODULE_PHONE, 1))
+                sendCmd(Msg.TELE_STATE_CHANGE_INCOMING, null)
+            }
+            CallStateSource.OFFHOOK -> {
+                AppLog.i("-> ГУ: звонок разговор/исходящий: MODULE_STATUS PHONE=2 + TELE_STATE_CHANGE_OUTGOING", true)
+                sendCmd(Msg.MODULE_STATUS, Msgs.moduleStatusSingle(MODULE_PHONE, 2))
+                sendCmd(Msg.TELE_STATE_CHANGE_OUTGOING, null)
+            }
+            else -> {
+                AppLog.i("-> ГУ: звонок закончен: MODULE_STATUS PHONE=0 + TELE_STATE_CHANGE_IDLE + FOREGROUND", true)
+                sendCmd(Msg.MODULE_STATUS, Msgs.moduleStatusSingle(MODULE_PHONE, 0))
+                sendCmd(Msg.TELE_STATE_CHANGE_IDLE, null)
+                sendCmd(Msg.FOREGROUND, null)
+            }
+        }
     }
 
     fun close(reason: String) {
@@ -185,6 +250,7 @@ class CarLifeSession(
         }
         WLog.ev(WLog.LINK, "session-end", "transport" to transport.caps.kind, "aliveS" to (SystemClock.elapsedRealtime() - t0) / 1000, "why" to reason)
         logSummary(reason)
+        calls.stop()
         CarLifeState.status = "закрыто: $reason"
         try {
             sched.shutdownNow()
@@ -293,8 +359,9 @@ class CarLifeSession(
                 AppLog.i("== HU_INFO: $huInfo")
                 PbReader.parse(m.body)?.let {
                     WLog.ev(WLog.HS, "HU_INFO", "manufacturer" to PbReader.str(it, 13), "model" to PbReader.str(it, 14))
-                    bridge.onHuInfo(PbReader.str(it, 13), PbReader.str(it, 14), PbReader.str(it, 15))
+                    bridge.onHuInfo(PbReader.str(it, 13), PbReader.str(it, 14), PbReader.str(it, 15), PbReader.str(it, 2))
                 }
+                applyMobis()
                 logDesay()
                 // ответа нет: Baidu только сохраняет (CarlifeDeviceInfoManager.setCarDeviceInfo)
             }
@@ -305,6 +372,8 @@ class CarLifeSession(
                     WLog.ev(WLog.HS, "STATISTIC_INFO", "channel" to PbReader.str(it, 4))
                     bridge.onHuStatistic(PbReader.str(it, 4))
                 }
+                applyMobis()
+                scheduleMobisMic()
                 logDesay()
                 for (c in Handshake.onStatisticInfo(sendFeatureConfigRequest = true)) sendCmd(c.type, c.body)
             }
@@ -320,14 +389,20 @@ class CarLifeSession(
                 CarLifeState.auth = "HU_AUTHEN_REQUEST пришёл, ${if (v2) "2.0;" else "не 2.0;"}"
                 // как Baidu 8.6.7 (PrivateKeyManager.encryptContentProcess): сразу по запросу подпись приватным ключом Baidu,
                 // для "2.0;" md5-код от MD_INFO; MD_AUTHEN_RESULT{true} по-прежнему уходит после STATISTIC_INFO
-                val enc = if (rndStr == null) null else try {
+                // Mobis CCNC (h242) шлёт "1": у Baidu versionVerify падает на substring(-1), ответа нет вовсе - делаем так же
+                val baiduSilent = bridge.huMobisNx4c && rndStr != null && !HuAuth.isV2Branch(rndStr) && !rndStr.contains('_')
+                val enc = if (rndStr == null || baiduSilent) null else try {
                     HuAuth.encryptValue(rndStr, mdInfoKey)
                 } catch (e: Exception) {
                     AppLog.e("подпись HU_AUTHEN_REQUEST", e)
                     null
                 }
                 if (enc == null) {
-                    AppLog.i("на HU_AUTHEN_REQUEST не отвечаю (${if (rndStr == null) "нет randomValue" else "подпись не вышла"})")
+                    AppLog.i("на HU_AUTHEN_REQUEST не отвечаю (${when {
+                        rndStr == null -> "нет randomValue"
+                        baiduSilent -> "Mobis CCNC: randomValue без \"2.0;\" и \"_\", Baidu тут молчит"
+                        else -> "подпись не вышла"
+                    }})")
                 } else {
                     if (rndStr != null && HuAuth.isV2Branch(rndStr)) AppLog.i("== AUTHEN 2.0: md5 от \"CARLIFE\" + \"$mdInfoKey\" + дата")
                     AppLog.i("== отвечаю MD_AUTHEN_RESPONSE encryptValue=$enc")
@@ -336,6 +411,15 @@ class CarLifeSession(
                 }
             }
             Msg.HU_FEATURE_CONFIG_RESPONSE -> onFeatureConfig(m)
+            Msg.BT_START_IDENTIFY_REQ -> {
+                // Baidu BtDeviceManager :436-457: без HFP с ГУ и BLUETOOTH_AUTO_CONNECT - status=0 с адресом ГУ.
+                // Остальным ГУ не отвечаем, как раньше (живут и без ответа)
+                val addr = PbReader.parse(m.body)?.let { PbReader.str(it, 1) }
+                if (bridge.huMobisNx4c && !addr.isNullOrEmpty()) {
+                    AppLog.i("== BT_START_IDENTIFY_REQ $addr: Mobis CCNC, отвечаю BT_IDENTIFY_RESULT_IND status=0")
+                    sendCmd(Msg.BT_IDENTIFY_RESULT_IND, Msgs.btIdentifyResult(0, addr))
+                }
+            }
             Msg.CARLIFE_DATA_SUBSCRIBE -> {
                 val done = Msgs.subscribeDone(m.body)
                 if (done == null) {
@@ -433,6 +517,10 @@ class CarLifeSession(
 
     /** Авто: целевой fps транскодера = max(fps ГУ, 10) на лету; фиксированная настройка: только ответ DONE. Passthrough не трогаем (выброс P-кадров ломает поток). */
     private fun onFrameRateChange(fps: Int) {
+        if (bridge.huMobisNx4c) {
+            AppLog.i("видео: FRAME_RATE_CHANGE fps=$fps, Mobis CCNC: отвечаю DONE, энкодер держит ${AaBridgeCore.MOBIS_FPS} fps, как Baidu")
+            return
+        }
         if (!bridge.transcodeEnabled) {
             AppLog.i("видео: FRAME_RATE_CHANGE fps=$fps, passthrough: частота не регулируется, энкодер AA не трогаю")
             return
@@ -470,11 +558,14 @@ class CarLifeSession(
         }
         // размер задаёт видео-режим (по умолчанию 1280x720 fps 30: ГУ Honda принимает и показывает целиком, проверено в машине)
         val (w, h, why) = Triple(mode.outW, mode.outH, "мост: режим ${mode.label}")
-        val fps = Handshake.chooseFps(cfg.fpsSetting, rf, huMaxFps())
+        // Mobis CCNC (h242): INIT_DONE с тем fps, что просила ГУ, а энкодер Baidu при этом идёт на 20 fps
+        val mobis = bridge.huMobisNx4c
+        val fps = if (mobis) (if (rf in 1..30) rf else Handshake.DEFAULT_FPS) else Handshake.chooseFps(cfg.fpsSetting, rf, huMaxFps())
         pendingW = w
         pendingH = h
         pendingFps = fps
-        targetFps = fps
+        targetFps = if (mobis) AaBridgeCore.MOBIS_FPS else fps
+        if (mobis) AppLog.i("видео: Mobis CCNC, INIT_DONE fps=$fps, энкодер ${AaBridgeCore.MOBIS_FPS} fps ${AaBridgeCore.MOBIS_BITRATE / 1000} кбит/с VBR")
         videoInited = true
         chosen = "${w}x$h ($why)"
         AppLog.i("== ОТВЕЧАЮ INIT_DONE ${w}x$h fps=$fps ($why; ГУ просит fps=$rf, настройка ${cfg.fpsSetting.name}${if (bridge.transcodeEnabled) "" else ", passthrough: частота не регулируется"})")
@@ -502,6 +593,46 @@ class CarLifeSession(
         AppLog.i("== ГУ Desay G6S: маршрутный NAVI=1 выключен")
     }
 
+    /**
+     * Mobis CCNC (h242): реакции режима Baidu, которым нужен флаг ещё до STATISTIC_INFO. Флаг приходит по HU_INFO
+     * (запасной признак - канал в STATISTIC_INFO), поэтому зовётся после обоих. Один раз за сессию.
+     */
+    private fun applyMobis() {
+        if (!bridge.huMobisNx4c || mobisApplied) return
+        mobisApplied = true
+        transport.setWholeWrites(true)
+        AppLog.i("== Mobis CCNC: запись в AOA как у Baidu (8 байт заголовка и весь inner по одному write), пустой VIDEO_DATA после ${MOBIS_KEEPALIVE_MS} мс тишины")
+    }
+
+    /** Через [Handshake.MIC_INIT_DELAY_MS] после STATISTIC_INFO Baidu инициализирует голос (CarlifeConnectHsgHandler :490-495). */
+    private fun scheduleMobisMic() {
+        if (!bridge.huMobisNx4c || mobisMicScheduled) return
+        mobisMicScheduled = true
+        try {
+            sched.schedule({ sendMobisMic() }, Handshake.MIC_INIT_DELAY_MS, TimeUnit.MILLISECONDS)
+        } catch (_: java.util.concurrent.RejectedExecutionException) {
+            // сессия уже закрывается
+        }
+    }
+
+    private fun sendMobisMic() {
+        if (closed.get()) return
+        val items = huFeatureItems
+        val what = Handshake.baiduMicStart(items ?: emptyList())
+        val src = if (items == null) "FEATURE_CONFIG ещё не пришёл, решаю по умолчаниям Baidu" else "FEATURE_CONFIG: ${huFeature ?: "пусто"}"
+        when (what) {
+            Handshake.MicStart.END -> {
+                AppLog.i("MIC -> ГУ: Mobis CCNC, MIC_RECORD_END как Baidu ($src)")
+                sendCmd(Msg.MIC_RECORD_END, null)
+            }
+            Handshake.MicStart.WAKEUP_START -> {
+                AppLog.i("MIC -> ГУ: Mobis CCNC, MIC_RECORD_WAKEUP_START как Baidu ($src)")
+                sendCmd(Msg.MIC_RECORD_WAKEUP_START, null)
+            }
+            Handshake.MicStart.NONE -> AppLog.i("MIC: Mobis CCNC, Baidu тут ГУ ничего не шлёт ($src)")
+        }
+    }
+
     private fun onFeatureConfig(m: CmdMsg) {
         val fc = FeatureConfig.parse(m.body)
         if (fc == null) {
@@ -509,7 +640,14 @@ class CarLifeSession(
             return
         }
         huFeature = fc.items.joinToString(" ") { "${it.first}=${it.second}" }
+        huFeatureItems = fc.items
         bridge.onHuFeatureConfig(fc.value("AUDIO_TRANSMISSION_MODE"))
+        // Baidu FeatureConfigManager.excute :241-243: VOICE_MIC -> MODULE_STATUS{moduleID=6, statusID=значение} сразу
+        val voiceMic = fc.value("VOICE_MIC")
+        if (bridge.huMobisNx4c && voiceMic != null) {
+            AppLog.i("== VOICE_MIC=$voiceMic: Mobis CCNC, шлю MODULE_STATUS moduleID=$MODULE_MIC statusID=$voiceMic, как Baidu")
+            sendCmd(Msg.MODULE_STATUS, Msgs.moduleStatusSingle(MODULE_MIC, voiceMic))
+        }
         AppLog.i("== HU FEATURE_CONFIG (${fc.items.size} ключей), btAudio=${fc.huBtAudioSupport} btName=${fc.huBtName} btMAC=${fc.huBtMac}")
         for ((k, v) in fc.items) AppLog.i("   feature $k = $v")
         val enc = fc.value(FEATURE_CONTENT_ENCRYPTION)
@@ -556,8 +694,11 @@ class CarLifeSession(
             }
             // h529: в passthrough с SPS-кропом заглушка в кадре AA с теми же полями, ГУ не видит смены размера на AA.
             // На воздухе тоже: с галкой «И по Wi-Fi» там passthrough (stubInAaGeometry сам проверяет перекодирование)
-            stubCropped = bridge.stubInAaGeometry
-            val s = if (stubCropped) {
+            val mobis = bridge.huMobisNx4c
+            stubCropped = !mobis && bridge.stubInAaGeometry
+            val s = if (mobis) {
+                VideoSource(pendingW, pendingH, AaBridgeCore.MOBIS_FPS, mobisStubCeiling.current, this, baidu = true)
+            } else if (stubCropped) {
                 val (x, y) = bridge.spsCropOrigin
                 VideoSource(mode.aaW, mode.aaH, pendingFps, stubBps, this, Rect(x, y, x + mode.outW, y + mode.outH))
             } else {
@@ -664,6 +805,13 @@ class CarLifeSession(
     private fun adaptBitrate() {
         try {
             if (closed.get() || !carlifeStarted) return
+            if (bridge.huMobisNx4c) {
+                if (!mobisAdaptLogged) {
+                    mobisAdaptLogged = true
+                    AppLog.i("видео: Mobis CCNC, адаптация по бэклогу выключена: энкодер ${AaBridgeCore.MOBIS_BITRATE / 1000} кбит/с VBR, как Baidu, вниз только по размеру IDR > ${IdrBitrateCeiling.LIMIT_BYTES / 1024} КБ")
+                }
+                return
+            }
             if (!bridge.transcodeEnabled) {
                 if (!passthroughBitrateLogged) {
                     passthroughBitrateLogged = true
@@ -738,8 +886,38 @@ class CarLifeSession(
     /** Потолок fps под ГУ (Pioneer RM56E8B: 15), null = без ограничения. */
     private fun huMaxFps(): Int? = if (bridge.huPioneerRm56) AaBridgeCore.PIONEER_RM56_MAX_FPS else null
 
+    /**
+     * Mobis CCNC (h242): ГУ уходит в цикл START -> EIO на IDR > ~600 КБ, а IDR qti VBR на движении растёт каждую
+     * секунду (200 -> 712 КБ при 3,84 Мбит/с). Каждый IDR > 300 КБ режет битрейт энкодера ×0,7 (пол 1 Мбит/с), несколько
+     * маленьких подряд возвращают его ×1,15 ([IdrBitrateCeiling]). [apply] применяет новый битрейт к энкодеру-источнику.
+     */
+    private fun mobisKeyFrame(size: Int, ceiling: IdrBitrateCeiling, who: String, apply: (Int) -> Unit) {
+        val old = ceiling.current
+        val bps = ceiling.onKeyFrame(size)
+        if (bps == null) {
+            if (ceiling.stuckAtFloor == 1) {
+                AppLog.i("Mobis: IDR ${size / 1024} КБ > ${IdrBitrateCeiling.LIMIT_BYTES / 1024}, битрейт $who ${old / 1000} кбит/с уже на полу")
+            }
+            return
+        }
+        try {
+            apply(bps)
+        } catch (e: Exception) {
+            AppLog.e("Mobis: битрейт $who", e)
+        }
+        if (bps < old) {
+            AppLog.i("Mobis: IDR ${size / 1024} КБ > ${IdrBitrateCeiling.LIMIT_BYTES / 1024}, битрейт $who ${old / 1000} -> ${bps / 1000} кбит/с")
+        } else {
+            AppLog.i("Mobis: ${IdrBitrateCeiling.CALM_COUNT} IDR подряд < ${IdrBitrateCeiling.CALM_BYTES / 1024} КБ, битрейт $who ${old / 1000} -> ${bps / 1000} кбит/с")
+        }
+    }
+
     /** Страховка VW ID: IDR > 450 КБ - потолок ×0,75 (не ниже 1,5 Мбит/с), не чаще раза в секунду; кадр уже ушёл. */
     override fun onEncodedKeyFrame(size: Int) {
+        if (bridge.huMobisNx4c) {
+            mobisKeyFrame(size, mobisAaCeiling, "энкодера") { bridge.setEncoderBitrate(it) }
+            return
+        }
         if (size <= VW_20082138_IDR_LIMIT) return
         val now = SystemClock.elapsedRealtime()
         if (vwIdrCutMs != NEVER_MS && now - vwIdrCutMs < VW_20082138_CUT_INTERVAL_MS) return
@@ -759,6 +937,12 @@ class CarLifeSession(
         val time = if (isData) (System.currentTimeMillis() and 0xFFFFFFFFL).toInt() else 0
         send(channel, Wire.dataInner(type, time, payload))
         return true
+    }
+
+    /** h425: хвост MEDIA_DATA, ещё не записанный в USB, выбрасываем (ГУ ушло в звонок и не читает). Очередь общая: другие каналы не трогаем. */
+    override fun dropQueuedMedia(): Int {
+        if (closed.get()) return 0
+        return transport.dropQueued(Ch.MEDIA) { it.size >= 12 && Wire.u32(it, 8) == CarlifeAudio.MEDIA_DATA }
     }
 
     /** MODULE_STATUS об одном модуле (NAVI перед TTS, MUSIC при MEDIA INIT/PAUSE), как Baidu ModuleStatusManage. */
@@ -881,9 +1065,11 @@ class CarLifeSession(
     /** Транскодер моста: декодер AA (кадр режима) -> кроп -> Surface энкодера (выход режима). null, если MediaCodec не поднялся. */
     override fun createTranscoder(out: TranscodeOutput): VideoTranscoder? = try {
         applyHuCeilings()
+        val mobis = bridge.huMobisNx4c   // Baidu: 20 fps, VBR до 3,84 Мбит/с, битрейт ведёт только потолок IDR (mobisKeyFrame)
         AaTranscoder(
-            mode.outW, mode.outH, thermalThrottle.capFps(targetFps), bitratePolicy.current, out, { AppLog.i(it, false) },
-            srcWidth = mode.aaW, srcHeight = mode.aaH, crop = mode.crop,
+            mode.outW, mode.outH, thermalThrottle.capFps(if (mobis) AaBridgeCore.MOBIS_FPS else targetFps),
+            if (mobis) mobisAaCeiling.current else bitratePolicy.current, out, { AppLog.i(it, false) },
+            srcWidth = mode.aaW, srcHeight = mode.aaH, crop = mode.cropFor(bridge.marginsAtBottom), baidu = mobis,
         ).also { it.start() }
     } catch (e: Exception) {
         AppLog.e("BRIDGE транскодер не создан", e)
@@ -1032,6 +1218,7 @@ class CarLifeSession(
     }
 
     private fun onEncoderFrame(data: ByteArray, key: Boolean) {
+        if (key && bridge.huMobisNx4c) mobisKeyFrame(data.size, mobisStubCeiling, "заглушки") { source?.setBitrate(it) }
         if (!key && csdPending) {
             vDropped++
             return // до первого IDR ничего не шлём (первый пакет обязан начинаться с SPS)
@@ -1115,6 +1302,26 @@ class CarLifeSession(
         send(Ch.VIDEO, Wire.dataInner(Msg.VIDEO_HEARTBEAT, unixSeconds(), ByteArray(0)))
     }
 
+    /**
+     * Mobis CCNC (h242): как Baidu (Recorder.sendEmptyPacketForeground, VideoOutputThread :404-410, :545-581) -
+     * после START и пока нет PAUSE, если VIDEO_DATA не уходил >= 200 мс, шлём пустой VIDEO_DATA (длина 0, time = unix-секунды)
+     * и повторяем каждые 200 мс тишины. Включая промежуток между START и первым IDR (lastVideoTx ставит onVideoStart).
+     * Не VIDEO_HEARTBEAT 0x20002. На PAUSE работает прежний [pauseHeartbeat].
+     */
+    private fun mobisKeepalive() {
+        if (closed.get() || !bridge.huMobisNx4c || !carlifeStarted || paused) return
+        synchronized(videoLock) {
+            val now = SystemClock.elapsedRealtime()
+            if (now - lastVideoTx < MOBIS_KEEPALIVE_MS) return
+            if (!mobisBeatLogged) {
+                mobisBeatLogged = true
+                AppLog.i("видео: Mobis CCNC, ${now - lastVideoTx} мс без VIDEO_DATA, шлю пустой VIDEO_DATA 0x20001 раз в $MOBIS_KEEPALIVE_MS мс тишины, как Baidu")
+            }
+            lastVideoTx = now
+            send(Ch.VIDEO, Wire.dataInner(Msg.VIDEO_DATA, unixSeconds(), ByteArray(0)))
+        }
+    }
+
     private fun tick() {
         if (closed.get()) return
         val now = SystemClock.elapsedRealtime()
@@ -1164,6 +1371,11 @@ class CarLifeSession(
         }
         val fps = thermalThrottle.capFps(targetFps)
         val live = bridge.setTargetFps(fps)
+        if (bridge.huMobisNx4c) {
+            // Mobis CCNC: битрейт энкодера не трогаем (Baidu держит фиксированный), от нагрева только потолок fps
+            AppLog.i("нагрев: ступень ${level.name} ($why): Mobis CCNC, fps $fps (цель $targetFps), битрейт не меняю")
+            return
+        }
         val old = bitratePolicy.current
         val cap = if (level == ThermalLevel.NORMAL) Int.MAX_VALUE else thermalThrottle.capBitrate(bitratePolicy.ceilingBps)
         if (bitratePolicy.setThermalCap(cap)) bridge.setEncoderBitrate(bitratePolicy.current)
@@ -1263,7 +1475,17 @@ class CarLifeSession(
 
         /** moduleID голосового помощника в MODULE_STATUS (ModuleStatusManage: 4 = VR). */
         private const val MODULE_VR = 4
+
+        /** moduleID телефона в MODULE_STATUS (ModuleStatusManage: 1 = PHONE; 0 idle, 1 входящий, 2 исходящий/разговор). */
+        private const val MODULE_PHONE = 1
         private const val VR_ECHO_MS = 1500L
+
+        /** moduleID микрофона ГУ в MODULE_STATUS (ModuleStatusManage.setCarlifeModuleStatus(6, VOICE_MIC)). */
+        private const val MODULE_MIC = 6
+
+        /** Mobis CCNC: пустой VIDEO_DATA после >= 200 мс без видео (Baidu Recorder/VideoOutputThread), опрос чаще шага. */
+        private const val MOBIS_KEEPALIVE_MS = 200L
+        private const val MOBIS_KEEPALIVE_POLL_MS = 50L
 
         /** Поле time видеопакета: unix-секунды (Recorder.sendVideoData :930-962). */
         private fun unixSeconds() = (System.currentTimeMillis() / 1000).toInt()

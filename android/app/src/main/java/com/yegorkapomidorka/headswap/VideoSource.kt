@@ -27,6 +27,8 @@ class VideoSource(
     private val listener: Listener,
     /** Видимая часть кадра (SPS-кроп, h529): надпись рисуется только в ней, вне её фон. null = весь кадр. */
     private val area: Rect? = null,
+    /** Энкодер в формате Baidu (Mobis CCNC, h242): VBR, level 256, повтор кадра 100 мс. */
+    private val baidu: Boolean = false,
 ) {
     interface Listener {
         fun onConfig(csd: ByteArray)
@@ -58,14 +60,23 @@ class VideoSource(
         encoderName = c.name
         var s: Surface? = null
         try {
-            var fmt = format(withExtras = true)
-            try {
-                c.configure(fmt, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE)
-            } catch (e: Exception) {
-                AppLog.e("configure с profile/CBR не прошёл, пробую минимальный формат", e)
-                c.reset()
-                fmt = format(withExtras = false)
-                c.configure(fmt, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE)
+            if (baidu) {
+                // формат Baidu (h242): с level 256, при отказе без него, дальше обычная лесенка
+                var done = false
+                for (withLevel in listOf(true, false)) {
+                    try {
+                        c.configure(formatBaidu(withLevel), null, null, MediaCodec.CONFIGURE_FLAG_ENCODE)
+                        AppLog.i("заглушка: энкодер в формате Baidu ($width x $height ${fps}fps ${bitrate / 1000}kbps VBR${if (withLevel) ", level 256" else ", без level"})")
+                        done = true
+                        break
+                    } catch (e: Exception) {
+                        AppLog.e("configure в формате Baidu (${if (withLevel) "с level 256" else "без level"}) не прошёл", e)
+                        c.reset()
+                    }
+                }
+                if (!done) configureFallback(c)
+            } else {
+                configureFallback(c)
             }
             s = c.createInputSurface()
             c.start()
@@ -86,6 +97,31 @@ class VideoSource(
         running = true
         drainThread = Thread({ drainLoop(c) }, "video-enc-drain").also { it.start() }
         renderThread = Thread({ renderLoop() }, "video-render").also { it.start() }
+    }
+
+    private fun configureFallback(c: MediaCodec) {
+        try {
+            c.configure(format(withExtras = true), null, null, MediaCodec.CONFIGURE_FLAG_ENCODE)
+        } catch (e: Exception) {
+            AppLog.e("configure с profile/CBR не прошёл, пробую минимальный формат", e)
+            c.reset()
+            c.configure(format(withExtras = false), null, null, MediaCodec.CONFIGURE_FLAG_ENCODE)
+        }
+    }
+
+    /** Как Baidu MediaFormatUtils :41-60: Baseline, VBR, level 256 (AVCLevel3), I-frame 1 с, повтор кадра 100 мс. */
+    private fun formatBaidu(withLevel: Boolean): MediaFormat {
+        val f = MediaFormat.createVideoFormat(MIME, width, height)
+        f.setInteger(MediaFormat.KEY_COLOR_FORMAT, MediaCodecInfo.CodecCapabilities.COLOR_FormatSurface)
+        f.setInteger(MediaFormat.KEY_BIT_RATE, bitrate)
+        f.setInteger(MediaFormat.KEY_FRAME_RATE, fps)
+        f.setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, 1)
+        f.setLong(MediaFormat.KEY_REPEAT_PREVIOUS_FRAME_AFTER, 100_000L)
+        f.setInteger(MediaFormat.KEY_PROFILE, MediaCodecInfo.CodecProfileLevel.AVCProfileBaseline)
+        f.setInteger(MediaFormat.KEY_BITRATE_MODE, MediaCodecInfo.EncoderCapabilities.BITRATE_MODE_VBR)
+        if (withLevel) f.setInteger(MediaFormat.KEY_LEVEL, MediaCodecInfo.CodecProfileLevel.AVCLevel3)
+        f.setInteger(MediaFormat.KEY_MAX_B_FRAMES, 0)
+        return f
     }
 
     private fun format(withExtras: Boolean): MediaFormat {
