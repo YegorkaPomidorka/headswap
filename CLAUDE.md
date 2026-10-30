@@ -1,5 +1,17 @@
 # CLAUDE.md
 
+## Ticket workflow
+
+### Ticket isolation
+- Each session owns exactly ONE ticket (hNNN). At session start, state the ticket ID, the reporter's name/handle and their head unit. Re-confirm it before any message, build or log analysis.
+- Never message, build for, or act on another ticket's user (e.g. h319/@olya1305 vs h295) unless explicitly told to.
+- If the user says stop or do nothing, stop all actions immediately.
+
+### Research before building
+- Default for a new ticket: collect ALL logs, photos and videos, then analyze and report a diagnosis.
+- Do NOT build test APKs (hNNNtestN) or start implementing until the user explicitly says to build.
+- Before adding a new video mode or fix, check existing branches, commits and open PRs for overlap (`git log --all --oneline | grep -i <keyword>`, `gh pr list`).
+
 ## Как изменения попадают в main
 
 Репозиторий github.com/YegorkaPomidorka/headswap, владелец Егор. Порядок всегда один:
@@ -19,3 +31,18 @@
 Релиз, кроме сайта, выкладывается в GitHub Releases: оттуда приложение обновляется само (`update/UpdateLogic.kt`). Тег `vX.Y.Z`, файл `headswap-X.Y.Z.apk` (имя как на сайте), описание релиза приложение показывает перед установкой:
 `gh release create vX.Y.Z headswap-X.Y.Z.apk --repo YegorkaPomidorka/headswap --title "Headswap X.Y.Z" --notes-file <что нового>`
 Тестовые сборки на GitHub выкладывать только с `--prerelease`: последним релизом GitHub их не считает, приложение их не предложит.
+
+## Release
+
+### Release checklist
+- Certificates must be in app assets at `assets/aa/hur/` (NOT `assets/hur/`).
+- After building the signed APK, verify it before deploying: `unzip -l app.apk | grep assets/aa/hur` must list the cert files.
+- Before creating a GitHub release, run `gh release list` and check for drafts. If the release exists, publish it rather than create a new one.
+
+## Working conventions
+
+### Design & scope
+- For UI features, discuss the design first. Then show a real screen mockup in the Claude Design canvas, not an inline widget, before writing code.
+- Car-brand fixes (e.g. Honda cluster) apply to all models and channels of that brand unless told otherwise.
+- 'Install on phone' means adb install, not sending the APK via Telegram.
+- Take the user's hypotheses seriously and test them before arguing against them.
