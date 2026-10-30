@@ -39,3 +39,5 @@ Thumbs.db
 desktop.ini
 .claude/
 /research/
+# метки проверенных APK (verify-apk.ps1), по ним хук пускает деплой
+/.release/
