@@ -1288,10 +1288,11 @@ class CarLifeSession(
     /**
      * VW CNS2 Delphi 20082114 (h425, лог 2026-10-24): AA на статичном экране не шлёт кадров, через 6,4 с без видео ГУ
      * порвала USB (EIO), паузы до 5,1 с проходили. Вне PAUSE после [IDLE_HEARTBEAT_MS] без кадров шлём VIDEO_HEARTBEAT,
-     * как на PAUSE, и дальше с тем же шагом, пока AA молчит.
+     * как на PAUSE, и дальше с тем же шагом, пока AA молчит. Skoda CNS3 21290002 так же (h625, 2026-10-30: EIO через
+     * 5,7 с простоя AA).
      */
     private fun idleHeartbeat() {
-        if (!bridge.huVwCns2Delphi || !carlifeStarted || vFrames == 0L) return
+        if (!bridge.huIdleVideoHeartbeat || !carlifeStarted || vFrames == 0L) return
         val now = SystemClock.elapsedRealtime()
         if (now - lastVideoTx < IDLE_HEARTBEAT_MS) return
         if (!idleBeatLogged) {

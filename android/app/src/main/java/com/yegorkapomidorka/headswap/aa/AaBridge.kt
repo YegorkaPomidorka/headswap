@@ -197,6 +197,7 @@ class AaBridgeCore(
     private var naviShownSinceRaise = false   // Honda: после последнего NAVI=1 уже был SHOW (переход 0->1 приборкой «израсходован»)
     @Volatile var huVwBt1420 = false           // VW BT 1420 (Павел, канал 20082138): по воздуху без heartbeat на PAUSE рвёт CarLife через ~1 мин
     @Volatile var huVwCns2Delphi = false       // VW CNS2 Delphi 20082114 (h425): речь AA в голосовой сессии молчит в TTS, шлём в VR
+    @Volatile var huIdleVideoHeartbeat = false // 20082114 (h425), Skoda CNS3 21290002 (h625): без видео 5-6 с рвёт USB и вне PAUSE
     private var vrReply = false                // поток ответа ассистента открыт в канале VR (VR_INIT ушёл)
     @Volatile var huVw20082120 = false        // VW (STATISTIC_INFO channel 20082120 h93, 20082122 h222): без heartbeat рвёт USB через 3,7-5,6 с PAUSE
         private set
@@ -421,6 +422,7 @@ class AaBridgeCore(
         huMazda20622111 = false                // STATISTIC_INFO придёт заново в этой сессии
         huMobisNx4c = false                    // HU_INFO / STATISTIC_INFO придут заново в этой сессии
         huVwCns2Delphi = false                 // STATISTIC_INFO придёт заново в этой сессии
+        huIdleVideoHeartbeat = false           // STATISTIC_INFO придёт заново в этой сессии
         vrReply = false
         touchDecimator.reset()
         touchDecimationLogged = 1
@@ -702,7 +704,8 @@ class AaBridgeCore(
             log("BRIDGE ГУ Mazda 20622111: VIDEO_DATA режу на куски ≤ $MAZDA_20622111_MAX_VIDEO_PACKET Б, потолок ${MAZDA_20622111_CEILING_BPS / 1000} кбит/с", true)
         }
         if (channel == VW_20082120_CHANNEL || channel == VW_CNS3_20082122_CHANNEL || channel == VW_CNS3_20082134_CHANNEL ||
-            channel == VW_CNS2_20082114_CHANNEL) huVw20082120 = true
+            channel == VW_CNS2_20082114_CHANNEL || channel == SKODA_CNS3_21290002_CHANNEL) huVw20082120 = true
+        if (channel == VW_CNS2_20082114_CHANNEL || channel == SKODA_CNS3_21290002_CHANNEL) huIdleVideoHeartbeat = true
         if (channel == VW_CNS2_20082114_CHANNEL && !huVwCns2Delphi) {
             huVwCns2Delphi = true
             log("BRIDGE ГУ VW CNS2 Delphi 20082114: ответ ассистента в канал VR, антидребезг кнопки голоса", true)
@@ -2646,6 +2649,7 @@ class AaBridgeCore(
         const val VW_CNS3_20082122_CHANNEL = "20082122"   // VW CNS3 (Tharu и др.): рвёт USB через ~5,6 с PAUSE без heartbeat (h222)
         const val VW_CNS3_20082134_CHANNEL = "20082134"   // VW CNS3 Tiguan L Pro: рвёт CarLife по Wi-Fi через ~5,1-5,7 с PAUSE (h224)
         const val VW_CNS2_20082114_CHANNEL = "20082114"   // VW CNS2 Delphi (Tharu 2020): рвёт USB через 6-8 с PAUSE (h425)
+        const val SKODA_CNS3_21290002_CHANNEL = "21290002" // Skoda Octavia Pro CNS3: рвёт USB через 5-6 с PAUSE и статичного AA (h625)
         const val VW_20082138_CHANNEL = "20082138"        // VW ID: HU_INFO manufacturer=model="VW BT 1538" (h196), "VW BT 4370" (ID. UNYX)
         const val VW_BT_1420_MANUFACTURER = "VW BT 1420"  // VW (Павел): HU_INFO manufacturer=model, канал 20082138
         const val VW_20082128_CHANNEL = "20082128"        // VW ID.6 Crozz (24.10.2026): HU_INFO manufacturer=model="VW BT 9491", тот же лимит IDR
