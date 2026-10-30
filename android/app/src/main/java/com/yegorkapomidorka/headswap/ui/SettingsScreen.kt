@@ -911,13 +911,21 @@ class SettingsSectionScreen(host: MainActivity, val section: SettingsSection) : 
             background = c.rippleBg(if (selected) c.shape(c.clr(R.color.pric), 12) else null, 12)
             alpha = if (blocked) 0.45f else 1f
             isClickable = true
+            // силуэт экрана в пропорции режима, под ним пропорция цифрой
+            val label = rowLabel(m)
+            val (w, h) = label.split('×').map { it.trim().toIntOrNull() ?: 1 }.let { it[0] to it.getOrElse(1) { 1 } }
+            addView(c.vbox(3).apply {
+                gravity = Gravity.CENTER_HORIZONTAL
+                addView(View(c).apply { background = c.shape(0, 3, fg2, 1.5f) },
+                    LinearLayout.LayoutParams(c.dp(36), c.dp(36f * h / w)))
+                addView(c.text(ratioOf(m), 10f, 400, fg2))
+            }, LinearLayout.LayoutParams(c.dp(40), WRAP))
             addView(c.vbox(2).apply {
-                addView(c.text(rowLabel(m), 16f, 600, fg))
-                addView(c.text(ratioOf(m), 12f, 400, fg2))
-            }, LinearLayout.LayoutParams(c.dp(96), WRAP))
-            addView(c.text(if (blocked) c.getString(R.string.set_needs_transcode) else subOf(m), 13f, 400, fg2).apply {
-                maxLines = 2
-                ellipsize = TextUtils.TruncateAt.END
+                addView(c.text(label, 16f, 600, fg))
+                addView(c.text(if (blocked) c.getString(R.string.set_needs_transcode) else subOf(m), 13f, 400, fg2).apply {
+                    maxLines = 2
+                    ellipsize = TextUtils.TruncateAt.END
+                })
             }, lp(0, WRAP, 1f))
             if (selected) addView(c.icon(R.drawable.ic_check, 20, fg))
             setOnClickListener {
