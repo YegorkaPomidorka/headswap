@@ -801,7 +801,7 @@ class SettingsSectionScreen(host: MainActivity, val section: SettingsSection) : 
         if (names.isEmpty()) return null
         return names.groupBy({ it.substringBefore(' ') }, { it.substringAfter(' ', "") })
             .map { (brand, models) -> listOf(brand, models.filter { it.isNotEmpty() }.distinct().joinToString(", ")).filter { it.isNotEmpty() }.joinToString(" ") }
-            .joinToString(" · ")
+            .joinToString(", ")
     }
 
     /** Марка и модель без годов, поколений, рестайлов и двигателя: «Honda CR-V, 6 поколение, дорестайл» -> «Honda CR-V». */
