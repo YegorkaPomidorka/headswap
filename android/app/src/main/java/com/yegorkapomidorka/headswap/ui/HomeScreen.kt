@@ -215,6 +215,10 @@ class HomeScreen(host: MainActivity) : Screen(host) {
             // «Отправить лог» живёт внутри самодиагностики: на главном одна понятная вторая кнопка
             footer.addView(c.tonalButton(c.getString(R.string.diag_home_btn)).apply { setOnClickListener { host.showDiag() } })
         }
+        // настройки AA нужны не только для сервера ГУ: кнопка внизу в любом состоянии, если её уже нет (основная ведёт туда же)
+        if (st.primary == null && st.outline != OutlineAction.OPEN_AA) {
+            footer.addView(c.outlineButton(c.getString(R.string.home_btn_open_aa), R.drawable.ic_open).apply { setOnClickListener { Actions.openAaSettings(c) } })
+        }
         if (st.phase == Phase.RECONNECTING) updateGrace(st)
     }
 
