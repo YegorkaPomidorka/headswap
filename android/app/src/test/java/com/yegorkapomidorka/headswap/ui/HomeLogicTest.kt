@@ -21,10 +21,25 @@ class HomeLogicTest {
         hangs: Int = 0,
         worked: Boolean = false,
         refusedFresh: Boolean = false,
+        checking: Boolean = false,
     ) = Inputs(
         running, status, protocol, serverRunning, ended, graceLeft, 8, usbAudio, setupError, wireless = wireless,
-        refusedForMs = refusedMs, versionHangs = hangs, serverWorked = worked, refusedFresh = refusedFresh,
+        refusedForMs = refusedMs, versionHangs = hangs, serverWorked = worked, refusedFresh = refusedFresh, serverChecking = checking,
     )
+
+    @Test
+    fun checkingWhileAutoProbeRuns() {
+        // проба при открытии идёт, итога ещё нет: не «Проверьте», а «Проверяю», без кнопок
+        val s = HomeLogic.compute(inp(checking = true))
+        assertEquals(UiText.res(R.string.home_title_checking), s.title)
+        assertEquals(StageState.ACTIVE to UiText.res(R.string.home_stage_checking), s.stages[0].second)
+        assertEquals(null, s.primary)
+        // прошлый итог пробы важнее: пока идёт повторная, экран не мигает
+        assertEquals(UiText.res(R.string.home_title_ready), HomeLogic.compute(inp(checking = true, serverRunning = true)).title)
+        assertEquals(Phase.OFF, HomeLogic.compute(inp(checking = true, serverRunning = false)).phase)
+        // мост важнее пробы
+        assertEquals(Phase.WAITING, HomeLogic.compute(inp(checking = true, running = true, status = "мост: жду кабель")).phase)
+    }
 
     @Test
     fun errorWhenCertificateMissing() {

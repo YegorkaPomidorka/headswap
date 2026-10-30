@@ -7,6 +7,7 @@ import com.yegorkapomidorka.headswap.CarLifeState
 import com.yegorkapomidorka.headswap.R
 import com.yegorkapomidorka.headswap.aa.AaCreds
 import com.yegorkapomidorka.headswap.aa.AaPrefs
+import com.yegorkapomidorka.headswap.aa.AaServerCheck
 import com.yegorkapomidorka.headswap.aa.AaServerWatch
 import com.yegorkapomidorka.headswap.aa.AaState
 
@@ -45,7 +46,7 @@ class Inputs(
     val bridgeRunning: Boolean,
     val aaStatus: String,
     val protocolKnown: Boolean,
-    /** Сервер ГУ AA запущен по его уведомлению; null - доступа к уведомлениям нет, не знаем. */
+    /** Сервер ГУ AA запущен: по его уведомлению или по автопробе при открытии экрана; null - не знаем. */
     val serverRunning: Boolean? = null,
     /** Подключённая сессия закончилась (обрыв USB или «Стоп»), AA закрыта штатно: сервер ГУ должен был остаться. */
     val ended: Boolean,
@@ -66,6 +67,8 @@ class Inputs(
     val serverWorked: Boolean = false,
     /** Отказ не в окне ~10 с после закрытия нашей сессии: на свежем старте моста сервер ГУ не запущен, ждать нечего. */
     val refusedFresh: Boolean = false,
+    /** Идёт автопроба сервера ГУ (короткая сессия AA, ~1 с). */
+    val serverChecking: Boolean = false,
 )
 
 object HomeLogic {
@@ -175,7 +178,15 @@ object HomeLogic {
                 outline = OutlineAction.OPEN_AA,
                 notifText = UiText.res(R.string.notif_server_started),
             )
-            // доступа к уведомлениям нет: запущен ли сервер ГУ, не знаем
+            i.serverChecking -> state(
+                Phase.WAITING, Tone.PRI, HeroIcon.POWER, UiText.res(R.string.home_title_checking), UiText.res(R.string.home_sub_checking),
+                listOf(
+                    StageState.ACTIVE to UiText.res(R.string.home_stage_checking), StageState.PEND to NONE, StageState.PEND to NONE,
+                    StageState.PEND to NONE, StageState.PEND to NONE,
+                ),
+                notifText = UiText.res(R.string.home_title_checking),
+            )
+            // ни уведомление, ни проба не сказали, запущен ли сервер ГУ
             else -> unknownState()
         }
     }
@@ -259,6 +270,7 @@ object HeadswapStatus {
     /** Пользователь нажал «Открыть Android Auto» (идёт включать сервер ГУ): снимаем «Машина отключена». Запущен ли сервер, говорит AaServerWatch. */
     fun markServerRequested() {
         ended = false
+        AaServerCheck.forgetAuto()
     }
 
     fun inputs(ctx: Context): Inputs {
@@ -272,6 +284,7 @@ object HeadswapStatus {
             ended = false
             sawConnected = false
             connectedSince = 0
+            AaServerCheck.forgetAuto()      // после поездки сервер мог упасть: итог пробы до неё больше не верен
         }
         if (connectedNow || reconnectingNow) sawConnected = true
         if (connectedNow) {
@@ -303,7 +316,8 @@ object HeadswapStatus {
             bridgeRunning = running,
             aaStatus = st,
             protocolKnown = CarLifeState.protocol != "-",
-            serverRunning = AaServerWatch.running,
+            serverRunning = AaServerWatch.running ?: AaServerCheck.autoRunning,
+            serverChecking = AaServerCheck.autoBusy,
             ended = ended,
             graceLeftS = left,
             graceTotalS = graceTotalS,

@@ -255,7 +255,7 @@ class AaServerCheckTest {
     @Test
     fun classifyHandshakeOutcomes() {
         val c = AaSessionProbe.Companion
-        assertEquals(ProbeResult.ALIVE, c.classify(null, true, true, "проба: SDR получен"))
+        assertEquals(ProbeResult.ALIVE, c.classify(null, true, true, "проба: сессия отработала"))
         assertEquals(ProbeResult.HUNG, c.classify(null, true, false, "нет VERSION_RESPONSE. Если соединение открыто, но тишина: сервер ГУ завис"))
         assertEquals(ProbeResult.HUNG, c.classify(null, true, false, "TLS handshake: таймаут"))
         assertEquals("сервер сразу закрыл соединение (h224): не утверждаем, что он умер", ProbeResult.ERROR, c.classify(null, true, false, "peer closed: телефон закрыл соединение (EOF)"))
@@ -268,7 +268,7 @@ class AaServerCheckTest {
 
     private fun probe(port: Int) = AaSessionProbe(
         loadCreds = { creds }, sd = { AapSdOptions() }, log = { l, _ -> logs.add(l) },
-        port = port, sdrWaitMs = 1500,
+        port = port, holdMs = 300,
     )
 
     @Test

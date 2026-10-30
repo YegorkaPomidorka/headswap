@@ -20,6 +20,7 @@ import com.yegorkapomidorka.headswap.AppTheme
 import com.yegorkapomidorka.headswap.CarLifeState
 import com.yegorkapomidorka.headswap.MainActivity
 import com.yegorkapomidorka.headswap.R
+import com.yegorkapomidorka.headswap.aa.AaServerCheck
 import com.yegorkapomidorka.headswap.update.Updater
 
 /** Главный экран «Готов к поездке» (Main.dc.html): шесть состояний, этапы, кнопки; сверху плашка обновления. */
@@ -73,6 +74,7 @@ class HomeScreen(host: MainActivity) : Screen(host) {
     override fun onShow() {
         lastState = null
         updKey = null
+        AaServerCheck.wantAuto()       // без доступа к уведомлениям AA проверяем сервер ГУ короткой сессией
         tick()
     }
 
@@ -91,6 +93,7 @@ class HomeScreen(host: MainActivity) : Screen(host) {
 
     override fun tick() {
         refreshUpdate()
+        AaServerCheck.autoTick(ctx)
         val st = HeadswapStatus.current(ctx)
         val wl = wirelessLine()
         if (st == lastState && wl == lastWireless) return

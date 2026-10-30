@@ -10,6 +10,7 @@
     <string name="home_title_server_down">Head unit server not responding</string>
     <string name="home_title_ready">Ready for the trip</string>
     <string name="home_title_unknown">Check the head unit server</string>
+    <string name="home_title_checking">Checking the head unit server</string>
 
     <!-- Home screen: hero subtitles -->
     <string name="home_err_no_cert">No head unit certificate in the app build.</string>
@@ -24,6 +25,7 @@
     <string name="home_sub_server_down">Android closed the head unit server. Turn it on again: Android Auto → ⋮ → “Start head unit server”.</string>
     <string name="home_sub_ready">Connect the phone to the head unit with a USB cable.</string>
     <string name="home_sub_unknown">Headswap cannot tell whether the server is running. In Android Auto → ⋮: if you see “Stop head unit server”, it is running; if you see “Start head unit server”, turn it on. To let Headswap see this by itself, allow notification access.</string>
+    <string name="home_sub_checking">A couple of seconds: Headswap briefly connects to Android Auto.</string>
     <string name="home_sub_parked_unknown">Next trip: connect the cable. If Android Auto does not appear, check the head unit server: Android Auto → ⋮.</string>
 
     <!-- Home screen: how to start the head unit server (bold = what to tap) -->
@@ -55,6 +57,7 @@
     <string name="home_stage_started">started</string>
     <string name="home_stage_wait_cable">waiting for cable</string>
     <string name="home_stage_unknown">not checked</string>
+    <string name="home_stage_checking">checking</string>
 
     <!-- Home screen: widgets -->
     <string name="home_settings">Settings</string>

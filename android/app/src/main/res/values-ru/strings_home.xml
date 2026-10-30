@@ -10,6 +10,7 @@
     <string name="home_title_server_down">Сервер ГУ не отвечает</string>
     <string name="home_title_ready">Готов к поездке</string>
     <string name="home_title_unknown">Проверьте сервер ГУ</string>
+    <string name="home_title_checking">Проверяю сервер ГУ</string>
 
     <!-- Главный экран: подзаголовки -->
     <string name="home_err_no_cert">Нет сертификата head unit: положите cert.pem и key.pem в app/src/main/assets/aa/jvc/ (см. README)</string>
@@ -24,6 +25,7 @@
     <string name="home_sub_server_down">Android закрыл сервер ГУ. Включите его снова: Android Auto → ⋮ → «Вкл. сервер головного устр-ва».</string>
     <string name="home_sub_ready">Подключите телефон к магнитоле кабелем.</string>
     <string name="home_sub_unknown">Headswap не видит, запущен ли сервер. В Android Auto → ⋮: если есть «Остановить сервер ГУ» — он запущен, если «Вкл. сервер головного устр-ва» — включите. Чтобы Headswap видел сам, разрешите доступ к уведомлениям.</string>
+    <string name="home_sub_checking">Пара секунд: Headswap коротко подключается к Android Auto.</string>
     <string name="home_sub_parked_unknown">Следующая поездка — подключите кабель. Если Android Auto не появится, проверьте сервер ГУ: Android Auto → ⋮.</string>
 
     <!-- Главный экран: как запустить сервер ГУ (жирное - то, что нажать) -->
@@ -54,6 +56,7 @@
     <string name="home_stage_started">запущен</string>
     <string name="home_stage_wait_cable">ждём кабель</string>
     <string name="home_stage_unknown">не проверен</string>
+    <string name="home_stage_checking">проверяю</string>
 
     <!-- Главный экран: элементы -->
     <string name="home_settings">Настройки</string>
