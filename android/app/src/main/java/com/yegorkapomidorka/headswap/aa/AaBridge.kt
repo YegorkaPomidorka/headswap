@@ -1885,6 +1885,10 @@ class AaBridgeCore(
     private val latStats = LatencyStats()
     private var spliceLastSentAt = NEVER               // когда свой IDR последний раз ушёл на ГУ
     private var spliceMisses = 0                       // картинка не пришла из декодера, подряд
+    private var spliceBackoffUntil = NEVER             // пауза после [SPLICE_MAX_MISSES] пропусков: до этого момента свой IDR не пробуем
+    private var spliceBackoffs = 0                     // сколько таких пауз за AA-сессию
+    private var refLagSince = NEVER                    // с какого момента декодер отстаёт от кадров AA больше чем на 2 и не двигается
+    private var refLagOutSeq = 0L                      // refOutSeq в начале этого отставания: сдвинулся - декодер жив
     private var spliceDisabled: String? = null          // вставка невозможна до конца AA-сессии (причина)
     private var aaFrameGapMs = Long.MAX_VALUE          // пауза перед последним кадром AA
     private var builder: IdrBuilder? = null
@@ -1898,9 +1902,13 @@ class AaBridgeCore(
 
     private val spliceOn: Boolean get() = spliceMs > 0 && !transcodeEnabled
 
-    /** Свой IDR реально возможен: декодер уже отдал картинку, поток подходит. Тогда повторный IDR от AA (встряска) не нужен. */
-    private val spliceWorks: Boolean
-        get() = spliceOn && spliceDisabled == null && refDecoder != null && refPicSeq > 0 && splicer?.blocker() == null
+    /**
+     * Свой IDR реально возможен: декодер уже отдал картинку, поток подходит, пауза после пропусков кончилась. Тогда
+     * повторный IDR от AA (встряска) не нужен. Пока паузы или вставший декодер - false: h529 и h295 работают как страховка.
+     */
+    internal val spliceWorks: Boolean
+        get() = spliceOn && spliceDisabled == null && refDecoder != null && refPicSeq > 0 &&
+            clockMs() >= spliceBackoffUntil && splicer?.blocker() == null
 
     /** Кадр AA через splicer (frame_num/POC после своего IDR) и в декодер опорных картинок. */
     private fun spliceTrack(b: ByteArray): ByteArray {
@@ -1947,7 +1955,7 @@ class AaBridgeCore(
         if (splicePendingSeq != 0L || spliceDisabled != null || !carlifeStarted || active != Source.AA) return false
         val sp = splicer ?: return false
         if (refDecoder == null || sp.seq == 0L || sp.seq - refOutSeq > 2) return false     // декодер отстал или ждёт IDR
-        if (now < spliceNotBefore) return false
+        if (now < spliceNotBefore || now < spliceBackoffUntil) return false
         if (gotIdr && now - lastIdrSentMs < spliceMs) return false
         val why = sp.blocker()
         if (why != null) {
@@ -1959,7 +1967,12 @@ class AaBridgeCore(
         return true
     }
 
+    /**
+     * Раз в 0.5 с. Пропуски картинки из декодера ([SPLICE_MAX_MISSES] подряд) вставку не выключают: пауза [SPLICE_BACKOFF_MS]
+     * и новая попытка (телефон мог просто притормозить), пока пауза - [spliceWorks] false. Вставший декодер перезапускается.
+     */
     private fun spliceTick(now: Long) {
+        spliceCheckStall(now)
         // выброс начат, а следующего кадра AA нет (экран встал): выброшенные уходят, на статике очередь ГУ уходит и так
         if (spliceDropped.isNotEmpty() && now - spliceDroppedAt > SPLICE_QUIET_MS) spliceFlushDropped()
         val seq = splicePendingSeq
@@ -1968,7 +1981,14 @@ class AaBridgeCore(
             spliceStats.noPicture++
             spliceNotBefore = now + SPLICE_RETRY_MS
             spliceCancel(null)
-            if (++spliceMisses >= SPLICE_MAX_MISSES) spliceDisable("картинка из декодера не пришла $spliceMisses раз подряд")
+            if (++spliceMisses >= SPLICE_MAX_MISSES) {
+                spliceBackoffs++
+                log("BRIDGE свой IDR: картинка из декодера не пришла $spliceMisses раз подряд, пауза $SPLICE_BACKOFF_MS мс, потом снова " +
+                    "(пауз за сессию $spliceBackoffs)", true)
+                spliceMisses = 0
+                spliceBackoffUntil = now + SPLICE_BACKOFF_MS
+                spliceNotBefore = spliceBackoffUntil
+            }
         } else if (seq != 0L && spliceHold && now - splicePendingAt > SPLICE_HOLD_MAX_MS) {
             // сборка не успела: кадры AA уходят, IDR по готовности выбрасывается (splicePendingSeq сброшен)
             spliceStats.holdTimeout++
@@ -1978,6 +1998,35 @@ class AaBridgeCore(
             spliceRequest(fromFrame = false)
         }
         spliceStats.logIfDue(now, builder?.qp)
+    }
+
+    /**
+     * Декодер встал: кадры AA идут, а его вывод не двигается и отстаёт больше чем на 2 дольше [SPLICE_STALL_MS]. Без этого
+     * своего IDR нет, а [spliceWorks] (картинка когда-то была) глушил бы h295. Декодер останавливается, новый создаст
+     * [spliceTrack] на следующем кадре AA; ему нужен IDR от AA, до него картинок нет ([refPicSeq] 0, [spliceWorks] false).
+     * Пока вывода у нового декодера не было ([refOutSeq] 0), он просто ждёт IDR - не вставший, повторно не перезапускаем.
+     * AA молчит дольше [SPLICE_STALL_IDLE_MS] (статика, декодер держит последние кадры) - отсчёт идёт заново.
+     */
+    private fun spliceCheckStall(now: Long) {
+        val sp = splicer
+        if (sp == null || refDecoder == null || spliceDisabled != null || refOutSeq == 0L || sp.seq - refOutSeq <= 2) {
+            refLagSince = NEVER
+            return
+        }
+        if (refLagSince == NEVER || refOutSeq != refLagOutSeq || now - lastAaFrameAt > SPLICE_STALL_IDLE_MS) {
+            refLagSince = now
+            refLagOutSeq = refOutSeq
+            return
+        }
+        if (now - refLagSince < SPLICE_STALL_MS) return
+        log("BRIDGE свой IDR: декодер встал ${now - refLagSince} мс, перезапускаю", true)
+        refDecoder?.stop()
+        refDecoder = null                       // refDecoderFailed не трогаем: фабрика вернёт null - тогда он станет true, как при старте
+        refPicSeq = 0
+        refOutSeq = 0
+        refPic = null
+        refLagSince = NEVER
+        spliceCancel(null)
     }
 
     override fun wantsRefPicture(seq: Long): Boolean {
@@ -2136,6 +2185,9 @@ class AaBridgeCore(
         refDecoderFailed = false
         spliceDisabled = null
         spliceMisses = 0
+        spliceBackoffUntil = NEVER
+        spliceBackoffs = 0
+        refLagSince = NEVER
         spliceLastSentAt = NEVER
         spliceLastSeq = 0
         refOutSeq = 0
@@ -2624,7 +2676,10 @@ class AaBridgeCore(
         const val SPLICE_HOLD_MAX_MS = 250L      // дольше кадры AA не держим: отпускаем, IDR по готовности выбрасывается
         const val SPLICE_SLICES = 4              // слайсов в сжатом IDR: собираются параллельно
         const val SPLICE_STATS_MS = 30_000L
-        const val SPLICE_MAX_MISSES = 3          // таймаутов картинки подряд - вставка выключается до конца AA-сессии
+        const val SPLICE_MAX_MISSES = 3          // таймаутов картинки подряд - пауза [SPLICE_BACKOFF_MS] и новая попытка
+        const val SPLICE_BACKOFF_MS = 5000L      // пауза своего IDR после [SPLICE_MAX_MISSES] пропусков (spliceWorks в ней false)
+        const val SPLICE_STALL_MS = 3000L        // декодер опорных картинок не двигается при идущих кадрах AA дольше - перезапуск
+        const val SPLICE_STALL_IDLE_MS = 1000L   // AA молчит дольше - кадров нет, декодер вставшим не считаем
         const val SPLICE_KICK_GRACE_MS = 1500L   // h529-повтор IDR от AA откладывается на столько, если свой IDR вот-вот уйдёт
         const val SPLICE_RETRY_MS = 1000L        // пауза между попытками (без IDR на ГУ, после отказа, пропуска, таймаута)
 
