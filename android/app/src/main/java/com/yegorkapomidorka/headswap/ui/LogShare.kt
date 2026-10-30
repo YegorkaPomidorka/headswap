@@ -72,7 +72,8 @@ class LogProvider : ContentProvider() {
 }
 
 object LogShare {
-    const val AUTHORITY = "com.yegorkapomidorka.headswap.logs"
+    // в манифесте authority = ${applicationId}.logs: у варианта smoke свой id, иначе две установки конфликтуют
+    const val AUTHORITY = BuildConfig.APPLICATION_ID + ".logs"
     private const val MAX_FILE_BYTES = 4L * 1024 * 1024
     private const val MAX_LOGS = 5
     private const val WL_MARK = " WL "

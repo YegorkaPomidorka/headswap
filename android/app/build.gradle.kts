@@ -47,6 +47,21 @@ android {
             isMinifyEnabled = false
             signingConfig = signingConfigs.findByName("release")
         }
+        // smoke-тест перед релизом: debug-сборка с другим applicationId, ставится на телефон рядом с release (настройки release не трогаем)
+        create("smoke") {
+            initWith(getByName("debug"))
+            applicationIdSuffix = ".smoke"
+            versionNameSuffix = "-smoke"
+            matchingFallbacks += listOf("debug")
+        }
+    }
+
+    sourceSets {
+        // debug-транспорт для эмулятора ГУ (DebugTransport) и exported BridgeService; в smoke берём debug-набор целиком
+        getByName("smoke") {
+            kotlin.srcDir("src/debug/java")
+            manifest.srcFile("src/debug/AndroidManifest.xml")
+        }
     }
 
     compileOptions {
