@@ -871,28 +871,10 @@ class SettingsSectionScreen(host: MainActivity, val section: SettingsSection) : 
             }, lp(MATCH, WRAP))
             for (m in modes) list.addView(resRow(m, m == selected), lp(MATCH, WRAP).margins(c, 6, 0, 6, 0))
         }
-        val acc = c.clr(R.color.acc)
-        val custom = c.hbox(12).apply {
-            pad(c, 16, 0, 14, 0)
-            background = c.rippleBg(null, 0)
-            isClickable = true
-            addView(c.icon(R.drawable.ic_terminal, 20, acc))
-            addView(c.text(c.getString(R.string.dev_custom_res_title), 15f, 600, acc).apply {
-                maxLines = 1
-                ellipsize = TextUtils.TruncateAt.END
-            }, lp(0, WRAP, 1f))
-            addView(c.icon(R.drawable.ic_chevron, 20, acc))
-            setOnClickListener {
-                resPopup?.dismiss()
-                host.showDev()      // своё разрешение задаётся в разделе для разработчиков
-            }
-        }
         val content = c.vbox().apply {
             background = c.shape(c.clr(R.color.surf2), 16)
             clipToOutline = true
             addView(ScrollView(c).apply { addView(list) }, lp(MATCH, 0, 1f))
-            addView(View(c).apply { setBackgroundColor(c.clr(R.color.line)) }, lp(MATCH, c.dp(1)))
-            addView(custom, c.lpDp(MATCH, 48))
         }
         // высота: весь список или место под полем (не меньше 280 dp: тогда PopupWindow сам прокрутит экран к полю)
         content.measure(View.MeasureSpec.makeMeasureSpec(anchor.width, View.MeasureSpec.EXACTLY), View.MeasureSpec.UNSPECIFIED)
