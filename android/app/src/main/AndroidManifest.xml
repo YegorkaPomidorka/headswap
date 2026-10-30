@@ -95,7 +95,7 @@
         <!-- раздача логов и отчётов через «Поделиться» (только чтение, без AndroidX FileProvider) -->
         <provider
             android:name=".ui.LogProvider"
-            android:authorities="com.yegorkapomidorka.headswap.logs"
+            android:authorities="${applicationId}.logs"
             android:exported="false"
             android:grantUriPermissions="true" />
 
