@@ -695,12 +695,12 @@ class CarLifeSession(
             // h529: в passthrough с SPS-кропом заглушка в кадре AA с теми же полями, ГУ не видит смены размера на AA.
             // На воздухе тоже: с галкой «И по Wi-Fi» там passthrough (stubInAaGeometry сам проверяет перекодирование)
             val mobis = bridge.huMobisNx4c
-            stubCropped = !mobis && bridge.stubInAaGeometry
-            val s = if (mobis) {
-                VideoSource(pendingW, pendingH, AaBridgeCore.MOBIS_FPS, mobisStubCeiling.current, this, baidu = true)
-            } else if (stubCropped) {
+            stubCropped = bridge.stubInAaGeometry
+            val s = if (stubCropped) {
                 val (x, y) = bridge.spsCropOrigin
                 VideoSource(mode.aaW, mode.aaH, pendingFps, stubBps, this, Rect(x, y, x + mode.outW, y + mode.outH))
+            } else if (mobis) {
+                VideoSource(pendingW, pendingH, AaBridgeCore.MOBIS_FPS, mobisStubCeiling.current, this, baidu = true)
             } else {
                 VideoSource(pendingW, pendingH, pendingFps, if (air) bitratePolicy.current else stubBps, this)
             }

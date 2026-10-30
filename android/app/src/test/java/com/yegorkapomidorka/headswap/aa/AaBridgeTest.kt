@@ -134,7 +134,7 @@ class AaBridgeCoreTest {
         core.transcodeEnabled = false
         core.onHuInfo("Mobis", "CCNC", "NX4C", "CCNC")
         assertTrue(core.huMobisNx4c)
-        assertTrue(core.transcodeEnabled)
+        assertFalse(core.transcodeEnabled)                   // 3.0.0-beta2: проброс не отключаем
         assertEquals(1, logs.count { it == "MOBIS CCNC: режим Baidu включён" })
         core.onHuStatistic("20022188")                        // повторно не пишет строку
         assertEquals(1, logs.count { it == "MOBIS CCNC: режим Baidu включён" })

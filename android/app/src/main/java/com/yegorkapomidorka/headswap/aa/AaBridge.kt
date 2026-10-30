@@ -647,11 +647,7 @@ class AaBridgeCore(
         if (manufacturer == PIONEER_MANUFACTURER && model == PIONEER_RM56_MODEL) {
             if (!huPioneerRm56) log("BRIDGE ГУ Pioneer RM56E8B: потолок ${PIONEER_RM56_CEILING_BPS / 1000} кбит/с, fps ≤ $PIONEER_RM56_MAX_FPS", true)
             huPioneerRm56 = true
-            // в passthrough потолок и fps не работают (h277 test1); BridgeService вернёт поле к настройке на следующей сессии
-            if (!transcodeEnabled) {
-                transcodeEnabled = true
-                log("BRIDGE ГУ Pioneer RM56E8B: passthrough отключаю, перекодирование принудительно", true)
-            }
+            // в passthrough потолок и fps не работают (h277 test1); 3.0.0-beta2: перекодирование всё равно не навязываем
         }
     }
 
@@ -664,10 +660,8 @@ class AaBridgeCore(
         if (huMobisNx4c) return
         huMobisNx4c = true
         log("MOBIS CCNC: режим Baidu включён", true)
-        if (!transcodeEnabled) {
-            transcodeEnabled = true
-            log("BRIDGE ГУ Mobis CCNC: passthrough отключаю, перекодирование принудительно", true)
-        }
+        // 3.0.0-beta2: перекодирование не навязываем, проверяем проброс на Mobis
+        if (!transcodeEnabled) log("BRIDGE ГУ Mobis CCNC: прямой проброс (бета, без принудительного перекодирования)", true)
     }
 
     private var vwIdName: String? = null       // HU_INFO manufacturer = BT-имя ГУ ("VW BT NNNN", цифры свои у каждой машины)
