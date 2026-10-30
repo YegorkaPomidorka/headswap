@@ -140,17 +140,28 @@ class SpsCropTest {
     fun geometrySpsCropable() {
         for (m in listOf(VideoMode.WIDE, VideoMode.WIDE_MID, VideoMode.WIDE_HD, VideoMode.WIDE_640, VideoMode.WIDE_2_1, VideoMode.R1024)) {
             assertTrue(m.name, m.spsCropable)
-            assertSame(m, m.effective(transcode = false, spsCrop = true))
-            assertSame(VideoMode.R720, m.effective(transcode = false, spsCrop = false))
+            // кроп всегда включён: в passthrough режим остаётся как есть
+            assertSame(m, m.effective(transcode = false))
+            assertSame(m, m.effective(transcode = true))
         }
         assertTrue(VideoMode.WIDE_836.spsCropable)
-        assertSame(VideoMode.WIDE_836, VideoMode.WIDE_836.effective(transcode = false, spsCrop = true))
-        assertFalse(VideoMode.WIDE_976.spsCropable)
-        assertSame(VideoMode.R720, VideoMode.WIDE_976.effective(transcode = false, spsCrop = true))
+        assertSame(VideoMode.WIDE_836, VideoMode.WIDE_836.effective(transcode = false))
         assertFalse(VideoMode.R1080.spsCropable)
-        assertSame(VideoMode.R1080, VideoMode.R1080.effective(transcode = false, spsCrop = true))
+        assertSame(VideoMode.R1080, VideoMode.R1080.effective(transcode = false))
         // своё 1:1 с полями - можно, со масштабом - нет
         assertTrue(CustomVideoMode(1920, 640).spsCropable)
+        assertEquals(CustomVideoMode(1920, 640), CustomVideoMode(1920, 640).effective(transcode = false))
         assertFalse(CustomVideoMode(2240, 976).spsCropable)
+        assertSame(VideoMode.R720, CustomVideoMode(2240, 976).effective(transcode = false))
+    }
+
+    @Test
+    fun tiguanWide976BecomesWide836InPassthrough() {
+        // WIDE_976 масштабирует область 1920x836 -> 2240x976, SPS-кропом не режется: в passthrough та же полоса 1:1
+        assertFalse(VideoMode.WIDE_976.spsCropable)
+        assertSame(VideoMode.WIDE_836, VideoMode.WIDE_976.effective(transcode = false))
+        assertSame(VideoMode.WIDE_976, VideoMode.WIDE_976.effective(transcode = true))
+        assertEquals("1920×836", VideoMode.WIDE_976.effective(transcode = false).outLabel)
+        assertEquals("2240×976", VideoMode.WIDE_976.effective(transcode = true).outLabel)
     }
 }

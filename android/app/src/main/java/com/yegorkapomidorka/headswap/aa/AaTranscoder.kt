@@ -40,6 +40,8 @@ class AaTranscoder(
     private val srcWidth: Int = width,
     private val srcHeight: Int = height,
     private val crop: VideoCrop = VideoCrop.NONE,
+    /** Энкодер как у Baidu (MediaFormatUtils :41-60): Baseline, level 256 (AVCLevel3), VBR, I-frame 1 с, повтор кадра 100 мс; fps и битрейт задаёт вызывающий. */
+    private val baidu: Boolean = false,
 ) : VideoTranscoder {
     private var encoder: MediaCodec? = null
     private var surface: Surface? = null
@@ -98,11 +100,15 @@ class AaTranscoder(
         encoderName = c.name
         var configured = false
         var lastErr: Exception? = null
-        for (level in 0..2) {
+        // Baidu-формат: сначала с level 256, при отказе без него (с записью в лог), дальше обычная лесенка
+        val levels = if (baidu) listOf(BAIDU_WITH_LEVEL, BAIDU_NO_LEVEL, 0, 1, 2) else listOf(0, 1, 2)
+        for ((attempt, level) in levels.withIndex()) {
             try {
-                if (level > 0) c.reset()
+                if (attempt > 0) c.reset()
                 c.configure(format(level), null, null, MediaCodec.CONFIGURE_FLAG_ENCODE)
                 encoderNote = when (level) {
+                    BAIDU_WITH_LEVEL -> "baidu: baseline+level256+VBR+repeat100ms"
+                    BAIDU_NO_LEVEL -> "baidu: baseline+VBR+repeat100ms, без level"
                     0 -> "baseline+CBR+noB+repeat100ms+realtime"
                     1 -> "baseline+CBR+noB+repeat100ms"
                     else -> "минимальный формат+repeat100ms"
@@ -204,6 +210,15 @@ class AaTranscoder(
         // как у Baidu (Recorder.java:1364, MediaFormatUtils.java:48): на статичном экране кадр повторяется раз в 100 мс
         val repeat = Regex("""repeat=(\d+)""").find(tuning)?.groupValues?.get(1)?.toLong() ?: REPEAT_AFTER_US
         f.setLong(MediaFormat.KEY_REPEAT_PREVIOUS_FRAME_AFTER, repeat)
+        if (level == BAIDU_WITH_LEVEL || level == BAIDU_NO_LEVEL) {
+            f.setInteger(MediaFormat.KEY_PROFILE, MediaCodecInfo.CodecProfileLevel.AVCProfileBaseline)
+            f.setInteger(MediaFormat.KEY_BITRATE_MODE, MediaCodecInfo.EncoderCapabilities.BITRATE_MODE_VBR)
+            if (level == BAIDU_WITH_LEVEL) f.setInteger(MediaFormat.KEY_LEVEL, MediaCodecInfo.CodecProfileLevel.AVCLevel3)
+            f.setInteger(MediaFormat.KEY_MAX_B_FRAMES, 0)
+            f.setInteger(MediaFormat.KEY_PRIORITY, 0)
+            if (Build.VERSION.SDK_INT >= 30) f.setInteger(MediaFormat.KEY_LOW_LATENCY, 1)
+            return f
+        }
         if (level <= 1 && !tuning.contains("nobase")) {
             f.setInteger(MediaFormat.KEY_PROFILE, MediaCodecInfo.CodecProfileLevel.AVCProfileBaseline)
             // VBR: на растворении логотипа AA в карты CBR c2.qti выдавал P-кадры до 129 КБ (~4x к исходнику AA, ~850 КБ за 0,3 с)
@@ -585,6 +600,10 @@ class AaTranscoder(
     companion object {
         const val MIME = "video/avc"
         const val REPEAT_AFTER_US = 100_000L
+
+        /** Попытки configure в Baidu-формате: с KEY_LEVEL=AVCLevel3 (256) и без него. */
+        private const val BAIDU_WITH_LEVEL = -2
+        private const val BAIDU_NO_LEVEL = -1
 
         /** Реле перерисовывает последний кадр, если новых нет столько мс (как repeat-previous-frame-after у Baidu). */
         const val REDRAW_IDLE_MS = 100L

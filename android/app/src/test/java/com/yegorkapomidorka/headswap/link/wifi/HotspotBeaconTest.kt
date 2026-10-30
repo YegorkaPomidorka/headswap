@@ -58,6 +58,19 @@ class HotspotBeaconTest {
     }
 
     @Test
+    fun hotspotNames() {
+        // h420: Xiaomi/Qualcomm держит хотспот на wlan1; wlan0 - всегда STA
+        for (n in listOf("swlan0", "ap0")) assertTrue(n, HotspotDetect.apIface(n, emptySet()))
+        for (n in listOf("swlan0", "ap0")) assertTrue("$n без данных о STA", HotspotDetect.apIface(n, null))
+        assertTrue(HotspotDetect.apIface("wlan1", emptySet()))
+        assertTrue(HotspotDetect.apIface("wlan2", setOf("wlan0")))
+        assertFalse("wlan1 - второй STA (сеть машины)", HotspotDetect.apIface("wlan1", setOf("wlan0", "wlan1")))
+        assertFalse("STA неизвестны: wlan1 не трогаем", HotspotDetect.apIface("wlan1", null))
+        assertFalse(HotspotDetect.apIface("wlan0", emptySet()))
+        for (n in listOf("rmnet_data0", "p2p-wlan0-0", "lo", "eth0", "wlan")) assertFalse(n, HotspotDetect.apIface(n, emptySet()))
+    }
+
+    @Test
     fun codec() {
         assertArrayEquals("CarlifeHost".toByteArray(), BeaconCodec.BEACON)
         val probe = """{"carlifehost":"carlife","deviceInfo":{}}""".toByteArray()

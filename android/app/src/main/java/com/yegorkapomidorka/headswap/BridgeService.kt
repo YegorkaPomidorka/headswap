@@ -828,7 +828,7 @@ class BridgeService : Service() {
         // режим фиксируется на подключение (SDR уже ушёл). Сервер ГУ одноразовый, а перезапустить его теперь некому
         // (службы спецвозможностей нет), поэтому живую AA с другой геометрией или DPI не закрываем: работаем со старым режимом
         val chosenGeometry = aaPrefs.videoGeometry
-        val wantMode = chosenGeometry.effective(aaPrefs.transcode, aaPrefs.spsCrop)
+        val wantMode = chosenGeometry.effective(aaPrefs.transcode)
         val wantDensity = aaPrefs.aaDensity
         if (h != null && !h.isDead && h.core.videoMode != wantMode) {
             AppLog.i("BRIDGE: видео-режим/DPI сменился (${h.core.videoMode.label} -> ${wantMode.label}), применится после перезапуска сервера ГУ")
@@ -851,9 +851,9 @@ class BridgeService : Service() {
         // перекодирование - по настройке; прямой проброс по воздуху тоже разрешён: битрейт AA не регулируется, ГУ восстанавливается
         // нашим IDR. Режим хоста не трогаем (без перекодирования он уже R720, его можно перекодировать), хост не пересоздаём:
         // сервер AA одноразовый. Старый режим живого хоста с кропом (WIDE*, R1024) в passthrough живёт только с SPS-кропом (h529):
-        // иначе перекодирование.
+        // если область масштабируется (WIDE_976, своё с растяжением) - перекодирование.
         val hostMode = h.core.videoMode
-        val transcode = aaPrefs.transcode || (hostMode.needsTranscode && !(aaPrefs.spsCrop && hostMode.spsCropable))
+        val transcode = aaPrefs.transcode || (hostMode.needsTranscode && !hostMode.spsCropable)
         if (h.core.transcodeEnabled != transcode) {
             AppLog.i("BRIDGE видео: ${if (transcode) "перекодирование включаю принудительно (режим хоста ${h.core.videoMode.label})" else "возвращаю passthrough по настройке"}")
             h.core.transcodeEnabled = transcode
@@ -875,7 +875,7 @@ class BridgeService : Service() {
         stopRequested = false
 
         val sref = arrayOfNulls<CarLifeSession>(1)
-        val s = CarLifeSession(transport, cfg, h.core, PhoneThermal(this), onHuSize = { w, hh -> aaPrefs.saveHuSize(w, hh) }) { reason -> main.post { onSessionClosed(sref[0]!!, reason) } }
+        val s = CarLifeSession(transport, cfg, h.core, PhoneThermal(this), PhoneCalls(this, aaPrefs.callsToHu), onHuSize = { w, hh -> aaPrefs.saveHuSize(w, hh) }) { reason -> main.post { onSessionClosed(sref[0]!!, reason) } }
         sref[0] = s
         session = s
         s.start()
@@ -914,7 +914,7 @@ class BridgeService : Service() {
             core.videoMode = mode
             core.densityOverride = densityOverride
             // h529: поля справа/снизу только для SPS-кропа в прямом проброске; транскодер режет центр
-            val bottom = !aaPrefs.transcode && aaPrefs.spsCrop && mode.spsCropable
+            val bottom = !aaPrefs.transcode && mode.spsCropable
             core.marginsAtBottom = bottom
             if (bottom) AppLog.i("BRIDGE SPS-кроп: поля ${mode.marginW} px справа и ${mode.marginH} px снизу (ui_config.margins), интерфейс в левом верхнем углу")
             core.expectFeatureConfig = true

@@ -135,6 +135,37 @@ object Handshake {
         return out
     }
 
+    /** Что Baidu шлёт ГУ при голосовой инициализации после подключения. */
+    enum class MicStart { NONE, WAKEUP_START, END }
+
+    /** Задержка голосовой инициализации после STATISTIC_INFO (CarlifeConnectHsgHandler :490-495, postDelayed 1000). */
+    const val MIC_INIT_DELAY_MS = 1000L
+
+    /**
+     * Что Baidu 8.6.7 пошлёт ГУ через [MIC_INIT_DELAY_MS] после STATISTIC_INFO (VrManager.onUsbConnectedImpl :582-675,
+     * prepareWakeUp :400-439) для FEATURE_CONFIG ГУ [items] (в порядке прихода, FeatureConfigManager.excute :213-290):
+     * - VOICE_MIC задаёт micStatus (по умолчанию 0 = микрофон ГУ), 2 = «ГУ не поддерживает голос» -> MIC_RECORD_END;
+     * - ALL_VOICE_WAKEUP_DISABLE=1 и VOICE_WAKEUP=0 глушат wake-up ГУ (disableWakeUp); при micStatus=0 это MIC_RECORD_END,
+     *   prepareWakeUp тогда не вызывается (флаг wake-up сброшен);
+     * - иначе (wake-up разрешён, микрофон ГУ) -> MIC_RECORD_WAKEUP_START (пустое тело).
+     * Каналы из списков Baidu (DisableWakeUpChannelManager и др.) приходят с сервера Baidu и тут не учитываются.
+     */
+    fun baiduMicStart(items: List<Pair<String, Int>>): MicStart {
+        var micStatus = 0
+        var vehicleDisable = false   // VrManager.isVehicleDisableWakeUp
+        for ((key, value) in items) {
+            when (key) {
+                "VOICE_MIC" -> micStatus = value
+                "ALL_VOICE_WAKEUP_DISABLE" -> if (value == 1) vehicleDisable = true
+                "VOICE_WAKEUP" -> vehicleDisable = value != 1
+            }
+        }
+        if (micStatus == 2) return MicStart.END                 // closeWakeUp -> sendRecordEndMsgToVehicle
+        // prepareWakeUp: при выключенном wake-up ГУ ничего не шлёт (стартует микрофон телефона), micStatus 1 = микрофон телефона
+        if (!vehicleDisable && micStatus != 1) return MicStart.WAKEUP_START
+        return if (micStatus == 0 && vehicleDisable) MicStart.END else MicStart.NONE
+    }
+
     /** randomValue из HU_AUTHEN_REQUEST вида "2.0;<rnd>" (v2-вариант запроса). */
     fun isAuthV2(random: String?) = random != null && random.startsWith("2.0;")
 

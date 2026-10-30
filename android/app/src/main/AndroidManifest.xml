@@ -19,6 +19,8 @@
     <uses-permission android:name="android.permission.CHANGE_NETWORK_STATE" />
     <!-- Wi-Fi машины (WifiNetworkSpecifier) и признак STA+STA; обычные разрешения, выдаются при установке -->
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+    <!-- какие интерфейсы Wi-Fi заняты телефоном-клиентом, а какие хотспотом (h420); обычное разрешение -->
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.CHANGE_WIFI_STATE" />
     <!-- Android 17 (targetSdk 37): локальная сеть (входящий TCP беспроводного CarLife, UDP-маяк 7999/8999). Loopback (AA 5277, debug) не требует. -->
     <uses-permission android:name="android.permission.ACCESS_LOCAL_NETWORK" />
@@ -38,6 +40,8 @@
     <uses-permission android:name="android.permission.REQUEST_COMPANION_RUN_IN_BACKGROUND" />
     <!-- микрофон телефона как запасной источник звука для AA (режим «авто»/«телефон») -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <!-- h428: состояние звонка для ГУ (MODULE_STATUS PHONE / TELE_STATE), как Baidu -->
+    <uses-permission android:name="android.permission.READ_PHONE_STATE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
     <!-- онбординг: запрос исключения из оптимизации батареи (HyperOS убивает фон) -->
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />

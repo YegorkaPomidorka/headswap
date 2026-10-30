@@ -41,6 +41,12 @@ interface CarTransport {
         onClosed: (reason: String) -> Unit,
     )
 
+    /**
+     * Запись как у Baidu: 8 байт внешнего заголовка одним write, весь inner одним write (h242, Mobis CCNC).
+     * Нужна только потоку с внешним заголовком; транспорты без него игнорируют.
+     */
+    fun setWholeWrites(on: Boolean) {}
+
     /** Неблокирующая постановка inner в очередь канала. */
     fun send(chan: Int, inner: ByteArray)
 
@@ -52,6 +58,12 @@ interface CarTransport {
 
     /** Сообщений в очереди, где стоит канал chan (у потока одна общая очередь на все каналы). */
     fun queueSize(chan: Int): Int
+
+    /**
+     * Выбросить из очереди ещё не записанные inner канала chan, для которых [pred] истинен; сколько выброшено.
+     * Видео-счётчики не трогает (звук туда не входит). По умолчанию ничего не чистит.
+     */
+    fun dropQueued(chan: Int, pred: (ByteArray) -> Boolean): Int = 0
 
     val queuedVideoBytes: Long
     val queuedVideoFrames: Int

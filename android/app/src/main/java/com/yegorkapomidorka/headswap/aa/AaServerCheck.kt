@@ -38,10 +38,10 @@ fun interface ServerProbe {
 /**
  * Проба живости сервера ГУ: настоящая AA-сессия (AapSession, как в мосте и AaProbe), а не голый connect.
  * Голое connect/close без рукопожатия вешает сервер 5277, поэтому после TCP попытка идёт до конца:
- * VERSION, TLS, AuthComplete, ответ на SERVICE_DISCOVERY_REQUEST и сразу штатное закрытие (ByeBye, EOF, close).
- * Видео и каналы не открываем: после SDR телефон шлёт запросы каналов, но сессия уже останавливается.
+ * VERSION, TLS, AuthComplete, SDR, открытие каналов (видеофокус NATIVE, видео не идёт), через [HOLD_MS] штатное
+ * закрытие (ByeBye, EOF, close). Закрытие ровно на SDR сервер вешает: 85+ с без VERSION_RESPONSE и ручной перезапуск
+ * (стенд aa_gap 30.10; поездка 24.10 на noa11y5). Секунду после AuthComplete сервер переживает: следующая сессия через 1-5 с.
  * Возвращается только когда сессия закрылась полностью (onEnd): иначе мост подключился бы поверх неё.
- * Автоматически не запускается: даже короткая проба сбивает Android Auto, следующее подключение машины получало отказ или зависание.
  */
 class AaSessionProbe(
     private val loadCreds: () -> AapCredentials,
@@ -50,7 +50,7 @@ class AaSessionProbe(
     private val host: String = "127.0.0.1",
     private val port: Int = 5277,
     private val connectTimeoutMs: Int = CONNECT_TIMEOUT_MS,
-    private val sdrWaitMs: Long = SDR_WAIT_MS,
+    private val holdMs: Long = HOLD_MS,
 ) : ServerProbe {
     private object NoSink : AaVideoSink {
         override fun onCodecConfig(annexB: ByteArray) {}
@@ -73,15 +73,11 @@ class AaSessionProbe(
         val ended = CountDownLatch(1)
         val endReason = AtomicReference("-")
         val connectError = AtomicReference<IOException?>(null)
-        val ref = AtomicReference<AapSession?>(null)
         val session = AapSession(
-            creds, NoSink, AapOptions(host = host, port = port, sdProvider = sd),
+            creds, NoSink, AapOptions(host = host, port = port, sdProvider = sd, videoFocus = false),
             log = { line, _ ->
                 // "AA " -> "aa ": LogDiag/logdiag.py ищут маркеры моста ("AA TCP подключено", "AA сервер ... недоступен") подстрокой по всей строке
                 log("SRVCHECK | " + (if (line.startsWith("AA ")) "aa " + line.substring(3) else line), false)
-                // телефон спросил возможности ГУ: это последний шаг, дальше штатное закрытие. Ответ на SDR
-                // лог-хук опережает (dispatch логирует до onControl), но в очереди он встанет раньше ByeBye
-                if ("RX CONTROL(0) SERVICE_DISCOVERY_REQUEST" in line) ref.get()?.requestStop("проба: SDR получен")
             },
             socketFactory = {
                 Socket().also { s ->
@@ -102,11 +98,11 @@ class AaSessionProbe(
                 ended.countDown()
             },
         )
-        ref.set(session)
         session.start()
         // Пока TCP принят, прерывать нельзя: stop до TLS закрыл бы сокет без ByeBye. Сессия сама ограничена
         // таймаутами (version 10 с, TLS 15 с, bye и EOF ещё несколько секунд), поэтому ждём её конца.
         var establishedAtMs = 0L
+        var stopAsked = false
         var interrupted = false
         var polls = 0
         while (true) {
@@ -115,10 +111,13 @@ class AaSessionProbe(
             } catch (_: InterruptedException) {
                 interrupted = true      // нить не бросаем: сессия ещё держит сокет
             }
-            if (session.established) {
+            if (session.established && !stopAsked) {
                 val nowMs = System.nanoTime() / 1_000_000
                 if (establishedAtMs == 0L) establishedAtMs = nowMs
-                else if (nowMs - establishedAtMs > sdrWaitMs) session.requestStop("проба: SDR не пришёл за ${sdrWaitMs / 1000} с")
+                if (nowMs - establishedAtMs >= holdMs) {
+                    stopAsked = true
+                    session.requestStop("проба: сессия отработала")
+                }
             }
             if (++polls > MAX_POLLS) {
                 log("SRVCHECK сессия не закрылась за ${MAX_POLLS * 50 / 1000} с, выхожу не дожидаясь", true)
@@ -138,7 +137,8 @@ class AaSessionProbe(
 
     companion object {
         const val CONNECT_TIMEOUT_MS = 3000
-        const val SDR_WAIT_MS = 3000L
+        /** Сколько держать сессию после AuthComplete: телефон успевает спросить SDR и открыть каналы. */
+        const val HOLD_MS = 1000L
         private const val MAX_POLLS = 120 * 20      // 120 с при опросе раз в 50 мс
 
         /** Итог по тому, докуда дошла сессия. Таймауты рукопожатия = HUNG, всё остальное необычное = ERROR. */
@@ -156,10 +156,9 @@ class AaSessionProbe(
 }
 
 /**
- * Ручная проба из «Для разработчиков»: одна попытка в фоновой нити, без серий и повторов.
+ * Проба по запросу (кнопка или открытие экрана): одна попытка в фоновой нити, без серий и повторов.
  * Не стартует при живом мосте и подключённом USB (одноразовый сервер 5277 тогда нужен им) и не параллельно с другой.
  * Попытку, дошедшую до TCP, прервать нельзя, поэтому мост перед подключением ждёт её конца (awaitIdle).
- * Результат на состояние главного экрана не влияет.
  */
 class ManualServerCheck(
     private val probe: ServerProbe,
@@ -228,6 +227,9 @@ class ManualServerCheck(
 class ServerFailures(private val now: () -> Long = { System.nanoTime() / 1_000_000 }) {
     @Volatile private var refusedSince = NONE
 
+    /** Когда закончилась последняя установленная сессия (наш ByeBye или обрыв); NONE - в этом цикле такой не было. */
+    @Volatile private var lastEndAt = NONE
+
     /** Подряд принятых по TCP подключений без VERSION_RESPONSE. */
     @Volatile var versionHangs = 0
         private set
@@ -260,12 +262,29 @@ class ServerFailures(private val now: () -> Long = { System.nanoTime() / 1_000_0
         worked = true
     }
 
+    /** Установленная сессия закончилась (наш ByeBye или обрыв): ближайшие [RELISTEN_MS] отказ - норма, AA снова поднимает порт. */
+    fun onSessionEnded() {
+        lastEndAt = now()
+    }
+
+    /** Наша установленная сессия закончилась меньше [RELISTEN_MS] назад: AA ещё может не слушать порт. */
+    fun inRelistenWindow(): Boolean = lastEndAt.let { it != NONE && now() - it < RELISTEN_MS }
+
+    /**
+     * Сервер отказывает, и это не окно [RELISTEN_MS] после закрытия нашей же сессии: на свежем старте моста отказ
+     * значит, что сервер не запущен. Запас на перезапуск порта нужен только сразу после своего ByeBye.
+     */
+    val refusedFresh: Boolean
+        get() = refusedSince != NONE && (lastEndAt == NONE || refusedSince - lastEndAt >= RELISTEN_MS)
+
     /**
      * Пора просить пользователя включить сервер (текст заглушки на ГУ): зависания подряд, отказ у сервера, который
-     * в этом процессе ещё не работал, или отказ дольше [START_HINT_REFUSED_MS] у работавшего (как HomeLogic.REFUSED_DOWN_MS).
+     * в этом процессе ещё не работал, отказ вне окна после закрытия своей сессии ([refusedFresh]) или отказ дольше
+     * [START_HINT_REFUSED_MS] у работавшего (как HomeLogic.REFUSED_DOWN_MS).
      */
     fun needsStart(): Boolean =
-        versionHangs >= START_HINT_HANGS || (refusedSince != NONE && (!worked || refusedForMs >= START_HINT_REFUSED_MS))
+        versionHangs >= START_HINT_HANGS ||
+            (refusedSince != NONE && (!worked || refusedFresh || refusedForMs >= START_HINT_REFUSED_MS))
 
     /** Любой другой исход (голый EOF, TLS и т.п.), начало и конец цикла коннектора. */
     fun reset() {
@@ -276,17 +295,75 @@ class ServerFailures(private val now: () -> Long = { System.nanoTime() / 1_000_0
     private companion object {
         const val NONE = Long.MIN_VALUE
         const val START_HINT_REFUSED_MS = 15_000L
+        const val RELISTEN_MS = 10_000L
         const val START_HINT_HANGS = 2
     }
 }
 
-/** Ручная проба для кнопки в «Для разработчиков» (Actions.checkServer) и ожидание её конца перед подключением моста. */
+/**
+ * Проба сервера ГУ: кнопка в «Для разработчиков» (Actions.checkServer) и автопроба при открытии главного экрана.
+ * Мост перед подключением ждёт конца идущей пробы.
+ */
 object AaServerCheck {
     @Volatile private var manual: ManualServerCheck? = null
     @Volatile private var probe: AaSessionProbe? = null
 
     /** Сколько мост ждёт конец ручной пробы перед подключением. Попытка сама укладывается в ~35 с. */
     private const val AWAIT_MS = 45_000L
+
+    /** Повторно открытый экран чаще этого сервер не трогает: каждая проба - короткая сессия AA. */
+    private const val AUTO_EVERY_MS = 15_000L
+
+    /** Итог автопробы: true - сессия установилась, false - отказ или зависание, null - не проверяли, сбой или забыли. */
+    @Volatile var autoRunning: Boolean? = null
+        private set
+
+    /** Автопроба сейчас идёт (экран показывает «Проверяю сервер ГУ»). */
+    @Volatile var autoBusy = false
+        private set
+
+    @Volatile private var autoWanted = false
+    @Volatile private var autoAtMs = 0L
+
+    /** Главный экран открыт: проверить сервер, как только можно (autoTick). */
+    fun wantAuto() {
+        autoWanted = true
+    }
+
+    /** Итог устарел (пользователь пошёл включать сервер, начался мост): при следующем открытии проверить заново. */
+    fun forgetAuto() {
+        autoRunning = null
+        autoAtMs = 0L
+    }
+
+    /**
+     * Тик главного экрана (main). Пробует, только если мост не идёт, USB не подключён
+     * и своя сессия моста закрылась не только что (иначе отказ - просто AA ещё не слушает порт).
+     */
+    fun autoTick(ctx: Context) {
+        if (!autoWanted || autoBusy) return
+        if (AaState.serverFailures.inRelistenWindow()) return
+        val now = System.nanoTime() / 1_000_000
+        if (autoAtMs != 0L && now - autoAtMs < AUTO_EVERY_MS) {
+            autoWanted = false
+            return
+        }
+        autoBusy = true
+        val refusal = checker(ctx).start { result, _ ->
+            autoRunning = when (result) {
+                ProbeResult.ALIVE -> true
+                ProbeResult.REFUSED, ProbeResult.HUNG -> false
+                ProbeResult.ERROR -> null       // сервер сразу закрыл и т.п.: не утверждаем ни того, ни другого
+            }
+            autoAtMs = System.nanoTime() / 1_000_000
+            autoBusy = false
+        }
+        if (refusal != null) {
+            autoBusy = false        // мост, USB или ручная проба: попробуем на следующем тике, когда освободится
+            return
+        }
+        autoWanted = false
+    }
 
     private fun checker(ctx: Context): ManualServerCheck {
         manual?.let { return it }

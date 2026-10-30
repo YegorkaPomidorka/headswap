@@ -46,6 +46,12 @@ class StreamTransport(
     private var reader: Thread? = null
     private var writer: Thread? = null
     @Volatile private var desync = false
+    @Volatile private var wholeWrites = false
+
+    override fun setWholeWrites(on: Boolean) {
+        wholeWrites = on
+    }
+
     @Volatile private var rx = 0L
     @Volatile var lastRxMs = 0L
         private set
@@ -55,6 +61,16 @@ class StreamTransport(
     override val queuedVideoFrames: Int get() = videoFrames.get()
     override val drainBytesPerSec: Double get() = drain.bytesPerSec
     override fun queueSize(chan: Int): Int = queue.size
+
+    override fun dropQueued(chan: Int, pred: (ByteArray) -> Boolean): Int {
+        var n = 0
+        queue.removeIf { o ->
+            val drop = o.chan == chan && o.chan != Ch.VIDEO && pred(o.inner)
+            if (drop) n++
+            drop
+        }
+        return n
+    }
 
     override fun start(
         sink: (chan: Int, inner: ByteArray) -> Unit,
@@ -131,9 +147,10 @@ class StreamTransport(
                     videoBytes.addAndGet(-o.inner.size.toLong())
                     videoFrames.decrementAndGet()
                 }
-                // заголовок отдельным write, тело следом кусками <= 16384 (спека §1.4)
+                // заголовок отдельным write, тело следом кусками <= 16384 (спека §1.4); Mobis CCNC - тело одним write, как Baidu
                 val t0 = System.nanoTime()
-                for (part in Wire.writeSequence(o.chan, o.inner)) output.write(part)
+                val parts = if (wholeWrites) Wire.writeWhole(o.chan, o.inner) else Wire.writeSequence(o.chan, o.inner)
+                for (part in parts) output.write(part)
                 output.flush()
                 drain.onWrite(clock(), video, o.inner.size, System.nanoTime() - t0)
                 onWritten(o.chan, o.inner)
