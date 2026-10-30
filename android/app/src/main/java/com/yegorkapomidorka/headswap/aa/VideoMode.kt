@@ -58,9 +58,9 @@ interface VideoGeometry {
     val spsCropable: Boolean
         get() = !crop.isNone && outW == aaW - marginW && outH == aaH - marginH && (marginW / 2) % 2 == 0 && (marginH / 2) % 2 == 0
 
-    /** Геометрия, которая реально применится при данном переключателе перекодирования и SPS-кропе (эксперимент h529). */
-    fun effective(transcode: Boolean, spsCrop: Boolean = false): VideoGeometry =
-        if (!transcode && needsTranscode && !(spsCrop && spsCropable)) VideoMode.R720 else this
+    /** Геометрия, которая реально применится при данном переключателе перекодирования: в passthrough кроп только SPS-кропом (h529). */
+    fun effective(transcode: Boolean): VideoGeometry =
+        if (!transcode && needsTranscode && !spsCropable) VideoMode.R720 else this
 
     /** Метка выхода для UI: «1280×720». */
     val outLabel: String get() = "${outW}×$outH"
@@ -123,7 +123,8 @@ enum class VideoMode(
     WIDE_976(R.string.video_wide_976_title, R.string.video_wide_976_sub, "1920x1080", 0, 244, 160, 2240, 976, 8_000_000),
     /**
      * 1920×836 - окно VW BT 1420 (2240×976) той же пропорции, но без масштаба (h529, Павел): из кадра AA 1920×1080 вырезается
-     * полоса 1920×836 один к одному, годится для SPS-кропа; до окна 2240×976 растягивает сама ГУ.
+     * полоса 1920×836 один к одному, годится для SPS-кропа; до окна 2240×976 растягивает сама ГУ. В UI отдельной строкой
+     * не показывается: это WIDE_976 в passthrough ([effective]).
      */
     WIDE_836(R.string.video_wide_836_title, R.string.video_wide_836_sub, "1920x1080", 0, 244, 160, 1920, 836, 6_000_000);
 
@@ -131,9 +132,16 @@ enum class VideoMode(
     override val aaH: Int = aaResolution.substringAfter('x').toInt()
     override val label: String get() = name
 
-    /** Режим, который реально применится при данном переключателе перекодирования и SPS-кропе. */
-    override fun effective(transcode: Boolean, spsCrop: Boolean): VideoMode =
-        if (!transcode && needsTranscode && !(spsCrop && spsCropable)) R720 else this
+    /**
+     * Режим, который реально применится при данном переключателе перекодирования. WIDE_976 масштабирует область
+     * и SPS-кропом не режется: в passthrough вместо него WIDE_836, до окна 2240×976 растягивает сама ГУ (h529).
+     */
+    override fun effective(transcode: Boolean): VideoMode = when {
+        transcode -> this
+        this == WIDE_976 -> WIDE_836
+        needsTranscode && !spsCropable -> R720
+        else -> this
+    }
 
     /**
      * Строка для лога: «видео-режим WIDE: AA 1280x720 margins 0x240 density 160, CarLife 1280x480, кроп v 0.167..0.833».

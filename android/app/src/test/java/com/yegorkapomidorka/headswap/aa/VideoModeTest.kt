@@ -54,7 +54,7 @@ class VideoModeTest {
         assertEquals(60f / 720f, m.crop.v0, 1e-6f)
         assertEquals(660f / 720f, m.crop.v1, 1e-6f)
         assertTrue(m.needsTranscode)
-        assertEquals(VideoMode.R720, m.effective(transcode = false))
+        assertEquals(m, m.effective(transcode = false))         // 1:1 с полями: SPS-кроп в passthrough
         assertEquals(m, m.effective(transcode = true))
         assertEquals("1024×600", m.outLabel)
         assertEquals(VideoMode.R1024, VideoMode.parse("R1024"))
@@ -75,7 +75,7 @@ class VideoModeTest {
 
     @Test
     fun effectiveAndParse() {
-        assertEquals(VideoMode.R720, VideoMode.WIDE.effective(transcode = false))
+        assertEquals(VideoMode.WIDE, VideoMode.WIDE.effective(transcode = false))
         assertEquals(VideoMode.WIDE, VideoMode.WIDE.effective(transcode = true))
         assertEquals(VideoMode.R1080, VideoMode.R1080.effective(transcode = false))
         assertEquals(VideoMode.R800, VideoMode.R800.effective(transcode = false))
@@ -155,7 +155,7 @@ class VideoModeTest {
         assertEquals(40f / 720f, k.crop.v0, 1e-6f)
         assertEquals(680f / 720f, k.crop.v1, 1e-6f)
         assertTrue(k.needsTranscode)
-        assertEquals(VideoMode.R720, k.effective(transcode = false))
+        assertEquals(k, k.effective(transcode = false))
         assertEquals("1280×640", k.outLabel)
         assertEquals(VideoMode.WIDE_2_1, VideoMode.parse("WIDE_2_1"))
     }
@@ -168,7 +168,7 @@ class VideoModeTest {
         assertEquals(0f, k.crop.u0, 1e-6f)
         assertEquals(1f, k.crop.u1, 1e-6f)
         assertTrue(k.needsTranscode)
-        assertEquals(VideoMode.R720, k.effective(transcode = false))
+        assertEquals(VideoMode.WIDE_836, k.effective(transcode = false))
         // рабочая область AA 1920x836 масштабируется в кадр ГУ 2240x976: тач пересчитывается и клампится в область
         assertEquals(1919 to 835, k.mapTouch(3000, 2000))
         assertEquals(960 to 418, k.mapTouch(1120, 488))

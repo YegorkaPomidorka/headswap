@@ -51,11 +51,6 @@ class AaPrefs(ctx: Context) {
         get() = sp.getBoolean("transcode", true)
         set(v) = sp.edit().putBoolean("transcode", v).apply()
 
-    /** Кроп полей WIDE-режимов в passthrough правкой SPS, без перекодирования (эксперимент h529, раздел для разработчиков). */
-    var spsCrop: Boolean
-        get() = sp.getBoolean("spsCrop", false)
-        set(v) = sp.edit().putBoolean("spsCrop", v).apply()
-
     /** Разрешение видео (имя VideoMode, по умолчанию 1280×720). Читается один раз на подключение. */
     var videoMode: VideoMode
         get() = VideoMode.parse(sp.getString("videoMode", VideoMode.DEFAULT.name))
@@ -114,7 +109,7 @@ class AaPrefs(ctx: Context) {
 
     /** Текущие значения настроек, которые выставляет выбор машины. */
     val carSettings: CarSettings
-        get() = CarSettings(transcode, videoMode, aaDensity, fpsSetting, musicRate, spsCrop)
+        get() = CarSettings(transcode, videoMode, aaDensity, fpsSetting, musicRate)
 
     /** Выбрать машину и записать её рекомендованные настройки. */
     fun applyCar(p: CarPreset) {
@@ -126,7 +121,6 @@ class AaPrefs(ctx: Context) {
             .putInt("aaDensity", s.aaDensity)
             .putString("fpsSetting", s.fps.name)
             .putString("musicRate", s.musicRate.name)
-            .putBoolean("spsCrop", s.spsCrop)
             .apply()
     }
 
