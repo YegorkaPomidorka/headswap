@@ -247,7 +247,11 @@ class MainActivity : Activity() {
                     this, intent.getIntExtra("hold_s", 180), intent.getStringExtra("close") ?: "bye",
                     intent.getBooleanExtra("video", false), intent.getBooleanExtra("until_usb", false),
                 )
-                "aa_hold_stop" -> AaHold.stop("команда aa_hold_stop")
+                // проба/сессия -> пауза -> сессия как у моста: --es first probe|hold --ei gap_s N --ei hold_s N
+                "aa_gap" -> AaHold.runGap(
+                    this, intent.getStringExtra("first") ?: "probe", intent.getIntExtra("gap_s", 5), intent.getIntExtra("hold_s", 15),
+                )
+                "aa_hold_stop" ->AaHold.stop("команда aa_hold_stop")
                 // проба локальной сети для беспровода: маяк UDP 7999, ответчик 8999 (--ei seconds N --es to <ip>)
                 "net_probe" -> NetProbe.run(this, intent.getIntExtra("seconds", 20), intent.getStringExtra("to"))
                 "net_perm" -> requestLocalNetwork()

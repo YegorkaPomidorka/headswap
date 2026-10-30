@@ -185,6 +185,130 @@ object AaHold {
         AppLog.i("$TAG ИТОГ: $held, закрытие=$close; восстановление: ${recover(ctx, sd)}")
     }
 
+    /**
+     * `--es cmd aa_gap`: первая сессия (`--es first probe|hold`: короткая проба SDR+ByeBye или `--ei hold_s` с видео и ByeBye),
+     * пауза `--ei gap_s`, потом сессия как у моста: видео, повтор раз в секунду до REJOIN_MAX_MS, держим hold_s, ByeBye.
+     * Отвечает на вопрос, можно ли пробовать сервер при открытии экрана и не сломать следующую поездку.
+     */
+    fun runGap(ctx: Context, first: String, gapS: Int, holdS: Int) {
+        val app = ctx.applicationContext
+        synchronized(idleLock) {
+            if (running) {
+                AppLog.i("$TAG уже идёт, пропускаю")
+                return
+            }
+            running = true
+            stopWhy = null
+        }
+        Thread({
+            try {
+                gap(app, first, gapS * 1000L, holdS * 1000L)
+            } catch (e: Throwable) {
+                AppLog.i("$TAG GAP ИТОГ: сбой ${e.javaClass.simpleName}: ${e.message}")
+            } finally {
+                synchronized(idleLock) {
+                    running = false
+                    idleLock.notifyAll()
+                }
+            }
+        }, "aa-gap").start()
+    }
+
+    private const val REJOIN_MAX_MS = 180_000L
+
+    private class Outcome(val established: Boolean, val establishMs: Long, val firstVideoMs: Long, val videoFrames: Long, val reason: String)
+
+    /** Одна сессия: до установки, потом держим holdMs (видео по [video]) и закрываем ByeBye. */
+    private fun session(ctx: Context, sd: () -> AapSdOptions, holdMs: Long, video: Boolean, tag: String): Outcome {
+        val prefs = AaPrefs(ctx)
+        val creds = AaCreds.load(ctx, prefs.certSet).creds
+        val ended = CountDownLatch(1)
+        val endReason = AtomicReference("-")
+        val s = AapSession(
+            creds, NoSink,
+            AapOptions(preVideoTimeoutMs = 30_000, sdProvider = sd, videoFocus = video),
+            log = { line, _ -> AppLog.i("$TAG $tag | " + (if (line.startsWith("AA ")) "aa " + line.substring(3) else line), false) },
+            socketFactory = {
+                Socket().also { sock ->
+                    try {
+                        sock.connect(InetSocketAddress("127.0.0.1", 5277), CONNECT_TIMEOUT_MS)
+                    } catch (e: IOException) {
+                        try {
+                            sock.close()
+                        } catch (_: IOException) {
+                        }
+                        throw e
+                    }
+                }
+            },
+            onEnd = { reason, _ ->
+                endReason.set(reason)
+                ended.countDown()
+            },
+        )
+        val t0 = nowMs()
+        s.start()
+        var estMs = -1L
+        var videoMs = -1L
+        while (!ended.await(TICK_MS / 4, TimeUnit.MILLISECONDS)) {
+            val now = nowMs()
+            if (s.established && estMs < 0) estMs = now - t0
+            if (s.stats.videoData > 0 && videoMs < 0) videoMs = now - t0
+            if (estMs >= 0 && now - t0 - estMs >= holdMs) {
+                s.requestStop("aa_gap: $tag отработала")
+                ended.await(CLOSE_WAIT_MS, TimeUnit.MILLISECONDS)
+                break
+            }
+        }
+        return Outcome(estMs >= 0, estMs, videoMs, s.stats.videoData, endReason.get())
+    }
+
+    private fun gap(ctx: Context, first: String, gapMs: Long, holdMs: Long) {
+        val prefs = AaPrefs(ctx)
+        val sd = { VideoMode.DEFAULT.sdOptions(fullAudio = false, carMake = prefs.carMake) }
+        AppLog.i("$TAG GAP старт: первая=$first, пауза=${gapMs / 1000} с, держать=${holdMs / 1000} с")
+        val firstRes = if (first == "probe") {
+            val probe = AaSessionProbe(
+                loadCreds = { AaCreds.load(ctx, prefs.certSet).creds },
+                sd = sd,
+                log = { line, _ -> AppLog.i("$TAG probe | $line", false) },
+            )
+            val a0 = nowMs()
+            val r = probe.probeOnce()
+            "проба $r за ${nowMs() - a0} мс ${probe.lastDetail}"
+        } else {
+            val o = session(ctx, sd, holdMs, true, "first")
+            "сессия established=${o.established} за ${o.establishMs} мс, видео через ${o.firstVideoMs} мс, кадров ${o.videoFrames}, конец: ${o.reason}"
+        }
+        AppLog.i("$TAG GAP первая: $firstRes")
+        val endFirst = nowMs()
+        Thread.sleep(gapMs)
+        var attempt = 0
+        var fails = ""
+        while (nowMs() - endFirst - gapMs < REJOIN_MAX_MS) {
+            if (stopWhy != null) {
+                AppLog.i("$TAG GAP ИТОГ: прервано ($stopWhy); первая: $firstRes")
+                return
+            }
+            attempt++
+            val a0 = nowMs()
+            val o = session(ctx, sd, holdMs, true, "second#$attempt")
+            val since = (a0 - endFirst) / 1000.0
+            if (o.established && o.firstVideoMs >= 0) {
+                AppLog.i(
+                    "$TAG GAP ИТОГ: первая: $firstRes; пауза ${gapMs / 1000} с; вторая OK с попытки $attempt через $since с после первой, " +
+                        "установка ${o.establishMs} мс, видео ${o.firstVideoMs} мс, кадров ${o.videoFrames}, конец: ${o.reason}; провалы:$fails",
+                )
+                return
+            }
+            AppLog.i("$TAG GAP вторая #$attempt через $since с: established=${o.established} видео=${o.firstVideoMs} (${nowMs() - a0} мс): ${o.reason}")
+            fails += " #$attempt@${since}с ${o.reason.take(60)};"
+            val wait = RECOVER_STEP_MS - (nowMs() - a0)
+            if (wait > 0) Thread.sleep(wait)
+        }
+        AppLog.i("$TAG GAP ИТОГ: первая: $firstRes; пауза ${gapMs / 1000} с; вторая НЕ ПОДНЯЛАСЬ за ${REJOIN_MAX_MS / 1000} с, попыток $attempt;$fails")
+    }
+
     /** Полное рукопожатие раз в секунду до ALIVE. Отказ (REFUSED) серверу не вредит, TCP без VERSION (HUNG) - уже беда. */
     private fun recover(ctx: Context, sd: () -> AapSdOptions): String {
         val prefs = AaPrefs(ctx)
