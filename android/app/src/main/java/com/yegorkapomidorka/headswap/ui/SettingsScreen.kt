@@ -653,6 +653,8 @@ class SettingsSectionScreen(host: MainActivity, val section: SettingsSection) : 
         /** Группы выпадающего списка разрешений; WIDE_836 отдельной строкой нет (это WIDE_976 в passthrough). */
         val RES_STANDARD = listOf(VideoMode.R800, VideoMode.R1024, VideoMode.R720, VideoMode.R1080)
         val RES_WIDE = listOf(VideoMode.WIDE, VideoMode.WIDE_MID, VideoMode.WIDE_HD, VideoMode.WIDE_640, VideoMode.WIDE_2_1, VideoMode.WIDE_976)
+        /** Слова названия машины, которые в списке разрешений не нужны: годы, двигатель, гибрид, рестайлинг. */
+        val CAR_NAME_NOISE = Regex("""(?i)(19|20)\d\d([–-](19|20)?\d\d)?|\d\.\dT|гибрид|hybrid|дорестайл|рестайлинг|restyling|facelift|pre-facelift""")
     }
 
     private fun note(text: String, color: Int = R.color.on2): TextView =
@@ -795,12 +797,19 @@ class SettingsSectionScreen(host: MainActivity, val section: SettingsSection) : 
      */
     private fun carsFor(m: VideoMode): String? {
         if (m == VideoMode.DEFAULT) return null
-        val names = CarPreset.values().filter { it.settings.videoMode == m }.map { ctx.getString(it.titleRes) }
+        val names = CarPreset.values().filter { it.settings.videoMode == m }.map { shortCarName(ctx.getString(it.titleRes)) }
         if (names.isEmpty()) return null
         return names.groupBy({ it.substringBefore(' ') }, { it.substringAfter(' ', "") })
-            .map { (brand, models) -> listOf(brand, models.filter { it.isNotEmpty() }.joinToString(", ")).filter { it.isNotEmpty() }.joinToString(" ") }
+            .map { (brand, models) -> listOf(brand, models.filter { it.isNotEmpty() }.distinct().joinToString(", ")).filter { it.isNotEmpty() }.joinToString(" ") }
             .joinToString(" · ")
     }
+
+    /** Марка и модель без годов, поколений, рестайлов и двигателя: «Honda CR-V, 6 поколение, дорестайл» -> «Honda CR-V». */
+    private fun shortCarName(title: String): String =
+        title.substringBefore(',').substringBefore('(')
+            .split(' ').filter { it.isNotEmpty() && !CAR_NAME_NOISE.matches(it) }
+            .joinToString(" ")
+            .replaceFirst("Volkswagen ", "VW ")
 
     /** Подпись режима: машины, для которых он задан, иначе короткое описание. */
     private fun subOf(m: VideoMode): String = carsFor(m) ?: ctx.getString(m.subRes)
