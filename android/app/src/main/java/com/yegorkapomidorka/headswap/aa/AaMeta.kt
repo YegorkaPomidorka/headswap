@@ -435,6 +435,8 @@ class MetaRelay(
     private val navRearm: () -> Unit = {},
     /** Пустую улицу заменять подписью манёвра (AaMeta.noRoadName) - Honda. */
     private val emptyRoadText: () -> Boolean = { false },
+    /** Смена трека или обложки посреди игры: отправить MEDIA_INFO через перевзвод MODULE_STATUS MUSIC 0->1, если ГУ этого требует (SEMIDRIVE X9). */
+    private val musicRearm: (send: () -> Unit) -> Unit = { it() },
 ) {
     // подписки ГУ (CARLIFE_DATA_SUBSCRIBE_START/STOP): музыка по умолчанию включена, навигация - только по START moduleID=0
     var musicSubscribed = true
@@ -566,7 +568,7 @@ class MetaRelay(
             songId = infoSeq.toString(),
         )
         if (!sameTrack) lastProgressMs = null
-        sendInfo(if (sameTrack) "обложка/поля трека обновились" else "новый трек")
+        sendInfo(if (sameTrack) "обложка/поля трека обновились" else "новый трек", rearm = true)
     }
 
     private fun replayMusic(why: String) {
@@ -576,7 +578,7 @@ class MetaRelay(
         else sendProgress(force = true)
     }
 
-    private fun sendInfo(why: String) {
+    private fun sendInfo(why: String, rearm: Boolean = false) {
         val i = info ?: return
         // трек на паузе не показываем: ГУ (Desay G6S, Mazda) считает CarLife-музыку активной и глушит радио
         if (!playing) {
@@ -589,7 +591,9 @@ class MetaRelay(
             log("META MEDIA_INFO отложен ($why): ${if (!ready()) "CarLife не START" else "музыка не подписана"}; $i", false)
             return
         }
-        if (link().sendMediaInfo(i)) log("META -> MEDIA_INFO ($why): $i", true)
+        val send = { if (link().sendMediaInfo(i)) log("META -> MEDIA_INFO ($why): $i", true) }
+        // h606: приборка SEMIDRIVE X9 берёт обложку только из MEDIA_INFO перед переходом MUSIC 0->1 (повтор на CarLife START её показывает)
+        if (rearm) musicRearm(send) else send()
         sendProgress(force = true)
     }
 

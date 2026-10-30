@@ -207,6 +207,8 @@ class AaBridgeCore(
         private set
     @Volatile var huMazda20622111 = false      // Mazda Connect 2 из Китая (channel 20622111, h238/h359): VIDEO_DATA > ~16 КиБ вешает чтение USB
         private set
+    @Volatile var huSemidriveX9 = false        // Honda CR-V 6 SEMIDRIVE X9 (channel 21580005, h606): обложка на приборке только после MUSIC 0->1
+        private set
     @Volatile var musicRateProvider: () -> MusicRate = { MusicRate.DEFAULT }
     private var resampler: MusicResampler? = null    // null при 48000: PCM идёт как есть
     private var mediaRateLogged = MEDIA_RATE
@@ -312,6 +314,7 @@ class AaBridgeCore(
         musicState = { on -> musicByState(on) },
         navRearm = { rearmNavi() },
         emptyRoadText = { huHonda },
+        musicRearm = { send -> rearmMusic(send) },
     )
 
     val metaRelay: MetaRelay get() = meta
@@ -399,6 +402,7 @@ class AaBridgeCore(
         huPioneerRm56 = false                  // HU_INFO придёт заново в этой сессии
         huHonda20772121 = false                // HU_INFO / STATISTIC_INFO придут заново в этой сессии
         huMazda20622111 = false                // STATISTIC_INFO придёт заново в этой сессии
+        huSemidriveX9 = false                  // STATISTIC_INFO придёт заново в этой сессии
         huVwCns2Delphi = false                 // STATISTIC_INFO придёт заново в этой сессии
         vrReply = false
         touchDecimator.reset()
@@ -666,6 +670,10 @@ class AaBridgeCore(
         if (channel == VW_CNS2_20082114_CHANNEL && !huVwCns2Delphi) {
             huVwCns2Delphi = true
             log("BRIDGE ГУ VW CNS2 Delphi 20082114: ответ ассистента в канал VR, антидребезг кнопки голоса", true)
+        }
+        if (channel == SEMIDRIVE_X9_21580005_CHANNEL && !huSemidriveX9) {
+            huSemidriveX9 = true
+            log("BRIDGE ГУ SEMIDRIVE X9 21580005: смена обложки через перевзвод MUSIC 0->1", true)
         }
         if (isHondaChannel(channel) && !huHonda) {
             huHonda = true
@@ -1395,6 +1403,22 @@ class AaBridgeCore(
 
     private fun musicStatus(status: Int) {
         if (MODULE_MUSIC_ENABLED) link.sendModuleStatus(CarlifeAudio.MODULE_MUSIC, status)
+    }
+
+    /**
+     * SEMIDRIVE X9 (CR-V 6, h606): на смену трека приборка меняет название, а обложку держит прежнюю (значок CarLife),
+     * пока ГУ не перезапустит музыку (выход на главный и обратно). Шлём MEDIA_INFO между MUSIC=0 и MUSIC=1, как при старте.
+     */
+    @Synchronized
+    private fun rearmMusic(send: () -> Unit) {
+        if (!huSemidriveX9 || !MODULE_MUSIC_ENABLED || !musicActive) {
+            send()
+            return
+        }
+        link.sendModuleStatus(CarlifeAudio.MODULE_MUSIC, 0)
+        send()
+        link.sendModuleStatus(CarlifeAudio.MODULE_MUSIC, 1)
+        log("BRIDGE SEMIDRIVE X9: MEDIA_INFO через перевзвод MUSIC 0->1 (обложка на приборке)", true)
     }
 
     /** Плеер AA сменил состояние (ch9). MUSIC по нему - только когда звук не по USB: иначе им владеет MEDIA INIT/PAUSE. */
@@ -2444,6 +2468,7 @@ class AaBridgeCore(
         const val HONDA_20832125_CHANNEL = "20832125"     // Honda Vezel (ГУ Егора): то же после заднего хода в passthrough, лог 26.10
         /** Mazda Connect 2 (Китай, CarLife 1.0, HU_INFO из заглушек, h238/h359): VIDEO_DATA 16163 Б прошёл, 16518 и 19104 Б - ГУ перестала читать USB. */
         const val MAZDA_20622111_CHANNEL = "20622111"
+        const val SEMIDRIVE_X9_21580005_CHANNEL = "21580005" // Honda CR-V 6 2026, SEMIDRIVE X9 (h606): обложка на приборке
         const val MAZDA_20622111_MAX_VIDEO_PACKET = 15_000
         const val MAZDA_20622111_ART_BYTES = 12_000          // обложка в MEDIA_INFO: весь пакет должен остаться < 15000 Б
         const val MAZDA_20622111_CEILING_BPS = 1_500_000  // IDR поменьше на случай, если ГУ не склеивает куски
