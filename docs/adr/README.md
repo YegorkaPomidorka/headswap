@@ -41,7 +41,7 @@
 | 0008 | [Потолок битрейта по размеру IDR включается по каналу ГУ](0008-idr-size-bitrate-ceiling.md) | принято |
 | 0009 | [Запись в USB: заголовок отдельно, тело кусками до 16 КиБ, с исключениями](0009-usb-write-chunking-16k.md) | принято |
 | 0010 | [Эталон поведения — Baidu CarLife 8.6.7; отличие от него считается ошибкой](0010-baidu-carlife-reference.md) | принято |
-| 0011 | [Кормление декодера перекодировщика — на отдельной нити через FeedQueue](0011-decoder-feed-thread.md) | принято |
+| 0011 | [Кадры в декодер перекодировщика подаёт отдельная нить (FeedQueue)](0011-decoder-feed-thread.md) | принято |
 | 0012 | [Приложение обновляется само из GitHub Releases](0012-updates-via-github-releases.md) | принято |
 | 0013 | [Legacy ADB-режим — отдельный APK с пакетом com.baidu.carlife](0013-legacy-adb-separate-apk.md) | принято |
 | 0014 | [Беспроводной CarLife: CarTransport, Wi-Fi Direct и маяк сети машины](0014-wireless-transport.md) | принято |
