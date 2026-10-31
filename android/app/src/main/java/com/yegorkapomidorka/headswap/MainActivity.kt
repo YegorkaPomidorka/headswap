@@ -81,7 +81,7 @@ class MainActivity : Activity() {
         }
         setContentView(root)
         registerReceiver(permReceiver, IntentFilter(ACTION_PERMISSION), Context.RECEIVER_NOT_EXPORTED)
-        AppLog.i("MainActivity.onCreate action=${intent?.action} SDK=${Build.VERSION.SDK_INT} ${Build.MANUFACTURER} ${Build.MODEL}")
+        AppLog.i("MainActivity.onCreate SDK=${Build.VERSION.SDK_INT} ${Build.MANUFACTURER} ${Build.MODEL}; старт activity: ${describeIntent(intent)}")
 
         restoreScreens(savedInstanceState)
         val hadCmd = intent?.getStringExtra(EXTRA_CMD) != null
@@ -109,7 +109,7 @@ class MainActivity : Activity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
-        AppLog.i("MainActivity.onNewIntent action=${intent.action}")
+        AppLog.i("MainActivity.onNewIntent: новый intent: ${describeIntent(intent)}")
         handleIntent(intent, "новый intent")
     }
 
@@ -298,6 +298,22 @@ class MainActivity : Activity() {
         /** adb shell am start -n com.yegorkapomidorka.headswap/.MainActivity --es cmd aa_selftest */
         const val EXTRA_CMD = "cmd"
         private const val STATE_SCREENS = "screens"
+
+        /**
+         * Стартовый intent целиком одной строкой: так видно, как ГУ запускает приложение по ADB (am start -n / -a / extras).
+         * Не должна ронять activity: на любом сбое возвращает то, что успела собрать.
+         */
+        @Suppress("DEPRECATION")
+        fun describeIntent(i: Intent?): String {
+            if (i == null) return "intent=null"
+            return try {
+                val extras = i.extras?.let { b -> b.keySet().sorted().joinToString(", ") { k -> "$k=${b.get(k)}" } } ?: ""
+                "action=${i.action} cmp=${i.component?.flattenToShortString()} cat=${i.categories} data=${i.dataString} " +
+                    "type=${i.type} pkg=${i.`package`} flags=0x${Integer.toHexString(i.flags)} extras={$extras}"
+            } catch (e: Exception) {
+                "action=${i.action} (разбор intent упал: ${e.javaClass.simpleName}: ${e.message})"
+            }
+        }
 
         /** Все поля аксессуара одной строкой. Серийник без разрешения на аксессуар бросает SecurityException. */
         fun describe(a: UsbAccessory): String {

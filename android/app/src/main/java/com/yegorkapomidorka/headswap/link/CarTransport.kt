@@ -5,7 +5,7 @@ package com.yegorkapomidorka.headswap.link
  * kind идёт в лог строкой «транспорт=…» и в WL-лог.
  */
 class TransportCaps(
-    /** usb-aoa, tcp-debug (один поток с внешним заголовком), tcp6 (6 сокетов Baidu без внешнего заголовка). */
+    /** usb-aoa, tcp-debug (один поток с внешним заголовком), tcp6 (6 сокетов Baidu без внешнего заголовка), tcp-adb (те же 6 сокетов через adb forward). */
     val kind: String,
     /** Поток с внешним заголовком [chan u32][len u32] (USB AOA, debug-TCP). */
     val outerHeader: Boolean,
@@ -18,6 +18,9 @@ class TransportCaps(
         val USB_AOA = TransportCaps("usb-aoa", outerHeader = true, separateSockets = false, nativeDetach = true)
         val TCP_DEBUG = TransportCaps("tcp-debug", outerHeader = true, separateSockets = false, nativeDetach = false)
         val TCP6 = TransportCaps("tcp6", outerHeader = false, separateSockets = true, nativeDetach = false)
+
+        /** ADB-режим старых ГУ (CarLife 3.0): формат сокетов как tcp6, но поведение сессии как у кабеля (не «воздух»). */
+        val TCP_ADB = TransportCaps("tcp-adb", outerHeader = false, separateSockets = true, nativeDetach = false)
     }
 }
 

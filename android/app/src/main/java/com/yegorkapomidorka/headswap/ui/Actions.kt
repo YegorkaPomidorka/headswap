@@ -13,6 +13,7 @@ import android.widget.Toast
 import com.yegorkapomidorka.headswap.MainActivity
 import com.yegorkapomidorka.headswap.AppLocale
 import com.yegorkapomidorka.headswap.AppLog
+import com.yegorkapomidorka.headswap.BuildConfig
 import com.yegorkapomidorka.headswap.BridgeService
 import com.yegorkapomidorka.headswap.CarLifeState
 import com.yegorkapomidorka.headswap.R
@@ -38,6 +39,8 @@ object Actions {
         val list = usb.accessoryList
         if (list == null || list.isEmpty()) {
             AppLog.i("аксессуар не найден (getAccessoryList=${if (list == null) "null" else "[]"})")
+            // ADB-сборка: статус ведёт AdbLink (ГУ запускает activity через am start, затирать его нельзя)
+            if (BuildConfig.CARLIFE_ADB) return
             CarLifeState.accessory = "не найден"
             CarLifeState.status = "ждём аксессуар"
             return

@@ -20,6 +20,7 @@ import android.widget.TextView
 import android.widget.Toast
 import com.yegorkapomidorka.headswap.AppLocale
 import com.yegorkapomidorka.headswap.AppLog
+import com.yegorkapomidorka.headswap.BuildConfig
 import com.yegorkapomidorka.headswap.CarLifeState
 import com.yegorkapomidorka.headswap.R
 import com.yegorkapomidorka.headswap.ui.UiText
@@ -103,8 +104,10 @@ object Updater {
         ).also { installed = it }
 
     /** Сохранённый релиз, если он новее установленной версии. */
-    fun available(ctx: Context): UpdateLogic.Release? =
-        UpdatePrefs(ctx).release()?.takeIf { UpdateLogic.isNewer(it.version, installedVersion(ctx)) }
+    fun available(ctx: Context): UpdateLogic.Release? {
+        if (BuildConfig.CARLIFE_ADB) return null      // versionName 8.6.7 не сравнится с релизами Headswap, а ставился бы другой пакет
+        return UpdatePrefs(ctx).release()?.takeIf { UpdateLogic.isNewer(it.version, installedVersion(ctx)) }
+    }
 
     /** Плашка на главном экране: проверка включена, есть новее и её не закрыли. */
     fun banner(ctx: Context): UpdateLogic.Release? {
@@ -119,6 +122,7 @@ object Updater {
 
     /** При открытии приложения: проверить, если включено и пора; заодно убрать APK уже установленных версий. */
     fun maybeCheck(ctx: Context) {
+        if (BuildConfig.CARLIFE_ADB) return
         if (!cleaned && step == Step.IDLE) {
             cleaned = true
             val cur = installedVersion(ctx)
@@ -132,6 +136,7 @@ object Updater {
 
     /** Запросить последний релиз в фоне. manual: ошибку показать тостом. */
     fun check(ctx: Context, manual: Boolean) {
+        if (BuildConfig.CARLIFE_ADB) return
         synchronized(this) {
             if (step != Step.IDLE) return
             step = Step.CHECKING
