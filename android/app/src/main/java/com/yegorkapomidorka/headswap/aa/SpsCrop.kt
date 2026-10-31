@@ -3,7 +3,7 @@ package com.yegorkapomidorka.headswap.aa
 import java.io.ByteArrayOutputStream
 
 /**
- * Кроп без перекодирования (h529, идея @diman_tm): поля кадра AA отрезает декодер ГУ по frame_crop_* в SPS.
+ * Кроп без перекодирования (h529, идея Димы): поля кадра AA отрезает декодер ГУ по frame_crop_* в SPS.
  * SPS разбирается до frame_cropping_flag, новые смещения пишутся заново, хвост (VUI) копируется побитно.
  * Остальные NAL потока не трогаются.
  */

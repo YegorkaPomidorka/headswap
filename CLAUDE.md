@@ -14,7 +14,7 @@
 
 ### Ticket isolation
 - Each session owns exactly ONE ticket (hNNN). At session start, state the ticket ID, the reporter's name/handle and their head unit. Re-confirm it before any message, build or log analysis.
-- Never message, build for, or act on another ticket's user (e.g. h319/@olya1305 vs h295) unless explicitly told to.
+- Never message, build for, or act on another ticket's user (e.g. h319 vs h295) unless explicitly told to.
 - If the user says stop or do nothing, stop all actions immediately.
 
 ### Research before building
