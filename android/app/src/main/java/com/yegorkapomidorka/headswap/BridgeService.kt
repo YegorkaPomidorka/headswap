@@ -248,7 +248,7 @@ class BridgeService : Service() {
                 AppLog.i("сервис: ADB-набор сокетов уже забран или сброшен, останавливаюсь")
                 CarLifeState.status = "ADB: набор сокетов не найден"
                 failStart()
-                return START_NOT_STICKY
+                return
             }
             val old = session
             if (old != null) {
@@ -258,7 +258,7 @@ class BridgeService : Service() {
                 old.close("новое ADB-подключение")
             }
             startSession(transport)
-            return START_NOT_STICKY
+            return
         }
         if (session != null) {
             AppLog.i("сервис: сессия уже идёт, повторный старт игнорирую")
