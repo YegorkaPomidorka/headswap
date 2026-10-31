@@ -1074,6 +1074,30 @@ class AaMetaTest {
     }
 
     @Test
+    fun honda20772104BtAudioMusicOffDoesNotPauseAa() {
+        // Civic 2021 (h629, лог 31.10 18:14-18:25): звук по BT, MUSIC=0 - ГУ ушло на BT-аудио этого же телефона, 127 его глушил
+        val r = Rig()
+        val peer = FakePeer()
+        r.core.peer = peer
+        r.core.usbAudioEnabled = false
+        r.core.onHuStatistic(AaBridgeCore.HONDA_20772104_CHANNEL)
+        r.start()
+        r.core.onMediaStatus(AaMeta.parseMediaStatus(status(2, 1))!!)
+        assertFalse(r.core.onCarlifeMusicControl(0))
+        assertTrue("127 не шлём", peer.keys.isEmpty())
+
+        // звук по USB: как раньше, пауза
+        val q = Rig()
+        val qPeer = FakePeer()
+        q.core.peer = qPeer
+        q.core.onHuStatistic(AaBridgeCore.HONDA_20772104_CHANNEL)
+        q.start()
+        q.core.onMediaStatus(AaMeta.parseMediaStatus(status(2, 1))!!)
+        assertFalse(q.core.onCarlifeMusicControl(0))
+        assertEquals(listOf(127), qPeer.keys.toList())
+    }
+
+    @Test
     fun g6sMusicOnWithoutOurPauseDoesNotPlay() {
         // свежая сессия: пачка MUSIC=1 через ~2 с после HU_INFO, паузы нашей нет (h33: радио не глушить)
         val r = Rig()

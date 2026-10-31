@@ -516,6 +516,11 @@ class AaBridgeCore(
      */
     @Synchronized
     fun onCarlifeMusicControl(status: Int?): Boolean {
+        if (HU_MUSIC_FOLLOW_ENABLED && status == 0 && carlifeStarted && huHonda20772104 && !audioViaUsb) {
+            // Civic 2021 (h629): звук по BT, «свой источник» ГУ - BT-аудио этого же телефона. Пауза AA глушила бы его.
+            log("BRIDGE Honda 20772104: ГУ ушло на свой источник (MUSIC=0), звук по BT - AA не трогаю", true)
+            return false
+        }
         if (HU_MUSIC_FOLLOW_ENABLED && status == 0 && carlifeStarted) {
             val p = peer
             if (meta.playing && !huPausedAa && p != null) {
