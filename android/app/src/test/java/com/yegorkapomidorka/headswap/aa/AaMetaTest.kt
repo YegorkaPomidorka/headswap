@@ -1032,6 +1032,48 @@ class AaMetaTest {
     }
 
     @Test
+    fun honda20772104ResumesAfterExternalPause() {
+        // Civic 2021 (h629, лог 31.10 12:29): после задней AA встаёт на паузу извне, через 100 мс ГУ шлёт MUSIC=1
+        val r = Rig()
+        val peer = FakePeer()
+        r.core.peer = peer
+        r.core.onHuStatistic(AaBridgeCore.HONDA_20772104_CHANNEL)
+        r.start()
+        assertFalse("свежая сессия: MUSIC=1 без паузы play не шлёт", r.core.onCarlifeMusicControl(1))
+        r.core.onMediaStatus(AaMeta.parseMediaStatus(status(2, 1))!!)
+        r.now += 60_000
+        r.core.onMediaStatus(AaMeta.parseMediaStatus(status(3, 2))!!)
+        r.now += 100
+        assertTrue(r.core.onCarlifeMusicControl(1))
+        r.now += 1300
+        assertTrue(r.core.onCarlifeMusicControl(1))
+        assertEquals("126 один раз", listOf(126), peer.keys.toList())
+
+        // пауза пользователем (кнопка с ГУ перед ней): MUSIC=1 play не шлёт
+        r.core.onMediaStatus(AaMeta.parseMediaStatus(status(2, 3))!!)
+        r.now += 10_000
+        r.core.onCarlifeVoiceKey()
+        r.now += 500
+        r.core.onMediaStatus(AaMeta.parseMediaStatus(status(3, 4))!!)
+        r.now += 100
+        assertFalse(r.core.onCarlifeMusicControl(1))
+        assertEquals(1, peer.keys.count { it == 126 })
+
+        // другая Honda без флага: как раньше
+        val q = Rig()
+        val qPeer = FakePeer()
+        q.core.peer = qPeer
+        q.core.onHuStatistic(AaBridgeCore.HONDA_20772121_CHANNEL)
+        q.start()
+        q.core.onMediaStatus(AaMeta.parseMediaStatus(status(2, 1))!!)
+        q.now += 60_000
+        q.core.onMediaStatus(AaMeta.parseMediaStatus(status(3, 2))!!)
+        q.now += 100
+        assertFalse(q.core.onCarlifeMusicControl(1))
+        assertTrue(qPeer.keys.isEmpty())
+    }
+
+    @Test
     fun g6sMusicOnWithoutOurPauseDoesNotPlay() {
         // свежая сессия: пачка MUSIC=1 через ~2 с после HU_INFO, паузы нашей нет (h33: радио не глушить)
         val r = Rig()
