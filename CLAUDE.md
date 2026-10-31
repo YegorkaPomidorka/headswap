@@ -1,10 +1,20 @@
 # CLAUDE.md
 
+## Карта и решения
+
+- `docs/ARCHITECTURE.md` — карта приложения: пакеты, поток данных, флаги ГУ, инварианты, «симптом → куда смотреть».
+  Читать перед разведкой по коду: часто она её заменяет.
+- `docs/adr/` — почему сделано так. Перед тем как менять подход (проброс/перекодирование, heartbeat, нарезка, сервер 5277),
+  прочитать ADR по теме.
+- Неочевидное решение (выбрали подход из нескольких, отвергли вариант после проверки на машине, ввели инвариант) — новая
+  запись ADR в том же PR, правила в `docs/adr/README.md`. Причину брать из разговора с Егором; неизвестна — так и написать.
+- Изменилась структура (новый пакет, флаг ГУ, путь данных) — поправить ARCHITECTURE.md в том же PR.
+
 ## Ticket workflow
 
 ### Ticket isolation
 - Each session owns exactly ONE ticket (hNNN). At session start, state the ticket ID, the reporter's name/handle and their head unit. Re-confirm it before any message, build or log analysis.
-- Never message, build for, or act on another ticket's user (e.g. h319/@olya1305 vs h295) unless explicitly told to.
+- Never message, build for, or act on another ticket's user (e.g. h319 vs h295) unless explicitly told to.
 - If the user says stop or do nothing, stop all actions immediately.
 
 ### Research before building
