@@ -516,9 +516,10 @@ class AaBridgeCore(
      */
     @Synchronized
     fun onCarlifeMusicControl(status: Int?): Boolean {
-        if (HU_MUSIC_FOLLOW_ENABLED && status == 0 && carlifeStarted && huHonda20772104 && !audioViaUsb) {
-            // Civic 2021 (h629): звук по BT, «свой источник» ГУ - BT-аудио этого же телефона. Пауза AA глушила бы его.
-            log("BRIDGE Honda 20772104: ГУ ушло на свой источник (MUSIC=0), звук по BT - AA не трогаю", true)
+        if (hondaBtMusic) {
+            // Civic 2021 (h629): звук по BT, «свой источник» ГУ - BT-аудио этого же телефона. Пауза AA глушила бы его,
+            // а MUSIC=1 в ответ уводит ГУ на CarLife-источник: оно ставит BT на паузу (лог 2026-10-31 20:58-21:07).
+            log("BRIDGE Honda 20772104: MODULE_CONTROL MUSIC=$status, звук по BT - AA не трогаю, CarLife-музыки нет", true)
             return false
         }
         if (HU_MUSIC_FOLLOW_ENABLED && status == 0 && carlifeStarted) {
@@ -1568,6 +1569,9 @@ class AaBridgeCore(
         return true
     }
 
+    /** Civic 2021 (h629) со звуком по BT: музыку играет BT-источник ГУ, CarLife-музыку ему не заявляем. */
+    private val hondaBtMusic get() = huHonda20772104 && !audioViaUsb
+
     private fun musicStatus(status: Int) {
         if (MODULE_MUSIC_ENABLED) link.sendModuleStatus(CarlifeAudio.MODULE_MUSIC, status)
     }
@@ -1582,6 +1586,10 @@ class AaBridgeCore(
             muteMediaOnCall("плеер AA остановился")
         }
         if (audioViaUsb || !MODULE_MUSIC_ENABLED || !carlifeStarted) return
+        if (hondaBtMusic) {
+            log("BRIDGE Honda 20772104: MODULE_STATUS MUSIC не шлю, звук по BT - ГУ держит свой BT-источник", false)
+            return
+        }
         if (link.sendModuleStatus(CarlifeAudio.MODULE_MUSIC, if (playing) 1 else 0)) {
             log("BRIDGE CarLife MODULE_STATUS MUSIC=${if (playing) 1 else 0} (плеер AA, звук не по USB)", true)
         }

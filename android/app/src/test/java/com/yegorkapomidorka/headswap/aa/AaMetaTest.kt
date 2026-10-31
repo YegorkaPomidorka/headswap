@@ -1086,6 +1086,17 @@ class AaMetaTest {
         assertFalse(r.core.onCarlifeMusicControl(0))
         assertTrue("127 не шлём", peer.keys.isEmpty())
 
+        // лог 31.10 20:58-21:07: MUSIC=1 от нас уводил ГУ на CarLife-источник, BT вставал на паузу
+        assertTrue("MUSIC по плееру не заявляем", r.link.modules.none { it.first == CarlifeAudio.MODULE_MUSIC })
+        r.now += 60_000
+        r.core.onMediaStatus(AaMeta.parseMediaStatus(status(3, 2))!!)
+        r.now += 20
+        assertFalse("MODULE_CONTROL MUSIC=1: отвечаем 0", r.core.onCarlifeMusicControl(1))
+        r.now += 1300
+        assertFalse(r.core.onCarlifeMusicControl(1))
+        assertTrue("126 не шлём", peer.keys.isEmpty())
+        assertTrue(r.link.modules.none { it.first == CarlifeAudio.MODULE_MUSIC })
+
         // звук по USB: как раньше, пауза
         val q = Rig()
         val qPeer = FakePeer()
