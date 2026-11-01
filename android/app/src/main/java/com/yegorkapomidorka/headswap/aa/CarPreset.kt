@@ -18,6 +18,7 @@ private val KOREAN = CarSettings(musicRate = MusicRate.HZ32)
  * Подтверждённые машины (README, «Совместимость») и проверенные сообществом настройки для каждой.
  * Выбор машины разом пишет [settings] в AaPrefs, дальше любую настройку можно поменять вручную.
  * Всем машинам одинаково: прямой проброс и кадры «Авто» (по умолчанию 1280×720, у машин с особым экраном - своё разрешение), музыка «Авто»; отдельные значения только проверенные живьём.
+ * Исключение - Elantra 7: перекодирование и 15 кадров.
  * Особенности ГУ, которые мост определяет сам (Hyundai CN7 - музыка 32 кГц в «Авто», VW ID - потолок битрейта), здесь не дублируются.
  * Имя элемента хранится в prefs: не переименовывать.
  */
@@ -35,7 +36,8 @@ enum class CarPreset(val titleRes: Int, val settings: CarSettings = CarSettings(
     HONDA_CRV_2026_HYBRID(R.string.car_honda_crv_2026_hybrid, CarSettings(videoMode = VideoMode.WIDE_HD)),
     /** Машина Егора: 1920×1080, 30 кадров. */
     HONDA_VEZEL_2022(R.string.car_honda_vezel_2022, CarSettings(videoMode = VideoMode.R1080)),
-    HYUNDAI_ELANTRA_7(R.string.car_hyundai_elantra_7, KOREAN),
+    /** ГУ CN7: прямой проброс моргает и гаснет (h638), канал слабый - перекодирование 1280×480 на 15 кадрах. */
+    HYUNDAI_ELANTRA_7(R.string.car_hyundai_elantra_7, KOREAN.copy(transcode = true, videoMode = VideoMode.WIDE, fps = FpsSetting.FPS15)),
     /** HSAE, вертикальный экран: 1280×480 работает шустро (h86). */
     HYUNDAI_IX35_2021(R.string.car_hyundai_ix35_2021, KOREAN.copy(videoMode = VideoMode.WIDE)),
     JETTA_VS(R.string.car_jetta_vs),
