@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Одноразовое окно после обновления до 3.0: прямой проброс видео и частота кадров «Авто» по умолчанию -->
+<resources>
+    <string name="u30_title">Прямой проброс видео</string>
+    <string name="u30_lead">Режим включён по умолчанию.</string>
+    <string name="u30_pros">Что это даёт</string>
+    <string name="u30_pro_1">Меньше задержка картинки</string>
+    <string name="u30_pro_2">Телефон меньше греется и тратит батарею</string>
+    <string name="u30_pro_3">Широкие экраны ГУ обрезает сама</string>
+    <string name="u30_changed">Что поменялось</string>
+    <string name="u30_chg_1">Частота кадров — <b>Авто</b>: её задаёт Android Auto</string>
+    <string name="u30_chg_2">Ваши прежние настройки видео не пропали, они для перекодирования</string>
+    <string name="u30_warn">Если что-то не так</string>
+    <string name="u30_warn_text">Чёрный экран, рывки, артефакты или картинка не на весь экран — включите <b>перекодирование</b>, как было раньше.</string>
+    <string name="u30_where">Настройки → Видео → Режим</string>
+    <string name="u30_ok">Понятно</string>
+    <string name="u30_open">Открыть настройки видео</string>
+</resources>

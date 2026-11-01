@@ -686,10 +686,10 @@ class ProtocolTest {
             assertEquals(15, Handshake.chooseFps(FpsSetting.FPS15, req))
             assertEquals(30, Handshake.chooseFps(FpsSetting.FPS30, req))
         }
-        assertEquals(FpsSetting.FPS15, FpsSetting.DEFAULT)
+        assertEquals(FpsSetting.AUTO, FpsSetting.DEFAULT)
         assertEquals(FpsSetting.FPS15, FpsSetting.parse("FPS15"))
-        assertEquals(FpsSetting.FPS15, FpsSetting.parse(null))
-        assertEquals(FpsSetting.FPS15, FpsSetting.parse("мусор"))
+        assertEquals(FpsSetting.AUTO, FpsSetting.parse(null))
+        assertEquals(FpsSetting.AUTO, FpsSetting.parse("мусор"))
     }
 
     @Test

@@ -123,6 +123,19 @@ class AaBridgeCoreTest {
     private fun types(b: ByteArray) = AnnexB.nalTypes(b)
 
     @Test
+    fun hyundaiCn7ForcesTranscode() {
+        // h638: на CN7 прямой проброс моргает и гаснет
+        core.transcodeEnabled = false
+        core.onHuInfo("QTI", "sm6150_au for arm64", "other")
+        assertFalse(core.huHyundaiCn7)
+        assertFalse(core.transcodeEnabled)
+        core.onHuInfo("QTI", "sm6150_au for arm64", AaBridgeCore.HYUNDAI_CN7_PRODUCT)
+        assertTrue(core.huHyundaiCn7)
+        assertTrue(core.transcodeEnabled)
+        assertEquals(1, logs.count { it.contains("Hyundai CN7: passthrough отключаю") })
+    }
+
+    @Test
     fun mobisFlagFromHuInfoOrChannelForcesTranscode() {
         // h242: Tucson (Mobis CCNC) опознаётся по HU_INFO, запасной признак - канал 20022188
         assertFalse(core.huMobisNx4c)

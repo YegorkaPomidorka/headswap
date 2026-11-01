@@ -56,6 +56,11 @@ class UiPrefs(ctx: Context) {
         get() = sp.getBoolean("a11yNoticeShown", false)
         set(v) = sp.edit().putBoolean("a11yNoticeShown", v).apply()
 
+    /** Окно «Прямой проброс видео» (3.0) уже показывали или оно не нужно (новичок прошёл онбординг). */
+    var v30NoticeShown: Boolean
+        get() = sp.getBoolean("v30NoticeShown", false)
+        set(v) = sp.edit().putBoolean("v30NoticeShown", v).apply()
+
     /** Тема интерфейса: system / light / medium / dark (см. AppTheme). */
     var theme: String
         get() = sp.getString("theme", "system") ?: "system"

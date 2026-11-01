@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- One-time window after updating to 3.0: direct video passthrough and frame rate Auto are the defaults -->
+<resources>
+    <string name="u30_title">Direct video passthrough</string>
+    <string name="u30_lead">This mode is on by default.</string>
+    <string name="u30_pros">What you get</string>
+    <string name="u30_pro_1">Lower picture latency</string>
+    <string name="u30_pro_2">The phone runs cooler and saves battery</string>
+    <string name="u30_pro_3">Wide head unit screens crop the picture themselves</string>
+    <string name="u30_changed">What changed</string>
+    <string name="u30_chg_1">Frame rate is <b>Auto</b>: Android Auto sets it</string>
+    <string name="u30_chg_2">Your old video settings are kept, they apply to re-encoding</string>
+    <string name="u30_warn">If something is wrong</string>
+    <string name="u30_warn_text">Black screen, stutter, artifacts or a picture that does not fill the screen: turn on <b>re-encoding</b>, as before.</string>
+    <string name="u30_where">Settings → Video → Mode</string>
+    <string name="u30_ok">Got it</string>
+    <string name="u30_open">Open video settings</string>
+</resources>

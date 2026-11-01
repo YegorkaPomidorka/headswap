@@ -643,7 +643,14 @@ class AaBridgeCore(
         vwIdName = manufacturer
         if (manufacturer == VW_BT_1420_MANUFACTURER) huVwBt1420 = true
         updateVwId()
-        if (product == HYUNDAI_CN7_PRODUCT) huHyundaiCn7 = true
+        if (product == HYUNDAI_CN7_PRODUCT) {
+            huHyundaiCn7 = true
+            // на прямом пробросе экран моргает и гаснет, канал ~250 КиБ/с (h638); BridgeService вернёт поле к настройке на следующей сессии
+            if (!transcodeEnabled) {
+                transcodeEnabled = true
+                log("BRIDGE ГУ Hyundai CN7: passthrough отключаю, перекодирование принудительно", true)
+            }
+        }
         if (manufacturer == PIONEER_MANUFACTURER && model == PIONEER_RM56_MODEL) {
             if (!huPioneerRm56) log("BRIDGE ГУ Pioneer RM56E8B: потолок ${PIONEER_RM56_CEILING_BPS / 1000} кбит/с, fps ≤ $PIONEER_RM56_MAX_FPS", true)
             huPioneerRm56 = true
