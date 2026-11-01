@@ -76,9 +76,9 @@ CONTROL0, SENSOR1, VIDEO2, INPUT3, SPEECH4, SYSTEM5, MEDIA6, MIC7, BT8, MEDIA_PL
 Закрытие всегда ByeBye → shutdownOutput → дочитать EOF → close.
 
 **5. Видео** (`AaBridgeCore.onFrame` → `aaFrame`):
-- *Перекодирование* (по умолчанию, ADR 0004): `feedTranscoder` → `AaTranscoder` (декодер → `GlRelay` → энкодер,
+- *Перекодирование* (включается вручную, ADR 0004): `feedTranscoder` → `AaTranscoder` (декодер → `GlRelay` → энкодер,
   повтор кадра каждые 100 мс, нить `aa-trans-feed` через `FeedQueue` — ADR 0011) → `onEncoderFrame` → ГУ.
-- *Прямой проброс*: `passthroughFrame`; поля режет `SpsCrop` правкой SPS; раз в 2 с свой IDR (`IdrSplice`, ADR 0005).
+- *Прямой проброс* (по умолчанию с 3.0, ADR 0018): `passthroughFrame`; поля режет `SpsCrop` правкой SPS; раз в 2 с свой IDR (`IdrSplice`, ADR 0005).
 - В ГУ: `CarLifeSession.sendVideo` → `AnnexB.fixSps` → `sendVideoData`. Очередь переполнилась (>30 кадров или
   ~500 мс) — кадры выбрасываются до следующего IDR.
 - Где решается «проброс или перекодирование» — в четырёх местах: `AaPrefs.transcode`, `VideoGeometry.effective()`,
