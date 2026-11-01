@@ -9,7 +9,9 @@ class CarPresetTest {
     fun presetsApplyAsWritten() {
         // режим с кропом без перекодирования молча стал бы 1280×720: такой пресет «изменён вручную» сразу после выбора
         for (p in CarPreset.values()) {
-            assertEquals(p.name, p.settings.videoMode, p.settings.videoMode.effective(p.settings.transcode))
+            // VW Tiguan L Pro: WIDE_976 масштабирует область, SPS-кропом не режется; в прямом пробросе это WIDE_836, до 2240×976 растягивает ГУ (h529)
+            val expected = if (p == CarPreset.VW_TIGUAN_L_PRO) VideoMode.WIDE_836 else p.settings.videoMode
+            assertEquals(p.name, expected, p.settings.videoMode.effective(p.settings.transcode))
             assertEquals(p.name, p.settings.aaDensity, AaDensity.parse(p.settings.aaDensity))
         }
     }
@@ -28,11 +30,10 @@ class CarPresetTest {
     }
 
     @Test
-    fun allPresetsTranscodeAt15Fps() {
+    fun allPresetsDirectPassthroughAutoFps() {
         for (p in CarPreset.values()) {
-            // Corolla Cross (h420): энкодер Xiaomi падает на 1920×720, прямой проброс с SPS-кропом
-            assertEquals(p.name, p != CarPreset.TOYOTA_COROLLA_CROSS_2024, p.settings.transcode)
-            assertEquals(p.name, FpsSetting.FPS15, p.settings.fps)
+            assertEquals(p.name, false, p.settings.transcode)
+            assertEquals(p.name, FpsSetting.AUTO, p.settings.fps)
         }
     }
 

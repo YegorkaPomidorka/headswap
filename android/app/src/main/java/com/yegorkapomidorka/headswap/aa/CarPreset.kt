@@ -4,20 +4,20 @@ import com.yegorkapomidorka.headswap.R
 
 /** Настройки моста, которые выставляет выбор машины в разделе «Мой автомобиль». */
 data class CarSettings(
-    val transcode: Boolean = true,
+    val transcode: Boolean = false,
     val videoMode: VideoMode = VideoMode.DEFAULT,
     val aaDensity: Int = AaDensity.AUTO,
     val fps: FpsSetting = FpsSetting.DEFAULT,
     val musicRate: MusicRate = MusicRate.DEFAULT,
 )
 
-/** Корейские ГУ слабые: на 30 кадрах и 48 кГц рвут USB, советуем 15 кадров, 32 кГц (h139, h218, h260). */
+/** Корейские ГУ слабые: на 30 кадрах и 48 кГц рвут USB, советуем 32 кГц (h139, h218, h260); кадры «Авто» как у всех. */
 private val KOREAN = CarSettings(musicRate = MusicRate.HZ32)
 
 /**
  * Подтверждённые машины (README, «Совместимость») и проверенные сообществом настройки для каждой.
  * Выбор машины разом пишет [settings] в AaPrefs, дальше любую настройку можно поменять вручную.
- * Всем машинам одинаково: перекодирование и 15 кадров (по умолчанию 1280×720, у машин с особым экраном - своё разрешение), музыка «Авто»; отдельные значения только проверенные живьём.
+ * Всем машинам одинаково: прямой проброс и кадры «Авто» (по умолчанию 1280×720, у машин с особым экраном - своё разрешение), музыка «Авто»; отдельные значения только проверенные живьём.
  * Особенности ГУ, которые мост определяет сам (Hyundai CN7 - музыка 32 кГц в «Авто», VW ID - потолок битрейта), здесь не дублируются.
  * Имя элемента хранится в prefs: не переименовывать.
  */
@@ -54,7 +54,7 @@ enum class CarPreset(val titleRes: Int, val settings: CarSettings = CarSettings(
     /** CNS3 просит 2:1, 1280×640 (h292); на 1080p виснет (h305). */
     SKODA_OCTAVIA_PRO(R.string.car_skoda_octavia_pro, CarSettings(videoMode = VideoMode.WIDE_2_1)),
     /** HSAE 21070007, 1920×720 (h420): энкодер Xiaomi на 1920×720 падает, ГУ игнорирует кроп SPS и берёт верхние 720 строк - прямой проброс с полями снизу. */
-    TOYOTA_COROLLA_CROSS_2024(R.string.car_toyota_corolla_cross_2024, CarSettings(transcode = false, videoMode = VideoMode.WIDE_HD)),
+    TOYOTA_COROLLA_CROSS_2024(R.string.car_toyota_corolla_cross_2024, CarSettings(videoMode = VideoMode.WIDE_HD)),
     TOYOTA_LEVIN(R.string.car_toyota_levin),
     /** Китай: 1920×1080, 30 кадров (Егор, 18.10). */
     VW_BORA_2021(R.string.car_vw_bora_2021, CarSettings(videoMode = VideoMode.R1080)),

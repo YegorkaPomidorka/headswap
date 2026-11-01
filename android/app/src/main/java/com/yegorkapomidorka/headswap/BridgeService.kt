@@ -162,6 +162,7 @@ class BridgeService : Service() {
         super.onCreate()
         alive = true
         AppLog.init(this)
+        AaPrefs(this).migrateTo30()        // приложение могло запуститься от USB, не открывшись (то же в MainActivity.onCreate)
         val nm = getSystemService(NotificationManager::class.java)
         nm.createNotificationChannel(NotificationChannel(CHANNEL, getString(R.string.notif_channel_bridge), NotificationManager.IMPORTANCE_LOW))
         registerReceiver(detachReceiver, IntentFilter(UsbManager.ACTION_USB_ACCESSORY_DETACHED), Context.RECEIVER_EXPORTED)
