@@ -118,36 +118,33 @@ internal fun <T> PagedApps(
     }
 }
 
-private val plusMarker = AppRef("", "")
-
-/** «Все приложения»: первая кнопка «Главный», дальше приложения пользователя и «+» в конце. */
+/** «Все приложения»: первая кнопка «Главный», дальше все установленные приложения страницами; тап открывает. */
 @Composable
 fun AllAppsScreen() {
     val model = LauncherModel
     var page by remember { mutableIntStateOf(model.allAppsPage) }
-    val items = model.visibleApps + plusMarker
+    val items = CatalogLists.all(model.catalog.map { AppRef(it.packageName, it.className) })
     PagedApps(
         items, page, onPage = { page = it; model.allAppsPage = it },
         leading = {
             PillButton(stringResource(R.string.l_home), { LauncherActions.goHome() }, icon = Ico.HOME)
         },
     ) { ref, iconPx ->
-        if (ref == plusMarker) PlusTile(labelled = true, iconPx = iconPx, onTap = { LauncherActions.openPicker() })
-        else AppTile(ref, labelled = true, iconPx = iconPx, onLong = { model.confirmRemove = ref })
+        AppTile(ref, labelled = true, iconPx = iconPx)
     }
 }
 
-/** Выбор приложения из установленных (страницами со стрелками); выбранное уходит в конец списка. */
+/** Выбор приложения для нижнего ряда главного из установленных (страницами со стрелками); выбранное уходит в избранное. */
 @Composable
 fun PickerScreen() {
     val model = LauncherModel
     val f1 = LocalMetrics.current.spec.f1
     var page by remember { mutableIntStateOf(0) }
-    val items = model.catalog.map { AppRef(it.packageName, it.className) }.filter { it !in model.apps }
+    val items = CatalogLists.pickable(model.catalog.map { AppRef(it.packageName, it.className) }, model.apps)
     PagedApps(
         items, page, onPage = { page = it },
         leading = {
-            PillButton(stringResource(R.string.l_back), { LauncherActions.openAllApps() }, icon = Ico.CHEV_L, filled = false)
+            PillButton(stringResource(R.string.l_back), { LauncherActions.goHome() }, icon = Ico.CHEV_L, filled = false)
             Txt(stringResource(R.string.l_choose_app), f1, color = Pal.SEC2)
         },
     ) { ref, iconPx ->

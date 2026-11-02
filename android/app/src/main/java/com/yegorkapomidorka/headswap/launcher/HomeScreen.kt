@@ -102,7 +102,7 @@ private fun QuickAppsRow() {
         for (slot in slots) {
             Box(Modifier.weight(1f).fillMaxHeight(), contentAlignment = Alignment.Center) {
                 when (slot) {
-                    is QuickSlot.App -> AppTile(slot.ref, labelled = true)
+                    is QuickSlot.App -> AppTile(slot.ref, labelled = true, onLong = { LauncherModel.confirmRemove = slot.ref })
                     QuickSlot.Plus -> PlusTile(labelled = true)
                     QuickSlot.Empty -> Unit
                 }
@@ -125,7 +125,7 @@ private fun AppsGrid(columns: Int, rows: Int) {
             Row(horizontalArrangement = Arrangement.spacedBy(m.dp(s.g))) {
                 for (c in 0 until columns) {
                     when (val slot = slots.getOrNull(r * columns + c)) {
-                        is QuickSlot.App -> AppTile(slot.ref, labelled = false)
+                        is QuickSlot.App -> AppTile(slot.ref, labelled = false, onLong = { LauncherModel.confirmRemove = slot.ref })
                         QuickSlot.Plus -> PlusTile(labelled = false)
                         else -> Spacer(Modifier.size(m.dp(s.appIc)))
                     }
@@ -143,7 +143,7 @@ fun rememberAppIcon(ref: AppRef): ImageBitmap? {
     return icon
 }
 
-/** Иконка-кружок приложения (+ подпись в быстром ряду). Тап запускает, долгий тап - только на экране «Все приложения». */
+/** Иконка-кружок приложения (+ подпись в быстром ряду). Тап запускает; долгий тап в нижнем ряду главного - «Убрать?». */
 @Composable
 fun AppTile(
     ref: AppRef, labelled: Boolean, onLong: (() -> Unit)? = null, iconPx: Int? = null,
@@ -177,9 +177,9 @@ fun AppCircle(ref: AppRef, sizePx: Int) {
     }
 }
 
-/** Закреплённый «+»: открывает «Все приложения». */
+/** Закреплённый «+»: открывает выбор приложения для нижнего ряда. */
 @Composable
-fun PlusTile(labelled: Boolean, iconPx: Int? = null, onTap: () -> Unit = { LauncherActions.openAllApps() }) {
+fun PlusTile(labelled: Boolean, iconPx: Int? = null, onTap: () -> Unit = { LauncherActions.openPicker() }) {
     val m = LocalMetrics.current
     val s = m.spec
     val size = iconPx ?: s.appIc
