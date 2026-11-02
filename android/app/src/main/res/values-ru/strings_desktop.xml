@@ -9,13 +9,4 @@
     <string name="desk_recovering">Восстанавливаю рабочий стол (%1$d/2)…</string>
     <string name="desk_recovery_stopped">Восстановление остановлено. Проверьте USB, доступ к рабочему столу и разблокировку телефона</string>
     <string name="desk_recovery_screen_busy">Предыдущий экран ещё не освобождён; автоматический запуск отменён</string>
-
-    <!-- desktop/DesktopHomeActivity: временный домашний экран рабочего стола -->
-    <string name="desk_home_connecting">Подключение рабочего стола…</string>
-    <string name="desk_home_choose">Выберите приложение</string>
-    <string name="desk_home_empty">Приложения не найдены</string>
-    <string name="desk_home_catalog_failed">Не удалось получить список приложений. Вернитесь на рабочий стол ещё раз.</string>
-    <string name="desk_home_not_ready">Подключение рабочего стола ещё не готово или уже завершено</string>
-    <string name="desk_home_launch_failed">«%1$s» не удалось открыть на рабочем столе. Выберите другое приложение.</string>
-    <string name="desk_home_hint">«Домой» — список приложений</string>
 </resources>

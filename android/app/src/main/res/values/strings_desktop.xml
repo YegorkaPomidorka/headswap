@@ -10,14 +10,4 @@
     <string name="desk_recovering">Restoring the desktop (%1$d/2)…</string>
     <string name="desk_recovery_stopped">Restore stopped. Check USB, desktop access and unlock the phone</string>
     <string name="desk_recovery_screen_busy">The previous screen is not released yet; automatic restore cancelled</string>
-
-    <!-- desktop/DesktopHomeActivity: временный домашний экран рабочего стола -->
-    <string name="desk_home_title" translatable="false">Headswap Desktop</string>
-    <string name="desk_home_connecting">Connecting the desktop…</string>
-    <string name="desk_home_choose">Choose an app</string>
-    <string name="desk_home_empty">No apps found</string>
-    <string name="desk_home_catalog_failed">Could not get the app list. Return to the desktop again.</string>
-    <string name="desk_home_not_ready">The desktop is not ready yet or has already ended</string>
-    <string name="desk_home_launch_failed">\"%1$s\" could not be opened on the desktop. Choose another app.</string>
-    <string name="desk_home_hint">Home shows the app list</string>
 </resources>

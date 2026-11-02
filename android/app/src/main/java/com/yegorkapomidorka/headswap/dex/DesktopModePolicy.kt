@@ -7,7 +7,7 @@ object DesktopModePolicy {
     const val SAMSUNG_DEX = 0
     const val ANDROID_DESKTOP = 1
     /** Class name in our namespace; the applicationId may carry a suffix (.smoke), the package part is runtime. */
-    const val ANDROID_HOME_CLASS = "com.yegorkapomidorka.headswap.desktop.DesktopHomeActivity"
+    const val ANDROID_HOME_CLASS = "com.yegorkapomidorka.headswap.launcher.LauncherActivity"
 
     fun requireMode(mode: Int) {
         require(mode == SAMSUNG_DEX || mode == ANDROID_DESKTOP) { "Неизвестный режим рабочего стола" }

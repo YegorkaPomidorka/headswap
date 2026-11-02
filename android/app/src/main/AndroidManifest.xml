@@ -114,10 +114,10 @@
             android:exported="false"
             android:grantUriPermissions="true" />
 
-        <!-- Домашний экран Headswap Desktop: его запускает :delegated (тот же uid) на виртуальном дисплее ГУ, снаружи не нужен;
-             домашним приложением телефона не становится. launchMode как у форка не задан (стандартный). -->
+        <!-- Домашний экран Headswap Desktop (лаунчер на Compose): его запускает :delegated (тот же uid) на виртуальном дисплее ГУ,
+             снаружи не нужен; домашним приложением телефона не становится. launchMode как у форка не задан (стандартный). -->
         <activity
-            android:name=".desktop.DesktopHomeActivity"
+            android:name=".launcher.LauncherActivity"
             android:exported="false"
             android:resizeableActivity="true"
             android:excludeFromRecents="true"
