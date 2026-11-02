@@ -568,7 +568,13 @@ class MetaRelay(
             songId = infoSeq.toString(),
         )
         if (!sameTrack) lastProgressMs = null
-        sendInfo(if (sameTrack) "обложка/поля трека обновились" else "новый трек", rearm = true)
+        // h606: перевзвод MUSIC только на новый трек; вторые метаданные AA (+0,6–0,8 с, другая обложка) - обычным MEDIA_INFO
+        sendInfo(if (sameTrack) "обложка/поля трека обновились" else "новый трек", rearm = !sameTrack)
+    }
+
+    /** Повторить текущий MEDIA_INFO без перевзвода (h606: приборка SEMIDRIVE X9). */
+    fun resendInfo(why: String) {
+        if (info != null) sendInfo(why)
     }
 
     private fun replayMusic(why: String) {

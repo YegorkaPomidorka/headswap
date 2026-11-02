@@ -768,6 +768,9 @@ class CarLifeSession(
         return true
     }
 
+    override fun sendModuleStatusAfterMeta(module: Int, status: Int): Boolean =
+        metaSubmit("MODULE_STATUS") { sendCmd(Msg.MODULE_STATUS, Msgs.moduleStatusSingle(module, status)) }
+
     /** CMD GO_TO_DESKTOP (MD -> ГУ, пустое тело): ГУ показывает свой рабочий стол. */
     override fun goToDesktop() {
         if (closed.get()) return
