@@ -43,6 +43,7 @@ import com.yegorkapomidorka.headswap.aa.CAR_MAKES
 import com.yegorkapomidorka.headswap.aa.CallStateSource
 import com.yegorkapomidorka.headswap.aa.CarPreset
 import com.yegorkapomidorka.headswap.aa.CustomVideoMode
+import com.yegorkapomidorka.headswap.aa.DesktopResolution
 import com.yegorkapomidorka.headswap.aa.EQ_BAND_MAX
 import com.yegorkapomidorka.headswap.aa.EQ_BAND_MIN
 import com.yegorkapomidorka.headswap.aa.EQ_FREQS
@@ -752,6 +753,7 @@ class SettingsSectionScreen(host: MainActivity, val section: SettingsSection) : 
     /** Активация с телефона, под ней свёрнутая «Активация с ПК»: команда adb из ActivationToken и копирование в буфер. */
     private fun buildActivation(box: LinearLayout) {
         val c = ctx
+        buildDesktopResolution(box)
         phoneActivation = PhoneActivationBlock(host).also { box.addView(it.view, lp(MATCH, WRAP)) }
         val pc = c.vbox(8).apply { visibility = View.GONE }
         box.addView(c.linkButton(c.getString(R.string.bm_act_title), 48, 15f).apply {
@@ -778,6 +780,24 @@ class SettingsSectionScreen(host: MainActivity, val section: SettingsSection) : 
         }, c.lpDp(MATCH, 52).margins(c, 0, 12, 0, 0))
         phoneCardNote = note(c.getString(R.string.l_perm_summary))
         refreshPhoneCardPermissions()
+    }
+
+    /** Разрешение рабочего стола: Авто и три фиксированных (своё пока не показываем); действует со следующего подключения. */
+    private fun buildDesktopResolution(box: LinearLayout) {
+        val c = ctx
+        val dex = DexPrefs(c)
+        val options = listOf(DesktopResolution.AUTO, DesktopResolution.R1024_768, DesktopResolution.R1280_720, DesktopResolution.R1600_900)
+        val labels = options.map { if (it == DesktopResolution.AUTO) c.getString(R.string.bm_res_auto) else "${it.width}×${it.height}" }
+        lateinit var seg: Segmented
+        seg = Segmented(c, labels, 14f) {
+            dex.desktopResolution = options[it]
+            seg.setSelected(it)
+            AppLog.i("настройка: разрешение рабочего стола -> ${options[it].name}, применится к следующему подключению")
+        }
+        seg.setSelected(options.indexOf(dex.desktopResolution))
+        box.addView(c.sectionTitle(c.getString(R.string.bm_res_title)))
+        box.addView(seg.view, lp(MATCH, WRAP))
+        box.addView(c.text(c.getString(R.string.bm_res_note), 13f, 400, c.clr(R.color.on2)), lp(WRAP, WRAP).margins(c, 8, 2, 8, 8))
     }
 
     private fun missingPhoneCardPermissions(): List<String> = PHONE_CARD_PERMISSIONS.filter {

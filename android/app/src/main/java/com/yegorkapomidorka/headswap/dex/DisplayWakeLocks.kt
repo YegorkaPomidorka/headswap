@@ -30,6 +30,19 @@ internal class DisplayWakeLocks(context: Context) {
         }
     }
 
+    companion object {
+        /** Display.FLAG_OWN_DISPLAY_GROUP / FLAG_ALWAYS_UNLOCKED (android-16 Display.java, не DisplayManager.VIRTUAL_DISPLAY_FLAG_*). */
+        const val FLAG_OWN_DISPLAY_GROUP = 1 shl 8
+        const val FLAG_ALWAYS_UNLOCKED = 1 shl 9
+
+        /** Замок по дисплею держим только у дисплея в своей группе: в общей он держал бы включённым экран самого телефона. */
+        fun shouldHold(displayFlags: Int): Boolean = displayFlags and FLAG_OWN_DISPLAY_GROUP != 0
+
+        fun describe(displayFlags: Int): String =
+            "flags=0x${Integer.toHexString(displayFlags)} ownGroup=${displayFlags and FLAG_OWN_DISPLAY_GROUP != 0} " +
+                "alwaysUnlocked=${displayFlags and FLAG_ALWAYS_UNLOCKED != 0}"
+    }
+
     fun release(displayId: Int) {
         val lock = locks.remove(displayId) ?: return
         runCatching { if (lock.isHeld) lock.release() }

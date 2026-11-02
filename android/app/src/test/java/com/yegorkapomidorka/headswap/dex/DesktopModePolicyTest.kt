@@ -29,6 +29,14 @@ class DesktopModePolicyTest {
         assertEquals(1355 or 2048 or 4096, DesktopModePolicy.displayFlags(mode, 33, alwaysUnlocked = true))
     }
 
+    @Test fun wakeLockOnlyForDisplayInOwnGroup() {
+        // Display.FLAG_*: TRUSTED 128, OWN_DISPLAY_GROUP 256, ALWAYS_UNLOCKED 512 (не те же биты, что VIRTUAL_DISPLAY_FLAG_*)
+        assertFalse(DisplayWakeLocks.shouldHold(128 or 1 or 8))
+        assertTrue(DisplayWakeLocks.shouldHold(128 or 256 or 512))
+        assertTrue(DisplayWakeLocks.describe(128 or 256 or 512).endsWith("ownGroup=true alwaysUnlocked=true"))
+        assertTrue(DisplayWakeLocks.describe(128).endsWith("ownGroup=false alwaysUnlocked=false"))
+    }
+
     @Test fun samsungDisplayKeepsItsVerifiedFlagSet() {
         for (sdk in listOf(33, 34, 37)) {
             assertEquals(132419, DesktopModePolicy.displayFlags(DesktopModePolicy.SAMSUNG_DEX, sdk))

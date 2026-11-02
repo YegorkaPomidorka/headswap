@@ -264,6 +264,9 @@
     <string name="bm_desktop_note">Свой рабочий стол на магнитоле. Нужна разовая активация.</string>
     <string name="bm_need_13">Нужен Android 13+</string>
     <string name="bm_sum_state">%1$s · %2$s</string>
+    <string name="bm_res_title">Разрешение рабочего стола</string>
+    <string name="bm_res_auto">Авто</string>
+    <string name="bm_res_note">Авто — как просит магнитола. Применится при следующем подключении.</string>
     <string name="bm_act_title">Активация с ПК</string>
     <string name="bm_act_on">Активировано</string>
     <string name="bm_act_off">Не активировано</string>

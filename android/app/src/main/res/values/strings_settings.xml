@@ -266,6 +266,9 @@
     <string name="bm_desktop_note">Your own desktop on the head unit. Needs a one-time activation.</string>
     <string name="bm_need_13">Android 13+ required</string>
     <string name="bm_sum_state">%1$s · %2$s</string>
+    <string name="bm_res_title">Desktop resolution</string>
+    <string name="bm_res_auto">Auto</string>
+    <string name="bm_res_note">Auto follows the request of the head unit. Applies on the next connection.</string>
     <string name="bm_act_title">Activation from PC</string>
     <string name="bm_act_on">Activated</string>
     <string name="bm_act_off">Not activated</string>

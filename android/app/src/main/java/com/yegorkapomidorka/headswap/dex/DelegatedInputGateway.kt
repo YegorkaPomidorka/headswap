@@ -72,9 +72,14 @@ internal class DelegatedInputGateway(context: Context) : IDelegatedInputGateway.
         wakeLocks.retain(liveDisplayIds)
     }
 
-    /** Дисплеи с OWN_DISPLAY_GROUP (создаются, когда есть право ALWAYS_UNLOCKED) не должны гаснуть по таймауту экрана. */
+    /**
+     * Фактические флаги дисплея в лог (видно, принял ли Android ALWAYS_UNLOCKED); дисплей в своей DisplayGroup не должен
+     * гаснуть по таймауту экрана, кнопка питания его не усыпляет (goToSleep трогает только общую группу).
+     */
     private fun holdAwake(displayId: Int) {
-        if (DelegatedDesktopAccess.canKeepUnlocked(context)) wakeLocks.hold(displayId)
+        val flags = displays.getDisplay(displayId)?.flags ?: return
+        AppLog.i("WAKE экран $displayId: ${DisplayWakeLocks.describe(flags)}", false)
+        if (DisplayWakeLocks.shouldHold(flags)) wakeLocks.hold(displayId)
     }
 
     @Synchronized override fun injectInput(displayId: Int, token: IBinder, event: InputEvent, actionButton: Int) {
