@@ -27,6 +27,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.boundsInRoot
@@ -39,9 +40,9 @@ import kotlinx.coroutines.withContext
 
 /** Подложка карточки главного экрана. */
 @Composable
-fun CardBox(modifier: Modifier = Modifier, background: Color = Pal.SURFACE, content: @Composable BoxScope.() -> Unit) {
+fun CardBox(modifier: Modifier = Modifier, background: Color = Pal.SURFACE, shape: Shape? = null, content: @Composable BoxScope.() -> Unit) {
     val m = LocalMetrics.current
-    Box(modifier.clip(RoundedCornerShape(m.dp(m.spec.radius))).background(background)) {
+    Box(modifier.clip(shape ?: RoundedCornerShape(m.dp(m.spec.radius))).background(background)) {
         Ltr { content() }
     }
 }
@@ -51,10 +52,11 @@ fun CardBox(modifier: Modifier = Modifier, background: Color = Pal.SURFACE, cont
 fun HomeScreen() {
     val m = LocalMetrics.current
     val s = m.spec
-    Column(Modifier.fillMaxSize().padding(start = m.dp(s.g), top = m.dp(s.g8), end = m.dp(s.m), bottom = m.dp(s.m))) {
+    // нижний ряд прибит к краю экрана, как блок навигации на рейке: снизу без поля
+    Column(Modifier.fillMaxSize().padding(start = m.dp(s.g), top = m.dp(s.g8), end = m.dp(s.m), bottom = m.dp(if (s.strip) s.m else 0))) {
         StatusBar()
         Spacer(Modifier.height(m.dp(s.g8)))
-        Row(Modifier.weight(if (s.strip) 1f else 2f).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(m.dp(s.g))) {
+        Row(Modifier.weight(1f).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(m.dp(s.g))) {
             MusicCard(Modifier.width(m.dp(s.music)).fillMaxHeight())
             NavCard(Modifier.weight(1f).fillMaxHeight())
             if (s.strip) {
@@ -63,10 +65,11 @@ fun HomeScreen() {
         }
         if (!s.strip) {
             Spacer(Modifier.height(m.dp(s.g)))
-            Row(Modifier.weight(1f).fillMaxWidth().heightIn(min = m.dp(s.bottomMin)),
-                horizontalArrangement = Arrangement.spacedBy(m.dp(s.g))) {
-                CardBox(Modifier.weight(1f).fillMaxHeight()) { QuickAppsRow() }
-                PhoneCard(Modifier.width(m.dp(s.phone)).fillMaxHeight())
+            val r = m.dp(s.radius)
+            val topOnly = RoundedCornerShape(topStart = r, topEnd = r)
+            Row(Modifier.height(m.dp(s.bottomH)).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(m.dp(s.g))) {
+                CardBox(Modifier.weight(1f).fillMaxHeight(), shape = topOnly) { QuickAppsRow() }
+                PhoneCard(Modifier.width(m.dp(s.phone)).fillMaxHeight(), topOnly)
             }
         }
     }

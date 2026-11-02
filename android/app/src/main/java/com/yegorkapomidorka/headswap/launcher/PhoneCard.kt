@@ -24,6 +24,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import com.yegorkapomidorka.headswap.R
@@ -63,7 +64,7 @@ private fun ContactsButton(sizePx: Int, onTap: () -> Unit) {
 
 /** Карточка «Телефон»: состояния А-Е из PhoneStates.dc.html. Тап по телу - экран «Вызовы». */
 @Composable
-fun PhoneCard(modifier: Modifier) {
+fun PhoneCard(modifier: Modifier, shape: Shape? = null) {
     val model = LauncherModel
     val m = LocalMetrics.current
     val s = m.spec
@@ -75,9 +76,10 @@ fun PhoneCard(modifier: Modifier) {
     val accent = LocalAccent.current
     val incoming = phone is PhoneCardModel.Incoming
     val ongoing = phone is PhoneCardModel.Incoming || phone is PhoneCardModel.InCall || phone is PhoneCardModel.Outgoing
-    CardBox(modifier, background = if (incoming) accent.copy(alpha = 0.14f) else Pal.SURFACE) {
+    val cardShape = shape ?: RoundedCornerShape(m.dp(s.radius))
+    CardBox(modifier, background = if (incoming) accent.copy(alpha = 0.14f) else Pal.SURFACE, shape = cardShape) {
         if (!ongoing) Pressable(Modifier.fillMaxSize(), description = stringResource(R.string.l_phone), onTap = { LauncherActions.openCalls() }) {}
-        if (incoming) Box(Modifier.fillMaxSize().border(m.dp(s.b4), accent, RoundedCornerShape(m.dp(s.radius))))
+        if (incoming) Box(Modifier.fillMaxSize().border(m.dp(s.b4), accent, cardShape))
         Column(
             Modifier.fillMaxSize().padding(horizontal = m.dp(if (incoming) s.g - s.b4 else s.g), vertical = m.dp(if (incoming) s.g8 - s.b4 else s.g8)),
             verticalArrangement = Arrangement.spacedBy(m.dp(s.g4)),
