@@ -101,8 +101,10 @@ enum class SettingsSection(val key: String, val titleRes: Int, val iconRes: Int)
     UPDATES("updates", R.string.upd_title, R.drawable.ic_download);
 
     companion object {
-        /** Разделы этой сборки: без беты беспровода его нет ни в меню, ни по ключу. */
-        fun shown(): List<SettingsSection> = values().filter { it != WIRELESS || BuildConfig.WIRELESS_BETA }
+        /** Разделы этой сборки: без беты беспровода его нет ни в меню, ни по ключу; без обновлений - их раздела. */
+        fun shown(): List<SettingsSection> = values().filter {
+            (it != WIRELESS || BuildConfig.WIRELESS_BETA) && (it != UPDATES || Updater.ENABLED)
+        }
 
         fun byKey(key: String?): SettingsSection? = shown().firstOrNull { it.key == key }
 
