@@ -48,6 +48,7 @@
     <string name="pa_notif_code_error">%1$s Введите код ещё раз.</string>
     <string name="pa_notif_code_label">Код из шести цифр</string>
     <string name="pa_notif_reply">Ввести код</string>
+    <string name="pa_notif_done">Headswap Desktop активирован</string>
 
     <string name="pa_err_no_wifi">Нет Wi-Fi. Отладка по Wi-Fi работает только через Wi-Fi: подключитесь к сети и повторите.</string>
     <string name="pa_err_port">Порт — число от 1 до 65535.</string>

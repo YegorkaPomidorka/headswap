@@ -337,6 +337,27 @@ class PhoneActivationService : Service() {
         private const val SURVIVE_MS = 25_000L
         private val ASK_AGAIN = setOf(AdbReason.INVALID_CODE, AdbReason.PAIR_REJECTED, AdbReason.NO_PAIRING_PORT)
 
+        /**
+         * From the restarted process once access is ready: the progress notification of the killed process stays
+         * spinning otherwise. Replace it with the result, only when an on-phone attempt was pending.
+         */
+        fun onAccessReady(context: Context) {
+            val state = PhoneActivationState(context)
+            if (state.nonce == null) return
+            state.clear()
+            val manager = context.getSystemService(NotificationManager::class.java)
+            manager.cancel(ID_PROGRESS)
+            manager.cancel(ID_CODE)
+            val open = context.packageManager.getLaunchIntentForPackage(context.packageName)
+                ?.let { PendingIntent.getActivity(context, 4, it, PendingIntent.FLAG_IMMUTABLE) }
+            manager.notify(ID_RESULT, Notification.Builder(context, CHANNEL_PROGRESS)
+                .setSmallIcon(R.drawable.ic_stat_headswap)
+                .setContentTitle(context.getString(R.string.pa_notif_done))
+                .setContentIntent(open)
+                .setAutoCancel(true)
+                .build())
+        }
+
         fun intent(context: Context, action: String): Intent =
             Intent(context, PhoneActivationService::class.java).setAction(action)
     }

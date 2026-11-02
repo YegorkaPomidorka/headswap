@@ -49,6 +49,7 @@
     <string name="pa_notif_code_error">%1$s Type the code again.</string>
     <string name="pa_notif_code_label">Six-digit code</string>
     <string name="pa_notif_reply">Enter code</string>
+    <string name="pa_notif_done">Headswap Desktop is activated</string>
 
     <string name="pa_err_no_wifi">No Wi-Fi. Wireless debugging works only over Wi-Fi: connect to a network and try again.</string>
     <string name="pa_err_port">The port must be a number from 1 to 65535.</string>

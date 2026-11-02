@@ -84,6 +84,7 @@ class DelegatedDesktopInstrumentation : Instrumentation() {
             check(!requestAudio || DesktopAudioAccess.hasPermission(context)) { "Android не разрешил захват звука приложений" }
             lease = DelegatedDesktopAccess.begin { stop.countDown() }
             ready = true
+            runCatching { PhoneActivationService.onAccessReady(context) }
             Log.i(DelegatedDesktopAccess.LOG_TAG, "READY protocol=1 uid=${Process.myUid()} pid=${Process.myPid()} permissions=${permissions.joinToString(",")} playbackAudio=$requestAudio")
             runCatching { sendStatus(0, Bundle().apply {
                 putString("headswap_access", "ready")
