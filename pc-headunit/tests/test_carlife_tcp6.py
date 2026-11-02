@@ -193,7 +193,7 @@ def test_tcp6_session():
         assert phone.pump(C.CH_VIDEO, lambda m: C.VIDEO_HEARTBEAT in [x[0] for x in m])
         assert phone.pump(C.CH_TOUCH, lambda m: len(m) >= 2)
         assert phone.types(C.CH_TOUCH) == [C.TOUCH_ACTION, C.TOUCH_ACTION]
-        assert phone.msgs[C.CH_TOUCH][0][1] == C.pb_int(1, 0) + C.pb_int(2, 640) + C.pb_int(3, 360)
+        assert phone.msgs[C.CH_TOUCH][0][1] == C.pb_int(1, 0) + C.pb_int(2, 960) + C.pb_int(3, 360)    # центр 1920x720: INIT_DONE не было, берём размер из нашего INIT
         for c in (C.CH_MEDIA, C.CH_TTS, C.CH_VR):
             assert phone.types(c) == []
         # телефон закрывает всё
