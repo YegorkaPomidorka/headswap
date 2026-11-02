@@ -186,6 +186,8 @@
     <string name="fps_15_sub">Lighter for weak head units and the link</string>
     <string name="fps_30_title">30 fps</string>
     <string name="fps_30_sub">Smoother, but heavier</string>
+    <string name="fps_60_title">60 fps</string>
+    <string name="fps_60_sub">Higher frame-rate target; requires capable phone and head unit</string>
 
     <!-- Wireless (branch B) -->
     <string name="wl_title">Wireless</string>

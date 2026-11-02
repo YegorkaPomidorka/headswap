@@ -45,6 +45,159 @@ class BridgeHostTest {
     }
 
     @Test
+    fun failedOneShotSourceCannotBeReusedBeforeItsFailureCallbackReachesTheHost() {
+        var failed = false
+        var starts = 0
+        var stops = 0
+        var stopAck: (() -> Unit)? = null
+        val source = object : AaLifecycle, TerminalSource, DesktopNavigation, DesktopPowerControl {
+            override val isTerminated get() = failed
+            override fun start() { starts++ }
+            override fun stop(onDone: () -> Unit) { stops++; stopAck = onDone }
+            override fun showDesktop() = error("Failed source must not receive navigation")
+            override fun setPhoneScreenOff(off: Boolean) = error("Failed source must not receive panel control")
+        }
+        val host = BridgeHost(core(), source, scheduler, { _, _ -> })
+        try {
+            assertTrue(host.onUsbSessionStarted())
+            failed = true // Binder thread reports death, main-looper callback has not run yet.
+            assertTrue(host.isDead)
+            host.onUsbSessionClosed(immediate = false)
+            assertFalse("a fast USB reconnect must create a different host", host.onUsbSessionStarted())
+            assertEquals(1, starts)
+            assertFalse(host.showDesktop())
+            assertFalse(host.setPhoneScreenOff(true))
+            host.shutdown("failure callback")
+            host.shutdown("duplicate callback")
+            assertEquals(1, stops)
+            assertFalse("a terminal source is not proof of Surface disposal", host.isTornDown)
+            checkNotNull(stopAck).invoke()
+            assertTrue(host.isTornDown)
+        } finally { scheduler.shutdownNow() }
+    }
+
+    @Test
+    fun previousStopTimeoutNeverAuthorizesAReplacementSource() {
+        var oldStopAck: (() -> Unit)? = null
+        val oldSource = object : AaLifecycle {
+            override fun start() = Unit
+            override fun stop(onDone: () -> Unit) { oldStopAck = onDone }
+        }
+        val old = BridgeHost(core(), oldSource, scheduler, { _, _ -> })
+        val nextSource = FakeLifecycle()
+        val done = CountDownLatch(1)
+        val next = BridgeHost(core(), nextSource, scheduler, { _, _ -> }, previous = old,
+            onTornDown = { done.countDown() }, previousStopTimeoutMs = 40)
+        try {
+            old.onUsbSessionStarted()
+            old.shutdown("producer has not confirmed cleanup")
+            next.onUsbSessionStarted()
+            assertTrue(done.await(3, TimeUnit.SECONDS))
+            assertTrue(next.isDead)
+            assertEquals("timeout cannot substitute for producer closure", 0, nextSource.starts.get())
+            assertEquals(1, nextSource.stops.get())
+            checkNotNull(oldStopAck).invoke()
+            assertEquals("late acknowledgement must not revive the retired replacement", 0, nextSource.starts.get())
+        } finally { scheduler.shutdownNow() }
+    }
+
+    @Test
+    fun desktopNavigationNeverReachesAnUnstartedDetachedOrRetiredSource() {
+        var calls = 0
+        var starts = 0
+        var sourceReady = false
+        val source = object : AaLifecycle, DesktopNavigation {
+            override fun start() { starts++; sourceReady = true }
+            override fun stop(onDone: () -> Unit) { sourceReady = false; onDone() }
+            override fun showDesktop(): Boolean { calls++; return sourceReady }
+        }
+        val host = BridgeHost(core(), source, scheduler, { _, _ -> }, graceMs = 10_000)
+        try {
+            assertFalse("navigation must not create a source", host.showDesktop())
+            assertEquals(0, calls)
+            host.onUsbSessionStarted()
+            assertTrue(host.showDesktop())
+            assertEquals(1, calls)
+            host.onUsbSessionClosed(immediate = false)
+            repeat(3) { assertFalse("no navigation during USB grace", host.showDesktop()) }
+            assertEquals(1, calls)
+            host.onUsbSessionStarted()
+            assertTrue(host.showDesktop())
+            assertEquals("USB reconnect reuses the source", 1, starts)
+            sourceReady = false
+            assertFalse("source readiness refusal must propagate", host.showDesktop())
+            assertEquals(3, calls)
+            host.shutdown("test")
+            assertFalse("navigation must not revive a retired source", host.showDesktop())
+            assertEquals(3, calls)
+        } finally {
+            host.shutdown("test cleanup")
+            scheduler.shutdownNow()
+        }
+    }
+
+    @Test
+    fun desktopNavigationDoesNotFallBackToAnOrdinarySource() {
+        val source = FakeLifecycle()
+        val host = BridgeHost(core(), source, scheduler, { _, _ -> })
+        try {
+            host.onUsbSessionStarted()
+            assertFalse(host.showDesktop())
+            assertEquals(1, source.starts.get())
+            assertEquals(0, source.stops.get())
+        } finally {
+            host.shutdown("test cleanup")
+            scheduler.shutdownNow()
+        }
+    }
+
+    @Test
+    fun panelCommandsOnlyReachAnActiveCapableSource() {
+        val requests = mutableListOf<Boolean>()
+        val source = object : AaLifecycle, DesktopPowerControl {
+            var ready = false
+            override fun start() { ready = true }
+            override fun stop(onDone: () -> Unit) { ready = false; onDone() }
+            override fun setPhoneScreenOff(off: Boolean): Boolean {
+                if (!ready) return false
+                requests += off
+                return true
+            }
+        }
+        val host = BridgeHost(core(), source, scheduler, { _, _ -> }, graceMs = 10_000)
+        try {
+            assertFalse("a panel command cannot start a source", host.setPhoneScreenOff(true))
+            host.onUsbSessionStarted()
+            assertTrue(host.setPhoneScreenOff(true))
+            host.onUsbSessionClosed(immediate = false)
+            assertFalse("a detached session cannot control the phone", host.setPhoneScreenOff(false))
+            host.onUsbSessionStarted()
+            assertTrue(host.setPhoneScreenOff(false))
+            host.shutdown("test")
+            assertFalse("a retired source cannot control the phone", host.setPhoneScreenOff(true))
+            assertEquals(listOf(true, false), requests)
+        } finally {
+            host.shutdown("test cleanup")
+            scheduler.shutdownNow()
+        }
+    }
+
+    @Test
+    fun panelCommandsDoNotFallBackToAnOrdinarySource() {
+        val source = FakeLifecycle()
+        val host = BridgeHost(core(), source, scheduler, { _, _ -> })
+        try {
+            host.onUsbSessionStarted()
+            assertFalse(host.setPhoneScreenOff(true))
+            assertEquals(1, source.starts.get())
+            assertEquals(0, source.stops.get())
+        } finally {
+            host.shutdown("test cleanup")
+            scheduler.shutdownNow()
+        }
+    }
+
+    @Test
     fun usbBackInsideGraceKeepsAaAndDoesNotRestartIt() {
         val lc = FakeLifecycle()
         val host = BridgeHost(core(), lc, scheduler, { l, _ -> logs.add(l) }, graceMs = 400)

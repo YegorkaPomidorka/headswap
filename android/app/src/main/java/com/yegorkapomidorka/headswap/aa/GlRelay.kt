@@ -40,8 +40,9 @@ class GlRelay(
     crop: VideoCrop = VideoCrop.NONE,
     /** Целевая частота выхода: гейт не отдаёт кадр в энкодер чаще (0 = без ограничения). */
     targetFps: Int = 0,
+    limitHighFps: Boolean = false,
 ) {
-    private val gate = FrameGate(targetFps)
+    private val gate = FrameGate(targetFps, limitHighFps)
     private val thread = HandlerThread("aa-gl-relay")
     private lateinit var handler: Handler
     private var display: EGLDisplay = EGL14.EGL_NO_DISPLAY

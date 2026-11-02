@@ -8,6 +8,9 @@ import com.yegorkapomidorka.headswap.aa.CarlifeAudio
 import com.yegorkapomidorka.headswap.aa.AaTranscoder
 import com.yegorkapomidorka.headswap.aa.BitratePolicy
 import com.yegorkapomidorka.headswap.aa.BitrateProfile
+import com.yegorkapomidorka.headswap.aa.DesktopVideoQuality
+import com.yegorkapomidorka.headswap.aa.DesktopVideoSelection
+import com.yegorkapomidorka.headswap.aa.DesktopVideoGeometry
 import com.yegorkapomidorka.headswap.aa.CallStateSource
 import com.yegorkapomidorka.headswap.aa.CarlifeLink
 import com.yegorkapomidorka.headswap.aa.FpsSetting
@@ -27,6 +30,9 @@ import com.yegorkapomidorka.headswap.aa.VideoTranscoder
 import java.util.concurrent.Executors
 import java.util.concurrent.ScheduledExecutorService
 import java.util.concurrent.TimeUnit
+import com.yegorkapomidorka.headswap.dex.DesktopAudioOutputLease
+import com.yegorkapomidorka.headswap.dex.DesktopConnectionState
+import com.yegorkapomidorka.headswap.dex.DesktopVideoDelivery
 import java.util.concurrent.atomic.AtomicBoolean
 import com.yegorkapomidorka.headswap.link.CarTransport
 import com.yegorkapomidorka.headswap.link.TransportCaps
@@ -45,6 +51,7 @@ class SessionConfig(
     val metaNavi: Boolean = true,
     /** Поле 6 NAVI_NEXT_TURN_INFO: иконка и/или time. */
     val naviField6: NaviField6 = NaviField6.BOTH,
+    val desktopVideo: DesktopVideoSelection? = null,
 )
 
 /**
@@ -67,14 +74,20 @@ class CarLifeSession(
 ) : VideoSource.Listener, CarlifeLink {
 
     /** Видео-режим хоста, снятый при подключении: одинаков для INIT_DONE, энкодера и тача в течение всей сессии. */
-    private val mode: VideoGeometry = bridge.videoMode
+    @Volatile private var mode: VideoGeometry = bridge.videoMode
 
     /** Транспорт сессии: usb-aoa, tcp-debug или tcp6. */
     val transportKind: String get() = transport.caps.kind
 
     /** Воздух (6 сокетов): своя лесенка битрейта, PAUSE-keepalive чаще, WL-строки видео. USB и tcp-debug - как было. */
     private val air = transport.caps == TransportCaps.TCP6
-    private val bitratePolicy = BitratePolicy(mode.bitrate, profile = if (air) BitrateProfile.WIFI else BitrateProfile.USB)
+    private val bitrateProfile = if (air) BitrateProfile.WIFI else BitrateProfile.USB
+    private val legacyBitratePolicy = BitratePolicy(mode.bitrate, profile = bitrateProfile)
+    private val surfaceBitratePolicy: BitratePolicy by lazy { DesktopVideoQuality.bitratePolicy(bitrateProfile) }
+    @Volatile private var encodingSurface = false
+    // The source starts after this session is constructed. Select its independent policy
+    // only when the direct Surface encoder is requested, never from an early source flag.
+    private val bitratePolicy: BitratePolicy get() = if (encodingSurface) surfaceBitratePolicy else legacyBitratePolicy
     @Volatile private var vwIdrCutMs = NEVER_MS
     private val thermalThrottle = ThermalThrottle()
     private var thermalStatus = 0                       // только нить cl-sched
@@ -98,11 +111,20 @@ class CarLifeSession(
     @Volatile private var metaMusicOffLogged = false
 
     private val t0 = SystemClock.elapsedRealtime()
+    private val desktopAudioOutputLease = DesktopAudioOutputLease(t0)
+    private val desktopVideoDelivery = DesktopVideoDelivery()
+
+    /** No enqueue/capture counter can substitute for successful transport writes. */
+    fun canCaptureDesktopAudio(): Boolean = !closed.get() &&
+        desktopAudioOutputLease.canCapture(SystemClock.elapsedRealtime())
+    fun healthyDesktopForIdleTimer(): Boolean = !closed.get() && desktopVideoDelivery.hasPicture() &&
+        canCaptureDesktopAudio()
+    fun hasFreshDesktopVideo(): Boolean = !closed.get() &&
+        desktopVideoDelivery.isFlowing(SystemClock.elapsedRealtime())
 
     // протокол
     @Volatile private var matchSent = false
-    private var huMajor = 0
-    private var huMinor = 0
+    private val protocolHandshake = ProtocolHandshake(cfg.screenOn, ::deviceInfo)
     private var pendingW = 0
     private var pendingH = 0
     private var pendingFps = FPS
@@ -169,6 +191,7 @@ class CarLifeSession(
     private val vrReassembler = DataReassembler()  // h425: Delphi режет VR MIC_DATA на кадры по 256 Б
 
     fun start() {
+        DesktopConnectionState.attach(desktopVideoDelivery)
         bridge.attach(this)
         AppLog.i("сессия: старт")
         CarLifeState.resetSession()
@@ -241,6 +264,9 @@ class CarLifeSession(
 
     fun close(reason: String) {
         if (!closed.compareAndSet(false, true)) return
+        desktopVideoDelivery.close()
+        DesktopConnectionState.detach(desktopVideoDelivery)
+        desktopAudioOutputLease.close()
         AppLog.i("сессия: закрытие, причина: $reason")
         bridge.onCarlifeClosed(this)
         if (air) {
@@ -327,26 +353,32 @@ class CarLifeSession(
     private fun onCmd(m: CmdMsg) {
         when (m.type) {
             Msg.HU_PROTOCOL_VERSION -> {
-                val f = PbReader.parse(m.body)
-                val maj = f?.let { PbReader.int(it, 1) }
-                val min = f?.let { PbReader.int(it, 2) }
-                huVersion = "$maj.$min"
-                if (matchSent) {
-                    // Baidu: ConnectClient.geHasMatch() -> второй MATCH не шлём (CarlifeConnectHsgHandler :308-310)
-                    AppLog.i("== ПОВТОРНЫЙ HU_PROTOCOL_VERSION $huVersion, второй MATCH не шлю (как Baidu)")
+                val reply = protocolHandshake.accept(m)
+                if (reply == null) {
+                    AppLog.i("== HU_PROTOCOL_VERSION некорректен или отличается от принятой версии $huVersion; игнор")
                     return
                 }
-                huMajor = maj ?: 0
-                huMinor = min ?: 0
+                if (reply.repeated) {
+                    if (cfg.desktopVideo == null) {
+                        // Baidu: ConnectClient.geHasMatch() -> второй MATCH не шлём (CarlifeConnectHsgHandler :308-310)
+                        AppLog.i("== ПОВТОРНЫЙ HU_PROTOCOL_VERSION $huVersion, второй MATCH не шлю (как Baidu)")
+                        return
+                    }
+                    // Software reconnect can leave AOA open. Replay our greeting, preserving
+                    // the active display/encoder; the following START requests a fresh IDR.
+                    AppLog.i("== ПОВТОРНЫЙ HU_PROTOCOL_VERSION $huVersion: повторяю стартовую пачку без перезапуска рабочего стола")
+                    for (c in reply.commands) sendCmd(c.type, c.body)
+                    return
+                }
+                huVersion = "${reply.major}.${reply.minor}"
                 CarLifeState.protocol = "ГУ шлёт версию $huVersion"
-                AppLog.i("== ВЕРСИЯ ПРОТОКОЛА ГУ: major=$maj minor=$min")
+                AppLog.i("== ВЕРСИЯ ПРОТОКОЛА ГУ: major=${reply.major} minor=${reply.minor}")
                 WLog.ev(WLog.HS, "HU_PROTOCOL_VERSION", "version" to huVersion)
                 matchSent = true
                 // стартовая пачка сразу, ничего не ждём от ГУ: MATCH, FOREGROUND, SCREEN_ON, MD_INFO
-                val info = deviceInfo()
-                mdInfoKey = HuAuth.mdInfoKey(info)
-                for (c in Handshake.startBatch(cfg.screenOn, info)) sendCmd(c.type, c.body)
-                val mod = Handshake.moduleStatus(huMajor)
+                mdInfoKey = reply.mdInfoKey
+                for (c in reply.commands) sendCmd(c.type, c.body)
+                val mod = Handshake.moduleStatus(reply.major)
                 try {
                     sched.schedule({ sendCmd(mod.type, mod.body) }, Handshake.MODULE_STATUS_DELAY_MS, TimeUnit.MILLISECONDS)
                 } catch (_: java.util.concurrent.RejectedExecutionException) {
@@ -463,6 +495,7 @@ class CarLifeSession(
             Msg.VIDEO_ENCODER_START -> onVideoStart()
             Msg.VIDEO_ENCODER_PAUSE -> {
                 paused = true
+                desktopVideoDelivery.pause()
                 if (pauseHeartbeatHu) { // первый heartbeat сразу; Desay по USB - как раньше, через 2 с
                     lastVideoTx = 0L
                     pauseHeartbeat()
@@ -476,13 +509,15 @@ class CarLifeSession(
                 bridge.onCarlifeKeyFrameRequest()
             }
             Msg.VIDEO_ENCODER_FRAME_RATE_CHANGE -> {
-                // как VideoMsgHandler.changeFrameRate: вне 3..30 молча игнор, иначе DONE с тем же fps
+                // Legacy AA accepts 3..30; the direct desktop also supports requests through 60 fps.
                 val fps = PbReader.parse(m.body)?.let { PbReader.int(it, 1) } ?: -1
-                if (Handshake.frameRateChangeAllowed(fps)) {
+                val allowed = if (cfg.desktopVideo != null) DesktopVideoQuality.frameRateChangeAllowed(fps)
+                    else Handshake.frameRateChangeAllowed(fps)
+                if (allowed) {
                     onFrameRateChange(fps)
                     sendCmd(Msg.VIDEO_ENCODER_FRAME_RATE_CHANGE_DONE, Msgs.frameRate(fps))
                 } else {
-                    AppLog.i("видео: FRAME_RATE_CHANGE fps=$fps вне 3..30, игнор (как Baidu)")
+                    AppLog.i("видео: FRAME_RATE_CHANGE fps=$fps вне 3..${if (cfg.desktopVideo != null) 60 else 30}, игнор")
                 }
             }
             Msg.MODULE_CONTROL -> {
@@ -541,7 +576,19 @@ class CarLifeSession(
         AppLog.i("видео: FRAME_RATE_CHANGE fps=$fps, целевой fps $old -> $applied$hu$heat${if (live) "" else " (транскодер ещё не создан, применится при старте)"}")
     }
 
-    private fun onVideoInit(m: CmdMsg) {
+    private fun resolveDesktopGeometry(width: Int = 0, height: Int = 0) {
+        val selection = cfg.desktopVideo ?: return
+        mode = selection.resolve(width, height)
+        bridge.configureDesktopVideo(this, mode, selection.densityFor(mode))
+        CarLifeState.videoMode = mode
+        CarLifeState.densityOverride = selection.densityFor(mode)
+    }
+
+    private fun chooseVideoFps(requested: Int): Int = if (cfg.desktopVideo != null)
+        DesktopVideoQuality.chooseFps(cfg.fpsSetting, requested, huMaxFps())
+        else Handshake.chooseFps(cfg.fpsSetting, requested, huMaxFps())
+
+    @Synchronized private fun onVideoInit(m: CmdMsg) {
         val f = PbReader.parse(m.body)
         val rw = f?.let { PbReader.int(it, 1) } ?: 0
         val rh = f?.let { PbReader.int(it, 2) } ?: 0
@@ -556,11 +603,12 @@ class CarLifeSession(
             sendCmd(Msg.VIDEO_ENCODER_INIT_DONE, Msgs.videoEncoderInfo(pendingW, pendingH, pendingFps))
             return
         }
+        resolveDesktopGeometry(rw, rh)
         // размер задаёт видео-режим (по умолчанию 1280x720 fps 30: ГУ Honda принимает и показывает целиком, проверено в машине)
         val (w, h, why) = Triple(mode.outW, mode.outH, "мост: режим ${mode.label}")
         // Mobis CCNC (h242): INIT_DONE с тем fps, что просила ГУ, а энкодер Baidu при этом идёт на 20 fps
         val mobis = bridge.huMobisNx4c
-        val fps = if (mobis) (if (rf in 1..30) rf else Handshake.DEFAULT_FPS) else Handshake.chooseFps(cfg.fpsSetting, rf, huMaxFps())
+        val fps = if (mobis) (if (rf in 1..30) rf else Handshake.DEFAULT_FPS) else chooseVideoFps(rf)
         pendingW = w
         pendingH = h
         pendingFps = fps
@@ -660,9 +708,16 @@ class CarLifeSession(
     }
 
     /** START: гейт AA сбрасывается, заглушка (если активна) стартует с SPS+PPS+IDR. */
-    private fun onVideoStart() {
+    @Synchronized private fun onVideoStart() {
         paused = false
+        desktopVideoDelivery.start(SystemClock.elapsedRealtime())
         if (pendingW <= 0) {
+            resolveDesktopGeometry()
+            if (cfg.desktopVideo != null) {
+                pendingFps = chooseVideoFps(0)
+                targetFps = pendingFps
+                videoInited = true // A late INIT must not resize a running Surface.
+            }
             pendingW = mode.outW
             pendingH = mode.outH
             chosen = "${mode.outW}x${mode.outH} (START без INIT, мост, режим ${mode.label})"
@@ -1063,13 +1118,35 @@ class CarLifeSession(
     }
 
     /** Транскодер моста: декодер AA (кадр режима) -> кроп -> Surface энкодера (выход режима). null, если MediaCodec не поднялся. */
-    override fun createTranscoder(out: TranscodeOutput): VideoTranscoder? = try {
+    override fun createTranscoder(out: TranscodeOutput): VideoTranscoder? = createBridgeEncoder(out, false)
+
+    override fun createSurfaceEncoder(out: TranscodeOutput): VideoTranscoder? = createBridgeEncoder(out, true)
+
+    private fun createBridgeEncoder(out: TranscodeOutput, directSurface: Boolean): VideoTranscoder? = try {
+        if (directSurface) {
+            require(DesktopVideoGeometry.matchesNative(mode)) { "Desktop encoder requires native ${DesktopVideoGeometry.outLabel} geometry" }
+            encodingSurface = true
+        }
         applyHuCeilings()
         val mobis = bridge.huMobisNx4c   // Baidu: 20 fps, VBR до 3,84 Мбит/с, битрейт ведёт только потолок IDR (mobisKeyFrame)
+        if (directSurface) {
+            // A thermal transition may have happened while the lower-bitrate placeholder
+            // was active. Apply that same level to the newly selected Surface policy.
+            bitratePolicy.setThermalCap(if (thermalThrottle.level == ThermalLevel.NORMAL) Int.MAX_VALUE
+                else thermalThrottle.capBitrate(bitratePolicy.ceilingBps))
+            val actualBps = if (mobis) mobisAaCeiling.current else bitratePolicy.current
+            AppLog.i("DEX video quality native=${mode.outW}x${mode.outH} singleEncode=true " +
+                "targetKbps=${actualBps / 1000} ceilingKbps=${bitratePolicy.ceilingBps / 1000} " +
+                "profile=${bitratePolicy.profile.name} adaptive=true", false)
+        }
         AaTranscoder(
             mode.outW, mode.outH, thermalThrottle.capFps(if (mobis) AaBridgeCore.MOBIS_FPS else targetFps),
             if (mobis) mobisAaCeiling.current else bitratePolicy.current, out, { AppLog.i(it, false) },
-            srcWidth = mode.aaW, srcHeight = mode.aaH, crop = mode.cropFor(bridge.marginsAtBottom), baidu = mobis,
+            srcWidth = if (directSurface) mode.outW else mode.aaW,
+            srcHeight = if (directSurface) mode.outH else mode.aaH,
+            crop = if (directSurface) com.yegorkapomidorka.headswap.aa.VideoCrop.NONE else mode.cropFor(bridge.marginsAtBottom),
+            baidu = mobis, directSurface = directSurface,
+            capabilityFps = if (mobis) AaBridgeCore.MOBIS_FPS else targetFps,
         ).also { it.start() }
     } catch (e: Exception) {
         AppLog.e("BRIDGE транскодер не создан", e)
@@ -1129,7 +1206,9 @@ class CarLifeSession(
             AppLog.i("TOUCH action=${t.action} пальцев=$n тело=${m.body.size} байт", false)
             lastMoveFingers = if (t.masked == 2) n else 0
         }
-        if (t.masked in TOUCH_TO_AA) bridge.onCarlifeTouch(t.action, t.x, t.y, t.px, t.py)
+        // Gesture opcodes also normalize to action 3; only raw TOUCH_ACTION means CANCEL.
+        val desktopCancel = bridge.desktopInputEnabled && m.type == Msg.TOUCH_ACTION && t.masked == 3
+        if (t.masked in TOUCH_TO_AA || desktopCancel) bridge.onCarlifeTouch(t.action, t.x, t.y, t.px, t.py)
         CarLifeState.touch = "$touchMode; событий=$touchCount; пальцев макс=$maxFingers; последний act=${t.action} x=${t.x} y=${t.y}" +
             (if (n > 1) " px=${t.px} py=${t.py}" else "")
     }
@@ -1157,6 +1236,7 @@ class CarLifeSession(
 
     /** После записи в транспорт (нить писателя). */
     private fun logTx(chan: Int, inner: ByteArray) {
+        desktopAudioOutputLease.writeCompleted(SystemClock.elapsedRealtime())
         if (Ch.isCmdStyle(chan)) {
             val m = Wire.parseCmd(inner) ?: return
             val decoded = if (m.body.isEmpty()) null else PbText.render(m.body, Schemas.byType[m.type])
@@ -1166,6 +1246,7 @@ class CarLifeSession(
             AppLog.msg("TX", chan, inner.size, m.type, m.declaredLen, decoded, inner, ui = !quiet)
         } else {
             val m = Wire.parseData(inner) ?: return
+            desktopVideoDelivery.writeCompleted(chan, m.type, m.data.size, SystemClock.elapsedRealtime())
             if (chan != Ch.VIDEO) { // аудио моста: INIT/STOP всегда, DATA - первые и каждый 200-й
                 audioTx++
                 if (m.type == CarlifeAudio.TTS_INIT) ttsTxSinceInit = 0

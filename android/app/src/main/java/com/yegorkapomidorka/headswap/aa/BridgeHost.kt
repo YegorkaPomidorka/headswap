@@ -13,6 +13,21 @@ interface AaLifecycle {
     fun stop(onDone: () -> Unit)
 }
 
+/** A one-shot source may fail before its host receives the asynchronous failure callback. */
+interface TerminalSource {
+    val isTerminated: Boolean
+}
+
+/** Optional source capability. A true result accepts an asynchronous request, not a hardware ACK. */
+interface DesktopPowerControl {
+    fun setPhoneScreenOff(off: Boolean): Boolean
+}
+
+/** Navigation belongs only to a currently attached desktop session. */
+interface DesktopNavigation {
+    fun showDesktop(): Boolean
+}
+
 /**
  * AA-сторона моста на время жизни СЕРВИСА, а не одной USB-сессии CarLife. Физический обрыв USB (EIO)
  * закрывает CarLife-сессию, но AA-сессия остаётся «тёплой» graceMs: если USB вернулся, новая
@@ -28,6 +43,7 @@ class BridgeHost(
     private val graceMs: Long = GRACE_MS,
     private val previous: BridgeHost? = null,
     private val onTornDown: () -> Unit = {},
+    private val previousStopTimeoutMs: Long = 15_000,
 ) {
     private var started = false
     private var tearingDown = false
@@ -39,17 +55,30 @@ class BridgeHost(
 
     /** Хост закрывается или закрыт: новую CarLife-сессию надо вешать на новый хост. */
     @get:Synchronized
-    val isDead: Boolean get() = tearingDown
+    val isDead: Boolean get() = tearingDown || (connector as? TerminalSource)?.isTerminated == true
 
     @get:Synchronized
     val isInGrace: Boolean get() = grace != null
 
     fun awaitTornDown(timeoutMs: Long): Boolean = tornDownLatch.await(timeoutMs, TimeUnit.MILLISECONDS)
 
+    /** Never create a source or apply a screen command to a retired / detached USB session. */
+    @Synchronized
+    fun setPhoneScreenOff(off: Boolean): Boolean {
+        if (!started || isDead || grace != null) return false
+        return (connector as? DesktopPowerControl)?.setPhoneScreenOff(off) ?: false
+    }
+
+    @Synchronized
+    fun showDesktop(): Boolean {
+        if (!started || isDead || grace != null) return false
+        return (connector as? DesktopNavigation)?.showDesktop() ?: false
+    }
+
     /** Новая CarLife-сессия: отменить grace, при первой - запустить AA. false = хост уже закрывается. */
     @Synchronized
     fun onUsbSessionStarted(): Boolean {
-        if (tearingDown) return false
+        if (isDead) return false
         grace?.let {
             it.cancel(false)
             grace = null
@@ -62,8 +91,13 @@ class BridgeHost(
                 // сервер 5277 одноразовый: новое соединение только после полного закрытия предыдущего
                 log("BRIDGE жду полного закрытия предыдущей AA-сессии перед новым подключением", true)
                 Thread({
-                    prev.awaitTornDown(15_000)
-                    synchronized(this) { if (!tearingDown) connector.start() }
+                    val closed = prev.awaitTornDown(previousStopTimeoutMs)
+                    synchronized(this) {
+                        if (!tearingDown) {
+                            if (closed && !isDead) connector.start()
+                            else tearDown("предыдущий источник не подтвердил закрытие; новый запуск отменён")
+                        }
+                    }
                 }, "aa-host-start").start()
             } else {
                 connector.start()

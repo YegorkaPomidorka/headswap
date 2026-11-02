@@ -26,6 +26,7 @@ android {
 
     buildFeatures {
         buildConfig = true
+        aidl = true
     }
 
     signingConfigs {
@@ -103,6 +104,7 @@ androidComponents {
 }
 
 dependencies {
+    implementation("androidx.annotation:annotation:1.8.1")
     testImplementation("junit:junit:4.13.2")
     // В unit-тестах android.jar — заглушки (isReturnDefaultValues), настоящий org.json нужен LogDiag
     testImplementation("org.json:json:20240303")

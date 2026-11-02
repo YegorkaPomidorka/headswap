@@ -186,6 +186,8 @@
     <string name="fps_15_sub">Легче для слабых ГУ и канала</string>
     <string name="fps_30_title">30 кадров/с</string>
     <string name="fps_30_sub">Плавнее, но тяжелее</string>
+    <string name="fps_60_title">60 кадров/с</string>
+    <string name="fps_60_sub">Повышенная частота; нужна поддержка телефона и магнитолы</string>
 
     <!-- Беспровод (ветка B) -->
     <string name="wl_title">По воздуху</string>

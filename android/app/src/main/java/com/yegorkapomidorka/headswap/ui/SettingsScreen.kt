@@ -729,7 +729,7 @@ class SettingsSectionScreen(host: MainActivity, val section: SettingsSection) : 
         note(c.getString(R.string.set_aa_density_note))
 
         body.addView(c.sectionTitle(c.getString(R.string.set_fps)))
-        val fps = FpsSetting.values()
+        val fps = FpsSetting.values().filter { it != FpsSetting.FPS60 }
         val fSeg = Segmented(c, fps.map { c.getString(it.titleRes) }, 15f) { setFps(fps[it]) }
         fpsSeg = fSeg
         body.addView(fSeg.view, lp(MATCH, WRAP))
@@ -1034,7 +1034,7 @@ class SettingsSectionScreen(host: MainActivity, val section: SettingsSection) : 
     /** В прямом пробросе частоту задаёт AA: переключатель затемнён и не нажимается, выбор в prefs остаётся. */
     private fun refreshFps() {
         val direct = !aa.transcode
-        fpsSeg?.setSelected(FpsSetting.values().indexOf(aa.fpsSetting))
+        fpsSeg?.setSelected(FpsSetting.values().filter { it != FpsSetting.FPS60 }.indexOf(aa.fpsSetting).coerceAtLeast(0))
         fpsSeg?.setEnabled(!direct)
         fpsNote?.text = ctx.getString(if (direct) R.string.set_fps_direct else aa.fpsSetting.subRes)
     }
