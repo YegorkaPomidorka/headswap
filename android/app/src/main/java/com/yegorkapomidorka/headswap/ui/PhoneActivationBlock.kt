@@ -45,32 +45,32 @@ class PhoneActivationBlock(private val host: MainActivity) {
         view.addView(c.sectionTitle(c.getString(R.string.pa_title)))
         status = c.text("", 16f, 600).also { view.addView(it, lp(WRAP, WRAP).margins(c, 8, 2, 8, 0)) }
         hint = c.text("", 13f, 400, c.clr(R.color.on2)).also { view.addView(it, lp(WRAP, WRAP).margins(c, 8, 2, 8, 0)) }
-        activate = c.tonalButton(c.getString(R.string.pa_button)).apply { setOnClickListener { onActivate() } }
-        view.addView(activate, lp(MATCH, WRAP).margins(c, 0, 4, 0, 0))
+        activate = c.primaryButton(c.getString(R.string.pa_button), heightDp = 60, sp = 17f).apply { setOnClickListener { onActivate() } }
+        view.addView(activate, c.lpDp(MATCH, 60).margins(c, 0, 4, 0, 0))
         cancel = c.tonalButton(c.getString(R.string.pa_cancel)).apply {
             setOnClickListener { PhoneActivation.cancel(c) }
         }
-        view.addView(cancel, lp(MATCH, WRAP))
-        manualToggle = c.linkButton(c.getString(R.string.pa_manual_toggle), 44, 14f).apply {
+        view.addView(cancel, c.lpDp(MATCH, 52))
+        manualToggle = c.linkButton(c.getString(R.string.pa_manual_toggle), 48, 15f).apply {
             setOnClickListener { manualBox.visibility = if (manualBox.visibility == View.VISIBLE) View.GONE else View.VISIBLE }
         }
-        view.addView(manualToggle, lp(MATCH, WRAP))
+        view.addView(manualToggle, c.lpDp(MATCH, 48))
         manualBox = c.vbox(8).apply { visibility = View.GONE }
         manualBox.addView(c.text(c.getString(R.string.pa_manual_hint), 13f, 400, c.clr(R.color.on2)), lp(WRAP, WRAP).margins(c, 8, 0, 8, 0))
         pairPort = field(R.string.pa_field_pair_port)
         code = field(R.string.pa_field_code)
         connectPort = field(R.string.pa_field_connect_port)
         listOf(pairPort, code, connectPort).forEach { manualBox.addView(it, c.lpDp(MATCH, 52)) }
-        manualBox.addView(c.tonalButton(c.getString(R.string.pa_manual_go)).apply { setOnClickListener { onManual() } }, lp(MATCH, WRAP))
+        manualBox.addView(c.tonalButton(c.getString(R.string.pa_manual_go)).apply { setOnClickListener { onManual() } }, c.lpDp(MATCH, 52))
         view.addView(manualBox, lp(MATCH, WRAP))
-        forget = c.linkButton(c.getString(R.string.pa_forget), 44, 14f).apply {
+        forget = c.linkButton(c.getString(R.string.pa_forget), 48, 15f).apply {
             setOnClickListener {
                 PhoneActivation.forgetPairing(c)
                 Toast.makeText(c, R.string.pa_forget_done, Toast.LENGTH_SHORT).show()
                 refresh()
             }
         }
-        view.addView(forget, lp(MATCH, WRAP))
+        view.addView(forget, c.lpDp(MATCH, 48))
         refresh()
     }
 

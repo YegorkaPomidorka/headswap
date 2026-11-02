@@ -388,7 +388,6 @@ class SettingsSectionScreen(host: MainActivity, val section: SettingsSection) : 
     private var modeSeg: Segmented? = null
     private var modeNote: TextView? = null
     private var actHost: LinearLayout? = null
-    private var actStatus: TextView? = null
     private var phoneCardNote: TextView? = null
     private var phoneActivation: PhoneActivationBlock? = null
     private var transcodeSeg: Segmented? = null
@@ -722,7 +721,6 @@ class SettingsSectionScreen(host: MainActivity, val section: SettingsSection) : 
         modeSeg = seg
         body.addView(seg.view, lp(MATCH, WRAP))
         modeNote = note("")
-        note(c.getString(R.string.bm_next_note))
         actHost = c.vbox(8).also { body.addView(it, lp(MATCH, WRAP)) }
         refreshMode()
     }
@@ -748,36 +746,36 @@ class SettingsSectionScreen(host: MainActivity, val section: SettingsSection) : 
         }
         box.visibility = View.VISIBLE
         if (box.childCount == 0) buildActivation(box)      // токен создаётся только когда блок впервые понадобился
-        val (text, color) = c.desktopActivation()
-        actStatus?.text = text
-        actStatus?.setTextColor(c.clr(color))
         phoneActivation?.refresh()
     }
 
-    /** «Активация с ПК»: готовая команда adb из ActivationToken, копирование в буфер и подсказка. Над ней - активация с самого телефона. */
+    /** Активация с телефона, под ней свёрнутая «Активация с ПК»: команда adb из ActivationToken и копирование в буфер. */
     private fun buildActivation(box: LinearLayout) {
         val c = ctx
         phoneActivation = PhoneActivationBlock(host).also { box.addView(it.view, lp(MATCH, WRAP)) }
-        box.addView(c.sectionTitle(c.getString(R.string.bm_act_title)))
-        actStatus = c.text("", 16f, 600).also { box.addView(it, lp(WRAP, WRAP).margins(c, 8, 2, 8, 0)) }
+        val pc = c.vbox(8).apply { visibility = View.GONE }
+        box.addView(c.linkButton(c.getString(R.string.bm_act_title), 48, 15f).apply {
+            setOnClickListener { pc.visibility = if (pc.visibility == View.VISIBLE) View.GONE else View.VISIBLE }
+        }, c.lpDp(MATCH, 48))
         val command = ActivationToken(c).adbCommand(DexPrefs(c).usbPlaybackAudio)
-        box.addView(c.text(command, 12f, 400, monospace = true).apply {
+        pc.addView(c.text(command, 12f, 400, monospace = true).apply {
             setTextIsSelectable(true)
             background = c.shape(c.clr(R.color.surf), 12)
             pad(c, 12, 10, 12, 10)
-        }, lp(MATCH, WRAP).margins(c, 0, 4, 0, 0))
-        box.addView(c.tonalButton(c.getString(R.string.bm_act_copy)).apply {
+        }, lp(MATCH, WRAP))
+        pc.addView(c.tonalButton(c.getString(R.string.bm_act_copy)).apply {
             setOnClickListener {
                 c.getSystemService(ClipboardManager::class.java)
                     .setPrimaryClip(ClipData.newPlainText(c.getString(R.string.bm_act_copy_label), command))
                 Toast.makeText(c, R.string.bm_act_copied, Toast.LENGTH_SHORT).show()
             }
-        }, lp(MATCH, WRAP).margins(c, 0, 4, 0, 0))
-        box.addView(c.text(c.getString(R.string.bm_act_hint), 13f, 400, c.clr(R.color.on2)), lp(WRAP, WRAP).margins(c, 8, 2, 8, 0))
+        }, c.lpDp(MATCH, 52))
+        pc.addView(c.text(c.getString(R.string.bm_act_hint), 13f, 400, c.clr(R.color.on2)), lp(WRAP, WRAP).margins(c, 8, 0, 8, 0))
+        box.addView(pc, lp(MATCH, WRAP))
         // карточка «Телефон» лаунчера: журнал вызовов, контакты, звонок и ответ с экрана ГУ
         box.addView(c.tonalButton(c.getString(R.string.l_perm_button)).apply {
             setOnClickListener { requestPhoneCardPermissions() }
-        }, lp(MATCH, WRAP).margins(c, 0, 12, 0, 0))
+        }, c.lpDp(MATCH, 52).margins(c, 0, 12, 0, 0))
         phoneCardNote = note(c.getString(R.string.l_perm_summary))
         refreshPhoneCardPermissions()
     }

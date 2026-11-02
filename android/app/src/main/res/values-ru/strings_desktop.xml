@@ -12,13 +12,13 @@
 
     <!-- Активация с самого телефона (беспроводная отладка), Настройки - Режим -->
     <string name="pa_title">Активация с телефона</string>
-    <string name="pa_hint">ПК не нужен. Включите Wi-Fi, откройте «Для разработчиков» → «Отладка по Wi-Fi», нажмите «Подключить устройство с кодом сопряжения» и введите шесть цифр в уведомлении Headswap. При активации Headswap один раз перезапустится.</string>
-    <string name="pa_hint_paired">Телефон уже сопряжён: при включённых Wi-Fi и отладке по Wi-Fi хватит одного нажатия, код не нужен. При активации Headswap один раз перезапустится.</string>
+    <string name="pa_hint">«Для разработчиков» → «Отладка по Wi-Fi» → «Подключить устройство с кодом сопряжения». Код введите в уведомлении Headswap.</string>
+    <string name="pa_hint_paired">Телефон сопряжён, код не нужен.</string>
     <string name="pa_button">Активировать с телефона</string>
     <string name="pa_button_again">Активировать снова</string>
     <string name="pa_cancel">Отмена</string>
     <string name="pa_manual_toggle">Ввести порт и код вручную</string>
-    <string name="pa_manual_hint">Если уведомление не работает: введите порт и код из окна сопряжения (поможет разделённый экран). После сопряжения нужен только порт с экрана «Отладка по Wi-Fi».</string>
+    <string name="pa_manual_hint">Порт и код из окна сопряжения. После сопряжения хватит порта отладки.</string>
     <string name="pa_field_pair_port">Порт сопряжения</string>
     <string name="pa_field_code">Код из шести цифр</string>
     <string name="pa_field_connect_port">Порт отладки по Wi-Fi</string>

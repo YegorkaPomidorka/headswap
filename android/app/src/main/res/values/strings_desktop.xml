@@ -13,13 +13,13 @@
 
     <!-- Activation from the phone itself (wireless debugging), Settings - Mode -->
     <string name="pa_title">Activation from the phone</string>
-    <string name="pa_hint">No PC needed. Turn on Wi-Fi, open Developer options → Wireless debugging, tap “Pair device with pairing code” and type the six digits into the Headswap notification. Headswap restarts once during activation.</string>
-    <string name="pa_hint_paired">The phone is paired: with Wi-Fi and wireless debugging on, one tap is enough, no code. Headswap restarts once during activation.</string>
+    <string name="pa_hint">Developer options → Wireless debugging → Pair device with pairing code. Type the code into the Headswap notification.</string>
+    <string name="pa_hint_paired">The phone is paired, no code needed.</string>
     <string name="pa_button">Activate from the phone</string>
     <string name="pa_button_again">Activate again</string>
     <string name="pa_cancel">Cancel</string>
     <string name="pa_manual_toggle">Enter the port and code by hand</string>
-    <string name="pa_manual_hint">If the notification does not work: fill in the port and the code from the pairing dialog (split screen helps). Once paired, only the port from the Wireless debugging screen is needed.</string>
+    <string name="pa_manual_hint">Port and code from the pairing dialog. Once paired, the debugging port is enough.</string>
     <string name="pa_field_pair_port">Pairing port</string>
     <string name="pa_field_code">Six-digit code</string>
     <string name="pa_field_connect_port">Wireless debugging port</string>
