@@ -64,7 +64,22 @@
             <action android:name="android.intent.action.MAIN" />
             <category android:name="android.intent.category.CAR_LAUNCHER" />
         </intent>
+        <!-- рабочий стол с компьютерной активацией: список и проверка запускаемых приложений для встроенных окон -->
+        <intent>
+            <action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.LAUNCHER" />
+        </intent>
     </queries>
+
+    <!-- Только явная активация с компьютера (adb shell -> am instrument с токеном из приложения).
+         Цель - главный процесс приложения, не :delegated. Токен сверяется до выдачи любых прав.
+         Имя полное: AGP не раскрывает относительное имя в instrumentation, а в сборке .smoke оно
+         разрешилось бы от applicationId, а не от namespace. -->
+    <instrumentation
+        android:name="com.yegorkapomidorka.headswap.dex.DelegatedDesktopInstrumentation"
+        android:targetPackage="${applicationId}"
+        android:functionalTest="true"
+        android:handleProfiling="false" />
 
     <application
         android:allowBackup="false"
@@ -125,5 +140,11 @@
             android:name=".BridgeService"
             android:exported="false"
             android:foregroundServiceType="connectedDevice|microphone" />
+
+        <!-- производитель рабочего стола (виртуальный экран) в отдельном процессе: его гибель не обрывает активацию в главном -->
+        <service
+            android:name=".dex.DelegatedDesktopService"
+            android:exported="false"
+            android:process=":delegated" />
     </application>
 </manifest>
