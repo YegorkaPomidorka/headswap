@@ -13,6 +13,8 @@ object DelegatedDesktopAccess {
     const val INJECT_EVENTS = "android.permission.INJECT_EVENTS"
     const val REAL_GET_TASKS = "android.permission.REAL_GET_TASKS"
     const val MEDIA_CONTENT_CONTROL = "android.permission.MEDIA_CONTENT_CONTROL"
+    /** Optional: without it the displays are created as before and the phone lock covers them. */
+    const val ADD_ALWAYS_UNLOCKED_DISPLAY = "android.permission.ADD_ALWAYS_UNLOCKED_DISPLAY"
     /** Trusted virtual displays and the adopted permissions are Android 13+; the app itself still runs on minSdk. */
     const val MIN_SDK = 33
     enum class Status { INACTIVE, PERMISSION_LOST, READY }
@@ -34,6 +36,11 @@ object DelegatedDesktopAccess {
             context.checkSelfPermission(INJECT_EVENTS) == PackageManager.PERMISSION_GRANTED &&
             context.checkSelfPermission(REAL_GET_TASKS) == PackageManager.PERMISSION_GRANTED &&
             context.checkSelfPermission(MEDIA_CONTENT_CONTROL) == PackageManager.PERMISSION_GRANTED
+    }.getOrDefault(false)
+
+    /** Also usable in the producer process: the adopted permission belongs to the app UID. */
+    fun canKeepUnlocked(context: Context): Boolean = isSupported && runCatching {
+        context.checkSelfPermission(ADD_ALWAYS_UNLOCKED_DISPLAY) == PackageManager.PERMISSION_GRANTED
     }.getOrDefault(false)
 
     internal fun begin(stop: () -> Unit): DelegatedBootstrapState.Lease = bootstrap.begin(stop)

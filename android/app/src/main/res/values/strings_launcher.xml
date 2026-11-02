@@ -2,7 +2,6 @@
 <resources>
     <!-- launcher/*: Headswap Desktop launcher on the car display -->
     <string name="l_connecting">Connecting the desktop…</string>
-    <string name="l_home">Home</string>
     <string name="l_all_apps">All apps</string>
     <string name="l_choose_app">Choose an app</string>
     <string name="l_back">Back</string>

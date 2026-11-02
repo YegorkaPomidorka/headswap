@@ -13,6 +13,7 @@ import android.view.InputDevice
 import android.view.InputEvent
 import android.view.KeyEvent
 import android.view.MotionEvent
+import com.yegorkapomidorka.headswap.AppLog
 
 /** TestApi calls stay in the already instrumented main process, not in ordinary helper ART. */
 internal class DelegatedInputGateway(context: Context) : IDelegatedInputGateway.Stub() {
@@ -23,6 +24,7 @@ internal class DelegatedInputGateway(context: Context) : IDelegatedInputGateway.
     private val inputManager = checkNotNull(context.getSystemService(InputManager::class.java))
     private val inject by lazy { InputManager::class.java.getMethod("injectInputEvent", InputEvent::class.java, Int::class.javaPrimitiveType) }
     private val displayEvents = DisplayEventAccess()
+    private val wakeLocks = DisplayWakeLocks(context)
     private val setActionButton by lazy { MotionEvent::class.java.getMethod("setActionButton", Int::class.javaPrimitiveType) }
 
     fun preflight() {
@@ -38,6 +40,7 @@ internal class DelegatedInputGateway(context: Context) : IDelegatedInputGateway.
         activeGateway.set(this)
     }
     @Synchronized fun deactivate() {
+        wakeLocks.releaseAll()
         liveDisplayIds = emptySet()
         activeGateway.compareAndSet(this, null)
         registry.deactivate()
@@ -47,12 +50,14 @@ internal class DelegatedInputGateway(context: Context) : IDelegatedInputGateway.
         requireActive(); requireTrustedDisplay(displayId)
         registry.registerParent(displayId, token, width, height)
         liveDisplayIds = registry.registeredDisplayIds()
+        holdAwake(displayId)
     }
 
     @Synchronized override fun registerChild(parentId: Int, displayId: Int, token: IBinder, width: Int, height: Int) {
         requireActive(); requireTrustedDisplay(parentId); requireTrustedDisplay(displayId)
         registry.registerChild(parentId, displayId, token, width, height)
         liveDisplayIds = registry.registeredDisplayIds()
+        holdAwake(displayId)
     }
 
     @Synchronized override fun resizeDisplay(displayId: Int, token: IBinder, width: Int, height: Int) {
@@ -64,6 +69,12 @@ internal class DelegatedInputGateway(context: Context) : IDelegatedInputGateway.
         requireCaller() // Cleanup remains possible after activation has ended.
         registry.unregister(displayId, token)
         liveDisplayIds = registry.registeredDisplayIds()
+        wakeLocks.retain(liveDisplayIds)
+    }
+
+    /** Дисплеи с OWN_DISPLAY_GROUP (создаются, когда есть право ALWAYS_UNLOCKED) не должны гаснуть по таймауту экрана. */
+    private fun holdAwake(displayId: Int) {
+        if (DelegatedDesktopAccess.canKeepUnlocked(context)) wakeLocks.hold(displayId)
     }
 
     @Synchronized override fun injectInput(displayId: Int, token: IBinder, event: InputEvent, actionButton: Int) {
@@ -106,16 +117,34 @@ internal class DelegatedInputGateway(context: Context) : IDelegatedInputGateway.
         check(registry.requireDisplay(displayId, token).parent != null) { "Ожидался экран виджета" }
         requireTrustedDisplay(displayId)
         EmbeddedDisplayPolicy.requirePackage(packageName)
-        val tasks = runCatching {
-            context.getSystemService(ActivityManager::class.java).getRunningTasks(100).map {
-                val identity = FrameworkTaskIdentityReader.read(it) ?: return@runCatching null
-                DelegatedDesktopPolicy.Task(identity.displayId, identity.userId,
+        val permitted = DelegatedDesktopAccess.hasPermissions(context)
+        var tasks: List<DelegatedDesktopPolicy.Task>? = null
+        if (!permitted) diag("прав", "нет прав рабочего стола в процессе ${Process.myPid()}")
+        else try {
+            val running = context.getSystemService(ActivityManager::class.java).getRunningTasks(100)
+            var unreadable = 0
+            tasks = running.map {
+                val identity = FrameworkTaskIdentityReader.read(it)
+                if (identity == null && unreadable++ == 0) diag("displayId", "displayId/userId задачи ${it.taskId} не прочитаны: " +
+                    FrameworkTaskIdentityReader.diagnose(it) + "; дальше по пакету")
+                DelegatedDesktopPolicy.Task(identity?.displayId ?: DelegatedDesktopPolicy.UNKNOWN,
+                    identity?.userId ?: DelegatedDesktopPolicy.UNKNOWN,
                     it.baseActivity?.packageName, it.topActivity?.packageName,
                     visible = Build.VERSION.SDK_INT < 32 || it.isVisible)
             }
-        }.getOrNull()
-        return DelegatedDesktopPolicy.taskState(displayId, context.applicationInfo.uid / 100000, packageName,
-            DelegatedDesktopAccess.hasPermissions(context), tasks)
+            if (unreadable == 0) diag("ok", "задачи читаются: ${running.size}, displayId/userId доступны")
+        } catch (e: Exception) {
+            diag("исключение", "getRunningTasks: ${e.javaClass.simpleName}: ${e.message}")
+        }
+        return DelegatedDesktopPolicy.taskState(displayId, context.applicationInfo.uid / 100000, packageName, permitted, tasks)
+    }
+
+    /** Причина, по которой состояние задач определяется плохо: в лог один раз на каждую смену причины. */
+    private var lastDiag: String? = null
+    private fun diag(key: String, text: String) {
+        if (key == lastDiag) return
+        lastDiag = key
+        AppLog.i("TASKS $text", false)
     }
 
     private fun requireCaller() {

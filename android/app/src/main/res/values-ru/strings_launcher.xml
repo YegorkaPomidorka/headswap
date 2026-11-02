@@ -2,7 +2,6 @@
 <resources>
     <!-- launcher/*: лаунчер Headswap Desktop на экране ГУ -->
     <string name="l_connecting">Подключаем рабочий стол…</string>
-    <string name="l_home">Главный</string>
     <string name="l_all_apps">Все приложения</string>
     <string name="l_choose_app">Выберите приложение</string>
     <string name="l_back">Назад</string>

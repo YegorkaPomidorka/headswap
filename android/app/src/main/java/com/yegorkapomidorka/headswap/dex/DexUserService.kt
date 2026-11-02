@@ -119,7 +119,7 @@ class DexUserService private constructor(private val context: Context,
                 ensureActive(epoch)
                 launchDesktop(lease)
                 ensureActive(epoch)
-                Log.i(TAG, "started display=$id mode=${DesktopModePolicy.label(mode)} native=${width}x${height} density=$density flags=${DesktopModePolicy.displayFlags(mode, android.os.Build.VERSION.SDK_INT)}")
+                Log.i(TAG, "started display=$id mode=${DesktopModePolicy.label(mode)} native=${width}x${height} density=$density flags=${DesktopModePolicy.displayFlags(mode, android.os.Build.VERSION.SDK_INT, DelegatedDesktopAccess.canKeepUnlocked(context))}")
                 id
             } catch (e: Throwable) {
                 releaseCurrent()

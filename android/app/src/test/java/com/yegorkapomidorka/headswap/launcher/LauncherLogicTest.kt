@@ -162,6 +162,50 @@ class LauncherLogicTest {
         assertEquals(TaskCheck.AfterBack.UNKNOWN, TaskCheck.afterBack(-1, last = true))
     }
 
+    @Test fun backNeverBlocksTouchesForLongAndGivesUpBeforeTwoSeconds() {
+        // касания: не дольше секунды после Back, даже если состояние так и не узнали
+        assertTrue(TaskCheck.blockedAfterBack(1_000, 900))
+        assertTrue(TaskCheck.blockedAfterBack(1_899, 900))
+        assertFalse(TaskCheck.blockedAfterBack(1_900, 900))
+        assertFalse(TaskCheck.blockedAfterBack(5_000, 900))
+        assertFalse(TaskCheck.blockedAfterBack(1_000, 0)) // Back не было / проверка закончилась
+        assertTrue(TaskCheck.BACK_BLOCK_MS <= 1_000)
+        // решение при неизвестном состоянии - на последней проверке, не позже 1,5 с от Back
+        assertEquals(1_500L, TaskCheck.BACK_CHECKS.sum())
+        assertTrue(TaskCheck.BACK_CHECKS.sum() > TaskCheck.BACK_BLOCK_MS)
+        // -1 на всех проверках кончается UNKNOWN: EmbedHost считает приложение ушедшим и возвращает на главный
+        var result = TaskCheck.afterBack(-1, last = false)
+        for (i in 1 until TaskCheck.BACK_CHECKS.size) {
+            assertEquals(TaskCheck.AfterBack.UNKNOWN_MORE, result)
+            result = TaskCheck.afterBack(-1, last = i == TaskCheck.BACK_CHECKS.size - 1)
+        }
+        assertEquals(TaskCheck.AfterBack.UNKNOWN, result)
+    }
+
+    @Test fun backGoesToPreviousLauncherScreenOrHome() {
+        val screens = listOf(Area.AllApps, Area.Picker, Area.Settings, Area.Calls, Area.Players)
+        for (a in screens) {
+            assertTrue(BackNav.enabled(a))
+            assertEquals(Area.Home, BackNav.target(a, null))
+            assertEquals(Area.Home, BackNav.target(a, Area.Home))
+            assertEquals(a, BackNav.remembered(a))
+        }
+        // из выбора приложения, открытого из настроек, - обратно в настройки
+        assertEquals(Area.Settings, BackNav.target(Area.Picker, Area.Settings))
+        // себя же и встроенные окна не запоминаем: идём на главный
+        assertEquals(Area.Home, BackNav.target(Area.Settings, Area.Settings))
+        assertEquals(Area.Home, BackNav.target(Area.AllApps, Area.Navigator))
+        assertNull(BackNav.remembered(Area.Home))
+        assertNull(BackNav.remembered(Area.Navigator))
+        assertNull(BackNav.remembered(Area.App(AppRef("a.b", "c"))))
+    }
+
+    @Test fun railBackIsGreyOnlyOnHome() {
+        assertFalse(BackNav.enabled(Area.Home))
+        assertTrue(BackNav.enabled(Area.Navigator))
+        assertTrue(BackNav.enabled(Area.App(AppRef("a.b", "c"))))
+    }
+
     @Test fun relaunchOnShowOnlyWhenTaskMissingOrStale() {
         assertTrue(TaskCheck.needsRelaunch(0, stale = false))
         assertTrue(TaskCheck.needsRelaunch(1, stale = false))

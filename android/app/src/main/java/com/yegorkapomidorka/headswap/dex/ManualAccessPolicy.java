@@ -22,7 +22,8 @@ public final class ManualAccessPolicy {
     public static final String INSTRUMENTATION_CLASS = DEX_CLASS_PACKAGE + ".DelegatedDesktopInstrumentation";
     public static final String TOKEN_ARGUMENT = "headswap_activation_token";
     public static final String AUDIO_ARGUMENT = "headswap_audio";
-    public static final String AM_CLASS = "com.android.commands.am.Am";
+    public static final String NO_HIDDEN_API_CHECKS = "--no-hidden-api-checks";
+    public static final String AM_CLASS ="com.android.commands.am.Am";
     public static final int TOKEN_BYTES = 16;
     private static final Pattern TOKEN = Pattern.compile("[0-9a-f]{32}");
     private static final Pattern PACKAGE = Pattern.compile("[A-Za-z][A-Za-z0-9_]*(\\.[A-Za-z][A-Za-z0-9_]*)+");
@@ -78,7 +79,9 @@ public final class ManualAccessPolicy {
     public static List<String> arguments(Options options) {
         requirePackage(options.packageName);
         requireToken(options.token);
-        List<String> args = new ArrayList<>(Arrays.asList("instrument", "-w", "-r", "-e", TOKEN_ARGUMENT, options.token));
+        // --no-hidden-api-checks: the instrumented app process reads the display/user of other tasks (TaskInfo
+        // fields are hidden API); without it the launcher cannot tell whether an embedded app is still on screen.
+        List<String> args = new ArrayList<>(Arrays.asList("instrument", "-w", "-r", NO_HIDDEN_API_CHECKS, "-e", TOKEN_ARGUMENT, options.token));
         if (options.audio) args.addAll(Arrays.asList("-e", AUDIO_ARGUMENT, "true"));
         args.add(component(options.packageName));
         return Collections.unmodifiableList(args);

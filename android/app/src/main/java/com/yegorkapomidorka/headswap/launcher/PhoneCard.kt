@@ -174,9 +174,6 @@ fun CallsScreen() {
         verticalArrangement = Arrangement.spacedBy(m.dp(s.g)),
     ) {
         PagerHeader(current, pages, onPage = { page = it }, leading = {
-            RoundButton(s.t, stringResource(R.string.l_home), { LauncherActions.goHome() }, background = Pal.SURFACE_HI) {
-                SvgIcon(Ico.CHEV_L, s.ic, Pal.WHITE, stroke = 2.6f)
-            }
             PillButton(stringResource(R.string.l_recent), { tab = 0; page = 0 }, filled = tab == 0)
             PillButton(stringResource(R.string.l_contacts), { tab = 1; page = 0 }, filled = tab == 1)
         })

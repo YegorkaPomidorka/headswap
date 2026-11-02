@@ -49,7 +49,6 @@ private fun SettingsMain() {
     ) {
         Row(Modifier.fillMaxWidth().height(m.dp(s.t)), verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(m.dp(s.g))) {
-            PillButton(stringResource(R.string.l_home), { LauncherActions.goHome() }, icon = Ico.HOME)
             Txt(stringResource(R.string.l_settings), s.f1, color = Pal.SEC2, weight = FontWeight.SemiBold)
         }
         SettingRow(stringResource(R.string.l_set_theme)) {

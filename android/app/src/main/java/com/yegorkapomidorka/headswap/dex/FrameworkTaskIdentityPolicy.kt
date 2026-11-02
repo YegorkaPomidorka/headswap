@@ -9,6 +9,7 @@ internal object FrameworkTaskIdentityPolicy {
     private val prefix = Regex(
         "\\ATaskInfo\\{userId=(0|[1-9][0-9]{0,9}) " +
             "taskId=(0|[1-9][0-9]{0,9}) " +
+            "(?:effectiveUid=-?[0-9]{1,10} )?" +
             "displayId=(0|[1-9][0-9]{0,9}) isRunning=(?:true|false)(?: |\\})"
     )
 
@@ -18,6 +19,7 @@ internal object FrameworkTaskIdentityPolicy {
     /**
      * Android 13 exposes neither TaskInfo.getDisplayId nor its identity fields to ordinary ART.
      * Its framework toString begins with these three integers, before any app-controlled strings.
+     * Newer releases may put a system-written effectiveUid between taskId and displayId.
      * A changed/OEM format or an inconsistent public task id makes the whole observation unknown.
      */
     fun fromFrameworkPrefix(text: String, expectedTaskId: Int): Identity? {

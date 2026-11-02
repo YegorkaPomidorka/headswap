@@ -14,6 +14,21 @@ class DesktopModePolicyTest {
         assertTrue(flags and 256 != 0) // Destroy display-owned tasks on close.
     }
 
+    @Test fun alwaysUnlockedAddsOwnDisplayGroupTogetherAndOnlyWhenAllowed() {
+        val mode = DesktopModePolicy.ANDROID_DESKTOP
+        for (sdk in listOf(33, 34, 37)) {
+            val plain = DesktopModePolicy.displayFlags(mode, sdk)
+            val unlocked = DesktopModePolicy.displayFlags(mode, sdk, alwaysUnlocked = true)
+            // без права флагов нет: иначе DisplayManagerService бросит SecurityException и рабочий стол не стартует
+            assertEquals(0, plain and ((1 shl 11) or (1 shl 12)))
+            // ALWAYS_UNLOCKED без OWN_DISPLAY_GROUP система молча отбрасывает, поэтому только парой
+            assertEquals((1 shl 11) or (1 shl 12), unlocked xor plain)
+            assertTrue(unlocked and 1024 != 0) // TRUSTED остаётся: OWN_DISPLAY_GROUP требует ADD_TRUSTED_DISPLAY
+            assertEquals(0, unlocked and (1 shl 16)) // STEAL_TOP_FOCUS_DISABLED не трогаем (клавиатура)
+        }
+        assertEquals(1355 or 2048 or 4096, DesktopModePolicy.displayFlags(mode, 33, alwaysUnlocked = true))
+    }
+
     @Test fun samsungDisplayKeepsItsVerifiedFlagSet() {
         for (sdk in listOf(33, 34, 37)) {
             assertEquals(132419, DesktopModePolicy.displayFlags(DesktopModePolicy.SAMSUNG_DEX, sdk))

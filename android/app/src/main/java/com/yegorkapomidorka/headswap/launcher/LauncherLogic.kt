@@ -118,6 +118,12 @@ object TaskCheck {
     /** Приложение осталось первой задачей, но не видно: Back из корня сделал moveTaskToBack. */
     const val MOVED_TO_BACK = 3
 
+    /** Пауза до каждой проверки задачи после Back: 300, 700, 1100, 1500 мс от Back. */
+    val BACK_CHECKS = longArrayOf(300, 400, 400, 400)
+    /** Дольше этого после Back касания не блокируются, даже если состояние неизвестно: чёрный экран без кликов хуже лишнего касания. */
+    const val BACK_BLOCK_MS = 1000L
+
+    /** UNKNOWN: все проверки без ответа (-1), считаем, что приложение ушло из корня; вызывающий закрывает слой, как при CLOSED. */
     enum class AfterBack { CLOSED, STAYED_MORE, STAYED, UNKNOWN_MORE, UNKNOWN }
 
     /** Итог очередной проверки после Back; [last] - проверка была последней. */
@@ -128,12 +134,34 @@ object TaskCheck {
         else -> AfterBack.UNKNOWN_MORE
     }
 
+    /** Касания в окно не идут первую секунду после Back ([backAt] - uptime Back, 0 - Back не было). */
+    fun blockedAfterBack(now: Long, backAt: Long): Boolean = backAt != 0L && now - backAt in 0 until BACK_BLOCK_MS
+
     /** Окно показали снова: запускать приложение заново, если его нет сверху; -1 считается только после Back с неизвестным итогом. */
     fun needsRelaunch(state: Int, stale: Boolean): Boolean =
         state == NONE || state == BACKGROUND || state == MOVED_TO_BACK || (state < 0 && stale)
 
     /** Приложение исчезло с дисплея: «нет задачи» после того, как оно уже было сверху (до этого оно могло просто не появиться). */
     fun vanished(state: Int, seenTop: Boolean): Boolean = state == NONE && seenTop
+}
+
+/**
+ * «Назад» на экранах лаунчера (без кнопки «Главный»): на предыдущий экран лаунчера, если он был не главным, иначе на главный.
+ * Та же кнопка рейки, что открыла экран (логотип, шестерёнка), при повторном нажатии тоже ведёт назад.
+ */
+object BackNav {
+    /** Экраны лаунчера, куда можно вернуться Назад; встроенные приложения и главный не запоминаются. */
+    fun isScreen(area: Area): Boolean =
+        area == Area.AllApps || area == Area.Picker || area == Area.Settings || area == Area.Calls || area == Area.Players
+
+    /** Что запомнить как «предыдущий» при уходе с [from]. */
+    fun remembered(from: Area): Area? = from.takeIf(::isScreen)
+
+    /** Куда ведёт Назад с экрана [current]; [previous] - запомненный предыдущий экран. */
+    fun target(current: Area, previous: Area?): Area = previous?.takeIf { isScreen(it) && it != current } ?: Area.Home
+
+    /** Серый «Назад» - только на главном: идти некуда. */
+    fun enabled(current: Area): Boolean = current != Area.Home
 }
 
 /**

@@ -63,8 +63,10 @@ internal class EmbedSlot(val name: String) {
     var lastState = -2
     /** С запуска хоть раз видели приложение сверху: только тогда «задачи нет» значит «закрыто», а не «ещё не появилась». */
     var seenTop = false
-    /** Касания не пересылаются: сразу после Back до подтверждения и после «задача закрыта». Снимается запуском или state 2. */
+    /** Касания не пересылаются после «задача закрыта». Снимается запуском или state 2. */
     @Volatile var touchBlocked = false
+    /** uptime последнего Back: первую секунду после него касания не идут (TaskCheck.BACK_BLOCK_MS), потом снова при любом state. */
+    @Volatile var backAt = 0L
     /** После Back состояние осталось неизвестным (-1): при следующем показе приложение запускается заново. */
     var stale = false
     var dropped = 0
@@ -92,8 +94,6 @@ internal object EmbedHost {
     private const val CREATE_BUDGET_MS = 20_000L
     /** Вызов реестра дольше этого попадает в лог: так видно, что рабочий поток завис на Binder. */
     private const val SLOW_MS = 300L
-    /** Пауза до каждой проверки задачи после Back: 300, 800, 1500, 2500 мс. */
-    private val BACK_CHECKS = longArrayOf(300, 500, 700, 1000)
     private const val WATCH_MS = 2000L
     /** Касание, простоявшее в очереди дольше (рабочий поток ждал Binder), уже не нужно. */
     private const val STALE_TOUCH_MS = 1000L
@@ -197,7 +197,7 @@ internal object EmbedHost {
                 main.post(onClosed)
                 return@post
             }
-            slot.touchBlocked = true
+            slot.backAt = SystemClock.uptimeMillis()
             try {
                 cancelTouch(slot)
                 timed(slot, "back") { EmbeddedSessionRegistry.back(uid, slot.handle) }
@@ -210,35 +210,39 @@ internal object EmbedHost {
                     return@post
                 }
             }
-            worker.postDelayed({ checkAfterBack(slot, 0, onClosed) }, BACK_CHECKS[0])
+            worker.postDelayed({ checkAfterBack(slot, 0, onClosed) }, TaskCheck.BACK_CHECKS[0])
         }
     }
 
     private fun checkAfterBack(slot: EmbedSlot, attempt: Int, onClosed: () -> Unit) {
         val state = queryState(slot, "back#$attempt", strict = true)
-        val last = attempt >= BACK_CHECKS.size - 1
+        val last = attempt >= TaskCheck.BACK_CHECKS.size - 1
         when (TaskCheck.afterBack(state, last)) {
             TaskCheck.AfterBack.CLOSED -> {
                 AppLog.i("EMBED ${slot.name}: после Back задачи на экране нет (state=$state), возврат на главный", false)
                 slot.launchedKey = null
                 slot.seenTop = false
+                slot.backAt = 0L
                 main.post(onClosed)
             }
             TaskCheck.AfterBack.STAYED_MORE -> {
-                slot.touchBlocked = false // приложение приняло Back внутри себя, касания снова идут
-                worker.postDelayed({ checkAfterBack(slot, attempt + 1, onClosed) }, BACK_CHECKS[attempt + 1])
+                slot.backAt = 0L // приложение приняло Back внутри себя, касания снова идут
+                worker.postDelayed({ checkAfterBack(slot, attempt + 1, onClosed) }, TaskCheck.BACK_CHECKS[attempt + 1])
             }
             TaskCheck.AfterBack.STAYED -> {
-                slot.touchBlocked = false
+                slot.backAt = 0L
                 AppLog.i("EMBED ${slot.name}: после Back приложение осталось сверху", false)
             }
             TaskCheck.AfterBack.UNKNOWN_MORE ->
-                worker.postDelayed({ checkAfterBack(slot, attempt + 1, onClosed) }, BACK_CHECKS[attempt + 1])
+                worker.postDelayed({ checkAfterBack(slot, attempt + 1, onClosed) }, TaskCheck.BACK_CHECKS[attempt + 1])
             TaskCheck.AfterBack.UNKNOWN -> {
-                // узнать не удалось ни разу: слой остаётся, но следующий показ запустит приложение заново
-                AppLog.i("EMBED ${slot.name}: после Back состояние неизвестно (state=$state), помечаю на перезапуск", false)
+                // узнать не удалось за 1,5 с: считаем, что приложение ушло из корня; следующий показ запустит его заново
+                AppLog.i("EMBED ${slot.name}: после Back состояние неизвестно (state=$state), считаю закрытым, возврат на главный", false)
                 slot.stale = true
-                slot.touchBlocked = false
+                slot.launchedKey = null
+                slot.seenTop = false
+                slot.backAt = 0L
+                main.post(onClosed)
             }
         }
     }
@@ -285,7 +289,7 @@ internal object EmbedHost {
     /** Пока слой на экране и принимает касания, раз в 2 с проверяем, что задача на месте (процесс убит, Back из корня). */
     private fun watchTick(slot: EmbedSlot) {
         if (slot.wantKey == null || slot.handle <= 0 || slot.status != EmbedStatus.READY) return
-        if (slot.interactive && !slot.touchBlocked) {
+        if (slot.interactive && !slot.touchBlocked && slot.backAt == 0L) { // проверки после Back идут своим ходом
             val state = queryState(slot, "watch")
             if (TaskCheck.vanished(state, slot.seenTop)) { gone(slot, "watch"); return }
         }
@@ -383,6 +387,7 @@ internal object EmbedHost {
             slot.stale = false
             slot.seenTop = false
             slot.touchBlocked = false
+            slot.backAt = 0L
         }
         slot.attempts = 0
         slot.createdAt = 0L
@@ -413,7 +418,8 @@ internal object EmbedHost {
             if (slot.handle <= 0 || !slot.interactive) continue
             // в дисплей без живой задачи касания не идут: после Back до подтверждения, после «задача закрыта», до готовности
             val reason = when {
-                slot.touchBlocked -> "заблокированы (Back/задача закрыта)"
+                slot.touchBlocked -> "заблокированы (задача закрыта)"
+                TaskCheck.blockedAfterBack(SystemClock.uptimeMillis(), slot.backAt) -> "заблокированы (сразу после Back)"
                 slot.status != EmbedStatus.READY -> "окно ещё не готово (${slot.status})"
                 p.action == 0 && SystemClock.uptimeMillis() - p.at > STALE_TOUCH_MS -> "устарели в очереди"
                 else -> null

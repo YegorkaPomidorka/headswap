@@ -74,6 +74,14 @@ class EmbeddedDisplayPolicyTest {
         assertEquals(0, flags and (16 or 512 or 131072)) // No mirror, system decorations, Samsung content-mode.
     }
 
+    @Test fun childDisplaysFollowTheParentUnlockedPolicy() {
+        for (sdk in listOf(33, 34, 37)) {
+            assertEquals(DesktopModePolicy.displayFlags(DesktopModePolicy.ANDROID_DESKTOP, sdk, true),
+                EmbeddedDisplayPolicy.displayFlags(sdk, true))
+        }
+        assertEquals(1355, EmbeddedDisplayPolicy.displayFlags(33, false))
+    }
+
     @Test fun embeddedAndParentFocusPoliciesMatchAcrossAndroidBoundary() {
         assertEquals(1355, EmbeddedDisplayPolicy.displayFlags(33))
         for (sdk in listOf(33, 34, 37)) {

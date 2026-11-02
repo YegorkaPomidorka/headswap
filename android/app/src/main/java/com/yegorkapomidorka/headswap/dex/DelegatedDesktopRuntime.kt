@@ -27,7 +27,8 @@ internal class DelegatedDesktopRuntime(private val context: Context, private val
     override fun createDisplay(surface: Surface, width: Int, height: Int, density: Int, mode: Int): VirtualDisplay {
         DelegatedDesktopPolicy.requireMode(mode)
         return checkNotNull(displays.createVirtualDisplay("HeadSwap ${DesktopModePolicy.label(mode)}",
-            width, height, density, surface, DesktopModePolicy.displayFlags(mode, Build.VERSION.SDK_INT))) {
+            width, height, density, surface,
+            DesktopModePolicy.displayFlags(mode, Build.VERSION.SDK_INT, DelegatedDesktopAccess.canKeepUnlocked(context)))) {
             "Android отклонил доверенный виртуальный экран"
         }
     }
@@ -37,7 +38,9 @@ internal class DelegatedDesktopRuntime(private val context: Context, private val
     @SuppressLint("WrongConstant")
     override fun createChildDisplay(surface: Surface, width: Int, height: Int, density: Int): VirtualDisplay =
         checkNotNull(displays.createVirtualDisplay("HeadSwap navigator widget", width, height, density,
-            surface, EmbeddedDisplayPolicy.displayFlags(Build.VERSION.SDK_INT))) { "Android отклонил экран виджета" }
+            surface, EmbeddedDisplayPolicy.displayFlags(Build.VERSION.SDK_INT, DelegatedDesktopAccess.canKeepUnlocked(context)))) {
+            "Android отклонил экран виджета"
+        }
 
     override fun inject(event: InputEvent, id: Int, actionButton: Int) {
         check(id > 0) { "Ввод на основной экран запрещён" }

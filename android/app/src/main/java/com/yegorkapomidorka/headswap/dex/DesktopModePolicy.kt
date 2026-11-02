@@ -21,15 +21,24 @@ object DesktopModePolicy {
     /** PUBLIC | PRESENTATION | OWN_CONTENT_ONLY | SUPPORTS_TOUCH | TRUSTED | DESTROY_CONTENT. */
     const val ANDROID_DISPLAY_FLAGS = 1 or 2 or 8 or 64 or 1024 or 256
     private const val VIRTUAL_DISPLAY_OWN_FOCUS = 1 shl 14
+    /** Own DisplayGroup (needs ADD_TRUSTED_DISPLAY): the display does not sleep and lock together with the phone's screen. */
+    const val VIRTUAL_DISPLAY_OWN_DISPLAY_GROUP = 1 shl 11
+    /**
+     * Keyguard never covers the display (needs ADD_ALWAYS_UNLOCKED_DISPLAY). DisplayManagerService drops the flag
+     * without OWN_DISPLAY_GROUP and throws SecurityException without the permission, so both are requested only together
+     * and only when [alwaysUnlocked] (the permission is held).
+     */
+    const val VIRTUAL_DISPLAY_ALWAYS_UNLOCKED = 1 shl 12
 
-    fun displayFlags(mode: Int, sdkInt: Int): Int {
+    fun displayFlags(mode: Int, sdkInt: Int, alwaysUnlocked: Boolean = false): Int {
         requireMode(mode)
         if (mode == SAMSUNG_DEX) return DexUserServicePolicy.VIRTUAL_DISPLAY_FLAGS
         // A tap is forwarded parent -> child. Independent focus prevents the parent's DOWN
         // from clearing the embedded app's pressed state before its UP arrives. Android 13
         // has no per-display flag; retain its existing behavior. Do not disable stealing top
         // focus: that separate flag prevents the child from showing its software keyboard.
-        return ANDROID_DISPLAY_FLAGS or (if (sdkInt >= 34) VIRTUAL_DISPLAY_OWN_FOCUS else 0)
+        return ANDROID_DISPLAY_FLAGS or (if (sdkInt >= 34) VIRTUAL_DISPLAY_OWN_FOCUS else 0) or
+            (if (alwaysUnlocked) VIRTUAL_DISPLAY_OWN_DISPLAY_GROUP or VIRTUAL_DISPLAY_ALWAYS_UNLOCKED else 0)
     }
 
     /** HOME and APP_SWITCH must never reach a primary-display global navigation handler. */

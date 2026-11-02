@@ -116,7 +116,7 @@ private fun Rail() {
     val accent = LocalAccent.current
     val model = LauncherModel
     val status = model.status
-    val embedded = model.area is Area.App || model.area == Area.Navigator
+    val canBack = BackNav.enabled(model.area)
     Column(Modifier.width(m.dp(s.rail)).fillMaxHeight(), verticalArrangement = Arrangement.spacedBy(m.dp(s.g))) {
         Column(
             Modifier.weight(1f).fillMaxWidth()
@@ -132,9 +132,9 @@ private fun Rail() {
                     Txt(status.net, s.fs, color = Pal.SEC)
                 }
             }
-            // «Назад» виден всегда: белый, когда открыто приложение, серый, когда идти некуда
-            RoundButton(s.rb, stringResource(R.string.l_back), onTap = { LauncherActions.embeddedBack() }, enabled = embedded) {
-                SvgIcon(Ico.CHEV_BACK, s.backIc, if (embedded) Pal.WHITE else BackIdle, stroke = 2f)
+            // «Назад» виден всегда: белый везде, кроме главного, где идти некуда (серый)
+            RoundButton(s.rb, stringResource(R.string.l_back), onTap = { LauncherActions.embeddedBack() }, enabled = canBack) {
+                SvgIcon(Ico.CHEV_BACK, s.backIc, if (canBack) Pal.WHITE else BackIdle, stroke = 2f)
             }
             RoundButton(s.rb, stringResource(R.string.l_all_apps), onTap = { LauncherActions.openAllApps() }) {
                 Box(Modifier.matchParentSize().drawBehind {

@@ -58,13 +58,13 @@ public final class ManualAccessPolicyTest {
             new String[]{"--package", APP + ".smoke", "--token", TOKEN}).packageName);
     }
 
-    @Test public void instrumentationCarriesTokenAndAudioAndNeverDisablesHiddenApiChecks() {
+    @Test public void instrumentationCarriesTokenAudioAndDisablesHiddenApiChecks() {
         List<String> args = ManualAccessPolicy.arguments(options("--audio"));
-        assertEquals(Arrays.asList("instrument", "-w", "-r", "-e", "headswap_activation_token", TOKEN,
+        assertEquals(Arrays.asList("instrument", "-w", "-r", "--no-hidden-api-checks", "-e", "headswap_activation_token", TOKEN,
             "-e", "headswap_audio", "true", APP + "/" + DelegatedDesktopInstrumentation.class.getName()), args);
         List<String> plain = ManualAccessPolicy.arguments(options());
         assertFalse(plain.contains("headswap_audio"));
-        assertFalse(plain.contains("--no-hidden-api-checks"));
+        assertTrue(plain.contains("--no-hidden-api-checks")); // task display/user are hidden API (embedded app state)
         assertFalse(plain.contains("headswap_screen"));
     }
 

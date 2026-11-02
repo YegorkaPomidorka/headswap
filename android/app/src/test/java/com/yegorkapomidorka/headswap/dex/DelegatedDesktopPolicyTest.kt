@@ -86,6 +86,20 @@ class DelegatedDesktopPolicyTest {
             listOf(task(42, top = "com.example.dialog"))))
     }
 
+    @Test fun unreadableDisplayFallsBackToPackageInsteadOfUnknown() {
+        val u = DelegatedDesktopPolicy.UNKNOWN
+        // displayId/userId скрыты: состояние берём по пакету, а не -1
+        assertEquals(2, DelegatedDesktopPolicy.taskState(42, 0, "com.example.map", true, listOf(task(u, u))))
+        assertEquals(3, DelegatedDesktopPolicy.taskState(42, 0, "com.example.map", true, listOf(task(u, u, visible = false))))
+        assertEquals(0, DelegatedDesktopPolicy.taskState(42, 0, "com.example.map", true,
+            listOf(task(u, u, base = "com.example.music"))))
+        assertEquals(1, DelegatedDesktopPolicy.taskState(42, 0, "com.example.map", true,
+            listOf(task(u, u, base = "com.example.music"), task(u, u, base = "com.example.map", top = "com.example.dialog"))))
+        // читаемые задачи по-прежнему фильтруются по дисплею, нечитаемые чужого пакета не мешают
+        assertEquals(0, DelegatedDesktopPolicy.taskState(42, 0, "com.example.map", true, listOf(task(0), task(u, u, base = "x.y"))))
+        assertEquals(2, DelegatedDesktopPolicy.taskState(42, 0, "com.example.map", true, listOf(task(u, u, base = "x.y"), task(42))))
+    }
+
     @Test(expected = IllegalArgumentException::class)
     fun taskObserverRejectsPhoneEvenWhenQueryPermissionMissing() {
         DelegatedDesktopPolicy.taskState(0, 0, "com.example.map", false, null)

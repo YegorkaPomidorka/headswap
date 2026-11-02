@@ -31,15 +31,27 @@ internal object DelegatedDesktopPolicy {
         return Component(appPackage, DesktopModePolicy.ANDROID_HOME_CLASS, true)
     }
 
-    /** [visible]: задача на экране (TaskInfo.isVisible, API 32+); после moveTaskToBack она остаётся первой в списке, но не видна. */
+    /**
+     * [visible]: задача на экране (TaskInfo.isVisible, API 32+); после moveTaskToBack она остаётся первой в списке, но не видна.
+     * [displayId]/[userId] = [UNKNOWN], если Android не отдал их приложению (скрытые поля TaskInfo).
+     */
     data class Task(val displayId: Int, val userId: Int, val basePackage: String?, val topPackage: String?, val visible: Boolean = true)
 
-    /** null means unavailable/filtered, not an empty display. Never examine another display or user. */
+    const val UNKNOWN = -1
+
+    /**
+     * null means unavailable/filtered, not an empty display. Never examine another display or user.
+     * Задача с неизвестным дисплеем учитывается только по пакету: на практике у приложения одна задача (повторный запуск
+     * переиспользует её), так что оценка верна, пока то же приложение не открыто и на экране телефона.
+     */
     fun taskState(id: Int, userId: Int, packageName: String, permitted: Boolean, tasks: List<Task>?): Int {
         require(id > 0) { "Проверка основного экрана запрещена" }
         EmbeddedDisplayPolicy.requirePackage(packageName)
         if (!permitted || tasks == null) return -1
-        val owned = tasks.filter { it.displayId == id && it.userId == userId }
+        val owned = tasks.filter {
+            if (it.displayId == UNKNOWN || it.userId == UNKNOWN) it.basePackage == packageName || it.topPackage == packageName
+            else it.displayId == id && it.userId == userId
+        }
         val first = owned.firstOrNull()
         return when {
             first?.topPackage == packageName -> if (first.visible) 2 else 3

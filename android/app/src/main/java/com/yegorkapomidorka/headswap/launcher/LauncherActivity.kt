@@ -1,7 +1,11 @@
 package com.yegorkapomidorka.headswap.launcher
 
 import android.annotation.SuppressLint
+import android.app.KeyguardManager
+import android.content.BroadcastReceiver
 import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -14,6 +18,7 @@ import androidx.activity.compose.setContent
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.core.content.ContextCompat
 import com.yegorkapomidorka.headswap.AppLocale
 import com.yegorkapomidorka.headswap.AppLog
 import com.yegorkapomidorka.headswap.desktop.DesktopAppCatalog
@@ -42,6 +47,15 @@ class LauncherActivity : ComponentActivity() {
         }
     }
 
+    /** Блокировка телефона во время сеанса: в логе видно, что случилось с экраном и держит ли рабочий стол ключ-защита. */
+    private val screenEvents = object : BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent) {
+            val locked = getSystemService(KeyguardManager::class.java)?.isKeyguardLocked
+            AppLog.i("SCREEN ${intent.action?.substringAfterLast('.')} keyguard=$locked дисплей=${currentDisplayId()} " +
+                "активность=${if (visible) "видна" else "не видна"} подключён=$connected", false)
+        }
+    }
+
     override fun attachBaseContext(base: Context) {
         super.attachBaseContext(AppLocale.wrap(base))
     }
@@ -52,6 +66,13 @@ class LauncherActivity : ComponentActivity() {
         // Render a neutral first frame; reveal the launcher only after the client confirms ownership.
         if (currentDisplayId() <= 0) { finish(); return }
         AppLog.init(this)
+        // Рабочий стол остаётся на экране при блокировке телефона (сам дисплей не блокируется: ALWAYS_UNLOCKED).
+        setShowWhenLocked(true)
+        ContextCompat.registerReceiver(this, screenEvents, IntentFilter().apply {
+            addAction(Intent.ACTION_SCREEN_OFF)
+            addAction(Intent.ACTION_SCREEN_ON)
+            addAction(Intent.ACTION_USER_PRESENT)
+        }, ContextCompat.RECEIVER_NOT_EXPORTED)
         LauncherModel.init(this)
         // дочерние окна живут с плотностью дисплея ГУ
         val dpi = resources.displayMetrics.densityDpi.coerceIn(96, 1280)
@@ -70,6 +91,7 @@ class LauncherActivity : ComponentActivity() {
         if (currentDisplayId() <= 0) { finish(); return }
         visible = true
         connected = ownsDisplay()
+        AppLog.i("LAUNCHER активность на экране, дисплей=${currentDisplayId()}", false)
         LauncherModel.reloadCatalog() // за время работы могли поставить или удалить приложение
         window.insetsController?.apply {
             hide(WindowInsets.Type.statusBars() or WindowInsets.Type.navigationBars())
@@ -81,12 +103,14 @@ class LauncherActivity : ComponentActivity() {
     }
 
     override fun onPause() {
+        AppLog.i("LAUNCHER активность ушла с экрана (onPause), дисплей=${currentDisplayId()}", false)
         visible = false
         main.removeCallbacks(awaitOwnership)
         super.onPause()
     }
 
     override fun onDestroy() {
+        runCatching { unregisterReceiver(screenEvents) }
         main.removeCallbacksAndMessages(null)
         super.onDestroy()
     }

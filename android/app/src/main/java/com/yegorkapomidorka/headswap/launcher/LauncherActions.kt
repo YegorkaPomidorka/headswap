@@ -6,10 +6,15 @@ import com.yegorkapomidorka.headswap.AppLog
 object LauncherActions {
     private val model get() = LauncherModel
 
-    fun goHome() { model.home() }
-    fun openAllApps() { model.go(Area.AllApps) }
+    /** Логотип на рейке: «Все приложения»; повторное нажатие - назад. */
+    fun openAllApps() { if (model.area == Area.AllApps) model.back() else model.go(Area.AllApps) }
     fun openPicker() { model.go(Area.Picker) }
-    fun openSettings() { model.settingsPage = SettingsPage.MAIN; model.go(Area.Settings) }
+    /** Шестерёнка на рейке: настройки; повторное нажатие - назад. */
+    fun openSettings() {
+        if (model.area == Area.Settings) { model.back(); return }
+        model.settingsPage = SettingsPage.MAIN
+        model.go(Area.Settings)
+    }
     /** Тап по карточке «Телефон»: экран «Вызовы»; пропущенные считаются просмотренными. */
     fun openCalls() {
         model.markMissedSeen()
@@ -84,13 +89,17 @@ object LauncherActions {
         model.go(Area.Settings)
     }
 
-    /** Кнопка «Назад» рейки: Back в открытое окно; если приложение вышло из корня - на главный. */
+    /**
+     * Кнопка «Назад» рейки: Back в открытое окно (если приложение вышло из корня - на главный); с экрана лаунчера - на
+     * предыдущий экран или главный; на главном ничего.
+     */
     fun embeddedBack() {
         AppLog.i("LAUNCHER Назад на рейке: экран=${model.area}", false)
         when (model.area) {
             is Area.App -> EmbedHost.back(EmbedHost.app) { backClosed(EmbedHost.app) }
             Area.Navigator -> EmbedHost.back(EmbedHost.nav) { backClosed(EmbedHost.nav) }
-            else -> model.home()
+            Area.Home -> Unit
+            else -> model.back()
         }
     }
 
@@ -105,13 +114,9 @@ object LauncherActions {
     /** Слот сообщил, что задачи приложения больше нет (процесс убит, Back из корня, окно потеряно): слой убираем. */
     internal fun embedGone(slot: EmbedSlot) = backClosed(slot)
 
-    /** Аппаратный Back ГУ: из встроенного приложения - назад в него, из экранов лаунчера - на главный, на главном ничего. */
+    /** Аппаратный Back ГУ - то же, что «Назад» на рейке. */
     fun hardwareBack() {
         AppLog.i("LAUNCHER аппаратный Back: экран=${model.area}", false)
-        when (model.area) {
-            Area.Home -> Unit
-            is Area.App, Area.Navigator -> embeddedBack()
-            else -> model.home()
-        }
+        embeddedBack()
     }
 }

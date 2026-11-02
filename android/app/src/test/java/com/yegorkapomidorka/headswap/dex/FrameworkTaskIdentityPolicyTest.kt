@@ -22,6 +22,13 @@ class FrameworkTaskIdentityPolicyTest {
         ))
     }
 
+    @Test fun newerFrameworkPrefixWithEffectiveUidIsAccepted() {
+        assertEquals(FrameworkTaskIdentityPolicy.Identity(7, 0, 42),
+            parse("TaskInfo{userId=0 taskId=42 effectiveUid=10234 displayId=7 isRunning=true baseIntent=Intent { }}"))
+        assertNull(parse("TaskInfo{userId=0 taskId=42 effectiveUid=x displayId=7 isRunning=true }"))
+        assertNull(parse("TaskInfo{userId=0 taskId=42 effectiveUid=1 effectiveUid=2 displayId=7 isRunning=true }"))
+    }
+
     @Test fun primaryDisplayAndDifferentUserRemainVisibleForLaterScopedFiltering() {
         assertEquals(FrameworkTaskIdentityPolicy.Identity(0, 10, 42),
             parse("TaskInfo{userId=10 taskId=42 displayId=0 isRunning=false}"))

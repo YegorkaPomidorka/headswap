@@ -78,6 +78,8 @@ class DelegatedDesktopInstrumentation : Instrumentation() {
                 DelegatedDesktopAccess.INJECT_EVENTS, DelegatedDesktopAccess.REAL_GET_TASKS,
                 DelegatedDesktopAccess.MEDIA_CONTENT_CONTROL)
             if (requestAudio) permissions.add(DesktopAudioPolicy.PERMISSION)
+            // Optional (not part of hasPermissions): shells that lack it simply do not pass it on.
+            permissions.add(DelegatedDesktopAccess.ADD_ALWAYS_UNLOCKED_DISPLAY)
             automation.adoptShellPermissionIdentity(*permissions.toTypedArray())
             adoptedHere = true
             check(DelegatedDesktopAccess.hasPermissions(context)) { "Android не предоставил все права рабочего стола и управления музыкой. Повторите явную активацию HeadSwap." }
@@ -85,7 +87,7 @@ class DelegatedDesktopInstrumentation : Instrumentation() {
             lease = DelegatedDesktopAccess.begin { stop.countDown() }
             ready = true
             runCatching { PhoneActivationService.onAccessReady(context) }
-            Log.i(DelegatedDesktopAccess.LOG_TAG, "READY protocol=1 uid=${Process.myUid()} pid=${Process.myPid()} permissions=${permissions.joinToString(",")} playbackAudio=$requestAudio")
+            Log.i(DelegatedDesktopAccess.LOG_TAG, "READY protocol=1 uid=${Process.myUid()} pid=${Process.myPid()} permissions=${permissions.joinToString(",")} playbackAudio=$requestAudio alwaysUnlocked=${DelegatedDesktopAccess.canKeepUnlocked(context)}")
             runCatching { sendStatus(0, Bundle().apply {
                 putString("headswap_access", "ready")
                 putString("headswap_pid", Process.myPid().toString())

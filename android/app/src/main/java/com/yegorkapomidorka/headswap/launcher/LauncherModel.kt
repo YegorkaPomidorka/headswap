@@ -157,11 +157,25 @@ internal object LauncherModel {
     val navigatorPkg: String? get() = NavigatorPick.effective(savedNavigator, installedPackages)
     val installedNavigators: List<String> get() = NavigatorPick.KNOWN.filter { it in installedPackages }
 
+    /** Предыдущий экран лаунчера для «Назад»; после самого «Назад» пуст, чтобы не ходить по кругу. */
+    var previous: Area? = null
+        private set
+
     fun go(next: Area) {
-        if (next != area) AppLog.i("LAUNCHER экран: $area -> $next", false)
+        if (next != area) {
+            AppLog.i("LAUNCHER экран: $area -> $next", false)
+            previous = BackNav.remembered(area)
+        }
         area = next
     }
-    fun home() = go(Area.Home)
+    fun home() { go(Area.Home); previous = null }
+
+    /** «Назад» с экрана лаунчера: на предыдущий экран, если он был не главным, иначе на главный. */
+    fun back() {
+        val target = BackNav.target(area, previous)
+        go(target)
+        previous = null
+    }
 
     fun now(): Long = SystemClock.uptimeMillis()
 

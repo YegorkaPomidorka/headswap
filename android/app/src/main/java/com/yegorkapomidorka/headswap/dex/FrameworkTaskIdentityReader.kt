@@ -24,4 +24,21 @@ internal object FrameworkTaskIdentityReader {
             FrameworkTaskIdentityPolicy.fromFrameworkPrefix(task.toString(), task.taskId)
         }.getOrNull()
     }
+
+    /** One line for the log: why [read] returned null (class, reflection results, start of toString without app text). */
+    fun diagnose(task: ActivityManager.RunningTaskInfo): String {
+        if (task.javaClass != taskClass) return "класс ${task.javaClass.name}"
+        fun probe(name: String, block: () -> Any?): String =
+            runCatching { "$name=${block()}" }.getOrElse { "$name!${it.javaClass.simpleName}" }
+        val text = runCatching { task.toString().take(PREFIX_SAMPLE) }.getOrDefault("?")
+        return listOf(
+            "getDisplayId=" + if (displayMethod == null) "нет метода" else probe("вызов") { displayMethod.invoke(task) },
+            "поле displayId=" + if (displayField == null) "нет поля" else probe("чтение") { displayField.getInt(task) },
+            "getUserId=" + if (userMethod == null) "нет метода" else probe("вызов") { userMethod.invoke(task) },
+            "поле userId=" + if (userField == null) "нет поля" else probe("чтение") { userField.getInt(task) },
+            "toString='$text'",
+        ).joinToString(", ")
+    }
+
+    private const val PREFIX_SAMPLE = 90
 }

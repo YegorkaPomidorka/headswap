@@ -208,7 +208,7 @@ fun PlayersScreen() {
     PagedApps(
         players, page, onPage = { page = it },
         leading = {
-            PillButton(stringResource(R.string.l_back), { LauncherActions.goHome() }, icon = Ico.CHEV_L, filled = false)
+            PillButton(stringResource(R.string.l_back), { LauncherModel.back() }, icon = Ico.CHEV_L, filled = false)
             Txt(stringResource(if (players.isEmpty()) R.string.l_music_no_players else R.string.l_music_choose), f1, color = Pal.SEC2)
         },
     ) { pkg, iconPx -> PackageTile(pkg, iconPx, selected = pkg == model.musicPlayer, onTap = { LauncherActions.choosePlayer(pkg) }) }

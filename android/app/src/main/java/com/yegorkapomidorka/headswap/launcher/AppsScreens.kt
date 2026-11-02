@@ -118,7 +118,7 @@ internal fun <T> PagedApps(
     }
 }
 
-/** «Все приложения»: первая кнопка «Главный», дальше все установленные приложения страницами; тап открывает. */
+/** «Все приложения»: все установленные приложения страницами; тап открывает. Назад - кнопка рейки. */
 @Composable
 fun AllAppsScreen() {
     val model = LauncherModel
@@ -127,7 +127,7 @@ fun AllAppsScreen() {
     PagedApps(
         items, page, onPage = { page = it; model.allAppsPage = it },
         leading = {
-            PillButton(stringResource(R.string.l_home), { LauncherActions.goHome() }, icon = Ico.HOME)
+            Txt(stringResource(R.string.l_all_apps), LocalMetrics.current.spec.f1, color = Pal.SEC2, weight = FontWeight.SemiBold)
         },
     ) { ref, iconPx ->
         AppTile(ref, labelled = true, iconPx = iconPx)
@@ -144,7 +144,7 @@ fun PickerScreen() {
     PagedApps(
         items, page, onPage = { page = it },
         leading = {
-            PillButton(stringResource(R.string.l_back), { LauncherActions.goHome() }, icon = Ico.CHEV_L, filled = false)
+            PillButton(stringResource(R.string.l_back), { LauncherModel.back() }, icon = Ico.CHEV_L, filled = false)
             Txt(stringResource(R.string.l_choose_app), f1, color = Pal.SEC2)
         },
     ) { ref, iconPx ->
