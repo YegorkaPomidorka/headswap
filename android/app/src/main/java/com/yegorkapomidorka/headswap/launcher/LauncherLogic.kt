@@ -87,6 +87,15 @@ object AppList {
     fun quick(list: List<AppRef>, n: Int): List<AppRef> = list.take(n)
 }
 
+/**
+ * Списки экранов приложений из каталога установленных (порядок и фильтр нашего пакета уже сделал DesktopAppCatalog).
+ * «Все приложения» - весь каталог, выбор для нижнего ряда - каталог без избранных.
+ */
+object CatalogLists {
+    fun all(catalog: List<AppRef>): List<AppRef> = catalog.distinct()
+    fun pickable(catalog: List<AppRef>, favorites: List<AppRef>): List<AppRef> = catalog.distinct().filter { it !in favorites }
+}
+
 /** Выбор навигатора по умолчанию и проверка сохранённого. */
 object NavigatorPick {
     const val YANDEX_NAVI = "ru.yandex.yandexnavi"
@@ -98,6 +107,31 @@ object NavigatorPick {
     /** Сохранённый, пока он установлен; иначе по умолчанию. null - выбрать нечего. */
     fun effective(saved: String?, installed: Set<String>): String? =
         saved?.takeIf { it in installed } ?: defaultFor(installed)
+}
+
+/** Ответы taskState дочернего дисплея и решения по ним (EmbedHost): что делать после Back и при повторном показе. */
+object TaskCheck {
+    const val UNKNOWN = -1
+    const val NONE = 0
+    const val BACKGROUND = 1
+    const val TOP = 2
+
+    enum class AfterBack { CLOSED, STAYED_MORE, STAYED, UNKNOWN_MORE, UNKNOWN }
+
+    /** Итог очередной проверки после Back; [last] - проверка была последней. */
+    fun afterBack(state: Int, last: Boolean): AfterBack = when {
+        state == NONE || state == BACKGROUND -> AfterBack.CLOSED
+        state == TOP -> if (last) AfterBack.STAYED else AfterBack.STAYED_MORE
+        last -> AfterBack.UNKNOWN
+        else -> AfterBack.UNKNOWN_MORE
+    }
+
+    /** Окно показали снова: запускать приложение заново, если его нет сверху; -1 считается только после Back с неизвестным итогом. */
+    fun needsRelaunch(state: Int, stale: Boolean): Boolean =
+        state == NONE || state == BACKGROUND || (state < 0 && stale)
+
+    /** Приложение исчезло с дисплея: «нет задачи» после того, как оно уже было сверху (до этого оно могло просто не появиться). */
+    fun vanished(state: Int, seenTop: Boolean): Boolean = state == NONE && seenTop
 }
 
 /** Подпись типа сети в рейке. Типы - константы TelephonyManager.NETWORK_TYPE_*. */

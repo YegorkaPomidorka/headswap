@@ -6,12 +6,12 @@ import android.os.Handler
 import android.os.HandlerThread
 import android.os.Process
 import android.os.SystemClock
-import android.util.Log
 import android.view.MotionEvent
 import android.view.Surface
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import com.yegorkapomidorka.headswap.AppLog
 import com.yegorkapomidorka.headswap.dex.DexState
 import com.yegorkapomidorka.headswap.embed.EmbeddedSessionRegistry
 
@@ -19,8 +19,16 @@ internal enum class EmbedStatus { IDLE, CONNECTING, STARTING, READY, FAILED }
 
 /** Один дочерний экран: навигатор или «текущее приложение». Лимит реестра - 2 окна, значит слотов ровно два. */
 internal class EmbedSlot(val name: String) {
-    /** Состояние для UI; пишется с рабочего потока. */
-    var status by mutableStateOf(EmbedStatus.IDLE)
+    private var statusValue by mutableStateOf(EmbedStatus.IDLE)
+
+    /** Состояние для UI; пишется с рабочего потока. Смена попадает в лог: по ней видно, что показывал слой. */
+    var status: EmbedStatus
+        get() = statusValue
+        set(value) {
+            if (value == statusValue) return
+            AppLog.i("EMBED $name: статус $statusValue -> $value", false)
+            statusValue = value
+        }
 
     /** Желаемое содержимое «пакет/класс» и размер дисплея в px; null - окно не нужно. */
     @Volatile var wantKey: String? = null
@@ -51,13 +59,27 @@ internal class EmbedSlot(val name: String) {
     var lastPacket: TouchPacket? = null
     var scheduled = false
 
+    /** Последний ответ taskState: 2 - сверху, 1 - в фоне, 0 - задачи нет, -1 - не удалось узнать; -2 - ещё не спрашивали. */
+    var lastState = -2
+    /** С запуска хоть раз видели приложение сверху: только тогда «задачи нет» значит «закрыто», а не «ещё не появилась». */
+    var seenTop = false
+    /** Касания не пересылаются: сразу после Back до подтверждения и после «задача закрыта». Снимается запуском или state 2. */
+    @Volatile var touchBlocked = false
+    /** После Back состояние осталось неизвестным (-1): при следующем показе приложение запускается заново. */
+    var stale = false
+    var dropped = 0
+    val watchToken = Any()
+
     val touchQueue = ArrayDeque<TouchPacket>()
 
     val pkg: String? get() = wantKey?.substringBefore('/')
 }
 
-internal class TouchPacket(val action: Int, val index: Int, val ids: IntArray, val xs: FloatArray, val ys: FloatArray) {
-    fun cancel() = TouchPacket(3, 0, ids, xs, ys)
+internal class TouchPacket(
+    val action: Int, val index: Int, val ids: IntArray, val xs: FloatArray, val ys: FloatArray,
+    val at: Long = SystemClock.uptimeMillis(),
+) {
+    fun cancel() = TouchPacket(3, 0, ids, xs, ys, at)
 }
 
 /**
@@ -65,10 +87,16 @@ internal class TouchPacket(val action: Int, val index: Int, val ids: IntArray, v
  * рабочем потоке и не вызываются с главного. Касания приходят с главного потока в очередь, MOVE схлопываются.
  */
 internal object EmbedHost {
-    private const val TAG = "HeadSwapLauncher"
     private const val RETRY_MS = 500L
     private const val MAX_ATTEMPTS = 40
     private const val CREATE_BUDGET_MS = 20_000L
+    /** Вызов реестра дольше этого попадает в лог: так видно, что рабочий поток завис на Binder. */
+    private const val SLOW_MS = 300L
+    /** Пауза до каждой проверки задачи после Back: 300, 800, 1500, 2500 мс. */
+    private val BACK_CHECKS = longArrayOf(300, 500, 700, 1000)
+    private const val WATCH_MS = 2000L
+    /** Касание, простоявшее в очереди дольше (рабочий поток ждал Binder), уже не нужно. */
+    private const val STALE_TOUCH_MS = 1000L
 
     val nav = EmbedSlot("nav")
     val app = EmbedSlot("app")
@@ -82,6 +110,9 @@ internal object EmbedHost {
     /** Плотность родительского дисплея: дочерние окна живут с ней же. */
     @Volatile var densityDpi = 160
 
+    /** Задача приложения на дочернем дисплее исчезла (Back из корня, процесс убит). Вызывается на главном потоке. */
+    @Volatile var onGone: ((EmbedSlot) -> Unit)? = null
+
     // --- вызовы с главного потока ---
 
     /** Нужное содержимое и размер слота. Тот же ключ и размер - ничего не происходит. */
@@ -93,7 +124,10 @@ internal object EmbedHost {
         schedule(slot, 0)
     }
 
-    /** Окно снова показали: если задачи приложения уже нет (Back из корня, процесс убит), запустить заново. */
+    /**
+     * Окно снова показали или тапнули по уже открытому: если задачи приложения нет (Back из корня, процесс убит)
+     * либо состояние после Back осталось неизвестным, запустить заново.
+     */
     fun refresh(slot: EmbedSlot) {
         worker.post { slot.recheck = true; reconcile(slot) }
     }
@@ -149,22 +183,116 @@ internal object EmbedHost {
         worker.post { drainTouch(slot) }
     }
 
-    /** Back в окно; если приложение ушло из корня (его задачи больше нет сверху), onRoot вызовется на главном потоке. */
+    /**
+     * Back в окно; если приложение ушло из корня (его задачи больше нет сверху), onClosed вызовется на главном потоке.
+     * Задачу проверяем несколько раз: у закрывающейся активности top ещё держится, а ответ -1 (список задач
+     * недоступен) раньше навсегда оставлял слой поверх пустого дисплея.
+     */
     fun back(slot: EmbedSlot, onClosed: () -> Unit) {
         worker.post {
-            if (slot.handle <= 0) { main.post(onClosed); return@post }
+            AppLog.i("EMBED ${slot.name}: Back handle=${slot.handle} pkg=${slot.pkg} статус=${slot.status} " +
+                "state=${slot.lastState} касаний отброшено=${slot.dropped}", false)
+            if (slot.handle <= 0) {
+                AppLog.i("EMBED ${slot.name}: окна нет, Back = на главный", false)
+                main.post(onClosed)
+                return@post
+            }
+            slot.touchBlocked = true
             try {
                 cancelTouch(slot)
-                EmbeddedSessionRegistry.back(uid, slot.handle)
-            } catch (e: Exception) { Log.w(TAG, "back rejected", e) }
-            worker.postDelayed({
-                val pkg = slot.pkg
-                val state = if (pkg == null || slot.handle <= 0) 0 else runCatching {
-                    EmbeddedSessionRegistry.taskState(uid, slot.handle, pkg)
-                }.getOrDefault(-1)
-                if (state == 0 || state == 1) { slot.launchedKey = null; main.post(onClosed) }
-            }, 450)
+                timed(slot, "back") { EmbeddedSessionRegistry.back(uid, slot.handle) }
+            } catch (e: Exception) {
+                AppLog.i("EMBED ${slot.name}: Back отклонён: ${e.javaClass.simpleName}: ${e.message}", false)
+                if (leaseGone(e)) {
+                    lostLease(slot)
+                    AppLog.i("EMBED ${slot.name}: окно закрыто реестром, Back = на главный", false)
+                    main.post(onClosed)
+                    return@post
+                }
+            }
+            worker.postDelayed({ checkAfterBack(slot, 0, onClosed) }, BACK_CHECKS[0])
         }
+    }
+
+    private fun checkAfterBack(slot: EmbedSlot, attempt: Int, onClosed: () -> Unit) {
+        val state = queryState(slot, "back#$attempt")
+        val last = attempt >= BACK_CHECKS.size - 1
+        when (TaskCheck.afterBack(state, last)) {
+            TaskCheck.AfterBack.CLOSED -> {
+                AppLog.i("EMBED ${slot.name}: после Back задачи на экране нет (state=$state), возврат на главный", false)
+                slot.launchedKey = null
+                slot.seenTop = false
+                main.post(onClosed)
+            }
+            TaskCheck.AfterBack.STAYED_MORE -> {
+                slot.touchBlocked = false // приложение приняло Back внутри себя, касания снова идут
+                worker.postDelayed({ checkAfterBack(slot, attempt + 1, onClosed) }, BACK_CHECKS[attempt + 1])
+            }
+            TaskCheck.AfterBack.STAYED -> {
+                slot.touchBlocked = false
+                AppLog.i("EMBED ${slot.name}: после Back приложение осталось сверху", false)
+            }
+            TaskCheck.AfterBack.UNKNOWN_MORE ->
+                worker.postDelayed({ checkAfterBack(slot, attempt + 1, onClosed) }, BACK_CHECKS[attempt + 1])
+            TaskCheck.AfterBack.UNKNOWN -> {
+                // узнать не удалось ни разу: слой остаётся, но следующий показ запустит приложение заново
+                AppLog.i("EMBED ${slot.name}: после Back состояние неизвестно (state=$state), помечаю на перезапуск", false)
+                slot.stale = true
+                slot.touchBlocked = false
+            }
+        }
+    }
+
+    /** Спросить реестр о задаче слота. Окно, которое реестр уже закрыл, считается «задачи нет» (0). Только рабочий поток. */
+    private fun queryState(slot: EmbedSlot, source: String): Int {
+        val pkg = slot.pkg
+        val state = if (pkg == null || slot.handle <= 0) 0 else try {
+            timed(slot, "taskState") { EmbeddedSessionRegistry.taskState(uid, slot.handle, pkg) }
+        } catch (e: Exception) {
+            AppLog.i("EMBED ${slot.name}: taskState ($source) не удался: ${e.javaClass.simpleName}: ${e.message}", false)
+            if (leaseGone(e)) { lostLease(slot); 0 } else -1
+        }
+        if (state == 2) slot.seenTop = true
+        if (state != slot.lastState || source.startsWith("back")) {
+            AppLog.i("EMBED ${slot.name}: taskState=$state ($source) pkg=$pkg статус=${slot.status}", false)
+        }
+        slot.lastState = state
+        return state
+    }
+
+    /** Вызов реестра; если он занял больше [SLOW_MS], строка в логе. */
+    private inline fun <T> timed(slot: EmbedSlot, what: String, block: () -> T): T {
+        val t0 = SystemClock.uptimeMillis()
+        try {
+            return block()
+        } finally {
+            val dt = SystemClock.uptimeMillis() - t0
+            if (dt >= SLOW_MS) AppLog.i("EMBED ${slot.name}: $what занял $dt мс", false)
+        }
+    }
+
+    /** Приложение пропало с дочернего дисплея: слой надо убрать с экрана, касания в пустоту не слать. */
+    private fun gone(slot: EmbedSlot, why: String) {
+        AppLog.i("EMBED ${slot.name}: задача приложения исчезла ($why), pkg=${slot.pkg}", false)
+        slot.launchedKey = null
+        slot.seenTop = false
+        slot.touchBlocked = true
+        main.post { onGone?.invoke(slot) }
+    }
+
+    /** Пока слой на экране и принимает касания, раз в 2 с проверяем, что задача на месте (процесс убит, Back из корня). */
+    private fun watchTick(slot: EmbedSlot) {
+        if (slot.wantKey == null || slot.handle <= 0 || slot.status != EmbedStatus.READY) return
+        if (slot.interactive && !slot.touchBlocked) {
+            val state = queryState(slot, "watch")
+            if (TaskCheck.vanished(state, slot.seenTop)) { gone(slot, "watch"); return }
+        }
+        worker.postAtTime({ watchTick(slot) }, slot.watchToken, SystemClock.uptimeMillis() + WATCH_MS)
+    }
+
+    private fun startWatch(slot: EmbedSlot) {
+        worker.removeCallbacksAndMessages(slot.watchToken)
+        worker.postAtTime({ watchTick(slot) }, slot.watchToken, SystemClock.uptimeMillis() + WATCH_MS)
     }
 
     // --- рабочий поток ---
@@ -178,7 +306,7 @@ internal object EmbedHost {
         try {
             reconcileInternal(slot)
         } catch (e: Exception) {
-            Log.w(TAG, "${slot.name}: reconcile failed: ${e.javaClass.simpleName}: ${e.message}")
+            AppLog.i("EMBED ${slot.name}: reconcile не удался: ${e.javaClass.simpleName}: ${e.message}", false)
             if (slot.handle > 0 && leaseGone(e)) lostLease(slot)
             retryLater(slot)
         }
@@ -196,6 +324,7 @@ internal object EmbedHost {
         val now = SystemClock.uptimeMillis()
         if (slot.createdAt == 0L) slot.createdAt = now
         if (slot.attempts++ >= MAX_ATTEMPTS || now - slot.createdAt > CREATE_BUDGET_MS) {
+            AppLog.i("EMBED ${slot.name}: попытки исчерпаны (${slot.attempts}), окно не открылось", false)
             slot.status = EmbedStatus.FAILED
             return
         }
@@ -218,7 +347,8 @@ internal object EmbedHost {
             val surface = slot.surface ?: Surface(texture).also { slot.surface = it }
             texture.setDefaultBufferSize(w, h)
             val token = Binder()
-            slot.handle = EmbeddedSessionRegistry.create(uid, surface, token, display, w, h, densityDpi)
+            slot.handle = timed(slot, "create") { EmbeddedSessionRegistry.create(uid, surface, token, display, w, h, densityDpi) }
+            AppLog.i("EMBED ${slot.name}: окно создано handle=${slot.handle} display=$display ${w}x$h dpi=$densityDpi", false)
             slot.token = token
             slot.leaseDisplay = display
             slot.geomW = w
@@ -226,39 +356,50 @@ internal object EmbedHost {
             slot.launchedKey = null
         } else if (slot.geomW != w || slot.geomH != h) {
             cancelTouch(slot)
-            EmbeddedSessionRegistry.resize(uid, slot.handle, w, h, densityDpi)
+            AppLog.i("EMBED ${slot.name}: размер ${slot.geomW}x${slot.geomH} -> ${w}x$h", false)
+            timed(slot, "resize") { EmbeddedSessionRegistry.resize(uid, slot.handle, w, h, densityDpi) }
             texture.setDefaultBufferSize(w, h)
             slot.geomW = w
             slot.geomH = h
         }
         var launch = slot.launchedKey != key
         if (!launch && slot.recheck) {
-            val pkg = key.substringBefore('/')
-            val state = runCatching { EmbeddedSessionRegistry.taskState(uid, slot.handle, pkg) }.getOrDefault(-1)
-            launch = state == 0 || state == 1
+            // -1 (список задач недоступен) перезапуск вызывает только после Back с неизвестным итогом
+            val state = queryState(slot, "refresh")
+            launch = TaskCheck.needsRelaunch(state, slot.stale)
+            if (state == 2) slot.touchBlocked = false
         }
         slot.recheck = false
         if (launch) {
             slot.status = EmbedStatus.STARTING
             val pkg = key.substringBefore('/')
             val cls = key.substringAfter('/')
-            EmbeddedSessionRegistry.launch(uid, slot.handle, pkg, cls)
+            AppLog.i("EMBED ${slot.name}: запуск $key handle=${slot.handle} (state=${slot.lastState} stale=${slot.stale})", false)
+            timed(slot, "launch") { EmbeddedSessionRegistry.launch(uid, slot.handle, pkg, cls) }
             slot.launchedKey = key
             slot.launchedAt = SystemClock.uptimeMillis()
+            slot.stale = false
+            slot.seenTop = false
+            slot.touchBlocked = false
         }
         slot.attempts = 0
         slot.createdAt = 0L
         if (slot.status == EmbedStatus.STARTING) pollStarted(slot)
-        else if (slot.status != EmbedStatus.READY) slot.status = EmbedStatus.READY
+        else {
+            if (slot.status != EmbedStatus.READY) slot.status = EmbedStatus.READY
+            startWatch(slot)
+        }
     }
 
     /** Холодный старт: ждём, пока приложение станет верхним на дочернем дисплее, но не дольше 8 с. */
     private fun pollStarted(slot: EmbedSlot) {
         val key = slot.launchedKey ?: return
         val elapsed = SystemClock.uptimeMillis() - slot.launchedAt
-        val state = runCatching { EmbeddedSessionRegistry.taskState(uid, slot.handle, key.substringBefore('/')) }.getOrDefault(-1)
+        val state = queryState(slot, "start")
         if (state == 2 || elapsed >= PressLogic.COLD_START_MS || (state < 0 && elapsed >= 1500)) {
+            if (state != 2) AppLog.i("EMBED ${slot.name}: готовым считаю без подтверждения (state=$state, ${elapsed} мс после запуска)", false)
             slot.status = EmbedStatus.READY
+            startWatch(slot)
             return
         }
         worker.postAtTime({ if (slot.status == EmbedStatus.STARTING) reconcile(slot) }, slot, SystemClock.uptimeMillis() + 400)
@@ -268,13 +409,35 @@ internal object EmbedHost {
         while (true) {
             val p = synchronized(slot.touchQueue) { slot.touchQueue.removeFirstOrNull() } ?: return
             if (slot.handle <= 0 || !slot.interactive) continue
+            // в дисплей без живой задачи касания не идут: после Back до подтверждения, после «задача закрыта», до готовности
+            val reason = when {
+                slot.touchBlocked -> "заблокированы (Back/задача закрыта)"
+                slot.status != EmbedStatus.READY -> "окно ещё не готово (${slot.status})"
+                p.action == 0 && SystemClock.uptimeMillis() - p.at > STALE_TOUCH_MS -> "устарели в очереди"
+                else -> null
+            }
+            if (reason != null) {
+                if (p.action == 0) noteDropped(slot, reason)
+                continue
+            }
             if (p.action == 0) slot.touchDown = true
             if (!slot.touchDown) continue
             slot.lastPacket = p
             try {
-                EmbeddedSessionRegistry.touchPoints(uid, slot.handle, p.action, p.index, p.ids, p.xs, p.ys)
-            } catch (e: Exception) { Log.w(TAG, "touch rejected: ${e.javaClass.simpleName}") }
+                timed(slot, "touch") { EmbeddedSessionRegistry.touchPoints(uid, slot.handle, p.action, p.index, p.ids, p.xs, p.ys) }
+            } catch (e: Exception) {
+                AppLog.i("EMBED ${slot.name}: касание отклонено: ${e.javaClass.simpleName}: ${e.message}", false)
+                if (leaseGone(e)) { lostLease(slot); gone(slot, "касание") }
+            }
             if (p.action == 1 || p.action == 3) { slot.touchDown = false; slot.lastPacket = null }
+        }
+    }
+
+    /** Отброшенные касания: строка на первое и дальше на каждое 20-е, чтобы лог не забивался. */
+    private fun noteDropped(slot: EmbedSlot, reason: String) {
+        slot.dropped++
+        if (slot.dropped == 1 || slot.dropped % 20 == 0) {
+            AppLog.i("EMBED ${slot.name}: касание отброшено, $reason (всего отброшено ${slot.dropped})", false)
         }
     }
 
@@ -290,6 +453,7 @@ internal object EmbedHost {
 
     /** Реестр уже потерял окно (сеанс рабочего стола кончился): забываем его без вызова release. */
     private fun lostLease(slot: EmbedSlot) {
+        AppLog.i("EMBED ${slot.name}: окно потеряно (handle=${slot.handle})", false)
         slot.handle = -1
         slot.token = null
         slot.launchedKey = null
@@ -303,8 +467,9 @@ internal object EmbedHost {
         val handle = slot.handle
         if (handle > 0) {
             cancelTouch(slot)
-            runCatching { EmbeddedSessionRegistry.release(uid, handle) }
-                .onFailure { Log.w(TAG, "release failed: ${it.javaClass.simpleName}") }
+            AppLog.i("EMBED ${slot.name}: release handle=$handle", false)
+            runCatching { timed(slot, "release") { EmbeddedSessionRegistry.release(uid, handle) } }
+                .onFailure { AppLog.i("EMBED ${slot.name}: release не удался: ${it.javaClass.simpleName}", false) }
         }
         lostLease(slot)
         // Поверхность освобождается только после подтверждённого release: продюсер мог остаться жив.

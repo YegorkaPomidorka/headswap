@@ -70,6 +70,32 @@ class LauncherLogicTest {
         assertEquals(listOf(a), AppList.quick(list, 1))
     }
 
+    @Test fun allAppsIsWholeCatalogInItsOrder() {
+        val c = (1..30).map { AppRef("p$it", "p$it.Main") }
+        assertEquals(c, CatalogLists.all(c))
+        assertEquals(c.take(2), CatalogLists.all(c.take(2) + c.take(2))) // дубли компонента не показываются дважды
+        assertEquals(emptyList<AppRef>(), CatalogLists.all(emptyList()))
+    }
+
+    @Test fun pickerOffersCatalogWithoutFavorites() {
+        val c = (1..6).map { AppRef("p$it", "p$it.Main") }
+        val favorites = listOf(c[1], c[4], AppRef("gone", "gone.Main"))
+        assertEquals(listOf(c[0], c[2], c[3], c[5]), CatalogLists.pickable(c, favorites))
+        assertEquals(c, CatalogLists.pickable(c, emptyList()))
+        assertEquals(emptyList<AppRef>(), CatalogLists.pickable(c, c))
+    }
+
+    @Test fun allAppsPagesCoverCatalogOnce() {
+        val c = (1..30).map { AppRef("p$it", "p$it.Main") }
+        val perPage = 8
+        val pages = Pager.pageCount(c.size, perPage)
+        assertEquals(4, pages)
+        val seen = (0 until pages).flatMap { Pager.slice(CatalogLists.all(c), it, perPage) }
+        assertEquals(c, seen)
+        // запомненная страница после удаления приложений не вылетает за конец
+        assertEquals(1, Pager.clamp(Int.MAX_VALUE / 2, 9, perPage))
+    }
+
     @Test fun appListRoundTripsAndSkipsGarbage() {
         val list = listOf(AppRef("a.b", "a.b.Main"), AppRef("c.d", "c.d.Sub\$Inner"))
         assertEquals(list, AppList.decode(AppList.encode(list)))
@@ -120,5 +146,33 @@ class LauncherLogicTest {
         assertEquals(CardView.NAVIGATOR, CardView.CLOCK.next())
         assertEquals(CardView.NAVIGATOR, CardView.restore("junk"))
         assertEquals(CardView.CLOCK, CardView.restore("CLOCK"))
+    }
+
+    @Test fun afterBackClosesWhenTaskIsGoneOrInBackground() {
+        assertEquals(TaskCheck.AfterBack.CLOSED, TaskCheck.afterBack(0, last = false))
+        assertEquals(TaskCheck.AfterBack.CLOSED, TaskCheck.afterBack(1, last = true))
+    }
+
+    @Test fun afterBackKeepsPollingWhileTopOrUnknown() {
+        assertEquals(TaskCheck.AfterBack.STAYED_MORE, TaskCheck.afterBack(2, last = false))
+        assertEquals(TaskCheck.AfterBack.STAYED, TaskCheck.afterBack(2, last = true))
+        assertEquals(TaskCheck.AfterBack.UNKNOWN_MORE, TaskCheck.afterBack(-1, last = false))
+        assertEquals(TaskCheck.AfterBack.UNKNOWN, TaskCheck.afterBack(-1, last = true))
+    }
+
+    @Test fun relaunchOnShowOnlyWhenTaskMissingOrStale() {
+        assertTrue(TaskCheck.needsRelaunch(0, stale = false))
+        assertTrue(TaskCheck.needsRelaunch(1, stale = false))
+        assertFalse(TaskCheck.needsRelaunch(2, stale = true))
+        // -1 без Back с неизвестным итогом не мигает «Запускаем…» при каждом показе
+        assertFalse(TaskCheck.needsRelaunch(-1, stale = false))
+        assertTrue(TaskCheck.needsRelaunch(-1, stale = true))
+    }
+
+    @Test fun vanishedNeedsTopSeenBefore() {
+        assertFalse(TaskCheck.vanished(0, seenTop = false)) // приложение ещё стартует
+        assertTrue(TaskCheck.vanished(0, seenTop = true))
+        assertFalse(TaskCheck.vanished(1, seenTop = true)) // диалог другого пакета в той же задаче - не закрытие
+        assertFalse(TaskCheck.vanished(-1, seenTop = true))
     }
 }

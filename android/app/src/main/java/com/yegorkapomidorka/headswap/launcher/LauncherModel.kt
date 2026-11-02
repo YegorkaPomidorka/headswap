@@ -89,6 +89,7 @@ internal object LauncherModel {
         savedNavigator = prefs.navigator
         musicPlayer = prefs.musicPlayer
         missedSeenMs = prefs.missedSeenMs
+        EmbedHost.onGone = { LauncherActions.embedGone(it) }
         ready = true
         reloadCatalog()
     }
@@ -156,8 +157,11 @@ internal object LauncherModel {
     val navigatorPkg: String? get() = NavigatorPick.effective(savedNavigator, installedPackages)
     val installedNavigators: List<String> get() = NavigatorPick.KNOWN.filter { it in installedPackages }
 
-    fun go(next: Area) { area = next }
-    fun home() { area = Area.Home }
+    fun go(next: Area) {
+        if (next != area) AppLog.i("LAUNCHER экран: $area -> $next", false)
+        area = next
+    }
+    fun home() = go(Area.Home)
 
     fun now(): Long = SystemClock.uptimeMillis()
 
