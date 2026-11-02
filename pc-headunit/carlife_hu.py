@@ -13,6 +13,10 @@ Video goes to out/carlife_video.h264, the whole log to out/carlife_hu.log. Stand
 --pause-cycles N (with --pause-every S, --pause-for S) repeats VIDEO_ENCODER_PAUSE -> wait -> VIDEO_ENCODER_START and
 reports start->first frame, start->IDR and frames received during the pause.
 
+--view opens a live window (tkinter + ffmpeg from PATH, see carlife_view.py): the bridge's video in real time, mouse clicks
+and drags go to the bridge as TOUCH_ACTION (pixels of the video), right click / Esc / BackSpace = hard key BACK, middle
+click / Home = hard key HOME. --size WxH is the screen size the HU asks for in VIDEO_ENCODER_INIT (default 1920x720).
+
 Wireless format (--transport tcp6): the HU is the TCP client of 6 phone ports (CMD 7240, VIDEO 8240, MEDIA 9240,
 TTS 9241, VR 9242, TOUCH 9340; reach them with `adb forward`). No outer header, each channel is its own socket
 with plain inner messages. Session logic is the same. --kill-chan/--kill-after close one socket to see whether
@@ -31,6 +35,8 @@ import time
 from collections import Counter
 from datetime import datetime
 from pathlib import Path
+
+from carlife_view import parse_size
 
 HERE = Path(__file__).resolve().parent
 
@@ -70,6 +76,11 @@ HU_FEATURE_CONFIG_RESPONSE = 0x00018052
 VIDEO_DATA = 0x00020001
 VIDEO_HEARTBEAT = 0x00020002
 TOUCH_ACTION = 0x00068001
+TOUCH_CAR_HARD_KEY_CODE = 0x00068008
+# action у TOUCH_ACTION как у MotionEvent (AaBridge.onCarlifeTouch); коды кнопок - HUJ/CommonParams
+TOUCH_DOWN, TOUCH_UP, TOUCH_MOVE = 0, 1, 2
+HARD_KEY_HOME, HARD_KEY_BACK = 0x01, 0x0E
+DEFAULT_SIZE = (1920, 720)
 
 NAMES = {
     0x00010002: "PROTOCOL_VERSION_MATCH_STATUS", MD_INFO: "MD_INFO", 0x00010006: "MD_BT_OOB_INFO",
@@ -91,6 +102,7 @@ NAMES = {
     VIDEO_ENCODER_START: "VIDEO_ENCODER_START", VIDEO_ENCODER_PAUSE: "VIDEO_ENCODER_PAUSE", HU_AUTHEN_REQUEST: "HU_AUTHEN_REQUEST",
     HU_AUTHEN_RESULT: "HU_AUTHEN_RESULT", HU_UNKNOWN_1804C: "HU_1804C",
     HU_FEATURE_CONFIG_RESPONSE: "HU_FEATURE_CONFIG_RESPONSE", TOUCH_ACTION: "TOUCH_ACTION",
+    TOUCH_CAR_HARD_KEY_CODE: "TOUCH_CAR_HARD_KEY_CODE",
 }
 
 
@@ -367,6 +379,10 @@ def build_touch(action: int, x: int, y: int) -> bytes:
     return cmd_inner(TOUCH_ACTION, pb_int(1, action) + pb_int(2, x) + pb_int(3, y))
 
 
+def build_hard_key(code: int) -> bytes:
+    return cmd_inner(TOUCH_CAR_HARD_KEY_CODE, pb_int(1, code))
+
+
 def build_heartbeat() -> bytes:
     return data_inner(VIDEO_HEARTBEAT)
 
@@ -385,10 +401,12 @@ class Options:
                  discover=False, beacon_port=BEACON_PORT, bind_ip="0.0.0.0", discover_timeout=60.0,
                  probe_8999=False, probe_port=PROBE_PORT,
                  video_kbps=0, dip_kbps=0, dip_at=20.0, dip_for=5.0,
-                 pause_cycles=0, pause_every=10.0, pause_for=3.0, voice_key_at: list[float] | None = None):
+                 pause_cycles=0, pause_every=10.0, pause_for=3.0, voice_key_at: list[float] | None = None,
+                 size: tuple[int, int] = DEFAULT_SIZE):
         self.host, self.port, self.duration = host, port, duration
         # кнопка голоса на руле: MODULE_CONTROL moduleID=4 (VR) statusID=1 через N с от первого кадра (как Vezel)
         self.voice_key_at = sorted(voice_key_at or [])
+        self.size = size                                    # какой экран ГУ объявляем в VIDEO_ENCODER_INIT
         # циклы паузы: pause_every с от первого кадра (потом от каждого START) шлём PAUSE, через pause_for с - START
         self.pause_cycles, self.pause_every, self.pause_for = pause_cycles, pause_every, pause_for
         # шейпер видео (tcp6): ГУ читает video-сокет не быстрее video_kbps (0 = без ограничения), а с dip_at по
@@ -465,7 +483,11 @@ class HeadUnit:
         self.first_frame_at: float | None = None
         self.last_frame_at: float | None = None
         self.voice_keys_left = list(self.o.voice_key_at)
-        self.vid_size = (1280, 720)
+        self.vid_size = opts.size                   # до INIT_DONE моста - то, что просили мы; потом - выбор моста
+        # живое окно (--view): sink-и зовутся с нитей приёма и не должны блокировать; session_up - можно слать касания
+        self.video_sink = None                      # callable(bytes): тело VIDEO_DATA
+        self.size_sink = None                       # callable(w, h): размер из INIT_DONE моста
+        self.session_up = threading.Event()
         self.vfile = None
         self.t0 = 0.0
         self.host = opts.host                       # tcp6: при --discover подменяется адресом отправителя маяка
@@ -554,7 +576,10 @@ class HeadUnit:
             w, h = pb_get_int(f, 1), pb_get_int(f, 2)
             if w and h:
                 self.vid_size = (w, h)
-                self.log(f"video size from INIT_DONE: {w}x{h}")
+                note = "same as asked" if (w, h) == tuple(self.o.size) else f"the HU asked {self.o.size[0]}x{self.o.size[1]}"
+                self.log(f"video size from INIT_DONE: {w}x{h} ({note})")
+                if self.size_sink:
+                    self.size_sink(w, h)
 
     def on_md_info(self, body: bytes):
         f = pb_parse(body)
@@ -576,7 +601,7 @@ class HeadUnit:
             self.auth_sent_at = time.monotonic()
             self.auth_status = "PENDING"
         self.send_cmd(HU_UNKNOWN_1804C, cmd_inner(HU_UNKNOWN_1804C))
-        self.send_cmd(VIDEO_ENCODER_INIT, build_video_encoder_init())
+        self.send_cmd(VIDEO_ENCODER_INIT, build_video_encoder_init(*self.o.size))
         self.send_cmd(HU_FEATURE_CONFIG_RESPONSE, build_feature_config())
         self.send_cmd(VIDEO_ENCODER_START, cmd_inner(VIDEO_ENCODER_START))
 
@@ -607,6 +632,8 @@ class HeadUnit:
         self.vbytes += len(body)
         if self.vfile:
             self.vfile.write(body)
+        if self.video_sink:
+            self.video_sink(body)
         if self.o.pause_cycles:
             self.pause_on_video(now, body)
 
@@ -780,7 +807,16 @@ class HeadUnit:
         if self.srv is None:
             self.listen()
         self.log(f"listening on {self.o.host}:{self.port}")
-        self.conn, addr = self.srv.accept()
+        self.srv.settimeout(0.5)                    # короткие паузы: Ctrl+C и закрытие окна не ждут мост вечно
+        while True:
+            if self.stop.is_set():
+                return False
+            try:
+                self.conn, addr = self.srv.accept()
+                break
+            except socket.timeout:
+                continue
+        self.conn.settimeout(None)
         self.conn.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
         self.log(f"bridge connected from {addr[0]}:{addr[1]}")
         return True
@@ -938,6 +974,7 @@ class HeadUnit:
             if found and (self.open_tcp6() if self.tcp6 else self.open_stream()):
                 self.t0 = time.monotonic()
                 self.send_cmd(HU_PROTOCOL_VERSION, build_protocol_version())
+                self.session_up.set()
                 self.start_readers()
                 try:
                     self.loop()
@@ -1011,6 +1048,25 @@ class HeadUnit:
         self.send(CH_TOUCH, build_touch(0, x, y), f"TOUCH_ACTION DOWN {x},{y}")
         time.sleep(0.1)
         self.send(CH_TOUCH, build_touch(1, x, y), f"TOUCH_ACTION UP {x},{y}")
+
+    def send_touch_event(self, action: int, x: int, y: int):
+        """Касание ГУ в пикселях видео (с нити окна). MOVE без записи в лог: их десятки в секунду."""
+        if not self.session_up.is_set() or self.stop.is_set():
+            return
+        name = {TOUCH_DOWN: "DOWN", TOUCH_UP: "UP", TOUCH_MOVE: "MOVE"}.get(action, str(action))
+        try:
+            self.send(CH_TOUCH, build_touch(action, x, y), "" if action == TOUCH_MOVE else f"TOUCH_ACTION {name} {x},{y}")
+        except OSError as e:
+            self.finish(f"write error: {e}")
+
+    def send_hard_key(self, code: int):
+        """Хард-кнопка ГУ (TOUCH_CAR_HARD_KEY_CODE, одно сообщение на нажатие)."""
+        if not self.session_up.is_set() or self.stop.is_set():
+            return
+        try:
+            self.send(CH_TOUCH, build_hard_key(code), f"TOUCH_CAR_HARD_KEY_CODE 0x{code:02X}")
+        except OSError as e:
+            self.finish(f"write error: {e}")
 
     def summary(self) -> dict:
         dur = time.monotonic() - self.t0 if self.t0 else 0.0
@@ -1090,8 +1146,16 @@ def parse_args(argv=None) -> argparse.Namespace:
                    help="--pause-cycles: seconds from the first video frame (then from each START) to the next PAUSE (default 10)")
     p.add_argument("--pause-for", type=float, default=3.0, metavar="S",
                    help="--pause-cycles: seconds between PAUSE and START (default 3)")
-    p.add_argument("--duration", type=float, default=120.0, metavar="N",
-                   help="stop N seconds after the bridge connects (default 120)")
+    p.add_argument("--duration", type=float, default=None, metavar="N",
+                   help="stop N seconds after the bridge connects (default 120; unlimited with --view)")
+    p.add_argument("--view", action="store_true",
+                   help="live window: video from the bridge (needs ffmpeg in PATH), mouse = touches, right click/Esc/BackSpace = "
+                        "BACK, middle click/Home = HOME; closing the window ends the session")
+    p.add_argument("--view-scale", type=float, default=None, metavar="K",
+                   help="--view: window scale (default: fit to the PC screen, at most 1.0); click coordinates are mapped back")
+    p.add_argument("--size", default="1920x720", metavar="WxH",
+                   help="screen size the HU asks for in VIDEO_ENCODER_INIT (default 1920x720); the bridge answers with its own "
+                        "choice in INIT_DONE, the log shows both")
     p.add_argument("--no-auth", action="store_true", help="do not send HU_AUTHEN_REQUEST")
     p.add_argument("--touch-test", action="store_true",
                    help="15 s after the first video frame send a tap (DOWN+UP) at the centre")
@@ -1099,6 +1163,14 @@ def parse_args(argv=None) -> argparse.Namespace:
                    help="press the voice key (MODULE_CONTROL VR=1) S seconds after the first video frame; repeatable")
     p.add_argument("--out", type=Path, default=HERE / "out", help="output directory (default pc-headunit/out)")
     a = p.parse_args(argv)
+    try:
+        a.size = parse_size(a.size)
+    except ValueError as e:
+        p.error(f"--size: {e}")
+    if a.view_scale is not None and not a.view:
+        p.error("--view-scale needs --view")
+    if a.view_scale is not None and not 0.1 <= a.view_scale <= 4:
+        p.error("--view-scale must be between 0.1 and 4")
     if a.discover and a.transport != "tcp6":
         p.error("--discover works only with --transport tcp6")
     if a.probe_8999 and not a.discover:
@@ -1110,15 +1182,49 @@ def parse_args(argv=None) -> argparse.Namespace:
     return a
 
 
+def run_view(hu: HeadUnit, scale: float | None) -> int:
+    """--view: сессия в рабочей нити, окно tkinter в главной (tkinter другого не терпит)."""
+    import signal
+    import traceback
+    import carlife_view as V
+    ffmpeg = V.find_ffmpeg()
+    if not ffmpeg:
+        print("--view needs ffmpeg in PATH (winget install Gyan.FFmpeg)", file=sys.stderr)
+        return 2
+    if not hu.tcp6:
+        hu.listen()                                         # порт занят - узнаём сразу, до окна
+    viewer = V.Viewer(ffmpeg, hu.o.size, scale, hu.send_touch_event, hu.send_hard_key, lambda: hu.finish("window closed"),
+                      lambda: worker.is_alive(), hu.log, HARD_KEY_BACK, HARD_KEY_HOME)
+    hu.video_sink, hu.size_sink = viewer.pipe.on_video, viewer.pipe.set_video_size
+
+    def work():
+        try:
+            hu.run()
+        except BaseException:
+            traceback.print_exc()
+            hu.finish("error")
+
+    worker = threading.Thread(target=work, name="hu-session")
+    signal.signal(signal.SIGINT, lambda *_: hu.finish("Ctrl+C"))
+    worker.start()
+    viewer.run()
+    hu.finish("window closed")
+    worker.join()
+    return 0
+
+
 def main(argv=None) -> int:
     a = parse_args(argv)
-    hu = HeadUnit(Options(a.host, a.port, a.duration, a.no_auth, a.touch_test, a.out, transport=a.transport,
+    duration = a.duration if a.duration is not None else (float("inf") if a.view else 120.0)
+    hu = HeadUnit(Options(a.host, a.port, duration, a.no_auth, a.touch_test, a.out, transport=a.transport,
                           kill_chan=a.kill_chan, kill_after=a.kill_after, extra_data_socket=a.extra_data_socket,
                           discover=a.discover, beacon_port=a.beacon_port, bind_ip=a.bind_ip,
                           discover_timeout=a.discover_timeout, probe_8999=a.probe_8999,
                           video_kbps=a.video_kbps, dip_kbps=a.dip_kbps, dip_at=a.dip_at, dip_for=a.dip_for,
                           pause_cycles=a.pause_cycles, pause_every=a.pause_every, pause_for=a.pause_for,
-                          voice_key_at=a.voice_key_at))
+                          voice_key_at=a.voice_key_at, size=a.size))
+    if a.view:
+        return run_view(hu, a.view_scale)
     hu.run()
     return 0
 
