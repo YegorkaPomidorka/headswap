@@ -82,7 +82,7 @@ private fun PageArrow(icon: List<String>, description: String, enabled: Boolean,
  * Размер страницы считается по свободной области и крупной цели касания.
  */
 @Composable
-private fun <T> PagedApps(
+internal fun <T> PagedApps(
     items: List<T>, page: Int, onPage: (Int) -> Unit, leading: @Composable () -> Unit,
     cell: @Composable (T, iconPx: Int) -> Unit,
 ) {

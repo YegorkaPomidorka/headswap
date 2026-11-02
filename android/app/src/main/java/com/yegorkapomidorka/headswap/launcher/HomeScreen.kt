@@ -147,15 +147,16 @@ fun rememberAppIcon(ref: AppRef): ImageBitmap? {
 @Composable
 fun AppTile(
     ref: AppRef, labelled: Boolean, onLong: (() -> Unit)? = null, iconPx: Int? = null,
-    onTap: () -> Unit = { LauncherActions.openApp(ref) },
+    selected: Boolean = false, onTap: () -> Unit = { LauncherActions.openApp(ref) },
 ) {
     val m = LocalMetrics.current
     val s = m.spec
     val label = LauncherModel.label(ref) ?: ref.pkg
     val size = iconPx ?: s.appIc
     Pressable(
-        Modifier.clip(RoundedCornerShape(m.dp(s.radius))), description = label,
-        onLong = onLong, onTap = onTap,
+        Modifier.clip(RoundedCornerShape(m.dp(s.radius)))
+            .then(if (selected) Modifier.border(m.dp(s.b4), LocalAccent.current, RoundedCornerShape(m.dp(s.radius))) else Modifier),
+        description = label, onLong = onLong, onTap = onTap,
     ) { pressed ->
         if (pressed) Box(Modifier.matchParentSize().background(Pal.SURFACE_PRESSED))
         Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(m.dp(s.g4)),

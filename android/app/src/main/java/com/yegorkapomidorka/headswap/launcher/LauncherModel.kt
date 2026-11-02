@@ -61,6 +61,12 @@ internal object LauncherModel {
     var areaRect by mutableStateOf<Rect?>(null)
     var navCardRect by mutableStateOf<Rect?>(null)
 
+    /** Ключ «пакет/класс» приложения в окне приложения; null - ещё ни разу не открывали. */
+    var appKey by mutableStateOf<String?>(null)
+    /** Страница настроек, с которой открыть экран (выбор навигатора по тапу на пустую карточку). */
+    var settingsPage by mutableStateOf(SettingsPage.MAIN)
+    /** Плотность дисплея ГУ: дочерние окна живут с ней же. */
+    var densityDpi = 160
     /** Страница «Все приложения» запоминается между заходами. */
     var allAppsPage = 0
 

@@ -7,7 +7,7 @@ object LauncherActions {
     fun goHome() { model.home() }
     fun openAllApps() { model.go(Area.AllApps) }
     fun openPicker() { model.go(Area.Picker) }
-    fun openSettings() { model.go(Area.Settings) }
+    fun openSettings() { model.settingsPage = SettingsPage.MAIN; model.go(Area.Settings) }
     fun openCalls() { model.go(Area.Calls) }
     fun cycleCardView() { model.nextCardView() }
 
@@ -26,15 +26,33 @@ object LauncherActions {
     fun openApp(ref: AppRef) {
         val now = model.now()
         if (!model.launchDebounce.allow(now) || model.launchLock.isLocked(now)) return
+        // навигатор уже живёт в своём окне: приложение из списка с тем же пакетом разворачивает его
+        if (ref.pkg == model.navigatorPkg) { model.go(Area.Navigator); return }
         model.launchLock.begin(ref.key, now)
         model.starting = model.label(ref) ?: ref.pkg
+        model.appKey = ref.key
         model.go(Area.App(ref))
     }
 
-    fun openNavigator() { model.go(Area.Navigator) }
+    /** Блок навигации рейки и тап по карточке: навигатор на всю область справа от рейки. */
+    fun openNavigator() {
+        if (!model.launchDebounce.allow(model.now())) return
+        if (model.navigatorPkg == null) openNavigatorChoice() else model.go(Area.Navigator)
+    }
 
-    /** Кнопка «Назад» рейки: в открытом чужом приложении. */
-    fun embeddedBack() { model.home() }
+    fun openNavigatorChoice() {
+        model.settingsPage = SettingsPage.NAVIGATOR
+        model.go(Area.Settings)
+    }
+
+    /** Кнопка «Назад» рейки: Back в открытое окно; если приложение вышло из корня - на главный. */
+    fun embeddedBack() {
+        when (model.area) {
+            is Area.App -> EmbedHost.back(EmbedHost.app) { if (model.area is Area.App) model.home() }
+            Area.Navigator -> EmbedHost.back(EmbedHost.nav) { if (model.area == Area.Navigator) model.home() }
+            else -> model.home()
+        }
+    }
 
     /** Аппаратный Back ГУ: из встроенного приложения - назад в него, из экранов лаунчера - на главный, на главном ничего. */
     fun hardwareBack() {

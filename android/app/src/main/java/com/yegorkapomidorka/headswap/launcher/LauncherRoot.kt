@@ -83,14 +83,13 @@ fun LauncherRoot(connected: Boolean) {
 
 @Composable
 private fun AreaContent() {
-    when (val a = LauncherModel.area) {
+    when (LauncherModel.area) {
         Area.Home -> HomeScreen()
         Area.AllApps -> AllAppsScreen()
         Area.Picker -> PickerScreen()
         Area.Settings -> LauncherSettingsScreen()
         Area.Calls -> CallsScreen()
-        Area.Navigator -> EmbedPlaceholder(null)
-        is Area.App -> EmbedPlaceholder(a.ref)
+        Area.Navigator, is Area.App -> EmbedAreaBackdrop()
     }
 }
 

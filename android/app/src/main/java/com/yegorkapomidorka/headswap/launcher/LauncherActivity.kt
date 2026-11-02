@@ -53,6 +53,10 @@ class LauncherActivity : ComponentActivity() {
         if (currentDisplayId() <= 0) { finish(); return }
         AppLog.init(this)
         LauncherModel.init(this)
+        // дочерние окна живут с плотностью дисплея ГУ
+        val dpi = resources.displayMetrics.densityDpi.coerceIn(96, 1280)
+        LauncherModel.densityDpi = dpi
+        EmbedHost.densityDpi = dpi
         window.setDecorFitsSystemWindows(false)
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             // Back inside the launcher must not close it and leave the video surface empty.
