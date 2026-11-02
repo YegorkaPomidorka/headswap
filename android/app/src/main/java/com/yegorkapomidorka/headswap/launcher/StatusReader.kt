@@ -18,6 +18,8 @@ import java.util.Locale
 /** Рейка и строка статуса: время, сеть, Bluetooth, Wi-Fi и громкость медиа телефона. Ничего не нажимается. */
 data class StatusInfo(
     val time: String = "--:--", val date: String = "", val net: String = NetLabel.NONE,
+    /** Уровень сотового сигнала 0..4 для столбиков в рейке; -1 - не сотовая сеть или уровень неизвестен. */
+    val signal: Int = -1,
     val bluetooth: Boolean = false, val wifi: Boolean = false, val volume: Int = 0,
 )
 
@@ -29,6 +31,7 @@ internal object StatusReader {
         time = now.format(timeFormat),
         date = weekday(now.dayOfWeek) + " " + now.format(dateFormat),
         net = network(ctx),
+        signal = signal(ctx),
         bluetooth = runCatching { ctx.getSystemService(BluetoothManager::class.java)?.adapter?.isEnabled == true }
             .getOrDefault(false),
         wifi = runCatching { ctx.getSystemService(WifiManager::class.java)?.isWifiEnabled == true }.getOrDefault(false),
@@ -48,6 +51,14 @@ internal object StatusReader {
             caps.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET) -> "LAN"
             else -> NetLabel.NONE
         }
+    }
+
+    private fun signal(ctx: Context): Int {
+        val cm = ctx.getSystemService(ConnectivityManager::class.java) ?: return -1
+        val caps = runCatching { cm.getNetworkCapabilities(cm.activeNetwork) }.getOrNull() ?: return -1
+        if (!caps.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) || caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)) return -1
+        val level = runCatching { ctx.getSystemService(TelephonyManager::class.java)?.signalStrength?.level }.getOrNull()
+        return level?.coerceIn(0, 4) ?: -1
     }
 
     /** Тип сети нужен READ_PHONE_STATE; без него подпись «4G» по умолчанию. */

@@ -1,21 +1,17 @@
 package com.yegorkapomidorka.headswap.launcher
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -24,6 +20,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -108,7 +105,10 @@ private fun AreaContent() {
     }
 }
 
-/** Рейка на всю высоту (S-образно распределена) и под ней отдельный золотой блок навигации. */
+/** Серый «Назад» на рейке, когда идти некуда (макет v2). */
+private val BackIdle = Color(0xFF5F6A80)
+
+/** Рейка на всю высоту (S-образно распределена) и под ней отдельный золотой блок навигации. Макет v2. */
 @Composable
 private fun Rail() {
     val m = LocalMetrics.current
@@ -121,35 +121,36 @@ private fun Rail() {
         Column(
             Modifier.weight(1f).fillMaxWidth()
                 .clip(RoundedCornerShape(bottomEnd = m.dp(s.radius))).background(Pal.SURFACE)
-                .padding(vertical = m.dp(s.g)),
+                .padding(top = m.dp(s.g), bottom = m.dp(s.g8)),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.SpaceBetween,
         ) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(m.dp(s.g4))) {
-                Txt(status.time, s.f2, color = Pal.TEXT, weight = FontWeight.SemiBold, mono = true)
-                Txt(status.net, s.fs, color = Pal.SEC)
-            }
-            if (embedded) {
-                RoundButton(s.t, stringResource(R.string.l_back), onTap = { LauncherActions.embeddedBack() },
-                    modifier = Modifier.border(m.dp(s.b4), accent, CircleShape)) {
-                    SvgIcon(Ico.CHEV_L, s.ic, accent, stroke = 2.6f)
-                }
-            } else Spacer(Modifier.size(m.dp(s.t)))
-            RoundButton(s.logo, stringResource(R.string.l_all_apps), onTap = { LauncherActions.openAllApps() },
-                background = Color.Transparent) {
-                Box(Modifier.matchParentSize().background(Brush.radialGradient(
-                    0f to accent, 0.45f to accent.copy(alpha = 0.35f), 0.72f to accent.copy(alpha = 0f), 1f to accent.copy(alpha = 0f))),
-                    contentAlignment = Alignment.Center) {
-                    Box(Modifier.size(m.dp(s.logoIn)).border(m.dp(s.b4), Pal.WHITE, CircleShape), contentAlignment = Alignment.Center) {
-                        Box(Modifier.size(m.dp(s.logoDot)).clip(CircleShape).background(accent))
-                    }
+            Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(m.dp(s.g8))) {
+                Txt(status.time, s.f1, color = Pal.TEXT, weight = FontWeight.SemiBold, mono = true)
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(m.dp(s.g4))) {
+                    if (status.signal >= 0) VectorIcon(VIco.signal(status.signal), 24f, s.fs, Pal.SEC)
+                    Txt(status.net, s.fs, color = Pal.SEC)
                 }
             }
-            RoundButton(s.t, stringResource(R.string.l_settings), onTap = { LauncherActions.openSettings() }) {
-                SvgIcon(Ico.GEAR, s.ic, Pal.SEC2, stroke = 2f)
+            // «Назад» виден всегда: белый, когда открыто приложение, серый, когда идти некуда
+            RoundButton(s.rb, stringResource(R.string.l_back), onTap = { LauncherActions.embeddedBack() }, enabled = embedded) {
+                SvgIcon(Ico.CHEV_BACK, s.backIc, if (embedded) Pal.WHITE else BackIdle, stroke = 2f)
             }
-            RoundButton(s.t, stringResource(R.string.l_card_view), onTap = { LauncherActions.cycleCardView() }) {
-                SvgIcon(Ico.LAYERS, s.ic, Pal.SEC2, stroke = 2f)
+            RoundButton(s.rb, stringResource(R.string.l_all_apps), onTap = { LauncherActions.openAllApps() }) {
+                Box(Modifier.matchParentSize().drawBehind {
+                    // как CSS circle farthest-corner: радиус 0.707 стороны, стопы 0 / 40% / 70%
+                    drawCircle(Brush.radialGradient(
+                        0f to accent.copy(alpha = 0.6f), 0.4f to accent.copy(alpha = 0.25f), 0.7f to accent.copy(alpha = 0f),
+                        center = center, radius = size.minDimension * 0.7071f))
+                }, contentAlignment = Alignment.Center) {
+                    VectorIcon(VIco.LOGO, VIco.LOGO_VIEWPORT, s.logoIn, Pal.WHITE)
+                }
+            }
+            RoundButton(s.rb, stringResource(R.string.l_settings), onTap = { LauncherActions.openSettings() }) {
+                SvgIcon(Ico.GEAR, s.ric, Pal.SEC2, stroke = 2f)
+            }
+            RoundButton(s.rb, stringResource(R.string.l_card_view), onTap = { LauncherActions.cycleCardView() }) {
+                SvgIcon(Ico.LAYERS, s.ric, Pal.SEC2, stroke = 2f)
             }
         }
         Pressable(

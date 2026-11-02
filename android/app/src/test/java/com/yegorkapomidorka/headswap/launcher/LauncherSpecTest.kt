@@ -21,11 +21,57 @@ class LauncherSpecTest {
         assertEquals(18, s.radius)
         assertEquals(40, s.ic)
         assertEquals(54, s.icBig)
-        assertEquals(84, s.logo)
         assertEquals(81, s.appIc)
         assertEquals(324, s.music)
         assertEquals(540, s.phone)
         assertEquals(36, s.statusH)
+    }
+
+    @Test fun railFollowsV2Mockup() {
+        val s = LauncherSpecs.forSize(1920, 720)
+        assertEquals(90, s.rb) // все кнопки рейки по T, пока влезают
+        assertEquals(40, s.ric)
+        assertEquals(58, s.logoIn)
+        assertEquals(54, s.backIc) // белый шеврон 54 px на 1920x720
+        // 1280x480: рейка сжата по высоте, кнопки меньше T
+        val strip = LauncherSpecs.forSize(1280, 480)
+        assertTrue(strip.rb < strip.t)
+        assertEquals(54, strip.rb)
+        assertEquals(27, strip.ric)
+        for (row in LauncherSpecs.TABLE) {
+            val r = LauncherSpecs.forSize(row[0], row[1])
+            assertTrue("${row[0]}x${row[1]}", r.rb in 1..r.t && r.ric <= r.ic && r.backIc <= r.rb)
+        }
+    }
+
+    @Test fun musicChipAndTitleFollowV2Mockup() {
+        val s = LauncherSpecs.forSize(1920, 720)
+        assertEquals(54, s.pcH)
+        assertEquals(48, s.pcB)
+        assertEquals(27, s.pcIc)
+        assertEquals(109, s.titleB)
+        assertEquals(17, s.tag)
+    }
+
+    @Test fun tallWideScreensGetTallMusicCard() {
+        // 1920x1080 и реальный экран ГУ 1600x900 (масштаб строки 1920x1080)
+        val full = LauncherSpecs.forSize(1920, 1080)
+        assertEquals(440, full.music)
+        val vezel = LauncherSpecs.forSize(1600, 900)
+        assertEquals(83, vezel.t)
+        assertEquals(365, vezel.music)
+        assertEquals(498, vezel.phone)
+        assertEquals(83, vezel.rb)
+        // 1920x720 и 2240x976 остаются 3.6T
+        assertEquals(324, LauncherSpecs.forSize(1920, 720).music)
+        assertEquals(396, LauncherSpecs.forSize(2240, 976).music)
+    }
+
+    @Test fun phoneCardWidthByScreen() {
+        assertEquals(540, LauncherSpecs.forSize(1920, 720).phone) // 6T
+        val narrow = LauncherSpecs.forSize(1280, 720)
+        assertEquals(88 * 5 - 20, narrow.phone) // 5T - G
+        assertEquals(62 * 5 - 14, LauncherSpecs.forSize(800, 480).phone)
     }
 
     @Test fun stripOnlyForShortWideScreens() {

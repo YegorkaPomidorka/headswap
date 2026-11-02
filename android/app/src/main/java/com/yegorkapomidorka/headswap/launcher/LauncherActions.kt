@@ -58,6 +58,9 @@ object LauncherActions {
 
     fun openPlayers() { model.go(Area.Players) }
 
+    /** «Плеер телефона» на чипе: без выбранного приложения, играет любая активная сессия. */
+    fun choosePhonePlayer() { model.chooseMusicPlayer(null) }
+
     /** Выбранный плеер запоминается и становится текущим: играет сразу, если у него есть сессия или MediaBrowserService. */
     fun choosePlayer(pkg: String) {
         model.chooseMusicPlayer(pkg)

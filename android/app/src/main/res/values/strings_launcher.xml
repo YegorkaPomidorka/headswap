@@ -35,6 +35,9 @@
     <string name="l_play">Play</string>
     <string name="l_pause">Pause</string>
     <string name="l_like">Like</string>
+    <string name="l_player_phone">Phone player</string>
+    <string name="l_player_yandex">Yandex Music</string>
+    <string name="l_player_ytm">YouTube Music</string>
 
     <string name="l_phone">Phone</string>
     <string name="l_phone_missed">Missed · %1$d</string>

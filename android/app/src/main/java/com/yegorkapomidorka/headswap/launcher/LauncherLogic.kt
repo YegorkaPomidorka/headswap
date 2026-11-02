@@ -134,6 +134,24 @@ object TaskCheck {
     fun vanished(state: Int, seenTop: Boolean): Boolean = state == NONE && seenTop
 }
 
+/**
+ * Чип плееров на карточке музыки (макет v2): плеер телефона (любая активная сессия) и два известных сервиса,
+ * если установлены. Остальные медиаприложения - долгий тап по «ноте» (список плееров).
+ */
+object PlayerChip {
+    const val YANDEX = "ru.yandex.music"
+    const val YT_MUSIC = "com.google.android.apps.youtube.music"
+
+    enum class Kind { PHONE, YANDEX, YT_MUSIC }
+    data class Slot(val kind: Kind, val pkg: String?, val selected: Boolean)
+
+    fun slots(installed: Set<String>, chosen: String?): List<Slot> = buildList {
+        add(Slot(Kind.PHONE, null, chosen == null))
+        if (YANDEX in installed) add(Slot(Kind.YANDEX, YANDEX, chosen == YANDEX))
+        if (YT_MUSIC in installed) add(Slot(Kind.YT_MUSIC, YT_MUSIC, chosen == YT_MUSIC))
+    }
+}
+
 /** Подпись типа сети в рейке. Типы - константы TelephonyManager.NETWORK_TYPE_*. */
 object NetLabel {
     const val NONE = "нет"

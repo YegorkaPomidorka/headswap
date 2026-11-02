@@ -6,6 +6,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
@@ -70,9 +71,12 @@ fun EmbedLayers() {
     }
 
     val navShown = navKey != null && (area == Area.Navigator || (area == Area.Home && model.cardView == CardView.NAVIGATOR))
+    // подпись окна навигатора в углу карточки (макет v2); на весь экран не нужна
+    val navPkg = model.navigatorPkg
+    val navTag = if (area != Area.Navigator && navPkg != null) remember(navPkg) { LauncherModel.packageLabel(navPkg) } else null
     EmbedLayer(EmbedHost.nav, navTarget, shown = navShown, interactive = area == Area.Navigator,
         rounded = area != Area.Navigator, background = NavBg,
-        starting = stringResource(R.string.l_nav_starting), onCardTap = { LauncherActions.openNavigator() })
+        starting = stringResource(R.string.l_nav_starting), onCardTap = { LauncherActions.openNavigator() }, tag = navTag)
     if (appKey != null) {
         val label = model.starting ?: ""
         EmbedLayer(EmbedHost.app, areaRect, shown = area is Area.App, interactive = true, rounded = false, background = ScreenBg,
@@ -83,7 +87,7 @@ fun EmbedLayers() {
 @Composable
 private fun EmbedLayer(
     slot: EmbedSlot, target: Rect?, shown: Boolean, interactive: Boolean, rounded: Boolean, background: Color,
-    starting: String, onCardTap: (() -> Unit)?,
+    starting: String, onCardTap: (() -> Unit)?, tag: String? = null,
 ) {
     var last by remember(slot) { mutableStateOf<Rect?>(null) }
     if (target != null) last = target
@@ -138,6 +142,14 @@ private fun EmbedLayer(
             } else if (onCardTap != null && !interactive) {
                 // карточка навигатора: тап разворачивает окно, касания в приложение не идут
                 Pressable(Modifier.fillMaxSize(), onTap = onCardTap) {}
+            }
+            if (tag != null && status == EmbedStatus.READY) {
+                // подпись без обработки касаний: тап проходит к карточке под ней
+                Box(
+                    Modifier.align(Alignment.BottomStart).padding(start = m.dp(m.spec.g8), bottom = m.dp(m.spec.g8))
+                        .clip(RoundedCornerShape(m.dp(m.spec.radius))).background(Color(14, 20, 26, 153))
+                        .padding(horizontal = m.dp(m.spec.g8), vertical = m.dp(m.spec.b4)),
+                ) { Txt(tag, m.spec.tag, color = Pal.SEC2) }
             }
         }
     }

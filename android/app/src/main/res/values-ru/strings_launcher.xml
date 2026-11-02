@@ -35,6 +35,9 @@
     <string name="l_play">Играть</string>
     <string name="l_pause">Пауза</string>
     <string name="l_like">Нравится</string>
+    <string name="l_player_phone">Плеер телефона</string>
+    <string name="l_player_yandex">Я.Музыка</string>
+    <string name="l_player_ytm">YouTube Music</string>
 
     <string name="l_phone">Телефон</string>
     <string name="l_phone_missed">Пропущенные · %1$d</string>

@@ -1,6 +1,7 @@
 package com.yegorkapomidorka.headswap.launcher
 
 import kotlin.math.abs
+import kotlin.math.floor
 import kotlin.math.ln
 import kotlin.math.max
 import kotlin.math.min
@@ -28,19 +29,29 @@ class LauncherSpec(
     val icBig = r(t * 0.6)
     val radius = r(t * 0.2)
     val ic = r(t * 0.44)
-    val logo = r(t * 0.93)
-    val logoIn = r(t * 0.6)
-    val logoDot = r(t * 0.3)
     val statusH = r(f2 * 1.3)
-    val music = r(t * (if (strip) 3.4 else if (wide) 3.6 else 3.0))
-    /** Шире, чем в макете (4.6/3.6): имя и две кнопки. */
-    val phone = r(t * (if (wide) 6.0 else 4.4))
+    /** Высокий широкий экран (1920x1080, 1600x900): карточка музыки выше, узкая выглядела бы столбиком. */
+    val music = if (wide && h.toDouble() / w >= 0.5) r(t * 4.4) else r(t * (if (strip) 3.4 else if (wide) 3.6 else 3.0))
+    /** 540 px на 1920x720 = 6T; на узких без второй кнопки на T+G уже. */
+    val phone = if (wide) r(t * 6.0) else r(t * 5.0 - g)
     val cover = r(t * 1.6)
+    val tag = max(14, r(f2 * 0.6))
     val appIc = r(t * 0.9)
     val appSvg = r(t * 0.5)
     val appLbl = r(f2 * 0.85)
     val bottomMin = r(t * 1.75)
-    val chipH = r(t * 0.72)
+
+    // Рейка: четыре кнопки по T, но не больше, чем влезает по высоте между часами и блоком навигации.
+    private val railFree = h - navH - g - (g + g8) - (f1 + g8 + f2)
+    val rb = max(1, min(t, floor((railFree - 4 * g4) / 4.0).toInt()))
+    val ric = min(ic, r(rb * 0.5))
+    val logoIn = r(rb * 0.64)
+    val backIc = min(r(ric * 1.35), r(rb * 0.66))
+    // Чип плееров и «Нравится» на обложке
+    val pcH = r(t * 0.6)
+    val pcB = pcH - 2 * b4
+    val pcIc = r(pcB * 0.56)
+    val titleB = t + g8 + g4
     /** Сколько приложений в быстром ряду (без плюса). */
     val quickApps = if (w < 1000) 4 else 5
 

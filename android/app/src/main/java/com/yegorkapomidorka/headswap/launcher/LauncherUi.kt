@@ -136,11 +136,63 @@ object Ico {
     val MIC = listOf("M12 3a3 3 0 0 0-3 3v5a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3z", "M19 11a7 7 0 0 1-14 0", "M12 18v3")
     val PLUS = listOf("M12 5v14", "M5 12h14")
     val CHEV_L = listOf("M15 5 8 12l7 7")
+    /** Шеврон «Назад» на рейке (v2): шире и ниже обычной стрелки страниц. */
+    val CHEV_BACK = listOf("M15 6 7 12l8 6")
     val CHEV_R = listOf("m9 5 7 7-7 7")
     val CLOSE = listOf("M6 6l12 12", "M18 6 6 18")
     val MUSIC = listOf("M9 18V5l12-2v13", circle(6, 18, 3), circle(18, 16, 3))
     val HOME = listOf("m3 11 9-8 9 8", "M5 10v10h14V10")
     val CHECK = listOf("m5 12 5 5 9-10")
+}
+
+/** Прямоугольник со скруглением в SVG-синтаксисе (rect rx из макета рисуется как path). */
+fun roundRectPath(x: Float, y: Float, w: Float, h: Float, r: Float): String =
+    "M${x + r} ${y}h${w - 2 * r}a$r $r 0 0 1 $r $r v${h - 2 * r}a$r $r 0 0 1 ${-r} $r h${-(w - 2 * r)}a$r $r 0 0 1 ${-r} ${-r} v${-(h - 2 * r)}a$r $r 0 0 1 $r ${-r}z"
+
+/** Путь иконки со своим стилем: заливка, обводка (толщина в единицах viewBox) и прозрачность. */
+class VPath(val d: String, val fill: Boolean = false, val strokeW: Float? = null, val alpha: Float = 1f)
+
+/** Иконки с разными стилями путей и своим viewBox: логотип Headswap, столбики сигнала, значок YouTube Music. */
+object VIco {
+    /** Логотип Headswap из Calls.dc.html / Teyes.dc.html: две дуговые стрелки и прямоугольник, viewBox 48. */
+    val LOGO_VIEWPORT = 48f
+    val LOGO = listOf(
+        VPath("M9.51 20.12A15 15 0 0 1 35.49 14.36", strokeW = 4.4f),
+        VPath("M38.49 27.88A15 15 0 0 1 12.51 33.64", strokeW = 4.4f),
+        VPath("M39.32 11.15 39.99 19.72 31.66 17.58z", fill = true, strokeW = 1.5f),
+        VPath("M8.68 36.86 8.01 28.28 16.34 30.43z", fill = true, strokeW = 1.5f),
+        VPath("M18.4 20h11.2A2.4 2.4 0 0 1 32 22.4v4.7a2.4 2.4 0 0 1-2.4 2.4H18.4A2.4 2.4 0 0 1 16 27.1v-4.7A2.4 2.4 0 0 1 18.4 20z", fill = true),
+    )
+
+    /** Четыре столбика сигнала (viewBox 24): первые [level] залиты, остальные бледные (.35). */
+    fun signal(level: Int): List<VPath> = listOf(
+        roundRectPath(2f, 16f, 4f, 5f, 1f), roundRectPath(7.5f, 12f, 4f, 9f, 1f),
+        roundRectPath(13f, 8f, 4f, 13f, 1f), roundRectPath(18.5f, 3f, 4f, 18f, 1f),
+    ).mapIndexed { i, d -> VPath(d, fill = true, alpha = if (i < level) 1f else 0.35f) }
+
+    /** YouTube Music на чипе плееров: круг с треугольником. */
+    val YT_MUSIC = listOf(
+        VPath("M2.5 12a9.5 9.5 0 1 0 19 0 9.5 9.5 0 1 0-19 0", strokeW = 2.2f),
+        VPath("M10 8.5v7l6-3.5z", fill = true, strokeW = 2.2f),
+    )
+}
+
+@Composable
+fun VectorIcon(paths: List<VPath>, viewport: Float, sizePx: Int, color: Color, modifier: Modifier = Modifier) {
+    val m = LocalMetrics.current
+    val parsed = remember(paths) { paths.map { PathParser().parsePathString(it.d).toPath() } }
+    Canvas(modifier.size(m.dp(sizePx))) {
+        val sc = size.minDimension / viewport
+        scale(sc, sc, pivot = Offset.Zero) {
+            for ((i, p) in paths.withIndex()) {
+                val c = color.copy(alpha = color.alpha * p.alpha)
+                if (p.fill) drawPath(parsed[i], c, style = Fill)
+                if (p.strokeW != null) {
+                    drawPath(parsed[i], c, style = Stroke(width = p.strokeW, cap = StrokeCap.Round, join = StrokeJoin.Round))
+                }
+            }
+        }
+    }
 }
 
 @Composable

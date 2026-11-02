@@ -175,4 +175,14 @@ class LauncherLogicTest {
         assertFalse(TaskCheck.vanished(1, seenTop = true)) // диалог другого пакета в той же задаче - не закрытие
         assertFalse(TaskCheck.vanished(-1, seenTop = true))
     }
+
+    @Test fun playerChipAlwaysHasPhoneAndOnlyInstalledServices() {
+        val none = PlayerChip.slots(emptySet(), null)
+        assertEquals(listOf(PlayerChip.Slot(PlayerChip.Kind.PHONE, null, true)), none)
+        val both = PlayerChip.slots(setOf(PlayerChip.YANDEX, PlayerChip.YT_MUSIC, "x"), PlayerChip.YT_MUSIC)
+        assertEquals(listOf(PlayerChip.Kind.PHONE, PlayerChip.Kind.YANDEX, PlayerChip.Kind.YT_MUSIC), both.map { it.kind })
+        assertEquals(listOf(false, false, true), both.map { it.selected })
+        // выбран другой плеер (не из чипа): подсвечена ни одна кнопка
+        assertEquals(listOf(false, false), PlayerChip.slots(setOf(PlayerChip.YANDEX), "com.spotify").map { it.selected })
+    }
 }
