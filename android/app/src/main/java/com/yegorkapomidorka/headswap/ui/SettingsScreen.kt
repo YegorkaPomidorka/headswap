@@ -390,6 +390,7 @@ class SettingsSectionScreen(host: MainActivity, val section: SettingsSection) : 
     private var actHost: LinearLayout? = null
     private var actStatus: TextView? = null
     private var phoneCardNote: TextView? = null
+    private var phoneActivation: PhoneActivationBlock? = null
     private var transcodeSeg: Segmented? = null
     private var transcodeDesc: View? = null
     private var directDesc: View? = null
@@ -481,6 +482,7 @@ class SettingsSectionScreen(host: MainActivity, val section: SettingsSection) : 
     override fun onPermissionResult() {
         refreshMic()
         refreshPhoneCardPermissions()
+        phoneActivation?.onPermissionResult()
         onCallsPermissionResult()
         if (wlAwaitingPermission) {
             wlAwaitingPermission = false
@@ -749,11 +751,13 @@ class SettingsSectionScreen(host: MainActivity, val section: SettingsSection) : 
         val (text, color) = c.desktopActivation()
         actStatus?.text = text
         actStatus?.setTextColor(c.clr(color))
+        phoneActivation?.refresh()
     }
 
-    /** «Активация с ПК»: готовая команда adb из ActivationToken, копирование в буфер и подсказка. */
+    /** «Активация с ПК»: готовая команда adb из ActivationToken, копирование в буфер и подсказка. Над ней - активация с самого телефона. */
     private fun buildActivation(box: LinearLayout) {
         val c = ctx
+        phoneActivation = PhoneActivationBlock(host).also { box.addView(it.view, lp(MATCH, WRAP)) }
         box.addView(c.sectionTitle(c.getString(R.string.bm_act_title)))
         actStatus = c.text("", 16f, 600).also { box.addView(it, lp(WRAP, WRAP).margins(c, 8, 2, 8, 0)) }
         val command = ActivationToken(c).adbCommand(DexPrefs(c).usbPlaybackAudio)

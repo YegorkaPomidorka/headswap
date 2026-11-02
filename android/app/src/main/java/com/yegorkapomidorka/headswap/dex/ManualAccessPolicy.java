@@ -120,7 +120,7 @@ public final class ManualAccessPolicy {
      * `$(pm path ...)` has to survive the computer's own shell; it is revalidated against shell metacharacters.
      */
     public static String shellCommand(String apkPath, Options options) {
-        if (apkPath == null || !APK_PATH.matcher(apkPath).matches()) throw new IllegalArgumentException("Некорректный путь к APK");
+        requireApkPath(apkPath);
         requirePackage(options.packageName);
         requireToken(options.token);
         return "CLASSPATH=" + apkPath + " app_process / " + ENTRY + " --package " + options.packageName
@@ -129,6 +129,10 @@ public final class ManualAccessPolicy {
 
     public static String adbCommand(String apkPath, Options options) {
         return "adb -d shell " + shellCommand(apkPath, options);
+    }
+
+    public static void requireApkPath(String apkPath) {
+        if (apkPath == null || !APK_PATH.matcher(apkPath).matches()) throw new IllegalArgumentException("Некорректный путь к APK");
     }
 
     public static void requirePackage(String packageName) {
