@@ -58,6 +58,8 @@ enum class CarPreset(val titleRes: Int, val settings: CarSettings = CarSettings(
     /** HSAE 21070007, 1920×720 (h420): энкодер Xiaomi на 1920×720 падает, ГУ игнорирует кроп SPS и берёт верхние 720 строк - прямой проброс с полями снизу. */
     TOYOTA_COROLLA_CROSS_2024(R.string.car_toyota_corolla_cross_2024, CarSettings(videoMode = VideoMode.WIDE_HD)),
     TOYOTA_LEVIN(R.string.car_toyota_levin),
+    /** Китай 2025 и соседние годы: 1280×480. */
+    TOYOTA_RAV4_2025(R.string.car_toyota_rav4_2025, CarSettings(videoMode = VideoMode.WIDE)),
     /** Китай: 1920×1080, 30 кадров (Егор, 18.10). */
     VW_BORA_2021(R.string.car_vw_bora_2021, CarSettings(videoMode = VideoMode.R1080)),
     /** 1920×1080, остальное «Авто» (Александр). */
