@@ -70,6 +70,7 @@ class LauncherActivity : ComponentActivity() {
         if (currentDisplayId() <= 0) { finish(); return }
         visible = true
         connected = ownsDisplay()
+        LauncherModel.reloadCatalog() // за время работы могли поставить или удалить приложение
         window.insetsController?.apply {
             hide(WindowInsets.Type.statusBars() or WindowInsets.Type.navigationBars())
             systemBarsBehavior = WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE

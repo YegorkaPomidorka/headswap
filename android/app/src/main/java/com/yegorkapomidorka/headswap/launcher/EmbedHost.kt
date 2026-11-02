@@ -86,6 +86,8 @@ internal object EmbedHost {
 
     /** Нужное содержимое и размер слота. Тот же ключ и размер - ничего не происходит. */
     fun want(slot: EmbedSlot, key: String?, w: Int, h: Int) {
+        // другое приложение в то же окно: сразу «запускаем», не показывая на миг прежнее
+        if (key != slot.wantKey) slot.status = if (key == null) EmbedStatus.IDLE else EmbedStatus.STARTING
         slot.wantKey = key
         if (w > 0 && h > 0) { slot.wantW = w; slot.wantH = h }
         schedule(slot, 0)
