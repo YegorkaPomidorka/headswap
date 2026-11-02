@@ -191,6 +191,10 @@ class AaBridgeCore(
     @Volatile private var btAudio = false
     @Volatile var huDesayG6S = false           // ГУ Desay G6S (Mazda CX-5): NAVI=1 глушит штатное радио, маршрутный NAVI не шлём
         private set
+    @Volatile var huHondaVezel = false         // Honda Vezel (channel 20832125): кнопка звука на ГУ шлёт MUSIC=0/1, на MUSIC=1 возвращаем play
+        private set
+    @Volatile var huHonda20772104 = false      // Honda Civic 2021 (channel 20772104, h629): после задней AA встаёт на паузу извне, ГУ тут же просит MUSIC=1
+        private set
     @Volatile var huHonda = false              // Honda (STATISTIC_INFO channel 2077xxxx/2083xxxx, HU_INFO пустой): roadName на приборке режется по байтам и клеткам
         private set
     private var naviRaisedAt = NEVER          // Honda: когда последний раз ушёл MODULE_STATUS NAVI=1
@@ -298,6 +302,7 @@ class AaBridgeCore(
     @Volatile private var lastVoiceKeyMs = NEVER    // последний KEYCODE_SEARCH в AA (антидребезг h425)
     private var lastHfpConnectMs = NEVER       // ГУ прислало BT_HFP_CONNECTION=connected (дальше AA сам запускает автоплей по BT)
     private var lastPauseKeyMs = NEVER         // когда последний раз слали AA KEYCODE 127
+    private var lastExternalStopMs = NEVER     // плеер AA встал не от нашего 127 и не от ввода пользователя (Honda 20772104)
     private var naviSent = false               // MODULE_STATUS NAVI=1 ушёл (держит TTS и/или маршрут)
     private var naviEndPending = false           // маршрут кончился, пока NAVI=1 держал TTS: NAVI=0 уйдёт после TTS STOP
     private var ttsNaviHeld = false            // NAVI=1 нужен ради TTS (до stopAllAudio)
@@ -408,8 +413,11 @@ class AaBridgeCore(
         telephonyCall = null                   // CarLifeSession.calls пришлёт текущее состояние заново
         resumeOnHuMusic = false
         lastHuResumeMs = NEVER
+        lastExternalStopMs = NEVER
         gotIdr = false
         huDesayG6S = false                    // HU_INFO / STATISTIC_INFO придут заново в этой сессии
+        huHondaVezel = false                   // STATISTIC_INFO придёт заново в этой сессии
+        huHonda20772104 = false                // STATISTIC_INFO придёт заново в этой сессии
         huVw20082120 = false                   // HU_INFO / STATISTIC_INFO придут заново в этой сессии
         huHonda = false                        // STATISTIC_INFO придёт заново в этой сессии
         huVwBt1420 = false                     // HU_INFO придёт заново в этой сессии
@@ -508,6 +516,12 @@ class AaBridgeCore(
      */
     @Synchronized
     fun onCarlifeMusicControl(status: Int?): Boolean {
+        if (hondaBtMusic) {
+            // Civic 2021 (h629): звук по BT, «свой источник» ГУ - BT-аудио этого же телефона. Пауза AA глушила бы его,
+            // а MUSIC=1 в ответ уводит ГУ на CarLife-источник: оно ставит BT на паузу (лог 2026-10-31 20:58-21:07).
+            log("BRIDGE Honda 20772104: MODULE_CONTROL MUSIC=$status, звук по BT - AA не трогаю, CarLife-музыки нет", true)
+            return false
+        }
         if (HU_MUSIC_FOLLOW_ENABLED && status == 0 && carlifeStarted) {
             val p = peer
             if (meta.playing && !huPausedAa && p != null) {
@@ -522,7 +536,7 @@ class AaBridgeCore(
             requestMediaPause("ГУ MODULE_CONTROL MUSIC=0")
             return false
         }
-        if (HU_MUSIC_RESUME_ENABLED && status == 1 && huDesayG6S) {
+        if (HU_MUSIC_RESUME_ENABLED && status == 1 && (huDesayG6S || huHondaVezel)) {
             val now = clockMs()
             val p = peer
             if (huPausedAa && resumeOnHuMusic && p != null) {
@@ -536,6 +550,24 @@ class AaBridgeCore(
                 return true
             }
             if (now - lastHuResumeMs < HU_RESUME_ANSWER_MS) return true   // пачка MUSIC=1, пока AA раскачивается
+        }
+        // Honda Civic 2021 (h629, звук по BT): после задней плеер AA встаёт на паузу извне, через 50-100 мс ГУ шлёт MUSIC=1.
+        // Ответ MUSIC=0 ГУ повторяет раз, потом уходит на свой источник и обратно не возвращается (лог 2026-10-31).
+        if (HU_MUSIC_RESUME_ENABLED && status == 1 && huHonda20772104) {
+            val now = clockMs()
+            val p = peer
+            if (!meta.playing && p != null && now - lastExternalStopMs < HONDA_RESUME_AFTER_STOP_MS &&
+                now - lastHuResumeMs >= HONDA_RESUME_MIN_INTERVAL_MS) {
+                log("BRIDGE Honda 20772104: ГУ просит музыку (MUSIC=1) через ${now - lastExternalStopMs} мс после паузы AA извне: AA KEYCODE $KEYCODE_MEDIA_PLAY", true)
+                lastExternalStopMs = NEVER
+                huPausedAa = false
+                callPausedAa = false
+                resumeOnHuMusic = false
+                lastHuResumeMs = now
+                p.sendKey(KEYCODE_MEDIA_PLAY)
+                return true
+            }
+            if (now - lastHuResumeMs < HU_RESUME_ANSWER_MS) return true   // повтор MUSIC=1, пока AA раскачивается
         }
         return musicActive
     }
@@ -706,6 +738,8 @@ class AaBridgeCore(
         if (channel == MOBIS_NX4C_CHANNEL) enableMobisNx4c()
         if (channel == DESAY_G6S_CHANNEL) huDesayG6S = true
         if (channel == HONDA_20772121_CHANNEL || channel == HONDA_20832125_CHANNEL) huHonda20772121 = true
+        if (channel == HONDA_20832125_CHANNEL) huHondaVezel = true
+        if (channel == HONDA_20772104_CHANNEL) huHonda20772104 = true
         if (channel == MAZDA_20622111_CHANNEL && !huMazda20622111) {
             huMazda20622111 = true
             log("BRIDGE ГУ Mazda 20622111: VIDEO_DATA режу на куски ≤ $MAZDA_20622111_MAX_VIDEO_PACKET Б, потолок ${MAZDA_20622111_CEILING_BPS / 1000} кбит/с", true)
@@ -1535,6 +1569,9 @@ class AaBridgeCore(
         return true
     }
 
+    /** Civic 2021 (h629) со звуком по BT: музыку играет BT-источник ГУ, CarLife-музыку ему не заявляем. */
+    private val hondaBtMusic get() = huHonda20772104 && !audioViaUsb
+
     private fun musicStatus(status: Int) {
         if (MODULE_MUSIC_ENABLED) link.sendModuleStatus(CarlifeAudio.MODULE_MUSIC, status)
     }
@@ -1543,10 +1580,16 @@ class AaBridgeCore(
     private fun musicByState(playing: Boolean) {
         if (playing) releaseHuPause("AA заиграл")
         else {
+            val now = clockMs()
+            lastExternalStopMs = if (now - lastPauseKeyMs > USER_INPUT_WINDOW_MS && now - lastUserInputMs > USER_INPUT_WINDOW_MS) now else NEVER
             log("BRIDGE AA плеер остановился: наш KEYCODE $KEYCODE_MEDIA_PAUSE ${ago(lastPauseKeyMs)}, ввод пользователя ${ago(lastUserInputMs)}, BT HFP ${ago(lastHfpConnectMs)}", true)
             muteMediaOnCall("плеер AA остановился")
         }
         if (audioViaUsb || !MODULE_MUSIC_ENABLED || !carlifeStarted) return
+        if (hondaBtMusic) {
+            log("BRIDGE Honda 20772104: MODULE_STATUS MUSIC не шлю, звук по BT - ГУ держит свой BT-источник", false)
+            return
+        }
         if (link.sendModuleStatus(CarlifeAudio.MODULE_MUSIC, if (playing) 1 else 0)) {
             log("BRIDGE CarLife MODULE_STATUS MUSIC=${if (playing) 1 else 0} (плеер AA, звук не по USB)", true)
         }
@@ -2569,6 +2612,8 @@ class AaBridgeCore(
 
         const val BT_AUTOPLAY_WINDOW_MS = 20_000L
         const val USER_INPUT_WINDOW_MS = 3_000L
+        const val HONDA_RESUME_AFTER_STOP_MS = 3_000L      // MUSIC=1 от Honda 20772104 позже паузы AA извне - уже не про неё
+        const val HONDA_RESUME_MIN_INTERVAL_MS = 5_000L    // не чаще: если AA снова встаёт, не воевать с ним каждые 100 мс
         private const val REPAUSE_MIN_MS = 1_000L
 
         const val TTS_STOP_DELAY_MS = 1500L
@@ -2647,6 +2692,7 @@ class AaBridgeCore(
             channel != null && channel.length == 8 && HONDA_CHANNEL_PREFIXES.any { channel.startsWith(it) }
         const val HONDA_20772121_CHANNEL = "20772121"     // Honda Civic 11 2023 (Китай, h295): после камеры/меню ГУ не просит IDR
         const val HONDA_20832125_CHANNEL = "20832125"     // Honda Vezel (ГУ Егора): то же после заднего хода в passthrough, лог 26.10
+        const val HONDA_20772104_CHANNEL = "20772104"     // Honda Civic 2021 (Китай, h588/h629): после задней просит MUSIC=1
         /** Mazda Connect 2 (Китай, CarLife 1.0, HU_INFO из заглушек, h238/h359): VIDEO_DATA 16163 Б прошёл, 16518 и 19104 Б - ГУ перестала читать USB. */
         const val MAZDA_20622111_CHANNEL = "20622111"
         const val MAZDA_20622111_MAX_VIDEO_PACKET = 15_000

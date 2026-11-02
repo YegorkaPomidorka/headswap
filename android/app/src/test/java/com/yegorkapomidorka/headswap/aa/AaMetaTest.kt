@@ -1002,6 +1002,113 @@ class AaMetaTest {
     }
 
     @Test
+    fun vezelSoundKeyOffOnResumesAa() {
+        // Vezel (20832125): кнопка звука на ГУ - MUSIC=0, повторное нажатие - пачка MUSIC=1 (лог 30.10 11:10/11:26)
+        val r = Rig()
+        val peer = FakePeer()
+        r.core.peer = peer
+        r.core.onHuStatistic(AaBridgeCore.HONDA_20832125_CHANNEL)
+        r.start()
+        r.core.onMediaStatus(AaMeta.parseMediaStatus(status(2, 1))!!)
+        assertFalse(r.core.onCarlifeMusicControl(0))
+        assertEquals(listOf(127), peer.keys.toList())
+        r.now += 5000
+        assertTrue(r.core.onCarlifeMusicControl(1))
+        r.now += 100
+        assertTrue(r.core.onCarlifeMusicControl(1))
+        assertEquals("126 один раз", listOf(127, 126), peer.keys.toList())
+
+        // другая Honda без флага: как раньше, play не шлём
+        val q = Rig()
+        val qPeer = FakePeer()
+        q.core.peer = qPeer
+        q.core.onHuStatistic(AaBridgeCore.HONDA_20772121_CHANNEL)
+        q.start()
+        q.core.onMediaStatus(AaMeta.parseMediaStatus(status(2, 1))!!)
+        q.core.onCarlifeMusicControl(0)
+        q.now += 5000
+        assertFalse(q.core.onCarlifeMusicControl(1))
+        assertEquals(listOf(127), qPeer.keys.toList())
+    }
+
+    @Test
+    fun honda20772104ResumesAfterExternalPause() {
+        // Civic 2021 (h629, лог 31.10 12:29): после задней AA встаёт на паузу извне, через 100 мс ГУ шлёт MUSIC=1
+        val r = Rig()
+        val peer = FakePeer()
+        r.core.peer = peer
+        r.core.onHuStatistic(AaBridgeCore.HONDA_20772104_CHANNEL)
+        r.start()
+        assertFalse("свежая сессия: MUSIC=1 без паузы play не шлёт", r.core.onCarlifeMusicControl(1))
+        r.core.onMediaStatus(AaMeta.parseMediaStatus(status(2, 1))!!)
+        r.now += 60_000
+        r.core.onMediaStatus(AaMeta.parseMediaStatus(status(3, 2))!!)
+        r.now += 100
+        assertTrue(r.core.onCarlifeMusicControl(1))
+        r.now += 1300
+        assertTrue(r.core.onCarlifeMusicControl(1))
+        assertEquals("126 один раз", listOf(126), peer.keys.toList())
+
+        // пауза пользователем (кнопка с ГУ перед ней): MUSIC=1 play не шлёт
+        r.core.onMediaStatus(AaMeta.parseMediaStatus(status(2, 3))!!)
+        r.now += 10_000
+        r.core.onCarlifeVoiceKey()
+        r.now += 500
+        r.core.onMediaStatus(AaMeta.parseMediaStatus(status(3, 4))!!)
+        r.now += 100
+        assertFalse(r.core.onCarlifeMusicControl(1))
+        assertEquals(1, peer.keys.count { it == 126 })
+
+        // другая Honda без флага: как раньше
+        val q = Rig()
+        val qPeer = FakePeer()
+        q.core.peer = qPeer
+        q.core.onHuStatistic(AaBridgeCore.HONDA_20772121_CHANNEL)
+        q.start()
+        q.core.onMediaStatus(AaMeta.parseMediaStatus(status(2, 1))!!)
+        q.now += 60_000
+        q.core.onMediaStatus(AaMeta.parseMediaStatus(status(3, 2))!!)
+        q.now += 100
+        assertFalse(q.core.onCarlifeMusicControl(1))
+        assertTrue(qPeer.keys.isEmpty())
+    }
+
+    @Test
+    fun honda20772104BtAudioMusicOffDoesNotPauseAa() {
+        // Civic 2021 (h629, лог 31.10 18:14-18:25): звук по BT, MUSIC=0 - ГУ ушло на BT-аудио этого же телефона, 127 его глушил
+        val r = Rig()
+        val peer = FakePeer()
+        r.core.peer = peer
+        r.core.usbAudioEnabled = false
+        r.core.onHuStatistic(AaBridgeCore.HONDA_20772104_CHANNEL)
+        r.start()
+        r.core.onMediaStatus(AaMeta.parseMediaStatus(status(2, 1))!!)
+        assertFalse(r.core.onCarlifeMusicControl(0))
+        assertTrue("127 не шлём", peer.keys.isEmpty())
+
+        // лог 31.10 20:58-21:07: MUSIC=1 от нас уводил ГУ на CarLife-источник, BT вставал на паузу
+        assertTrue("MUSIC по плееру не заявляем", r.link.modules.none { it.first == CarlifeAudio.MODULE_MUSIC })
+        r.now += 60_000
+        r.core.onMediaStatus(AaMeta.parseMediaStatus(status(3, 2))!!)
+        r.now += 20
+        assertFalse("MODULE_CONTROL MUSIC=1: отвечаем 0", r.core.onCarlifeMusicControl(1))
+        r.now += 1300
+        assertFalse(r.core.onCarlifeMusicControl(1))
+        assertTrue("126 не шлём", peer.keys.isEmpty())
+        assertTrue(r.link.modules.none { it.first == CarlifeAudio.MODULE_MUSIC })
+
+        // звук по USB: как раньше, пауза
+        val q = Rig()
+        val qPeer = FakePeer()
+        q.core.peer = qPeer
+        q.core.onHuStatistic(AaBridgeCore.HONDA_20772104_CHANNEL)
+        q.start()
+        q.core.onMediaStatus(AaMeta.parseMediaStatus(status(2, 1))!!)
+        assertFalse(q.core.onCarlifeMusicControl(0))
+        assertEquals(listOf(127), qPeer.keys.toList())
+    }
+
+    @Test
     fun g6sMusicOnWithoutOurPauseDoesNotPlay() {
         // свежая сессия: пачка MUSIC=1 через ~2 с после HU_INFO, паузы нашей нет (h33: радио не глушить)
         val r = Rig()
