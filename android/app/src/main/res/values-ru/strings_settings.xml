@@ -257,4 +257,20 @@
     <string name="car_auto">Авто</string>
     <string name="car_value_keep">Без изменений</string>
     <string name="car_apply">Применить</string>
+
+    <!-- Режим моста: Android Auto / Headswap Desktop (SettingsSection.MODE) -->
+    <string name="bm_title">Режим</string>
+    <string name="bm_aa_note">Магнитола показывает Android Auto с телефона.</string>
+    <string name="bm_desktop_note">Магнитола показывает отдельный рабочий стол с приложениями телефона. Нужна разовая активация с ПК.</string>
+    <string name="bm_next_note">Смена применяется к следующему подключению, текущая сессия не прерывается.</string>
+    <string name="bm_need_13">Нужен Android 13+</string>
+    <string name="bm_sum_state">%1$s · %2$s</string>
+    <string name="bm_act_title">Активация с ПК</string>
+    <string name="bm_act_on">Активировано</string>
+    <string name="bm_act_off">Не активировано</string>
+    <string name="bm_act_lost">Доступ потерян, активируйте заново</string>
+    <string name="bm_act_hint">Подключите телефон к ПК с adb и выполните команду. Повторять после перезагрузки и обновления телефона.</string>
+    <string name="bm_act_copy">Скопировать</string>
+    <string name="bm_act_copied">Команда скопирована</string>
+    <string name="bm_act_copy_label">Активация Headswap Desktop</string>
 </resources>

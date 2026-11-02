@@ -2,6 +2,8 @@ package com.yegorkapomidorka.headswap.ui
 
 import android.Manifest
 import android.app.AlertDialog
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -25,6 +27,7 @@ import android.widget.PopupWindow
 import android.widget.ScrollView
 import android.widget.SeekBar
 import android.widget.TextView
+import android.widget.Toast
 import com.yegorkapomidorka.headswap.AppLocale
 import com.yegorkapomidorka.headswap.AppLog
 import com.yegorkapomidorka.headswap.AppTheme
@@ -35,6 +38,7 @@ import com.yegorkapomidorka.headswap.MainActivity
 import com.yegorkapomidorka.headswap.R
 import com.yegorkapomidorka.headswap.aa.AaDensity
 import com.yegorkapomidorka.headswap.aa.AaPrefs
+import com.yegorkapomidorka.headswap.aa.BridgeMode
 import com.yegorkapomidorka.headswap.aa.CAR_MAKES
 import com.yegorkapomidorka.headswap.aa.CallStateSource
 import com.yegorkapomidorka.headswap.aa.CarPreset
@@ -50,6 +54,9 @@ import com.yegorkapomidorka.headswap.aa.FpsSetting
 import com.yegorkapomidorka.headswap.aa.MicMode
 import com.yegorkapomidorka.headswap.aa.MusicRate
 import com.yegorkapomidorka.headswap.aa.VideoMode
+import com.yegorkapomidorka.headswap.dex.ActivationToken
+import com.yegorkapomidorka.headswap.dex.DelegatedDesktopAccess
+import com.yegorkapomidorka.headswap.dex.DexPrefs
 import com.yegorkapomidorka.headswap.link.car.CarNetwork
 import com.yegorkapomidorka.headswap.link.car.CarPairing
 import com.yegorkapomidorka.headswap.link.car.CarProfile
@@ -76,6 +83,8 @@ fun scaffold(ctx: Context, title: String, onBack: () -> Unit, body: View): Linea
 
 /** Разделы настроек: на главном экране по строке на каждый, внутри — свой экран (SettingsSectionScreen). */
 enum class SettingsSection(val key: String, val titleRes: Int, val iconRes: Int) {
+    /** Режим моста: Android Auto / Headswap Desktop и активация рабочего стола с ПК. */
+    MODE("mode", R.string.bm_title, R.drawable.ic_plug),
     APPEARANCE("appearance", R.string.set_sec_appearance, R.drawable.ic_palette),
     VIDEO("video", R.string.set_video, R.drawable.ic_video),
     SOUND("sound", R.string.set_sec_sound, R.drawable.ic_mic),
@@ -131,6 +140,13 @@ private val EQ_PRESETS = listOf(
 )
 
 private fun Context.eqPresetName(p: EqPreset): String = getString(EQ_PRESETS.first { it.first == p }.second)
+
+/** Состояние активации рабочего стола с ПК: подпись и цвет. Дёшево (проверка четырёх разрешений), годится для тикера. */
+private fun Context.desktopActivation(): Pair<String, Int> = when (DelegatedDesktopAccess.status(this)) {
+    DelegatedDesktopAccess.Status.READY -> getString(R.string.bm_act_on) to R.color.ok
+    DelegatedDesktopAccess.Status.PERMISSION_LOST -> getString(R.string.bm_act_lost) to R.color.warn
+    DelegatedDesktopAccess.Status.INACTIVE -> getString(R.string.bm_act_off) to R.color.warn
+}
 
 private fun Context.micMissing(aa: AaPrefs): Boolean =
     aa.micMode != MicMode.CAR && checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED
@@ -235,6 +251,14 @@ class SettingsScreen(host: MainActivity) : Screen(host) {
             if (tv.text.toString() != text) tv.text = text
             tv.setTextColor(c.clr(color))
         }
+        val bridgeMode = BridgeMode.effective(aa.bridgeMode, Build.VERSION.SDK_INT)
+        if (bridgeMode == BridgeMode.DESKTOP) {
+            val (act, actColor) = c.desktopActivation()
+            set(SettingsSection.MODE, c.getString(R.string.bm_sum_state, c.getString(R.string.bm_desktop), act), actColor)
+        } else {
+            set(SettingsSection.MODE, c.getString(R.string.bm_aa))
+        }
+
         val lang = c.getString(LANGS.firstOrNull { it.first == AppLocale.get(c) }?.second ?: R.string.lang_system)
         val theme = c.getString(THEMES.firstOrNull { it.first == AppTheme.get(c) }?.second ?: R.string.theme_system)
         set(SettingsSection.APPEARANCE, c.getString(R.string.set_sum_appearance, lang, theme))
@@ -359,6 +383,10 @@ class SettingsSectionScreen(host: MainActivity, val section: SettingsSection) : 
     private val micRows = HashMap<MicMode, RadioRow>()
     private val rateRows = LinkedHashMap<MusicRate, RadioRow>()
     private var makeValue: TextView? = null
+    private var modeSeg: Segmented? = null
+    private var modeNote: TextView? = null
+    private var actHost: LinearLayout? = null
+    private var actStatus: TextView? = null
     private var transcodeSeg: Segmented? = null
     private var transcodeDesc: View? = null
     private var directDesc: View? = null
@@ -412,6 +440,7 @@ class SettingsSectionScreen(host: MainActivity, val section: SettingsSection) : 
 
     init {
         when (section) {
+            SettingsSection.MODE -> buildMode()
             SettingsSection.APPEARANCE -> buildAppearance()
             SettingsSection.VIDEO -> buildVideo()
             SettingsSection.SOUND -> buildSound()
@@ -425,6 +454,7 @@ class SettingsSectionScreen(host: MainActivity, val section: SettingsSection) : 
     }
 
     override fun onShow() {
+        if (section == SettingsSection.MODE) refreshMode()      // активацию могли выполнить, пока экран был закрыт
         if (section == SettingsSection.VIDEO) refreshVideoMode()      // своё разрешение могли поменять в разделе для разработчиков
         refreshMic()
         refreshEq()
@@ -440,6 +470,7 @@ class SettingsSectionScreen(host: MainActivity, val section: SettingsSection) : 
     }
 
     override fun tick() {
+        if (section == SettingsSection.MODE) refreshMode()
         refreshUpdate()
         refreshWireless()
     }
@@ -663,6 +694,73 @@ class SettingsSectionScreen(host: MainActivity, val section: SettingsSection) : 
 
     private fun note(text: String, color: Int = R.color.on2): TextView =
         ctx.text(text, 13f, 400, ctx.clr(color)).also { body.addView(it, lp(WRAP, WRAP).margins(ctx, 8, 2, 8, 0)) }
+
+    // --- режим моста ---
+
+    private fun buildMode() {
+        val c = ctx
+        body.addView(c.sectionTitle(c.getString(R.string.bm_title)))
+        if (!BridgeMode.desktopSupported(Build.VERSION.SDK_INT)) {
+            // ниже Android 13 режим DESKTOP недоступен и трактуется как Android Auto
+            body.addView(c.text(c.getString(R.string.bm_need_13), 16f, 600, c.clr(R.color.warn)), lp(WRAP, WRAP).margins(c, 8, 4, 8, 0))
+            note(c.getString(R.string.bm_aa_note))
+            return
+        }
+        val seg = Segmented(c, listOf(c.getString(R.string.bm_aa), c.getString(R.string.bm_desktop)), 15f) { setBridgeMode(BridgeMode.values()[it]) }
+        modeSeg = seg
+        body.addView(seg.view, lp(MATCH, WRAP))
+        modeNote = note("")
+        note(c.getString(R.string.bm_next_note))
+        actHost = c.vbox(8).also { body.addView(it, lp(MATCH, WRAP)) }
+        refreshMode()
+    }
+
+    private fun setBridgeMode(m: BridgeMode) {
+        if (aa.bridgeMode == m) return
+        aa.bridgeMode = m
+        val running = BridgeService.alive && CarLifeState.running
+        AppLog.i("настройка: режим моста -> ${m.key}" + if (running) ", применится к следующему подключению (текущая сессия не прерывается)" else "")
+        refreshMode()
+    }
+
+    private fun refreshMode() {
+        val c = ctx
+        val seg = modeSeg ?: return
+        val desktop = aa.bridgeMode == BridgeMode.DESKTOP
+        seg.setSelected(if (desktop) 1 else 0)
+        modeNote?.text = c.getString(if (desktop) R.string.bm_desktop_note else R.string.bm_aa_note)
+        val box = actHost ?: return
+        if (!desktop) {
+            box.visibility = View.GONE
+            return
+        }
+        box.visibility = View.VISIBLE
+        if (box.childCount == 0) buildActivation(box)      // токен создаётся только когда блок впервые понадобился
+        val (text, color) = c.desktopActivation()
+        actStatus?.text = text
+        actStatus?.setTextColor(c.clr(color))
+    }
+
+    /** «Активация с ПК»: готовая команда adb из ActivationToken, копирование в буфер и подсказка. */
+    private fun buildActivation(box: LinearLayout) {
+        val c = ctx
+        box.addView(c.sectionTitle(c.getString(R.string.bm_act_title)))
+        actStatus = c.text("", 16f, 600).also { box.addView(it, lp(WRAP, WRAP).margins(c, 8, 2, 8, 0)) }
+        val command = ActivationToken(c).adbCommand(DexPrefs(c).usbPlaybackAudio)
+        box.addView(c.text(command, 12f, 400, monospace = true).apply {
+            setTextIsSelectable(true)
+            background = c.shape(c.clr(R.color.surf), 12)
+            pad(c, 12, 10, 12, 10)
+        }, lp(MATCH, WRAP).margins(c, 0, 4, 0, 0))
+        box.addView(c.tonalButton(c.getString(R.string.bm_act_copy)).apply {
+            setOnClickListener {
+                c.getSystemService(ClipboardManager::class.java)
+                    .setPrimaryClip(ClipData.newPlainText(c.getString(R.string.bm_act_copy_label), command))
+                Toast.makeText(c, R.string.bm_act_copied, Toast.LENGTH_SHORT).show()
+            }
+        }, lp(MATCH, WRAP).margins(c, 0, 4, 0, 0))
+        box.addView(c.text(c.getString(R.string.bm_act_hint), 13f, 400, c.clr(R.color.on2)), lp(WRAP, WRAP).margins(c, 8, 2, 8, 0))
+    }
 
     // --- язык и тема ---
 

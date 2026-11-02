@@ -1,5 +1,6 @@
 package com.yegorkapomidorka.headswap
 
+import android.app.KeyguardManager
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -14,6 +15,7 @@ import android.content.pm.ServiceInfo
 import android.hardware.usb.UsbManager
 import android.media.AudioManager
 import android.net.Network
+import android.os.Build
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
@@ -28,6 +30,8 @@ import com.yegorkapomidorka.headswap.aa.AaPrefs
 import com.yegorkapomidorka.headswap.aa.AaState
 import com.yegorkapomidorka.headswap.aa.AapOptions
 import com.yegorkapomidorka.headswap.aa.BridgeHost
+import com.yegorkapomidorka.headswap.aa.BridgeMode
+import com.yegorkapomidorka.headswap.aa.CallStateSource
 import com.yegorkapomidorka.headswap.aa.CarPreset
 import com.yegorkapomidorka.headswap.aa.EqLive
 import com.yegorkapomidorka.headswap.aa.MetaRelay
@@ -36,6 +40,17 @@ import com.yegorkapomidorka.headswap.aa.PhoneCall
 import com.yegorkapomidorka.headswap.aa.PhoneMicCapture
 import com.yegorkapomidorka.headswap.aa.RefDecoder
 import com.yegorkapomidorka.headswap.aa.VideoGeometry
+import com.yegorkapomidorka.headswap.dex.DelegatedDesktopAccess
+import com.yegorkapomidorka.headswap.dex.DelegatedDexConnector
+import com.yegorkapomidorka.headswap.dex.DesktopAccess
+import com.yegorkapomidorka.headswap.dex.DesktopAudioCapture
+import com.yegorkapomidorka.headswap.dex.DesktopAudioState
+import com.yegorkapomidorka.headswap.dex.DesktopFailure
+import com.yegorkapomidorka.headswap.dex.DesktopMusicPlayback
+import com.yegorkapomidorka.headswap.dex.DesktopRecoveryPolicy
+import com.yegorkapomidorka.headswap.dex.DexPrefs
+import com.yegorkapomidorka.headswap.dex.DexState
+import com.yegorkapomidorka.headswap.dex.UsbDetachPolicy
 import com.yegorkapomidorka.headswap.link.CarTransport
 import com.yegorkapomidorka.headswap.link.LinkSetupException
 import com.yegorkapomidorka.headswap.link.StreamTransport
@@ -79,6 +94,22 @@ class BridgeService : Service() {
     private var session: CarLifeSession? = null
     private var host: BridgeHost? = null
     private var stopRequested = false
+
+    // --- режим Headswap Desktop (BridgeMode.DESKTOP); в режиме Android Auto всё ниже не используется ---
+    /** Режим текущего/последнего AA- или desktop-хоста и сессии: снимается в startSession, не читается из prefs на лету. Только главная нить. */
+    private var hostMode = BridgeMode.ANDROID_AUTO
+    private var sessionMode = BridgeMode.ANDROID_AUTO
+    /** В этом экземпляре сервиса была desktop-сессия: onDestroy/finish чистят её глобальное состояние, даже если режим уже сменился. */
+    private var desktopUsed = false
+    private var desktopAudioImpl: DesktopAudioCapture? = null
+    private val desktopAudio: DesktopAudioCapture
+        get() = desktopAudioImpl ?: DesktopAudioCapture(applicationContext).also { desktopAudioImpl = it }
+    private var lastSessionWasUsb = false
+    private var physicalUsbDetached = false
+    private val desktopRecovery = DesktopRecoveryPolicy()
+    private data class Recovery(val attempt: DesktopRecoveryPolicy.Attempt, val session: CarLifeSession, val owner: BridgeHost)
+    private var pendingDesktopRecovery: Recovery? = null
+
     /** debug tcp6: слушатель ждёт 6/6 (нить debug-tcp6); Стоп его отменяет. */
     @Volatile private var pendingTcp6: Tcp6Listener? = null
     /** Идёт подъём tcp6/беспровода (от старта до 6/6 или отказа); сервис в это время не гасим. Только главная нить. */
@@ -152,10 +183,42 @@ class BridgeService : Service() {
         override fun onReceive(context: Context, intent: Intent) {
             if (intent.action == UsbManager.ACTION_USB_ACCESSORY_DETACHED) {
                 AppLog.i("USB_ACCESSORY_DETACHED")
+                if (sessionMode == BridgeMode.DESKTOP) {
+                    // старое сообщение не должно гасить новый аксессуар или беспроводную сессию: отсутствие проверяем по списку
+                    observePhysicalUsbDetach("USB accessory detached broadcast")
+                    return
+                }
                 // беспроводную сессию отключение USB-аксессуара не касается
                 session?.takeIf { it.transportKind == TransportCaps.USB_AOA.kind }?.close("аксессуар отключён (broadcast)")
             }
         }
+    }
+
+    /** Режим DESKTOP: USB остановлен физически; 8-секундный grace рабочего стола и активация остаются. */
+    private fun observePhysicalUsbDetach(reason: String): Boolean {
+        val present = runCatching { getSystemService(UsbManager::class.java).accessoryList.orEmpty().isNotEmpty() }.getOrNull()
+        if (!UsbDetachPolicy.confirmedDetached(lastSessionWasUsb, present)) return false
+        if (physicalUsbDetached) return true
+        physicalUsbDetached = true
+        DesktopMusicPlayback.physicalDetach(this)
+        cancelDesktopRecovery()
+        autoMode = false
+        wifiBMode = false
+        autoStarted = false
+        usbToAirPending = false
+        main.removeCallbacks(usbToAirTick)
+        getSystemService(NotificationManager::class.java).cancel(USB_TO_AIR_NOTIF_ID)
+        cancelAutoOff()
+        cancelHint()
+        stopCarNet(CarNetEvent.STOP, "usb-detach")
+        pendingTcp6?.abort()
+        CarLifeState.wireless = null
+        btProbe.stop("USB отключён")
+        AppLog.i("DESKTOP USB отключён: рабочий стол держу 8 с, активация остаётся ($reason)", false)
+        val current = session
+        if (current?.transportKind == TransportCaps.USB_AOA.kind) current.close("физически отключён USB")
+        else if (host == null) finish()      // grace и закрытие хоста ведёт сам BridgeHost
+        return true
     }
 
     override fun onCreate() {
@@ -170,6 +233,14 @@ class BridgeService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        if (intent?.action == ACTION_DESKTOP_HOME) {
+            // команда относится только к живой desktop-сессии: опоздавший клик не должен поднимать сервис и новый рабочий стол
+            val accepted = !stopRequested && session != null && host?.showDesktop() == true
+            AppLog.i("DESKTOP home request accepted=$accepted", false)
+            if (session == null && host == null && !linkWaiting) stopSelfResult(startId)
+            return stickiness()
+        }
+        DexState.desktopSession = foregroundMode() == BridgeMode.DESKTOP
         // startForegroundService требует startForeground в течение 5 с, делаем сразу
         val n = HeadswapNotification.build(this, CHANNEL, NOTIF_ID)
         if (intent == null) {
@@ -216,6 +287,10 @@ class BridgeService : Service() {
         if (intent?.action == ACTION_STOP) {
             AppLog.i("сервис: стоп по команде")
             stopRequested = true
+            if (sessionMode == BridgeMode.DESKTOP) {
+                DesktopMusicPlayback.cancel("explicit Stop")
+                cancelDesktopRecovery()
+            }
             wifiBMode = false
             autoMode = false      // до следующего ACL_CONNECTED
             autoStarted = false
@@ -245,6 +320,8 @@ class BridgeService : Service() {
         }
         if (session != null) {
             AppLog.i("сервис: сессия уже идёт, повторный старт игнорирую")
+            val wanted = BridgeMode.effective(AaPrefs(this).bridgeMode, Build.VERSION.SDK_INT)
+            if (wanted != sessionMode) AppLog.i("сервис: режим ${sessionMode.key} -> ${wanted.key}, применится к следующему подключению (текущая сессия не прерывается)")
             return
         }
 
@@ -816,6 +893,17 @@ class BridgeService : Service() {
         CarLifeState.wirelessSession = transport.caps.kind == TransportCaps.TCP6.kind
         if (transport.caps.kind != TransportCaps.TCP6.kind) WLog.begin(transport.caps.kind)
 
+        // режим моста снимается на подключение; DESKTOP на Android ниже 13 трактуется как Android Auto
+        val wantedMode = BridgeMode.effective(AaPrefs(this).bridgeMode, Build.VERSION.SDK_INT)
+        if (wantedMode == BridgeMode.DESKTOP && desktopNotActivated(transport)) return
+        reconcileHostMode(wantedMode)
+        sessionMode = wantedMode
+        DexState.desktopSession = wantedMode == BridgeMode.DESKTOP
+        if (wantedMode == BridgeMode.DESKTOP) {
+            startDesktopSession(transport)
+            return
+        }
+
         val aaPrefs = AaPrefs(this)
         val screenOn = getSystemService(PowerManager::class.java).isInteractive
         val cfg = SessionConfig(
@@ -881,6 +969,241 @@ class BridgeService : Service() {
         session = s
         s.start()
         h.onUsbSessionStarted()
+    }
+
+    /**
+     * Живой хост (grace после обрыва USB) другого режима новой сессии не годится: закрываем его, новый хост создастся
+     * под нужный режим и дождётся закрытия прежнего (previous). Хост того же режима не трогаем.
+     */
+    private fun reconcileHostMode(wanted: BridgeMode) {
+        val h = host
+        if (h != null && !h.isDead && !BridgeMode.hostReusable(hostMode, wanted)) {
+            AppLog.i("BRIDGE: режим сменился (${hostMode.key} -> ${wanted.key}), прежний хост закрываю")
+            h.shutdown("смена режима")
+        }
+        hostMode = wanted
+    }
+
+    /** Режим, под который сейчас работает сервис: идущая сессия держит свой, иначе берём настройку. */
+    private fun foregroundMode(): BridgeMode =
+        if (session != null) sessionMode else BridgeMode.effective(AaPrefs(this).bridgeMode, Build.VERSION.SDK_INT)
+
+    /**
+     * Режим DESKTOP без активации с ПК: сессия не стартует, причина в логе, статусе и отдельном уведомлении
+     * (foreground-уведомление уйдёт вместе с сервисом). true = старт отменён.
+     */
+    private fun desktopNotActivated(transport: CarTransport): Boolean {
+        if (DesktopAccess.isReady(this)) return false
+        val msg = getString(R.string.desk_not_activated)
+        AppLog.i("DESKTOP: сессия не стартует, доступ не активирован (${DelegatedDesktopAccess.status(this)}): $msg")
+        DexState.error = msg
+        CarLifeState.status = msg
+        transport.close()
+        val open = PendingIntent.getActivity(
+            this, 6, Intent(this, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP),
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+        )
+        val n = Notification.Builder(this, CHANNEL)
+            .setSmallIcon(R.drawable.ic_stat_headswap)
+            .setContentTitle(getString(R.string.desk_notif_title))
+            .setContentText(msg)
+            .setStyle(Notification.BigTextStyle().bigText(msg))
+            .setContentIntent(open)
+            .setAutoCancel(true)
+            .build()
+        getSystemService(NotificationManager::class.java).notify(DESKTOP_NOT_ACTIVATED_NOTIF_ID, n)
+        failStart()
+        return true
+    }
+
+    /** Сессия в режиме DESKTOP (DelegatedDexConnector вместо AA): видео с виртуального дисплея, CarLife-звук по настройке. */
+    private fun startDesktopSession(transport: CarTransport) {
+        getSystemService(NotificationManager::class.java).cancel(DESKTOP_NOT_ACTIVATED_NOTIF_ID)
+        desktopUsed = true
+        val isUsb = transport.caps.kind == TransportCaps.USB_AOA.kind
+        lastSessionWasUsb = isUsb
+        physicalUsbDetached = false
+        DexState.error = null
+
+        val aaPrefs = AaPrefs(this)
+        val dexPrefs = DexPrefs(this)
+        val desktopVideo = dexPrefs.desktopVideoSelection()
+        val screenOn = getSystemService(PowerManager::class.java).isInteractive
+        val cfg = SessionConfig(
+            screenOn, false, dexPrefs.desktopFps,
+            metaMusic = false, metaNavi = false, naviField6 = aaPrefs.naviField6, desktopVideo = desktopVideo,
+        )
+        MetaRelay.PROGRESS_UNIT = if (aaPrefs.progressSeconds) 1 else 1000
+
+        // новое физическое подключение: бюджет восстановления заново; восстановление его не обновляет
+        cancelDesktopRecovery()
+        desktopRecovery.newConnection()
+        // источник рабочего стола переживает короткий обрыв USB в grace BridgeHost
+        var h = host
+        val wantGeometry: VideoGeometry = desktopVideo.initialGeometry()
+        val wantDensity = desktopVideo.densityFor(wantGeometry)
+        if (h == null || h.isDead) {
+            h = createDesktopHost(aaPrefs, wantGeometry, wantDensity, previous = h)
+            host = h
+            if (h == null) {
+                // источник не собрался: открытый USB без видео оставлять нельзя
+                transport.close()
+                CarLifeState.status = AaState.setupError ?: "мост не стартовал"
+                failStart()
+                return
+            }
+        } else {
+            AppLog.i("DEX: источник уже есть, переиспользую (grace=${h.isInGrace})")
+        }
+        val owner: BridgeHost = h
+        // темп кадров CarLife, повтор статичных кадров и энкодер остаются как в основном видеоконвейере
+        owner.core.transcodeEnabled = true
+        owner.core.spliceMs = 0L
+        owner.core.carVwId = aaPrefs.carPreset == CarPreset.VW_ID_UNYX
+        if (wakeLock == null) {
+            wakeLock = getSystemService(PowerManager::class.java)
+                .newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "headswap:session")
+                .apply { acquire(4 * 60 * 60 * 1000L) }
+        }
+        CarLifeState.running = true
+        stopRequested = false
+
+        val sref = arrayOfNulls<CarLifeSession>(1)
+        val s = CarLifeSession(transport, cfg, owner.core, PhoneThermal(this), CallStateSource.NONE, onHuSize = { w, hh -> aaPrefs.saveHuSize(w, hh) }) { reason -> main.post { onSessionClosed(sref[0]!!, reason) } }
+        sref[0] = s
+        session = s
+        DesktopMusicPlayback.attach(applicationContext, this, s, isUsb,
+            ready = { session === s && DexState.running && s.hasFreshDesktopVideo() },
+            audioReady = { !DexPrefs(this).usbPlaybackAudio || !owner.core.audioViaUsb || DesktopAudioState.running })
+        desktopAudio.attach(owner.core, isUsb) { session === s && s.canCaptureDesktopAudio() }
+        s.start()
+        owner.onUsbSessionStarted()
+    }
+
+    /** Режим DESKTOP использует видеоконвейер CarLife; сертификаты Android Auto не нужны. */
+    private fun createDesktopHost(
+        aaPrefs: AaPrefs, mode: VideoGeometry, densityOverride: Int, previous: BridgeHost?, recoveredCore: AaBridgeCore? = null,
+    ): BridgeHost? {
+        return try {
+            AaState.setupError = null
+            AaState.reset()
+            AaState.cert = getString(R.string.desk_cert_na)
+            AaState.status = "рабочий стол: подключение"
+            val log = { line: String, ui: Boolean -> AppLog.i(line, ui) }
+            val core = recoveredCore ?: AaBridgeCore(
+                log,
+                clockUs = { SystemClock.elapsedRealtimeNanos() / 1_000 },
+                connectingText = getString(R.string.desk_connecting),
+                waitingText = getString(R.string.desk_waiting_frame),
+                disconnectedText = getString(R.string.desk_disconnected),
+            )
+            core.micModeProvider = { MicMode.CAR }
+            core.phoneMic = null
+            core.usbAudioEnabled = false
+            core.mapHomeKey = true
+            core.desktopInputEnabled = true
+            core.touchDecimationProvider = { aaPrefs.touchDecimation }
+            core.transcodeEnabled = true
+            core.refDecoderFactory = { sink -> RefDecoder(sink) { AppLog.i(it, false) } }
+            core.videoMode = mode
+            core.densityOverride = densityOverride
+            core.marginsAtBottom = false
+            core.spliceMs = 0L
+            core.expectFeatureConfig = false
+            val ref = arrayOfNulls<BridgeHost>(1)
+            val conn = DelegatedDexConnector(applicationContext, core) { reason ->
+                main.post { ref[0]?.let { onDesktopSourceFailed(it, reason) } }
+            }
+            AppLog.i("DEX: видео ${mode.outW}x${mode.outH} через CarLife; звук по USB по настройке; микрофон CarLife не передаётся")
+            val h = BridgeHost(core, conn, scheduler, log, previous = previous, onTornDown = {
+                main.post { ref[0]?.let(::onDesktopHostTornDown) }
+            })
+            ref[0] = h
+            h
+        } catch (e: Exception) {
+            AppLog.e("DEX: мост не стартовал", e)
+            DexState.error = "${e.javaClass.simpleName}: ${e.message}"
+            AaState.setupError = DexState.error
+            AaState.status = "ошибка: рабочий стол не стартовал"
+            null
+        }
+    }
+
+    /** Всё состояние восстановления принадлежит сервису, а не Activity. */
+    private fun canRecoverDesktop(current: CarLifeSession): Boolean = runCatching {
+        alive && !stopRequested && session === current &&
+            current.transportKind == TransportCaps.USB_AOA.kind && DesktopAccess.isReady(this) &&
+            getSystemService(PowerManager::class.java).isInteractive &&
+            !getSystemService(KeyguardManager::class.java).isDeviceLocked &&
+            getSystemService(UsbManager::class.java).let { usb ->
+                usb.accessoryList.orEmpty().any { usb.hasPermission(it) }
+            }
+    }.getOrDefault(false)
+
+    private fun onDesktopSourceFailed(owner: BridgeHost, reason: DesktopFailure) {
+        if (host !== owner) {
+            // переподключение могло уже заменить завершённый хост: закрываем только защёлку старого, её может ждать преемник
+            owner.shutdown("завершение предыдущего источника")
+            return
+        }
+        val current = session
+        val attempt = desktopRecovery.begin(reason == DesktopFailure.HELPER_UNAVAILABLE && current != null && canRecoverDesktop(current))
+        if (attempt != null && current != null) {
+            pendingDesktopRecovery = Recovery(attempt, current, owner)
+            AppLog.i("DESKTOP recovery planned attempt=${attempt.number}/2; server ready, keep CarLife transport", false)
+        }
+        // TerminalSource не даёт переиспользовать хост в grace ещё до этого колбэка
+        owner.shutdown("источник рабочего стола завершился")
+    }
+
+    private fun onDesktopHostTornDown(owner: BridgeHost) {
+        if (host === owner) host = null
+        AppLog.i("DEX: источник закрыт")
+        val recovery = pendingDesktopRecovery
+        if (recovery != null && recovery.owner === owner && desktopRecovery.isCurrent(recovery.attempt)) {
+            // колбэк подтверждает закрытие и привилегированного производителя, и энкодера с Surface
+            DexState.error = null
+            DexState.status = getString(R.string.desk_recovering, recovery.attempt.number)
+            main.postDelayed({ recoverDesktop(recovery) }, recovery.attempt.delayMs)
+        }
+        if (session == null && host == null && !linkWaiting && !wifiBMode && !usbToAirPending) finish()
+    }
+
+    private fun recoverDesktop(recovery: Recovery) {
+        if (pendingDesktopRecovery !== recovery || !desktopRecovery.consume(recovery.attempt)) return
+        pendingDesktopRecovery = null
+        if (host != null || session !== recovery.session || !recovery.owner.isTornDown) return
+        // после паузы проверяем заново: Стоп, отключение, отозванный доступ, смерть сервера или блокировка отменяют восстановление
+        if (!canRecoverDesktop(recovery.session)) {
+            DexState.error = getString(R.string.desk_recovery_stopped)
+            AppLog.i("DESKTOP recovery cancelled: current session/access no longer eligible", false)
+            return
+        }
+        val core = recovery.owner.core
+        if (!core.rearmDesktopSurfaceAfterStop()) {
+            DexState.error = getString(R.string.desk_recovery_screen_busy)
+            return
+        }
+        val replacement = createDesktopHost(AaPrefs(this), core.videoMode, core.densityOverride,
+            previous = recovery.owner, recoveredCore = core) ?: return
+        host = replacement
+        AppLog.i("DESKTOP recovery bind attempt=${recovery.attempt.number}/2; fresh producer and encoder generation", false)
+        replacement.onUsbSessionStarted()
+    }
+
+    private fun cancelDesktopRecovery() {
+        pendingDesktopRecovery = null
+        desktopRecovery.cancel()
+    }
+
+    /** Закрытие сессии режима DESKTOP: физический detach USB, звук, музыка, восстановление. */
+    private fun onDesktopSessionClosing(s: CarLifeSession) {
+        if (!stopRequested && s.transportKind == TransportCaps.USB_AOA.kind) {
+            observePhysicalUsbDetach("USB session closed and accessory absent")
+        }
+        desktopAudioImpl?.detach()
+        DesktopMusicPlayback.linkClosed(s)
+        cancelDesktopRecovery()
     }
 
     /** Новый AA-хост: ядро, коннектор, сертификаты. null = мост не поднялся (причина в AaState.setupError). */
@@ -956,6 +1279,11 @@ class BridgeService : Service() {
      * не даёт (while-in-use) - тогда остаёмся на connectedDevice.
      */
     private fun startForegroundTyped(n: Notification) {
+        if (foregroundMode() == BridgeMode.DESKTOP) {
+            // Headswap Desktop не снимает микрофон ни телефона, ни ГУ: только connectedDevice
+            startForeground(NOTIF_ID, n, ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE)
+            return
+        }
         var type = ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE
         val micWanted = AaPrefs(this).micMode != MicMode.CAR &&
             checkSelfPermission(android.Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
@@ -980,6 +1308,7 @@ class BridgeService : Service() {
     private fun onSessionClosed(s: CarLifeSession, reason: String) {
         AppLog.i("сервис: сессия завершена ($reason)")
         if (session !== s) return
+        if (sessionMode == BridgeMode.DESKTOP) onDesktopSessionClosing(s)
         session = null
         markCarSeen()
         CarLifeState.wirelessSession = false
@@ -1005,6 +1334,12 @@ class BridgeService : Service() {
         } else {
             // обрыв USB: CarLife закрыт, AA держим graceMs (или закрываем сразу, если Стоп)
             h.onUsbSessionClosed(immediate = stopRequested)
+            if (sessionMode == BridgeMode.DESKTOP && !stopRequested && s.transportKind == TransportCaps.USB_AOA.kind) {
+                // часть прошивок обновляет accessoryList чуть позже сообщения об ошибке чтения
+                for (delay in longArrayOf(250, 1000)) main.postDelayed({
+                    if (!stopRequested && session == null && host === h) observePhysicalUsbDetach("post-close USB absence check")
+                }, delay)
+            }
         }
         if (wifiBMode && !stopRequested) {
             // беспровод: ГУ ушла (обрыв Wi-Fi, выключили машину) - снова маяк и ожидание, AA пока тёплая (grace)
@@ -1017,6 +1352,7 @@ class BridgeService : Service() {
     }
 
     private fun finish() {
+        if (desktopUsed) cancelDesktopRecovery()
         stopCarNet(CarNetEvent.STOP, "finish")
         CarLifeState.running = false
         try {
@@ -1042,6 +1378,11 @@ class BridgeService : Service() {
         pendingTcp6?.abort()
         btProbe.stop("сервис уничтожен")
         audioDiag.stop()
+        if (desktopUsed) {
+            cancelDesktopRecovery()
+            desktopAudioImpl?.close()
+            DesktopMusicPlayback.serviceDestroyed(this, physicalUsbDetached)
+        }
         session?.close("сервис уничтожен")
         host?.shutdown("сервис уничтожен")
         super.onDestroy()
@@ -1051,6 +1392,8 @@ class BridgeService : Service() {
 
     companion object {
         const val ACTION_STOP = "com.yegorkapomidorka.headswap.STOP"
+        /** Режим DESKTOP: показать рабочий стол (кнопка HOME для идущей сессии). Только к живой сессии, сервис сам не поднимает. */
+        const val ACTION_DESKTOP_HOME = "com.yegorkapomidorka.headswap.DESKTOP_HOME"
         /** Беспровод (бета): ждать машину по Wi-Fi, ветка B (хотспот телефона + маяк). */
         const val ACTION_WIFI_B = "com.yegorkapomidorka.headswap.WIFI_B"
         /** Выбранная машина подключилась по Bluetooth (ACL_CONNECTED): ждать по Wi-Fi, пока она рядом. */
@@ -1067,6 +1410,12 @@ class BridgeService : Service() {
         private const val USB_TO_AIR_NOTIF_MS = 60_000L
         private const val BT_HINT_NOTIF_ID = 3
         private const val WIFI_OFF_NOTIF_ID = 4
+        private const val DESKTOP_NOT_ACTIVATED_NOTIF_ID = 6
+
+        /** Из UI (приложение на экране): startService, не startForegroundService, чтобы не требовать startForeground для команды без сессии. */
+        fun requestDesktopHome(ctx: Context) {
+            ctx.startService(Intent(ctx, BridgeService::class.java).setAction(ACTION_DESKTOP_HOME))
+        }
 
         /** Сервис создан и не уничтожен (один процесс): ресиверу ACL незачем будить пустой сервис ради отбоя. */
         @Volatile var alive = false

@@ -63,4 +63,6 @@ object DexState {
     @Volatile var error: String? = null
     @Volatile var running: Boolean = false
     @Volatile var displayId: Int = -1
+    /** Сервис моста сейчас работает в режиме Headswap Desktop: уведомление показывает статус рабочего стола, а не AA. */
+    @Volatile var desktopSession: Boolean = false
 }
