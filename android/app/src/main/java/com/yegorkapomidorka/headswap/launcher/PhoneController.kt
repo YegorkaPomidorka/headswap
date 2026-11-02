@@ -130,7 +130,7 @@ internal object PhoneController {
                 arrayOf(CallLog.Calls.NUMBER, CallLog.Calls.CACHED_NAME, CallLog.Calls.TYPE, CallLog.Calls.DATE), args, null,
             )?.use { c ->
                 buildList {
-                    while (c.moveToNext()) add(CallRecord(c.getString(0).orEmpty(), c.getString(1), CallType.fromLog(c.getInt(2)), c.getLong(3)))
+                    while (size < CALLS_LIMIT && c.moveToNext()) add(CallRecord(c.getString(0).orEmpty(), c.getString(1), CallType.fromLog(c.getInt(2)), c.getLong(3)))
                 }
             }.orEmpty()
         }.getOrElse { Log.w(TAG, "call log: ${it.javaClass.simpleName}"); emptyList() }
@@ -152,7 +152,7 @@ internal object PhoneController {
             )?.use { c ->
                 val seen = HashSet<Long>()
                 buildList {
-                    while (c.moveToNext()) {
+                    while (seen.size < CONTACTS_LIMIT && c.moveToNext()) {
                         val id = c.getLong(0)
                         if (seen.add(id)) add(ContactRecord(id, c.getString(1).orEmpty(), c.getString(2).orEmpty()))
                     }

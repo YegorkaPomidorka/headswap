@@ -57,7 +57,7 @@ object LauncherActions {
     /** Выбранный плеер запоминается и становится текущим: играет сразу, если у него есть сессия или MediaBrowserService. */
     fun choosePlayer(pkg: String) {
         model.chooseMusicPlayer(pkg)
-        kotlin.concurrent.thread(name = "headswap-launcher-player") { MusicController.startPlayer(model.context, pkg) }
+        MusicController.startPlayer(model.context, pkg) // главный поток: MediaBrowser создаёт Handler, connect асинхронный
         model.home()
     }
 

@@ -104,12 +104,18 @@ internal object EmbedHost {
 
     fun textureAvailable(slot: EmbedSlot, texture: SurfaceTexture) {
         worker.post {
-            synchronized(slot.lock) {
-                if (slot.texture !== texture) {
-                    dropSurface(slot)
+            val old = synchronized(slot.lock) {
+                val previous = slot.texture
+                if (previous !== texture) {
                     slot.texture = texture
                     slot.textureDisplay = DexState.displayId
                 }
+                previous.takeIf { it !== texture }
+            }
+            if (old != null) {
+                // окно жило на прежней поверхности: освобождаем его по-настоящему, reconcile создаст новое на этой
+                if (slot.handle > 0) releaseLease(slot) else dropSurface(slot)
+                runCatching { old.release() }
             }
             reconcile(slot)
         }

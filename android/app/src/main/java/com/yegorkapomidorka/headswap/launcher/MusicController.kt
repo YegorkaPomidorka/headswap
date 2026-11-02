@@ -119,19 +119,22 @@ internal object MusicController {
 
     /** Сделать плеер текущим: если сессия уже есть - играть, иначе разбудить его MediaBrowserService и нажать play. */
     fun startPlayer(ctx: Context, pkg: String) {
-        controller?.takeIf { it.packageName == pkg }?.let { runCatching { it.transportControls.play() }; return }
-        val svc = runCatching {
-            ctx.packageManager.queryIntentServices(Intent(MediaBrowserService.SERVICE_INTERFACE), 0)
-                .firstOrNull { it.serviceInfo.packageName == pkg }?.serviceInfo
-        }.getOrNull() ?: return
-        lateinit var browser: MediaBrowser
-        browser = MediaBrowser(ctx, ComponentName(pkg, svc.name), object : MediaBrowser.ConnectionCallback() {
-            override fun onConnected() {
-                runCatching { MediaController(ctx, browser.sessionToken).transportControls.play() }
-                browser.disconnect()
-            }
-            override fun onConnectionFailed() { Log.w(TAG, "player $pkg refused the browser connection") }
-        }, null)
-        runCatching { browser.connect() }
+        // Только главный поток (у MediaBrowser Handler); любое исключение здесь убило бы весь процесс моста.
+        try {
+            controller?.takeIf { it.packageName == pkg }?.let { it.transportControls.play(); return }
+            val svc = ctx.packageManager.queryIntentServices(Intent(MediaBrowserService.SERVICE_INTERFACE), 0)
+                .firstOrNull { it.serviceInfo.packageName == pkg }?.serviceInfo ?: return
+            lateinit var browser: MediaBrowser
+            browser = MediaBrowser(ctx, ComponentName(pkg, svc.name), object : MediaBrowser.ConnectionCallback() {
+                override fun onConnected() {
+                    runCatching { MediaController(ctx, browser.sessionToken).transportControls.play() }
+                    runCatching { browser.disconnect() }
+                }
+                override fun onConnectionFailed() { Log.w(TAG, "player $pkg refused the browser connection") }
+            }, null)
+            browser.connect()
+        } catch (e: Exception) {
+            Log.w(TAG, "startPlayer $pkg: ${e.javaClass.simpleName}")
+        }
     }
 }
