@@ -184,7 +184,8 @@ fun Pressable(
             }
             .pointerInput(Unit) {
                 awaitEachGesture {
-                    val down = awaitFirstDown(requireUnconsumed = false)
+                    // потреблённый DOWN - чужой (вложенная кнопка уже забрала касание)
+                    val down = awaitFirstDown()
                     if (!on.value) return@awaitEachGesture
                     down.consume()
                     pressed = true

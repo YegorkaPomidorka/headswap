@@ -9,6 +9,7 @@ import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.geometry.Rect
@@ -26,6 +27,8 @@ sealed interface Area {
     data object Picker : Area
     data object Settings : Area
     data object Calls : Area
+    /** Список медиаприложений (переключатель плееров на карточке музыки). */
+    data object Players : Area
     /** Навигатор, развёрнутый на всю область. */
     data object Navigator : Area
     /** Чужое приложение в дочернем окне. */
@@ -85,6 +88,7 @@ internal object LauncherModel {
         apps = prefs.apps
         savedNavigator = prefs.navigator
         musicPlayer = prefs.musicPlayer
+        missedSeenMs = prefs.missedSeenMs
         ready = true
         reloadCatalog()
     }
@@ -106,6 +110,24 @@ internal object LauncherModel {
         }
     }
 
+    fun packageLabel(pkg: String): String =
+        runCatching { appCtx.packageManager.getApplicationLabel(appCtx.packageManager.getApplicationInfo(pkg, 0)).toString() }
+            .getOrDefault(pkg)
+
+    fun loadPackageIcon(pkg: String): ImageBitmap? {
+        icons["pkg:$pkg"]?.let { return it }
+        val drawable = runCatching { appCtx.packageManager.getApplicationIcon(pkg) }.getOrNull() ?: return null
+        return drawableToImage(drawable).also { icons["pkg:$pkg"] = it }
+    }
+
+    private fun drawableToImage(drawable: android.graphics.drawable.Drawable): ImageBitmap {
+        val size = 144
+        val bmp = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
+        drawable.setBounds(0, 0, size, size)
+        drawable.draw(Canvas(bmp))
+        return bmp.asImageBitmap()
+    }
+
     fun label(ref: AppRef): String? = catalog.firstOrNull { it.packageName == ref.pkg && it.className == ref.cls }?.label
 
     /** Список пользователя без удалённых из системы приложений. */
@@ -120,9 +142,14 @@ internal object LauncherModel {
     fun nextCardView() { cardView = cardView.next().also { prefs.cardView = it } }
     fun setNavigator(pkg: String?) { savedNavigator = pkg; prefs.navigator = pkg }
     fun chooseMusicPlayer(pkg: String?) { musicPlayer = pkg; prefs.musicPlayer = pkg }
-    var missedSeenMs: Long
-        get() = prefs.missedSeenMs
-        set(value) { prefs.missedSeenMs = value }
+    /** Пропущенные не новее этого момента просмотрены: счётчик сбрасывается после тапа по карточке. */
+    var missedSeenMs by mutableLongStateOf(0L)
+        private set
+    fun markMissedSeen() {
+        val now = System.currentTimeMillis()
+        missedSeenMs = now
+        prefs.missedSeenMs = now
+    }
 
     /** Установленные известные навигаторы (по каталогу приложений с лаунчерным входом). */
     val installedPackages: Set<String> get() = catalog.mapTo(HashSet()) { it.packageName }
@@ -145,10 +172,6 @@ internal object LauncherModel {
         icons[ref.key]?.let { return it }
         val drawable = runCatching { appCtx.packageManager.getActivityIcon(ComponentName(ref.pkg, ref.cls)) }.getOrNull()
             ?: return null
-        val size = 144
-        val bmp = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
-        drawable.setBounds(0, 0, size, size)
-        drawable.draw(Canvas(bmp))
-        return bmp.asImageBitmap().also { icons[ref.key] = it }
+        return drawableToImage(drawable).also { icons[ref.key] = it }
     }
 }

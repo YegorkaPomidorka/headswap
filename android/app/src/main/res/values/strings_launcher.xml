@@ -51,6 +51,7 @@
     <string name="l_hangup">End call</string>
     <string name="l_cancel_call">Cancel call</string>
     <string name="l_mute">Mute microphone</string>
+    <string name="l_yesterday">yesterday</string>
     <string name="l_call_missed">Missed</string>
     <string name="l_call_incoming">Incoming</string>
     <string name="l_call_outgoing">Outgoing</string>

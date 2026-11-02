@@ -8,7 +8,18 @@ object LauncherActions {
     fun openAllApps() { model.go(Area.AllApps) }
     fun openPicker() { model.go(Area.Picker) }
     fun openSettings() { model.settingsPage = SettingsPage.MAIN; model.go(Area.Settings) }
-    fun openCalls() { model.go(Area.Calls) }
+    /** Тап по карточке «Телефон»: экран «Вызовы»; пропущенные считаются просмотренными. */
+    fun openCalls() {
+        model.markMissedSeen()
+        model.go(Area.Calls)
+    }
+
+    /** «Перезвонить» / «Позвонить»: звонок на номер, счётчик пропущенных сбрасывается. */
+    fun callBack(number: String) {
+        if (!model.launchDebounce.allow(model.now())) return
+        model.markMissedSeen()
+        PhoneController.dial(model.context, number)
+    }
     fun cycleCardView() { model.nextCardView() }
 
     fun addApp(ref: AppRef) {
@@ -32,6 +43,22 @@ object LauncherActions {
         model.starting = model.label(ref) ?: ref.pkg
         model.appKey = ref.key
         model.go(Area.App(ref))
+    }
+
+    /** Тап по телу карточки музыки: приложение плеера на весь экран справа от рейки. */
+    fun openMusicApp() {
+        val pkg = MusicController.state.pkg ?: model.musicPlayer ?: return
+        val entry = model.catalog.firstOrNull { it.packageName == pkg } ?: return
+        openApp(AppRef(entry.packageName, entry.className))
+    }
+
+    fun openPlayers() { model.go(Area.Players) }
+
+    /** Выбранный плеер запоминается и становится текущим: играет сразу, если у него есть сессия или MediaBrowserService. */
+    fun choosePlayer(pkg: String) {
+        model.chooseMusicPlayer(pkg)
+        kotlin.concurrent.thread(name = "headswap-launcher-player") { MusicController.startPlayer(model.context, pkg) }
+        model.home()
     }
 
     /** Блок навигации рейки и тап по карточке: навигатор на всю область справа от рейки. */

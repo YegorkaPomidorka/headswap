@@ -387,6 +387,7 @@ class SettingsSectionScreen(host: MainActivity, val section: SettingsSection) : 
     private var modeNote: TextView? = null
     private var actHost: LinearLayout? = null
     private var actStatus: TextView? = null
+    private var phoneCardNote: TextView? = null
     private var transcodeSeg: Segmented? = null
     private var transcodeDesc: View? = null
     private var directDesc: View? = null
@@ -477,6 +478,7 @@ class SettingsSectionScreen(host: MainActivity, val section: SettingsSection) : 
 
     override fun onPermissionResult() {
         refreshMic()
+        refreshPhoneCardPermissions()
         onCallsPermissionResult()
         if (wlAwaitingPermission) {
             wlAwaitingPermission = false
@@ -682,6 +684,12 @@ class SettingsSectionScreen(host: MainActivity, val section: SettingsSection) : 
         const val REQ_CAR_BT = 39
         /** READ_PHONE_STATE при включении «Сообщать ГУ о звонках»; тот же код, что MainActivity.REQ_PHONE_STATE (лог результата). */
         const val REQ_PHONE_STATE = 40
+        /** Разрешения карточки «Телефон» лаунчера Headswap Desktop. */
+        const val REQ_PHONE_CARD = 41
+        val PHONE_CARD_PERMISSIONS = listOf(
+            Manifest.permission.READ_PHONE_STATE, Manifest.permission.READ_CALL_LOG, Manifest.permission.READ_CONTACTS,
+            Manifest.permission.CALL_PHONE, Manifest.permission.ANSWER_PHONE_CALLS,
+        )
         /** Проверка Wi-Fi машины из настроек: сколько ждём одобрения и входа, и сколько держим сеть после входа. */
         const val CW_CHECK_TIMEOUT_MS = 60_000L
         const val CW_CHECK_HOLD_MS = 5_000L
@@ -760,6 +768,30 @@ class SettingsSectionScreen(host: MainActivity, val section: SettingsSection) : 
             }
         }, lp(MATCH, WRAP).margins(c, 0, 4, 0, 0))
         box.addView(c.text(c.getString(R.string.bm_act_hint), 13f, 400, c.clr(R.color.on2)), lp(WRAP, WRAP).margins(c, 8, 2, 8, 0))
+        // карточка «Телефон» лаунчера: журнал вызовов, контакты, звонок и ответ с экрана ГУ
+        box.addView(c.tonalButton(c.getString(R.string.l_perm_button)).apply {
+            setOnClickListener { requestPhoneCardPermissions() }
+        }, lp(MATCH, WRAP).margins(c, 0, 12, 0, 0))
+        phoneCardNote = note(c.getString(R.string.l_perm_summary))
+        refreshPhoneCardPermissions()
+    }
+
+    private fun missingPhoneCardPermissions(): List<String> = PHONE_CARD_PERMISSIONS.filter {
+        ctx.checkSelfPermission(it) != PackageManager.PERMISSION_GRANTED
+    }
+
+    private fun requestPhoneCardPermissions() {
+        val ask = missingPhoneCardPermissions()
+        if (ask.isEmpty()) {
+            Toast.makeText(ctx, R.string.l_perm_granted, Toast.LENGTH_SHORT).show()
+            return
+        }
+        host.requestPermissions(ask.toTypedArray(), REQ_PHONE_CARD)
+    }
+
+    private fun refreshPhoneCardPermissions() {
+        val granted = missingPhoneCardPermissions().isEmpty()
+        phoneCardNote?.text = ctx.getString(if (granted) R.string.l_perm_granted else R.string.l_perm_summary)
     }
 
     // --- язык и тема ---

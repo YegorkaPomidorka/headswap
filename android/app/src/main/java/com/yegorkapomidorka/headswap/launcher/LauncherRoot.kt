@@ -49,6 +49,13 @@ fun LauncherRoot(connected: Boolean) {
             delay(1000)
         }
     }
+    // состояние звонка и журнал: на главном потоке (PhoneStateListener берёт Looper потока создания)
+    LaunchedEffect(Unit) {
+        while (true) {
+            PhoneController.tick(model.context)
+            delay(1000)
+        }
+    }
     BoxWithConstraints(Modifier.fillMaxSize()) {
         val w = constraints.maxWidth
         val h = constraints.maxHeight
@@ -73,6 +80,13 @@ fun LauncherRoot(connected: Boolean) {
                     }
                     CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
                         EmbedLayers()
+                        // входящий звонок поверх чужого приложения или экрана без карточки «Телефон»
+                        if (PhoneController.callState == CallState.RINGING && (model.area != Area.Home || spec.strip)) {
+                            Box(Modifier.fillMaxSize().padding(end = metrics.dp(spec.m), bottom = metrics.dp(spec.m)),
+                                contentAlignment = Alignment.BottomEnd) {
+                                PhoneCard(Modifier.width(metrics.dp(spec.phone)).height(metrics.dp(spec.t * 9 / 4)))
+                            }
+                        }
                         RemoveConfirm()
                     }
                 }
@@ -89,6 +103,7 @@ private fun AreaContent() {
         Area.Picker -> PickerScreen()
         Area.Settings -> LauncherSettingsScreen()
         Area.Calls -> CallsScreen()
+        Area.Players -> PlayersScreen()
         Area.Navigator, is Area.App -> EmbedAreaBackdrop()
     }
 }

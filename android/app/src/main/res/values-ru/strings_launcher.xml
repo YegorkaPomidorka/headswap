@@ -51,6 +51,7 @@
     <string name="l_hangup">Завершить</string>
     <string name="l_cancel_call">Отменить вызов</string>
     <string name="l_mute">Выключить микрофон</string>
+    <string name="l_yesterday">вчера</string>
     <string name="l_call_missed">Пропущенный</string>
     <string name="l_call_incoming">Входящий</string>
     <string name="l_call_outgoing">Исходящий</string>

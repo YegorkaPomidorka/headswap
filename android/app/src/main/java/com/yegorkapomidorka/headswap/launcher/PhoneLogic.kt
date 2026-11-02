@@ -4,7 +4,19 @@ import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
-enum class CallType { INCOMING, OUTGOING, MISSED, OTHER }
+enum class CallType {
+    INCOMING, OUTGOING, MISSED, OTHER;
+
+    companion object {
+        /** CallLog.Calls.TYPE: 1 входящий, 2 исходящий, 3 пропущенный, 5 отклонённый (для ГУ - входящий). */
+        fun fromLog(type: Int): CallType = when (type) {
+            1, 5 -> INCOMING
+            2 -> OUTGOING
+            3 -> MISSED
+            else -> OTHER
+        }
+    }
+}
 
 data class CallRecord(val number: String, val name: String?, val type: CallType, val timeMs: Long) {
     val title: String get() = name?.takeIf { it.isNotBlank() } ?: number
@@ -97,9 +109,11 @@ object MusicLogic {
         return UNLIKE.any { it in s }
     }
 
-    /** Подбор сессии: выбранный плеер, иначе играющая, иначе первая. */
-    fun <T> pickSession(sessions: List<T>, pkgOf: (T) -> String, playing: (T) -> Boolean, preferred: String?): T? =
-        sessions.firstOrNull { pkgOf(it) == preferred }
-            ?: sessions.firstOrNull(playing)
+    /** Подбор сессии: играющая (выбранный плеер среди играющих первым), иначе выбранный плеер, иначе первая. */
+    fun <T> pickSession(sessions: List<T>, pkgOf: (T) -> String, playing: (T) -> Boolean, preferred: String?): T? {
+        val live = sessions.filter(playing)
+        return live.firstOrNull { pkgOf(it) == preferred } ?: live.firstOrNull()
+            ?: sessions.firstOrNull { pkgOf(it) == preferred }
             ?: sessions.firstOrNull()
+    }
 }

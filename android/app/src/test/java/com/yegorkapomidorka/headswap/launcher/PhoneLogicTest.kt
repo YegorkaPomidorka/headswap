@@ -64,6 +64,15 @@ class PhoneLogicTest {
         assertEquals("30.10", PhoneLogic.whenLabel(now, now - 3 * 24 * 3600_000, utc))
     }
 
+    @Test fun callLogTypesMap() {
+        assertEquals(CallType.INCOMING, CallType.fromLog(1))
+        assertEquals(CallType.OUTGOING, CallType.fromLog(2))
+        assertEquals(CallType.MISSED, CallType.fromLog(3))
+        assertEquals(CallType.INCOMING, CallType.fromLog(5))
+        assertEquals(CallType.OTHER, CallType.fromLog(4))
+        assertEquals(CallType.OTHER, CallType.fromLog(6))
+    }
+
     @Test fun timerFormat() {
         assertEquals("03:21", PhoneLogic.timer(201))
         assertEquals("00:00", PhoneLogic.timer(0))
@@ -86,11 +95,16 @@ class PhoneLogicTest {
         assertTrue(!MusicLogic.isLiked(MusicLogic.Action("like", "Like")))
     }
 
-    @Test fun sessionPickPrefersChosenThenPlaying() {
+    @Test fun sessionPickPrefersPlayingThenChosen() {
         data class S(val pkg: String, val playing: Boolean)
         val list = listOf(S("a", false), S("b", true), S("c", false))
-        assertEquals("c", MusicLogic.pickSession(list, { it.pkg }, { it.playing }, "c")?.pkg)
+        // играет b, выбран c: показываем играющий
+        assertEquals("b", MusicLogic.pickSession(list, { it.pkg }, { it.playing }, "c")?.pkg)
         assertEquals("b", MusicLogic.pickSession(list, { it.pkg }, { it.playing }, "zzz")?.pkg)
+        // среди играющих выбранный первым
+        assertEquals("c", MusicLogic.pickSession(listOf(S("b", true), S("c", true)), { it.pkg }, { it.playing }, "c")?.pkg)
+        // ничего не играет: выбранный
+        assertEquals("c", MusicLogic.pickSession(list.map { it.copy(playing = false) }, { it.pkg }, { it.playing }, "c")?.pkg)
         assertEquals("a", MusicLogic.pickSession(list.map { it.copy(playing = false) }, { it.pkg }, { it.playing }, null)?.pkg)
         assertNull(MusicLogic.pickSession(emptyList<S>(), { it.pkg }, { it.playing }, "a"))
     }
