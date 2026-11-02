@@ -6,6 +6,7 @@ import android.content.Context
 import android.hardware.display.DisplayManager
 import android.hardware.input.InputManager
 import android.os.Binder
+import android.os.Build
 import android.os.IBinder
 import android.os.Process
 import android.view.InputDevice
@@ -109,7 +110,8 @@ internal class DelegatedInputGateway(context: Context) : IDelegatedInputGateway.
             context.getSystemService(ActivityManager::class.java).getRunningTasks(100).map {
                 val identity = FrameworkTaskIdentityReader.read(it) ?: return@runCatching null
                 DelegatedDesktopPolicy.Task(identity.displayId, identity.userId,
-                    it.baseActivity?.packageName, it.topActivity?.packageName)
+                    it.baseActivity?.packageName, it.topActivity?.packageName,
+                    visible = Build.VERSION.SDK_INT < 32 || it.isVisible)
             }
         }.getOrNull()
         return DelegatedDesktopPolicy.taskState(displayId, context.applicationInfo.uid / 100000, packageName,

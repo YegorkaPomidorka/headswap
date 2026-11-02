@@ -54,8 +54,17 @@ class DelegatedDesktopPolicyTest {
         }
     }
 
-    private fun task(display: Int, user: Int = 0, base: String? = "com.example.map", top: String? = base) =
-        DelegatedDesktopPolicy.Task(display, user, base, top)
+    private fun task(display: Int, user: Int = 0, base: String? = "com.example.map", top: String? = base, visible: Boolean = true) =
+        DelegatedDesktopPolicy.Task(display, user, base, top, visible)
+
+    @Test fun taskObserverTellsMovedToBackFromTop() {
+        // Back из корня: задача осталась единственной и topActivity прежний, но её не видно
+        assertEquals(3, DelegatedDesktopPolicy.taskState(42, 0, "com.example.map", true, listOf(task(42, visible = false))))
+        assertEquals(2, DelegatedDesktopPolicy.taskState(42, 0, "com.example.map", true, listOf(task(42, visible = true))))
+        // невидимая чужая задача на том же дисплее приложение «сверху» не делает
+        assertEquals(1, DelegatedDesktopPolicy.taskState(42, 0, "com.example.map", true,
+            listOf(task(42, base = "com.example.music", visible = false), task(42))))
+    }
 
     @Test fun taskObserverNeverTurnsMissingPermissionOrFailedQueryIntoAbsent() {
         assertEquals(-1, DelegatedDesktopPolicy.taskState(42, 0, "com.example.map", false, emptyList()))

@@ -24,7 +24,7 @@ interface IDexUserService {
     void injectChildBack(IBinder childToken) = 12;
     /** Idempotent. A successful response acknowledges producer release before Surface disposal. */
     void closeChildDisplay(IBinder childToken) = 13;
-    /** -1 unknown, 0 absent, 1 present, 2 top. Observes only this child's launched package. */
+    /** -1 unknown, 0 absent, 1 present, 2 top and visible, 3 top but not visible (moved to back). Observes only this child's launched package. */
     int childTaskState(IBinder childToken, String packageName) = 14;
     /** Protocol 5: bounded native parent dimensions; producer and encoder must match. */
     int startDesktopSized(in Surface surface, IBinder lifetimeToken, int width, int height, int density, int mode) = 15;

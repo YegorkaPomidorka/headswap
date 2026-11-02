@@ -31,7 +31,8 @@ internal object DelegatedDesktopPolicy {
         return Component(appPackage, DesktopModePolicy.ANDROID_HOME_CLASS, true)
     }
 
-    data class Task(val displayId: Int, val userId: Int, val basePackage: String?, val topPackage: String?)
+    /** [visible]: задача на экране (TaskInfo.isVisible, API 32+); после moveTaskToBack она остаётся первой в списке, но не видна. */
+    data class Task(val displayId: Int, val userId: Int, val basePackage: String?, val topPackage: String?, val visible: Boolean = true)
 
     /** null means unavailable/filtered, not an empty display. Never examine another display or user. */
     fun taskState(id: Int, userId: Int, packageName: String, permitted: Boolean, tasks: List<Task>?): Int {
@@ -39,8 +40,9 @@ internal object DelegatedDesktopPolicy {
         EmbeddedDisplayPolicy.requirePackage(packageName)
         if (!permitted || tasks == null) return -1
         val owned = tasks.filter { it.displayId == id && it.userId == userId }
+        val first = owned.firstOrNull()
         return when {
-            owned.firstOrNull()?.topPackage == packageName -> 2
+            first?.topPackage == packageName -> if (first.visible) 2 else 3
             owned.any { it.basePackage == packageName || it.topPackage == packageName } -> 1
             else -> 0
         }

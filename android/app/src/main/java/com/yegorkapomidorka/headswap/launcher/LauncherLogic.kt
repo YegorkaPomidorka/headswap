@@ -115,12 +115,14 @@ object TaskCheck {
     const val NONE = 0
     const val BACKGROUND = 1
     const val TOP = 2
+    /** Приложение осталось первой задачей, но не видно: Back из корня сделал moveTaskToBack. */
+    const val MOVED_TO_BACK = 3
 
     enum class AfterBack { CLOSED, STAYED_MORE, STAYED, UNKNOWN_MORE, UNKNOWN }
 
     /** Итог очередной проверки после Back; [last] - проверка была последней. */
     fun afterBack(state: Int, last: Boolean): AfterBack = when {
-        state == NONE || state == BACKGROUND -> AfterBack.CLOSED
+        state == NONE || state == BACKGROUND || state == MOVED_TO_BACK -> AfterBack.CLOSED
         state == TOP -> if (last) AfterBack.STAYED else AfterBack.STAYED_MORE
         last -> AfterBack.UNKNOWN
         else -> AfterBack.UNKNOWN_MORE
@@ -128,7 +130,7 @@ object TaskCheck {
 
     /** Окно показали снова: запускать приложение заново, если его нет сверху; -1 считается только после Back с неизвестным итогом. */
     fun needsRelaunch(state: Int, stale: Boolean): Boolean =
-        state == NONE || state == BACKGROUND || (state < 0 && stale)
+        state == NONE || state == BACKGROUND || state == MOVED_TO_BACK || (state < 0 && stale)
 
     /** Приложение исчезло с дисплея: «нет задачи» после того, как оно уже было сверху (до этого оно могло просто не появиться). */
     fun vanished(state: Int, seenTop: Boolean): Boolean = state == NONE && seenTop

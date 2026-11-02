@@ -215,7 +215,7 @@ internal object EmbedHost {
     }
 
     private fun checkAfterBack(slot: EmbedSlot, attempt: Int, onClosed: () -> Unit) {
-        val state = queryState(slot, "back#$attempt")
+        val state = queryState(slot, "back#$attempt", strict = true)
         val last = attempt >= BACK_CHECKS.size - 1
         when (TaskCheck.afterBack(state, last)) {
             TaskCheck.AfterBack.CLOSED -> {
@@ -244,17 +244,19 @@ internal object EmbedHost {
     }
 
     /** Спросить реестр о задаче слота. Окно, которое реестр уже закрыл, считается «задачи нет» (0). Только рабочий поток. */
-    private fun queryState(slot: EmbedSlot, source: String): Int {
+    private fun queryState(slot: EmbedSlot, source: String, strict: Boolean = false): Int {
         val pkg = slot.pkg
-        val state = if (pkg == null || slot.handle <= 0) 0 else try {
+        val raw = if (pkg == null || slot.handle <= 0) 0 else try {
             timed(slot, "taskState") { EmbeddedSessionRegistry.taskState(uid, slot.handle, pkg) }
         } catch (e: Exception) {
             AppLog.i("EMBED ${slot.name}: taskState ($source) не удался: ${e.javaClass.simpleName}: ${e.message}", false)
             if (leaseGone(e)) { lostLease(slot); 0 } else -1
         }
-        if (state == 2) slot.seenTop = true
-        if (state != slot.lastState || source.startsWith("back")) {
-            AppLog.i("EMBED ${slot.name}: taskState=$state ($source) pkg=$pkg статус=${slot.status}", false)
+        // «не виден» (3) различают только Back и повторный показ; запуск и наблюдатель считают такое приложение сверху
+        val state = if (raw == TaskCheck.MOVED_TO_BACK && !strict) TaskCheck.TOP else raw
+        if (raw == TaskCheck.TOP || raw == TaskCheck.MOVED_TO_BACK) slot.seenTop = true
+        if (state != slot.lastState || raw != state || source.startsWith("back")) {
+            AppLog.i("EMBED ${slot.name}: taskState=$raw ($source) pkg=$pkg статус=${slot.status}", false)
         }
         slot.lastState = state
         return state
@@ -365,7 +367,7 @@ internal object EmbedHost {
         var launch = slot.launchedKey != key
         if (!launch && slot.recheck) {
             // -1 (список задач недоступен) перезапуск вызывает только после Back с неизвестным итогом
-            val state = queryState(slot, "refresh")
+            val state = queryState(slot, "refresh", strict = true)
             launch = TaskCheck.needsRelaunch(state, slot.stale)
             if (state == 2) slot.touchBlocked = false
         }

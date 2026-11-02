@@ -151,6 +151,8 @@ class LauncherLogicTest {
     @Test fun afterBackClosesWhenTaskIsGoneOrInBackground() {
         assertEquals(TaskCheck.AfterBack.CLOSED, TaskCheck.afterBack(0, last = false))
         assertEquals(TaskCheck.AfterBack.CLOSED, TaskCheck.afterBack(1, last = true))
+        // moveTaskToBack: задача осталась первой, но не видна
+        assertEquals(TaskCheck.AfterBack.CLOSED, TaskCheck.afterBack(TaskCheck.MOVED_TO_BACK, last = false))
     }
 
     @Test fun afterBackKeepsPollingWhileTopOrUnknown() {
@@ -164,6 +166,7 @@ class LauncherLogicTest {
         assertTrue(TaskCheck.needsRelaunch(0, stale = false))
         assertTrue(TaskCheck.needsRelaunch(1, stale = false))
         assertFalse(TaskCheck.needsRelaunch(2, stale = true))
+        assertTrue(TaskCheck.needsRelaunch(TaskCheck.MOVED_TO_BACK, stale = false))
         // -1 без Back с неизвестным итогом не мигает «Запускаем…» при каждом показе
         assertFalse(TaskCheck.needsRelaunch(-1, stale = false))
         assertTrue(TaskCheck.needsRelaunch(-1, stale = true))
@@ -173,6 +176,7 @@ class LauncherLogicTest {
         assertFalse(TaskCheck.vanished(0, seenTop = false)) // приложение ещё стартует
         assertTrue(TaskCheck.vanished(0, seenTop = true))
         assertFalse(TaskCheck.vanished(1, seenTop = true)) // диалог другого пакета в той же задаче - не закрытие
+        assertFalse(TaskCheck.vanished(TaskCheck.MOVED_TO_BACK, seenTop = true))
         assertFalse(TaskCheck.vanished(-1, seenTop = true))
     }
 
