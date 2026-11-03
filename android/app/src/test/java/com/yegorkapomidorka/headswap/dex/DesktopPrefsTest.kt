@@ -3,7 +3,6 @@ package com.yegorkapomidorka.headswap.dex
 
 import android.content.ContextWrapper
 import android.content.SharedPreferences
-import com.yegorkapomidorka.headswap.aa.DesktopResolution
 import com.yegorkapomidorka.headswap.aa.FpsSetting
 import org.junit.Assert.*
 import org.junit.Test
@@ -34,7 +33,6 @@ class DesktopPrefsTest {
     }
     @Test fun freshInstallDefaultsAreNativeGeometryAndIndependentDesktopFps() {
         val prefs = DexPrefs(MemoryPrefs())
-        assertEquals(DesktopResolution.R1600_900, prefs.desktopResolution)
         assertEquals(160, prefs.desktopDensity)
         assertEquals(FpsSetting.FPS30, prefs.desktopFps)
         assertNotEquals(FpsSetting.DEFAULT, prefs.desktopFps) // Independent from the AA default.
@@ -44,49 +42,41 @@ class DesktopPrefsTest {
     @Test fun desktopChoicesSurviveNewPreferenceInstances() {
         val context = MemoryPrefs()
         val prefs = DexPrefs(context)
-        prefs.desktopResolution = DesktopResolution.AUTO
         prefs.desktopDensity = 0
         prefs.desktopFps = FpsSetting.FPS15
         val restored = DexPrefs(context)
-        assertEquals(DesktopResolution.AUTO, restored.desktopResolution)
         assertEquals(0, restored.desktopDensity)
         assertEquals(FpsSetting.FPS15, restored.desktopFps)
         restored.desktopDensity = 200
         assertEquals(200, DexPrefs(context).desktopDensity)
     }
-    @Test fun customGeometryAndDpiAndSixtyFpsSurviveRestartWithoutChangingDefaults() {
+    @Test fun dpiAndSixtyFpsSurviveRestartWithoutChangingDefaults() {
         val context = MemoryPrefs()
         val prefs = DexPrefs(context)
-        prefs.setCustomDesktopSize(1920, 1080)
         prefs.desktopDensity = 96
         prefs.desktopFps = FpsSetting.FPS60
         val restored = DexPrefs(context)
-        assertEquals(DesktopResolution.CUSTOM, restored.desktopResolution)
-        assertEquals(1920, restored.customDesktopWidth)
-        assertEquals(1080, restored.customDesktopHeight)
-        assertEquals("1920 × 1080", restored.desktopResolutionLabel)
         assertEquals(96, restored.desktopDensity)
         assertEquals(FpsSetting.FPS60, restored.desktopFps)
-        val snapshot = restored.desktopVideoSelection()
-        restored.setCustomDesktopSize(1024, 768)
         restored.desktopDensity = 640
-        assertEquals(1920, snapshot.resolve().outW)
-        assertEquals(96, snapshot.densityOverride)
         assertEquals(640, DexPrefs(context).desktopDensity)
     }
-    @Test fun rejectedDimensionsDoNotPartiallySaveAndCorruptStoredCustomFallsBackSafely() {
+    @Test fun rejectedDensityDoesNotSave() {
         val context = MemoryPrefs()
         val prefs = DexPrefs(context)
-        prefs.setCustomDesktopSize(1280, 720)
-        assertThrows(IllegalArgumentException::class.java) { prefs.setCustomDesktopSize(1921, 1080) }
+        prefs.desktopDensity = 200
         assertThrows(IllegalArgumentException::class.java) { prefs.desktopDensity = 641 }
-        assertEquals(1280, prefs.customDesktopWidth)
-        assertEquals(720, prefs.customDesktopHeight)
-        for (bad in listOf("1921x1080", "1920x1080x1", "bad", "999999999999x720", "640x900")) {
-            context.values["desktop_custom_size"] = bad
-            assertEquals(1600, prefs.customDesktopWidth)
-            assertEquals(900, prefs.customDesktopHeight)
-        }
+        assertEquals(200, prefs.desktopDensity)
+    }
+    @Test fun launcherChoiceSurvivesRestartAndBrokenValueMeansHeadswap() {
+        val context = MemoryPrefs()
+        assertNull(DexPrefs(context).desktopComponent)
+        DexPrefs(context).desktopComponent = "ie.claudius.cardash/ie.claudius.cardash.HomeActivity"
+        assertEquals("ie.claudius.cardash/ie.claudius.cardash.HomeActivity", DexPrefs(context).desktopComponent)
+        context.values["desktop_component"] = "garbage"
+        assertNull(DexPrefs(context).desktopComponent)
+        DexPrefs(context).desktopComponent = null
+        assertNull(DexPrefs(context).desktopComponent)
     }
     @Test fun usbAudioOptOutIsKept() {
         val context = MemoryPrefs()

@@ -26,6 +26,9 @@ interface DesktopPowerControl {
 /** Navigation belongs only to a currently attached desktop session. */
 interface DesktopNavigation {
     fun showDesktop(): Boolean
+
+    /** Передать идущему сеансу выбор лаунчера из настроек (DexPrefs) и сразу показать его. */
+    fun applyDesktopChoice(): Boolean
 }
 
 /**
@@ -73,6 +76,12 @@ class BridgeHost(
     fun showDesktop(): Boolean {
         if (!started || isDead || grace != null) return false
         return (connector as? DesktopNavigation)?.showDesktop() ?: false
+    }
+
+    @Synchronized
+    fun applyDesktopChoice(): Boolean {
+        if (!started || isDead || grace != null) return false
+        return (connector as? DesktopNavigation)?.applyDesktopChoice() ?: false
     }
 
     /** Новая CarLife-сессия: отменить grace, при первой - запустить AA. false = хост уже закрывается. */

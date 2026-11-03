@@ -1,6 +1,5 @@
 package com.yegorkapomidorka.headswap.launcher
 
-import com.yegorkapomidorka.headswap.desktop.DesktopAppCatalog
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -296,45 +295,5 @@ class LauncherLogicTest {
             assertTrue((next - 90f) % 360f != 0f)
             assertEquals(0f, (next - 90f) % 45f)
         }
-    }
-
-    private fun entry(pkg: String, cls: String, label: String = pkg) = DesktopAppCatalog.Entry(pkg, cls, label)
-
-    @Test fun desktopOptionsNeedBothHomeAndLauncherEntries() {
-        val catalog = listOf(entry("ie.claudius.cardash", "ie.claudius.cardash.HomeActivity", "CarDash"),
-            entry("com.maps", "com.maps.Main"), entry("only.home", "only.home.Main"))
-        val homes = setOf("ie.claudius.cardash/ie.claudius.cardash.HomeActivity", "no.launcher/no.launcher.Home", "only.home/only.home.Home")
-        // карты без HOME и пакет без LAUNCHER в каталоге отсеяны
-        assertEquals(listOf("ie.claudius.cardash/ie.claudius.cardash.HomeActivity", "only.home/only.home.Main"),
-            DesktopPick.options(catalog, homes).map { it.key })
-    }
-
-    @Test fun desktopLaunchEntryPrefersTheOneAlsoUnderHome() {
-        val pkg = "ru.drivedeck.launcher"
-        val catalog = listOf(entry(pkg, "$pkg.AliasA"), entry(pkg, "$pkg.MainActivity"), entry(pkg, "$pkg.AliasB"))
-        assertEquals("$pkg/$pkg.MainActivity", DesktopPick.options(catalog, setOf("$pkg/$pkg.MainActivity")).single().key)
-        // HOME-вход не в списке LAUNCHER: первый LAUNCHER
-        assertEquals("$pkg/$pkg.AliasA", DesktopPick.options(catalog, setOf("$pkg/$pkg.Hidden")).single().key)
-    }
-
-    @Test fun selectedDesktopIsMatchedByPackageAndDroppedWhenGone() {
-        val options = listOf(entry("a.b", "a.b.Home"))
-        assertEquals("a.b/a.b.Home", DesktopPick.selected("a.b/a.b.Old", options)?.key)
-        assertNull(DesktopPick.selected("c.d/c.d.Home", options))
-        assertNull(DesktopPick.selected(null, options))
-        assertNull(DesktopPick.selected("garbage", options))
-    }
-
-    @Test fun desktopThatDiesTwiceInARowIsNotRestarted() {
-        assertFalse(DesktopPick.crashLoop(0L, 5_000L))
-        assertTrue(DesktopPick.crashLoop(1_000L, 1_000L + DesktopPick.RESTART_WINDOW_MS - 1))
-        assertFalse(DesktopPick.crashLoop(1_000L, 1_000L + DesktopPick.RESTART_WINDOW_MS))
-    }
-
-    @Test fun backFromSettingsGoesToDesktopHomeArea() {
-        val desktop = Area.App(AppRef("ie.claudius.cardash", "ie.claudius.cardash.HomeActivity"))
-        assertEquals(desktop, BackNav.target(Area.Settings, null, desktop))
-        assertEquals(Area.Settings, BackNav.target(Area.Picker, Area.Settings, desktop))
-        assertTrue(BackNav.enabled(desktop))
     }
 }

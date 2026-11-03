@@ -55,6 +55,7 @@ class BridgeHostTest {
             override fun start() { starts++ }
             override fun stop(onDone: () -> Unit) { stops++; stopAck = onDone }
             override fun showDesktop() = error("Failed source must not receive navigation")
+            override fun applyDesktopChoice() = error("Failed source must not receive navigation")
             override fun setPhoneScreenOff(off: Boolean) = error("Failed source must not receive panel control")
         }
         val host = BridgeHost(core(), source, scheduler, { _, _ -> })
@@ -104,23 +105,31 @@ class BridgeHostTest {
     @Test
     fun desktopNavigationNeverReachesAnUnstartedDetachedOrRetiredSource() {
         var calls = 0
+        var applied = 0
         var starts = 0
         var sourceReady = false
         val source = object : AaLifecycle, DesktopNavigation {
             override fun start() { starts++; sourceReady = true }
             override fun stop(onDone: () -> Unit) { sourceReady = false; onDone() }
             override fun showDesktop(): Boolean { calls++; return sourceReady }
+            override fun applyDesktopChoice(): Boolean { applied++; return sourceReady }
         }
         val host = BridgeHost(core(), source, scheduler, { _, _ -> }, graceMs = 10_000)
         try {
             assertFalse("navigation must not create a source", host.showDesktop())
+            assertFalse("launcher choice must not create a source", host.applyDesktopChoice())
             assertEquals(0, calls)
+            assertEquals(0, applied)
             host.onUsbSessionStarted()
             assertTrue(host.showDesktop())
             assertEquals(1, calls)
+            assertTrue(host.applyDesktopChoice())
+            assertEquals(1, applied)
             host.onUsbSessionClosed(immediate = false)
             repeat(3) { assertFalse("no navigation during USB grace", host.showDesktop()) }
+            assertFalse("no launcher choice during USB grace", host.applyDesktopChoice())
             assertEquals(1, calls)
+            assertEquals(1, applied)
             host.onUsbSessionStarted()
             assertTrue(host.showDesktop())
             assertEquals("USB reconnect reuses the source", 1, starts)

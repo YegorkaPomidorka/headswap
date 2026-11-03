@@ -102,6 +102,9 @@
     <string name="mock_loc_use_sub">Apps with this permission can access your location.</string>
     <string name="mock_usb_question">Open Headswap to handle the USB accessory?</string>
     <string name="mock_usb_default">Use by default for this USB accessory</string>
+    <string name="mock_dev_title">Developer options</string>
+    <string name="mock_dev_wifi">Wireless debugging</string>
+    <string name="mock_dev_pair">Pair device with pairing code</string>
     <string name="mock_cancel">Cancel</string>
     <string name="mock_ok">OK</string>
 

@@ -43,6 +43,27 @@ class DesktopVideoSelectionTest {
         assertEquals(640, selection.densityFor(mode))
         assertSame(mode, selection.resolve(800, 480))
     }
+    @Test fun displaySizeFollowsTheAaVideoSetting() {
+        for ((video, size) in listOf(VideoMode.R1080 to (1920 to 1080), VideoMode.R720 to (1280 to 720), VideoMode.R800 to (800 to 480),
+            VideoMode.R1024 to (1024 to 600), VideoMode.WIDE_HD to (1920 to 720), VideoMode.WIDE_836 to (1920 to 836))) {
+            val mode = DesktopVideoSelection.forAaVideo(video, 0).resolve(1024, 768) // запрос магнитолы игнорируется
+            assertEquals(video.name, size, mode.outW to mode.outH)
+        }
+        val custom = DesktopVideoSelection.forAaVideo(CustomVideoMode(1600, 700), 0).resolve()
+        assertEquals(1600 to 700, custom.outW to custom.outH)
+    }
+
+    @Test fun aaVideoOutsideTheDisplayLimitsFallsBackToAuto() {
+        // 2240×976 (WIDE_976 с перекодированием) шире 1920: как просит магнитола, без запроса - 1280×720
+        val wide = DesktopVideoSelection.forAaVideo(VideoMode.WIDE_976, 0)
+        assertEquals(1024 to 768, wide.resolve(1024, 768).let { it.outW to it.outH })
+        val noInit = DesktopVideoSelection.forAaVideo(VideoMode.WIDE_976, 0).resolve()
+        assertEquals(1280 to 720, noInit.outW to noInit.outH)
+        // без перекодирования WIDE_976 превращается в WIDE_836, и он помещается
+        val passthrough = DesktopVideoSelection.forAaVideo(VideoMode.WIDE_976.effective(false), 200).resolve()
+        assertEquals(1920 to 836, passthrough.outW to passthrough.outH)
+    }
+
     @Test fun invalidCustomInputsAreRejectedRatherThanRoundedOrClamped() {
         for ((w, h) in listOf(1921 to 1080, 1920 to 1081, 639 to 480, 640 to 479, 800 to 900)) {
             assertThrows(IllegalArgumentException::class.java) { DesktopVideoSelection(DesktopResolution.CUSTOM, 160, w, h) }

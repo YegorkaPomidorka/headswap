@@ -154,6 +154,7 @@ class DelegatedDexConnector(context: Context, private val core: AaBridgeCore,
             }
             val id = bounded(25) {
                 check(remote.protocolVersion() == 5) { "Версия службы рабочего стола не совпадает с приложением" }
+                remote.setDesktopComponent(prefs.desktopComponent)   // лаунчер ГУ: служба в другом процессе, prefs ей не видны
                 remote.startDesktopSized(input.surface, lifetime, input.width, input.height, density, desktopMode)
             }
             check(id > 0) { "Не удалось создать отдельный экран" }
@@ -261,10 +262,21 @@ class DelegatedDexConnector(context: Context, private val core: AaBridgeCore,
     override fun requestKeyFrame() { /* CarLife requests its own encoder's IDR directly. */ }
 
     override fun showDesktop(): Boolean {
-        if (stopping.get() || generation == 0L || retiringGeneration == generation || !firstFrame) return false
+        if (!navigable()) return false
         enqueue { it.showDesktop() }
         return true
     }
+
+    /** Выбор лаунчера в настройках сменился посреди сеанса: служба узнаёт его и тут же показывает. Обе команды идут в одной очереди. */
+    override fun applyDesktopChoice(): Boolean {
+        if (!navigable()) return false
+        val component = DexPrefs(context).desktopComponent
+        AppLog.i("DESKTOP лаунчер на ГУ -> ${component ?: "Headswap"}", false)
+        enqueue { it.setDesktopComponent(component); it.showDesktop() }
+        return true
+    }
+
+    private fun navigable() = !(stopping.get() || generation == 0L || retiringGeneration == generation || !firstFrame)
 
     private fun enqueue(block: (IDexUserService) -> Unit) {
         val token = generation

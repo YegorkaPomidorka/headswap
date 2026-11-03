@@ -2,9 +2,7 @@
 package com.yegorkapomidorka.headswap.dex
 
 import android.content.Context
-import com.yegorkapomidorka.headswap.aa.DesktopResolution
 import com.yegorkapomidorka.headswap.aa.DesktopGeometryPolicy
-import com.yegorkapomidorka.headswap.aa.DesktopVideoSelection
 import com.yegorkapomidorka.headswap.aa.FpsSetting
 
 /** Desktop preferences are separate from the AA / bridge settings. */
@@ -23,35 +21,16 @@ class DexPrefs(context: Context) {
             DesktopModePolicy.requireMode(value)
             prefs.edit().putInt("desktop_mode", value).apply()
         }
-    var desktopResolution: DesktopResolution
-        get() = DesktopResolution.restore(prefs.getString("desktop_resolution", null))
-        set(value) { prefs.edit().putString("desktop_resolution", value.name).apply() }
-    private fun customDesktopSize(): Pair<Int, Int> {
-        val parts = prefs.getString("desktop_custom_size", null)?.split('x')
-        val width = parts?.takeIf { it.size == 2 }?.get(0)?.toIntOrNull()
-        val height = parts?.takeIf { it.size == 2 }?.get(1)?.toIntOrNull()
-        return if (width != null && height != null && DesktopGeometryPolicy.accepts(width, height)) width to height
-            else 1600 to 900
-    }
-    val customDesktopWidth: Int get() = customDesktopSize().first
-    val customDesktopHeight: Int get() = customDesktopSize().second
-    /** One preference value keeps width and height atomic; invalid input changes nothing. */
-    fun setCustomDesktopSize(width: Int, height: Int) {
-        DesktopGeometryPolicy.requireDimensions(width, height)
-        prefs.edit().putString("desktop_custom_size", "${width}x$height")
-            .putString("desktop_resolution", DesktopResolution.CUSTOM.name).apply()
-    }
-    val desktopResolutionLabel: String get() = if (desktopResolution == DesktopResolution.CUSTOM)
-        customDesktopSize().let { "${it.first} × ${it.second}" } else desktopResolution.title
-    fun desktopVideoSelection(): DesktopVideoSelection = customDesktopSize().let {
-        DesktopVideoSelection(desktopResolution, desktopDensity, it.first, it.second)
-    }
     /** Zero selects proportional DPI. */
     var desktopDensity: Int
         get() = prefs.getInt("desktop_density", 160).let {
             if (it == 0) 0 else it.coerceIn(DesktopGeometryPolicy.MIN_DENSITY, DesktopGeometryPolicy.MAX_DENSITY)
         }
         set(value) { if (value != 0) DesktopGeometryPolicy.requireDensity(value); prefs.edit().putInt("desktop_density", value).apply() }
+    /** Сторонний лаунчер «пакет/класс» на весь экран ГУ вместо нашего LauncherActivity; null - Headswap. */
+    var desktopComponent: String?
+        get() = prefs.getString("desktop_component", null)?.takeIf(DesktopPick::isComponent)
+        set(value) { prefs.edit().putString("desktop_component", value?.takeIf(DesktopPick::isComponent)).apply() }
     /** Direct desktop has an independent 30 fps default; the AA preferences are unchanged. */
     var desktopFps: FpsSetting
         get() = prefs.getString("desktop_fps", null).let { name -> FpsSetting.entries.firstOrNull { it.name == name } ?: FpsSetting.FPS30 }

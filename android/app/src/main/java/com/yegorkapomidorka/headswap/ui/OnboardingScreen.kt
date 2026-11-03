@@ -116,30 +116,13 @@ class OnboardingScreen(host: MainActivity, private val showAll: Boolean, startAt
 
         // прокручивается только картинка и текст, заголовок остаётся на месте
         val body = c.vbox().apply {
-            addView(
-                FrameLayout(c).apply {
-                    background = c.shape(c.clr(R.color.surf2), 28)
-                    // с подсказкой и на шагах с окном Android Auto макет компактнее: текст целиком виден без прокрутки
-                    val compact = s.hint != null || s.id == StepId.AA_DEV || s.id == StepId.AA_UNKNOWN
-                    minimumHeight = c.dp(if (compact) 0 else 190)
-                    pad(c, 20, 20, 20, 20)
-                    addView(Mocks.build(c, s.id), FrameLayout.LayoutParams(MATCH, WRAP, Gravity.CENTER_VERTICAL))
-                },
-                lp(MATCH, WRAP).margins(c, 0, 4, 0, 0),
-            )
+            // с подсказкой и на шагах с окном Android Auto макет компактнее: текст целиком виден без прокрутки
+            val compact = s.hint != null || s.id == StepId.AA_DEV || s.id == StepId.AA_UNKNOWN
+            addView(c.stepMockCard(Mocks.build(c, s.id), compact), lp(MATCH, WRAP).margins(c, 0, 4, 0, 0))
             val text = c.vbox(10).apply { pad(c, 0, 18, 0, 36) }     // нижний отступ больше затемнения края: конец текста не тонет в fade
-            if (done) text.addView(doneChip(), lp(WRAP, WRAP))
-            text.addView(numberedList(s.listItems(c)), lp(MATCH, WRAP))
-            s.hint?.let {
-                text.addView(
-                    c.text(c.getString(it), 14f, 400, c.clr(R.color.onpric)).apply {
-                        lineHeight = c.dp(20)
-                        background = c.shape(c.clr(R.color.pric), 16)
-                        pad(c, 14, 12, 14, 12)
-                    },
-                    lp(MATCH, WRAP),
-                )
-            }
+            if (done) text.addView(c.doneChip(c.getString(R.string.onb_done_chip)), lp(WRAP, WRAP))
+            text.addView(c.numberedList(s.listItems(c)), lp(MATCH, WRAP))
+            s.hint?.let { text.addView(c.stepHint(c.getString(it)), lp(MATCH, WRAP)) }
             addView(text, lp(MATCH, WRAP))
         }
         root.addView(fadingScroll(body), lp(MATCH, 0, 1f))
@@ -220,39 +203,6 @@ class OnboardingScreen(host: MainActivity, private val showAll: Boolean, startAt
             c.text(c.getString(s.title), 24f, 600).apply { letterSpacing = -0.01f; lineHeight = c.dp(30) },
             lp(MATCH, WRAP).margins(c, 0, 4, 0, 16),
         )
-    }
-
-    /** Пронумерованный список: кружок pri с цифрой и текст шага. */
-    private fun numberedList(items: List<String>): View {
-        val c = ctx
-        return c.vbox(12).apply {
-            items.forEachIndexed { i, t ->
-                addView(
-                    c.hbox(12).apply {
-                        gravity = Gravity.TOP
-                        addView(
-                            FrameLayout(c).apply {
-                                background = c.oval(c.clr(R.color.pri))
-                                addView(c.text("${i + 1}", 14f, 700, c.clr(R.color.onpri)), FrameLayout.LayoutParams(WRAP, WRAP, Gravity.CENTER))
-                            },
-                            lp(c.dp(26), c.dp(26)),
-                        )
-                        addView(c.text(t, 17f, 400).apply { lineHeight = c.dp(24) }, lp(0, WRAP, 1f))
-                    },
-                    lp(MATCH, WRAP),
-                )
-            }
-        }
-    }
-
-    private fun doneChip(): View {
-        val c = ctx
-        return c.hbox(6).apply {
-            background = c.shape(c.clr(R.color.okc), 10)
-            pad(c, 10, 4, 12, 4)
-            addView(c.icon(R.drawable.ic_check, 14, c.clr(R.color.ok)))
-            addView(c.text(c.getString(R.string.onb_done_chip), 13f, 600, c.clr(R.color.ok)))
-        }
     }
 
     private fun onPrimary(s: StepInfo, done: Boolean) {

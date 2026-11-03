@@ -12,10 +12,13 @@
     <string name="desk_recovery_screen_busy">The previous screen is not released yet; automatic restore cancelled</string>
 
     <!-- Activation from the phone itself (wireless debugging), Settings - Mode -->
-    <string name="pa_title">Activation from the phone</string>
-    <string name="pa_hint">Developer options → Wireless debugging → Pair device with pairing code. Type the code into the Headswap notification.</string>
-    <string name="pa_hint_paired">The phone is paired, no code needed.</string>
-    <string name="pa_button">Activate from the phone</string>
+    <string name="pa_title">Activate Headswap</string>
+    <string name="pa_step_1">Open “Developer options” → “Wireless debugging” and turn it on.</string>
+    <string name="pa_step_2">Tap “Pair device with pairing code”.</string>
+    <string name="pa_step_3">Type the code into the Headswap notification.</string>
+    <string name="pa_step_paired">Tap “Activate”. The phone is already paired, no code needed.</string>
+    <string name="pa_hint">Repeat the activation after the phone reboots.</string>
+    <string name="pa_button">Activate</string>
     <string name="pa_button_again">Activate again</string>
     <string name="pa_cancel">Cancel</string>
     <string name="pa_manual_toggle">Enter the port and code by hand</string>

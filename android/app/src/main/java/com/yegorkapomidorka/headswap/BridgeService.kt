@@ -33,6 +33,7 @@ import com.yegorkapomidorka.headswap.aa.BridgeHost
 import com.yegorkapomidorka.headswap.aa.BridgeMode
 import com.yegorkapomidorka.headswap.aa.CallStateSource
 import com.yegorkapomidorka.headswap.aa.CarPreset
+import com.yegorkapomidorka.headswap.aa.DesktopVideoSelection
 import com.yegorkapomidorka.headswap.aa.EqLive
 import com.yegorkapomidorka.headswap.aa.MetaRelay
 import com.yegorkapomidorka.headswap.aa.MicMode
@@ -233,10 +234,11 @@ class BridgeService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        if (intent?.action == ACTION_DESKTOP_HOME) {
+        if (intent?.action == ACTION_DESKTOP_HOME || intent?.action == ACTION_DESKTOP_APPLY) {
             // команда относится только к живой desktop-сессии: опоздавший клик не должен поднимать сервис и новый рабочий стол
-            val accepted = !stopRequested && session != null && host?.showDesktop() == true
-            AppLog.i("DESKTOP home request accepted=$accepted", false)
+            val apply = intent.action == ACTION_DESKTOP_APPLY
+            val accepted = !stopRequested && session != null && (if (apply) host?.applyDesktopChoice() else host?.showDesktop()) == true
+            AppLog.i("DESKTOP ${if (apply) "launcher apply" else "home"} request accepted=$accepted", false)
             if (session == null && host == null && !linkWaiting) stopSelfResult(startId)
             return stickiness()
         }
@@ -1033,7 +1035,8 @@ class BridgeService : Service() {
 
         val aaPrefs = AaPrefs(this)
         val dexPrefs = DexPrefs(this)
-        val desktopVideo = dexPrefs.desktopVideoSelection()
+        // размер дисплея - то же разрешение, что выбрано в разделе «Видео»
+        val desktopVideo = DesktopVideoSelection.forAaVideo(aaPrefs.videoGeometry.effective(aaPrefs.transcode), dexPrefs.desktopDensity)
         val screenOn = getSystemService(PowerManager::class.java).isInteractive
         val cfg = SessionConfig(
             screenOn, false, dexPrefs.desktopFps,
@@ -1402,6 +1405,8 @@ class BridgeService : Service() {
         const val ACTION_STOP = "com.yegorkapomidorka.headswap.STOP"
         /** Режим DESKTOP: показать рабочий стол (кнопка HOME для идущей сессии). Только к живой сессии, сервис сам не поднимает. */
         const val ACTION_DESKTOP_HOME = "com.yegorkapomidorka.headswap.DESKTOP_HOME"
+        /** Режим DESKTOP: выбор лаунчера на ГУ (DexPrefs.desktopComponent) сменился, передать идущей сессии и показать. */
+        const val ACTION_DESKTOP_APPLY = "com.yegorkapomidorka.headswap.DESKTOP_APPLY"
         /** adb shell am startservice -a com.yegorkapomidorka.headswap.LAUNCHER_DEBUG --es area settings --es page music --es theme light --es map left */
         const val ACTION_LAUNCHER_DEBUG = "com.yegorkapomidorka.headswap.LAUNCHER_DEBUG"
         /** Беспровод (бета): ждать машину по Wi-Fi, ветка B (хотспот телефона + маяк). */
@@ -1425,6 +1430,11 @@ class BridgeService : Service() {
         /** Из UI (приложение на экране): startService, не startForegroundService, чтобы не требовать startForeground для команды без сессии. */
         fun requestDesktopHome(ctx: Context) {
             ctx.startService(Intent(ctx, BridgeService::class.java).setAction(ACTION_DESKTOP_HOME))
+        }
+
+        /** Из UI и стенда после смены DexPrefs.desktopComponent: как [requestDesktopHome], но сначала лаунчер уходит в службу рабочего стола. */
+        fun requestDesktopApply(ctx: Context) {
+            ctx.startService(Intent(ctx, BridgeService::class.java).setAction(ACTION_DESKTOP_APPLY))
         }
 
         /** Сервис создан и не уничтожен (один процесс): ресиверу ACL незачем будить пустой сервис ради отбоя. */

@@ -16,6 +16,7 @@ internal interface DesktopRuntimeAccess {
     fun registerChildDisplay(parentId: Int, id: Int, token: IBinder, width: Int, height: Int) {}
     fun resizeRegisteredDisplay(id: Int, token: IBinder, width: Int, height: Int) {}
     fun unregisterDisplay(id: Int, token: IBinder) {}
-    fun launchDesktop(mode: Int, id: Int)
+    /** [component] - «пакет/класс» стороннего лаунчера вместо нашего; null - наш. */
+    fun launchDesktop(mode: Int, id: Int, component: String?)
     fun launchChild(parentId: Int, id: Int, packageName: String, className: String)
 }

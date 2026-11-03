@@ -40,6 +40,8 @@ class DexUserService private constructor(private val context: Context,
     // Everything below is accessed only on worker, including destruction and input state.
     private var session: Session? = null
     private var runtime: DesktopRuntimeAccess? = null
+    // Сторонний лаунчер «пакет/класс» вместо нашего; ставится из основного процесса, читается на worker.
+    @Volatile private var desktopComponent: String? = null
     private var mouse = DexMouseState()
     private val keyDownTimes = HashMap<Int, Long>()
     private var mouseDownTime = 0L
@@ -219,10 +221,16 @@ class DexUserService private constructor(private val context: Context,
         serialized(START_TIMEOUT_MS) { launchDesktop(requireSession()) }
     }
 
+    override fun setDesktopComponent(component: String?) {
+        enforceClient()
+        require(component == null || DesktopPick.isComponent(component)) { "Неверный компонент лаунчера" }
+        desktopComponent = component
+    }
+
     private fun launchDesktop(active: Session) {
         ensureActive(active.epoch)
         val id = checkNotNull(active.display).display.displayId
-        checkNotNull(runtime).launchDesktop(active.desktopMode, id)
+        checkNotNull(runtime).launchDesktop(active.desktopMode, id, desktopComponent)
         ensureActive(active.epoch)
     }
 

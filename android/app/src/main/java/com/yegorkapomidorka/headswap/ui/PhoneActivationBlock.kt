@@ -28,7 +28,8 @@ class PhoneActivationBlock(private val host: MainActivity) {
     private val state = PhoneActivationState(c)
     val view: LinearLayout = c.vbox(8)
     private val status: TextView
-    private val hint: TextView
+    private val steps: LinearLayout
+    private var stepsPaired: Boolean? = null
     private val activate: LinearLayout
     private val cancel: LinearLayout
     private val manualToggle: LinearLayout
@@ -42,19 +43,25 @@ class PhoneActivationBlock(private val host: MainActivity) {
     private var collected: String? = null
 
     init {
-        view.addView(c.sectionTitle(c.getString(R.string.pa_title)))
-        status = c.text("", 16f, 600).also { view.addView(it, lp(WRAP, WRAP).margins(c, 8, 2, 8, 0)) }
-        hint = c.text("", 13f, 400, c.clr(R.color.on2)).also { view.addView(it, lp(WRAP, WRAP).margins(c, 8, 2, 8, 0)) }
-        activate = c.primaryButton(c.getString(R.string.pa_button), heightDp = 60, sp = 17f).apply { setOnClickListener { onActivate() } }
-        view.addView(activate, c.lpDp(MATCH, 60).margins(c, 0, 4, 0, 0))
+        // та же раскладка, что у шагов онбординга (StepParts): статус, заголовок, макет экрана, нумерованный список, пояснение, кнопки
+        status = c.text("", 16f, 600).also { view.addView(it, lp(WRAP, WRAP).margins(c, 8, 12, 8, 0)) }
+        view.addView(
+            c.text(c.getString(R.string.pa_title), 24f, 600).apply { letterSpacing = -0.01f; lineHeight = c.dp(30) },
+            lp(MATCH, WRAP).margins(c, 8, 8, 8, 8),
+        )
+        view.addView(c.stepMockCard(Mocks.developerOptions(c), compact = true), lp(MATCH, WRAP))
+        steps = c.vbox().also { view.addView(it, lp(MATCH, WRAP).margins(c, 0, 10, 0, 0)) }
+        view.addView(c.stepHint(c.getString(R.string.pa_hint)), lp(MATCH, WRAP))
+        activate = c.primaryButton(c.getString(R.string.pa_button)).apply { setOnClickListener { onActivate() } }
+        view.addView(activate, c.lpDp(MATCH, 64).margins(c, 0, 8, 0, 0))
         cancel = c.tonalButton(c.getString(R.string.pa_cancel)).apply {
             setOnClickListener { PhoneActivation.cancel(c) }
         }
         view.addView(cancel, c.lpDp(MATCH, 52))
-        manualToggle = c.linkButton(c.getString(R.string.pa_manual_toggle), 48, 15f).apply {
+        manualToggle = c.containerButton(c.getString(R.string.pa_manual_toggle)).apply {
             setOnClickListener { manualBox.visibility = if (manualBox.visibility == View.VISIBLE) View.GONE else View.VISIBLE }
         }
-        view.addView(manualToggle, c.lpDp(MATCH, 48))
+        view.addView(manualToggle, c.lpDp(MATCH, 56))
         manualBox = c.vbox(8).apply { visibility = View.GONE }
         manualBox.addView(c.text(c.getString(R.string.pa_manual_hint), 13f, 400, c.clr(R.color.on2)), lp(WRAP, WRAP).margins(c, 8, 0, 8, 0))
         pairPort = field(R.string.pa_field_pair_port)
@@ -88,7 +95,14 @@ class PhoneActivationBlock(private val host: MainActivity) {
         }
         status.text = text
         status.setTextColor(c.clr(color))
-        hint.text = c.getString(if (paired) R.string.pa_hint_paired else R.string.pa_hint)
+        if (stepsPaired != paired) {
+            // сопряжённому телефону код не нужен: шаги 2 и 3 заменяет одна строка
+            stepsPaired = paired
+            steps.removeAllViews()
+            val items = if (paired) listOf(c.getString(R.string.pa_step_paired))
+                else listOf(R.string.pa_step_1, R.string.pa_step_2, R.string.pa_step_3).map { c.getString(it) }
+            steps.addView(c.numberedList(items), lp(MATCH, WRAP))
+        }
         (activate.getChildAt(0) as TextView).text = c.getString(if (paired || access == DelegatedDesktopAccess.Status.READY) R.string.pa_button_again else R.string.pa_button)
         activate.visibility = if (busy) View.GONE else View.VISIBLE
         cancel.visibility = if (busy) View.VISIBLE else View.GONE

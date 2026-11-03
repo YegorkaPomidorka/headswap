@@ -12,6 +12,7 @@ import android.hardware.display.DisplayManager
 import android.hardware.display.VirtualDisplay
 import android.os.Build
 import android.os.IBinder
+import android.util.Log
 import android.view.InputEvent
 import android.view.Surface
 
@@ -73,9 +74,30 @@ internal class DelegatedDesktopRuntime(private val context: Context, private val
         inputGateway.unregisterDisplay(id, token)
     }
 
-    override fun launchDesktop(mode: Int, id: Int) {
-        val component = DelegatedDesktopPolicy.desktopComponent(mode, id, context.packageName)
-        launch(id, ComponentName(component.packageName, component.className), component.ownActivity, requireLauncher = false)
+    override fun launchDesktop(mode: Int, id: Int, component: String?) {
+        if (component != null) {
+            // Чужой лаунчер на весь экран ГУ. Пакет удалён, отключён или запуск отказан - сеанс не роняем, поднимаем свой.
+            try {
+                launchExternal(id, component)
+                return
+            } catch (e: Exception) {
+                Log.w(TAG, "лаунчер $component не запустился (${e.javaClass.simpleName}: ${e.message}), запускаю Headswap")
+            }
+        }
+        val own = DelegatedDesktopPolicy.desktopComponent(mode, id, context.packageName)
+        launch(id, ComponentName(own.packageName, own.className), own.ownActivity, requireLauncher = false)
+    }
+
+    /**
+     * Флаги те же, что у нашего: NEW_TASK (запуск из не-Activity контекста) + CLEAR_TOP + SINGLE_TOP. Лаунчер, чья задача уже
+     * на дисплее, поднимается в onNewIntent без пересоздания (singleTask это и так), а экраны, открытые внутри его задачи,
+     * сбрасываются, как по HOME. Приложения, запущенные лаунчером в свои задачи, остаются под ним.
+     */
+    private fun launchExternal(id: Int, flat: String) {
+        val cn = requireNotNull(ComponentName.unflattenFromString(flat)) { "Неверный компонент лаунчера" }
+        EmbeddedDisplayPolicy.requirePackage(cn.packageName)
+        require(cn.packageName != context.packageName) { "Свой пакет выбирается без компонента" }
+        launch(id, cn, ownActivity = false, requireLauncher = true)
     }
 
     override fun launchChild(parentId: Int, id: Int, packageName: String, className: String) {
@@ -114,5 +136,9 @@ internal class DelegatedDesktopRuntime(private val context: Context, private val
         check(id > 0) { "Проверка основного экрана запрещена" }
         val token = inputLeases[id] ?: return -1
         return inputGateway.childTaskState(id, token, packageName)
+    }
+
+    private companion object {
+        const val TAG = "HeadSwapDexRuntime"
     }
 }

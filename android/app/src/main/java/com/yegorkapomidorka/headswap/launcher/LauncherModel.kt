@@ -68,14 +68,6 @@ internal object LauncherModel {
     var lastOnlinePlayer by mutableStateOf<String?>(null)
     var catalog by mutableStateOf<List<DesktopAppCatalog.Entry>>(emptyList())
     var catalogLoaded by mutableStateOf(false)
-    /** Входы под MAIN+HOME («пакет/класс»): из них и LAUNCHER-входов каталога выбирается сторонний рабочий стол. */
-    var homeKeys by mutableStateOf<Set<String>>(emptySet())
-    /** Сторонний рабочий стол «пакет/класс» из настроек; null - наш главный экран. */
-    var desktop by mutableStateOf<String?>(null)
-    /** Рабочий стол не запустился или пропал: до новой попытки выбора (и до перезапуска процесса) работает наш главный. В prefs не пишется. */
-    var desktopBroken by mutableStateOf(false)
-    /** uptime последней потери рабочего стола не по «Назад» (0 - не было): защита от перезапуска по кругу. */
-    var desktopGoneAt = 0L
     var status by mutableStateOf(StatusInfo())
     /** Подтверждение удаления приложения из списка («Убрать?»). */
     var confirmRemove by mutableStateOf<AppRef?>(null)
@@ -110,14 +102,12 @@ internal object LauncherModel {
         cardView = prefs.cardView
         apps = prefs.apps
         savedNavigator = prefs.navigator
-        desktop = prefs.desktop
         musicPlayer = prefs.musicPlayer
         lastOnlinePlayer = prefs.lastOnlinePlayer
         missedSeenMs = prefs.missedSeenMs
         EmbedHost.onGone = { LauncherActions.embedGone(it) }
         ready = true
         reloadCatalog()
-        if (desktop != null) LauncherActions.home() // старт сразу в сторонний рабочий стол
     }
 
     fun reloadCatalog() {
@@ -133,11 +123,7 @@ internal object LauncherModel {
                 }
             }.getOrElse { AppLog.i("Launcher catalog: ${it.javaClass.simpleName}", false); emptyList() }
             val selected = DesktopAppCatalog.select(found, appCtx.packageName)
-            val homes = runCatching {
-                pm.queryIntentActivities(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME), 0)
-                    .mapNotNullTo(HashSet()) { info -> info.activityInfo?.let { "${it.packageName}/${it.name}" } }
-            }.getOrElse { AppLog.i("Launcher HOME: ${it.javaClass.simpleName}", false); emptySet() }
-            main.post { catalog = selected; homeKeys = homes; catalogLoaded = true }
+            main.post { catalog = selected; catalogLoaded = true }
         }
     }
 
@@ -175,7 +161,6 @@ internal object LauncherModel {
     fun chooseLocalPlayer(pkg: String?) { localPlayer = pkg; prefs.localPlayer = pkg }
     fun chooseOnlinePlayer(pkg: String?) { onlinePlayer = pkg; prefs.onlinePlayer = pkg }
     fun nextCardView() { cardView = cardView.next().also { prefs.cardView = it } }
-    fun chooseDesktop(key: String?) { desktop = key; desktopBroken = false; desktopGoneAt = 0L; prefs.desktop = key }
     fun setNavigator(pkg: String?) { savedNavigator = pkg; prefs.navigator = pkg }
     fun chooseMusicPlayer(pkg: String?) { musicPlayer = pkg; prefs.musicPlayer = pkg; noteOnlinePlayer(pkg) }
     /** Выбрали или услышали [pkg]: если это онлайн-плеер, он становится вторым слотом чипа. */
@@ -191,13 +176,6 @@ internal object LauncherModel {
         missedSeenMs = now
         prefs.missedSeenMs = now
     }
-
-    /** Лаунчеры, которые можно поставить вместо главного экрана. */
-    val desktopOptions: List<DesktopAppCatalog.Entry> get() = DesktopPick.options(catalog, homeKeys)
-    /** Действующий сторонний рабочий стол; null - наш главный (не выбран или откат после сбоя). */
-    val desktopRef: AppRef? get() = if (desktopBroken) null else desktop?.let(AppRef::parse)
-    /** «Главный» экран: окно стороннего рабочего стола или наш [Area.Home]. */
-    val homeArea: Area get() = desktopRef?.let { Area.App(it) } ?: Area.Home
 
     /** Установленные известные навигаторы (по каталогу приложений с лаунчерным входом). */
     val installedPackages: Set<String> get() = catalog.mapTo(HashSet()) { it.packageName }
@@ -215,13 +193,12 @@ internal object LauncherModel {
         }
         area = next
     }
-    /** Главный экран ([target] - Area.Home или окно стороннего рабочего стола); только через [LauncherActions.home]. */
-    fun home(target: Area = Area.Home) { go(target); previous = null }
+    fun home() { go(Area.Home); previous = null }
 
     /** «Назад» с экрана лаунчера: на предыдущий экран, если он был не главным, иначе на главный. */
     fun back() {
-        val target = BackNav.target(area, previous, homeArea)
-        if (desktopRef != null && target == homeArea) LauncherActions.home() else go(target)
+        val target = BackNav.target(area, previous)
+        go(target)
         previous = null
     }
 

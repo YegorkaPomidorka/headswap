@@ -449,6 +449,40 @@ object Mocks {
         }
     }
 
+    /**
+     * Экран «Для разработчиков» для шага активации в «Режиме»: заголовок, обведённая строка «Отладка по Wi-Fi»
+     * с включённым переключателем, под ней «Подключить устройство с кодом сопряжения» и размытая строка.
+     */
+    fun developerOptions(ctx: Context): View = ctx.developerRows().let { rows ->
+        ctx.vbox(8).apply { rows.forEach { addView(it, lp(MATCH, WRAP)) } }
+    }
+
+    private fun Context.developerRows(): List<View> {
+        val c = this
+        val title = text(getString(R.string.mock_dev_title), 13f, 600, clr(R.color.on2)).apply { pad(c, 6, 0, 6, 0) }
+        val wifi = hbox().apply {
+            background = shape(clr(R.color.surf), 16, clr(R.color.pri), 3)
+            pad(c, 14, 0, 12, 0)
+            addView(text(getString(R.string.mock_dev_wifi), 15f, 600), lp(0, WRAP, 1f))
+            addView(sysSwitch())
+            minimumHeight = dp(52)
+        }
+        val pair = hbox().apply {
+            background = shape(clr(R.color.surf), 16)
+            pad(c, 14, 8, 14, 8)
+            addView(text(getString(R.string.mock_dev_pair), 14f, 400).apply { lineHeight = dp(19) }, lp(0, WRAP, 1f))
+            minimumHeight = dp(48)
+        }
+        val ghost = hbox(12).apply {
+            background = shape(clr(R.color.surf), 16)
+            pad(c, 14, 0, 14, 0)
+            addView(bar(55), lp(0, WRAP, 1f))
+            minimumHeight = dp(44)
+            blurred(0.5f, 1.2f)
+        }
+        return listOf(title, wifi, pair, ghost)
+    }
+
     // --- кирпичики ---
 
     /** Полоска-«строка текста» шириной pct процентов (размытие рисуется полупрозрачной полоской цвета line). */

@@ -2,8 +2,6 @@ package com.yegorkapomidorka.headswap.ui
 
 import android.Manifest
 import android.app.AlertDialog
-import android.content.ClipData
-import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -43,7 +41,6 @@ import com.yegorkapomidorka.headswap.aa.CAR_MAKES
 import com.yegorkapomidorka.headswap.aa.CallStateSource
 import com.yegorkapomidorka.headswap.aa.CarPreset
 import com.yegorkapomidorka.headswap.aa.CustomVideoMode
-import com.yegorkapomidorka.headswap.aa.DesktopResolution
 import com.yegorkapomidorka.headswap.aa.EQ_BAND_MAX
 import com.yegorkapomidorka.headswap.aa.EQ_BAND_MIN
 import com.yegorkapomidorka.headswap.aa.EQ_FREQS
@@ -55,8 +52,9 @@ import com.yegorkapomidorka.headswap.aa.FpsSetting
 import com.yegorkapomidorka.headswap.aa.MicMode
 import com.yegorkapomidorka.headswap.aa.MusicRate
 import com.yegorkapomidorka.headswap.aa.VideoMode
-import com.yegorkapomidorka.headswap.dex.ActivationToken
+import com.yegorkapomidorka.headswap.desktop.DesktopAppCatalog
 import com.yegorkapomidorka.headswap.dex.DelegatedDesktopAccess
+import com.yegorkapomidorka.headswap.dex.DesktopPick
 import com.yegorkapomidorka.headswap.dex.DexPrefs
 import com.yegorkapomidorka.headswap.link.car.CarNetwork
 import com.yegorkapomidorka.headswap.link.car.CarPairing
@@ -387,7 +385,6 @@ class SettingsSectionScreen(host: MainActivity, val section: SettingsSection) : 
     private val rateRows = LinkedHashMap<MusicRate, RadioRow>()
     private var makeValue: TextView? = null
     private var modeSeg: Segmented? = null
-    private var modeNote: TextView? = null
     private var actHost: LinearLayout? = null
     private var phoneCardNote: TextView? = null
     private var phoneActivation: PhoneActivationBlock? = null
@@ -718,10 +715,9 @@ class SettingsSectionScreen(host: MainActivity, val section: SettingsSection) : 
             note(c.getString(R.string.bm_aa_note))
             return
         }
-        val seg = Segmented(c, listOf(c.getString(R.string.bm_aa), c.getString(R.string.bm_desktop)), 15f) { setBridgeMode(BridgeMode.values()[it]) }
+        val seg = Segmented(c, listOf(c.getString(R.string.bm_aa), c.getString(R.string.bm_own_launcher)), 15f) { setBridgeMode(BridgeMode.values()[it]) }
         modeSeg = seg
         body.addView(seg.view, lp(MATCH, WRAP))
-        modeNote = note("")
         actHost = c.vbox(8).also { body.addView(it, lp(MATCH, WRAP)) }
         refreshMode()
     }
@@ -739,7 +735,6 @@ class SettingsSectionScreen(host: MainActivity, val section: SettingsSection) : 
         val seg = modeSeg ?: return
         val desktop = aa.bridgeMode == BridgeMode.DESKTOP
         seg.setSelected(if (desktop) 1 else 0)
-        modeNote?.text = c.getString(if (desktop) R.string.bm_desktop_note else R.string.bm_aa_note)
         val box = actHost ?: return
         if (!desktop) {
             box.visibility = View.GONE
@@ -750,30 +745,11 @@ class SettingsSectionScreen(host: MainActivity, val section: SettingsSection) : 
         phoneActivation?.refresh()
     }
 
-    /** Активация с телефона, под ней свёрнутая «Активация с ПК»: команда adb из ActivationToken и копирование в буфер. */
+    /** Блок раздела «Режим» для своего лаунчера: выбор лаунчера, активация с телефона, разрешения карточки «Телефон». */
     private fun buildActivation(box: LinearLayout) {
         val c = ctx
-        buildDesktopResolution(box)
+        buildDesktopLauncher(box)
         phoneActivation = PhoneActivationBlock(host).also { box.addView(it.view, lp(MATCH, WRAP)) }
-        val pc = c.vbox(8).apply { visibility = View.GONE }
-        box.addView(c.linkButton(c.getString(R.string.bm_act_title), 48, 15f).apply {
-            setOnClickListener { pc.visibility = if (pc.visibility == View.VISIBLE) View.GONE else View.VISIBLE }
-        }, c.lpDp(MATCH, 48))
-        val command = ActivationToken(c).adbCommand(DexPrefs(c).usbPlaybackAudio)
-        pc.addView(c.text(command, 12f, 400, monospace = true).apply {
-            setTextIsSelectable(true)
-            background = c.shape(c.clr(R.color.surf), 12)
-            pad(c, 12, 10, 12, 10)
-        }, lp(MATCH, WRAP))
-        pc.addView(c.tonalButton(c.getString(R.string.bm_act_copy)).apply {
-            setOnClickListener {
-                c.getSystemService(ClipboardManager::class.java)
-                    .setPrimaryClip(ClipData.newPlainText(c.getString(R.string.bm_act_copy_label), command))
-                Toast.makeText(c, R.string.bm_act_copied, Toast.LENGTH_SHORT).show()
-            }
-        }, c.lpDp(MATCH, 52))
-        pc.addView(c.text(c.getString(R.string.bm_act_hint), 13f, 400, c.clr(R.color.on2)), lp(WRAP, WRAP).margins(c, 8, 0, 8, 0))
-        box.addView(pc, lp(MATCH, WRAP))
         // карточка «Телефон» лаунчера: журнал вызовов, контакты, звонок и ответ с экрана ГУ
         box.addView(c.tonalButton(c.getString(R.string.l_perm_button)).apply {
             setOnClickListener { requestPhoneCardPermissions() }
@@ -782,22 +758,43 @@ class SettingsSectionScreen(host: MainActivity, val section: SettingsSection) : 
         refreshPhoneCardPermissions()
     }
 
-    /** Разрешение рабочего стола: Авто и три фиксированных (своё пока не показываем); действует со следующего подключения. */
-    private fun buildDesktopResolution(box: LinearLayout) {
+    /**
+     * Лаунчер на ГУ: наш Headswap или любой установленный HOME-лаунчер (CarDash, DriveDeck) на весь экран, без рейки и рамки.
+     * Выбор пишется в DexPrefs и сразу применяется к идущему сеансу; список читаем не на главном потоке.
+     */
+    private fun buildDesktopLauncher(box: LinearLayout) {
         val c = ctx
         val dex = DexPrefs(c)
-        val options = listOf(DesktopResolution.AUTO, DesktopResolution.R1024_768, DesktopResolution.R1280_720, DesktopResolution.R1600_900)
-        val labels = options.map { if (it == DesktopResolution.AUTO) c.getString(R.string.bm_res_auto) else "${it.width}×${it.height}" }
-        lateinit var seg: Segmented
-        seg = Segmented(c, labels, 14f) {
-            dex.desktopResolution = options[it]
-            seg.setSelected(it)
-            AppLog.i("настройка: разрешение рабочего стола -> ${options[it].name}, применится к следующему подключению")
+        var options = emptyList<DesktopAppCatalog.Entry>()
+        val rows = LinkedHashMap<String?, RadioRow>()      // ключ - «пакет/класс», null - Headswap
+        fun mark() {
+            val current = DesktopPick.selected(dex.desktopComponent, options)?.key      // лаунчер пропал: показываем Headswap, он и запустится
+            for ((key, row) in rows) row.setSelected(key == current)
         }
-        seg.setSelected(options.indexOf(dex.desktopResolution))
-        box.addView(c.sectionTitle(c.getString(R.string.bm_res_title)))
-        box.addView(seg.view, lp(MATCH, WRAP))
-        box.addView(c.text(c.getString(R.string.bm_res_note), 13f, 400, c.clr(R.color.on2)), lp(WRAP, WRAP).margins(c, 8, 2, 8, 8))
+        val list = c.vbox(8)
+        fun add(key: String?, title: String) {
+            val row = RadioRow(c, title, "") {
+                if (dex.desktopComponent == key) return@RadioRow
+                dex.desktopComponent = key
+                AppLog.i("настройка: лаунчер на ГУ -> ${key ?: "Headswap"}")
+                mark()
+                if (BridgeService.alive) BridgeService.requestDesktopApply(c)
+            }
+            rows[key] = row
+            list.addView(row.view, lp(MATCH, WRAP))
+        }
+        add(null, c.getString(R.string.bm_launcher_own))
+        mark()
+        box.addView(c.sectionTitle(c.getString(R.string.bm_launcher_title)))
+        box.addView(list, lp(MATCH, WRAP))
+        Thread({
+            val found = DesktopPick.installed(c)
+            Handler(Looper.getMainLooper()).post {
+                options = found
+                for (e in found) add(e.key, e.label)
+                mark()
+            }
+        }, "desktop-launchers").apply { isDaemon = true; start() }
     }
 
     private fun missingPhoneCardPermissions(): List<String> = PHONE_CARD_PERMISSIONS.filter {

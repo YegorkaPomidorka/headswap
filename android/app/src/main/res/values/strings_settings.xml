@@ -263,18 +263,12 @@
     <string name="bm_aa" translatable="false">Android Auto</string>
     <string name="bm_desktop" translatable="false">Headswap Desktop</string>
     <string name="bm_aa_note">The head unit shows Android Auto from your phone.</string>
-    <string name="bm_desktop_note">Your own desktop on the head unit. Needs a one-time activation.</string>
+    <string name="bm_own_launcher">Own launcher</string>
+    <string name="bm_launcher_title">Launcher</string>
+    <string name="bm_launcher_own" translatable="false">Headswap</string>
     <string name="bm_need_13">Android 13+ required</string>
     <string name="bm_sum_state">%1$s · %2$s</string>
-    <string name="bm_res_title">Desktop resolution</string>
-    <string name="bm_res_auto">Auto</string>
-    <string name="bm_res_note">Auto follows the request of the head unit. Applies on the next connection.</string>
-    <string name="bm_act_title">Activation from PC</string>
     <string name="bm_act_on">Activated</string>
     <string name="bm_act_off">Not activated</string>
     <string name="bm_act_lost">Access lost, activate again</string>
-    <string name="bm_act_hint">Repeat after the phone reboots or updates.</string>
-    <string name="bm_act_copy">Copy</string>
-    <string name="bm_act_copied">Command copied</string>
-    <string name="bm_act_copy_label">Headswap Desktop activation</string>
 </resources>

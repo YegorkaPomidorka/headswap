@@ -5,6 +5,9 @@ import android.content.Intent
 import android.os.Handler
 import android.os.Looper
 import com.yegorkapomidorka.headswap.AppLog
+import com.yegorkapomidorka.headswap.BridgeService
+import com.yegorkapomidorka.headswap.dex.DesktopPick
+import com.yegorkapomidorka.headswap.dex.DexPrefs
 
 /** Стенд без машины: экран, раздел настроек, тема и сторона карты лаунчера из adb (MainActivity --es cmd launcher). */
 internal object LauncherDebug {
@@ -15,8 +18,13 @@ internal object LauncherDebug {
             intent.getStringExtra("theme")?.let { t -> ThemeChoice.entries.firstOrNull { it.name.equals(t, true) }?.let(model::chooseTheme) }
             intent.getStringExtra("map")?.let { model.chooseMapLeft(it == "left") }
             intent.getStringExtra("page")?.let { p -> SettingsPage.entries.firstOrNull { it.name.equals(p, true) }?.let { model.settingsPage = it } }
-            // рабочий стол «пакет/класс»; "own" - наш главный
-            intent.getStringExtra("desktop")?.let { d -> model.chooseDesktop(d.takeUnless { it == "own" }); LauncherActions.home() }
+            // лаунчер на ГУ «пакет/класс» (DexPrefs); "own" - наш. Идущему сеансу уходит сразу, как из настроек
+            intent.getStringExtra("desktop")?.let { d ->
+                if (d == "own" || DesktopPick.isComponent(d)) {
+                    DexPrefs(ctx).desktopComponent = d.takeUnless { it == "own" }
+                    BridgeService.requestDesktopApply(ctx)
+                }
+            }
             when (intent.getStringExtra("area")) {
                 "home" -> LauncherActions.home()
                 "settings" -> model.go(Area.Settings)

@@ -1,7 +1,6 @@
 package com.yegorkapomidorka.headswap.launcher
 
 import android.app.ActivityOptions
-import android.content.ComponentName
 import android.content.Intent
 import android.view.Display
 import com.yegorkapomidorka.headswap.AppLog
@@ -12,36 +11,11 @@ import com.yegorkapomidorka.headswap.dex.DexState
 object LauncherActions {
     private val model get() = LauncherModel
 
-    /** Логотип на рейке: на нашем главном - «Все приложения», на любом другом экране (и в открытом приложении) - домой. */
+    /** Логотип на рейке: на главном - «Все приложения», на любом другом экране (и в открытом приложении) - домой. */
     fun logo() { if (model.area == Area.Home) model.go(Area.AllApps) else home() }
 
-    /**
-     * Домой, единственная точка возврата: сторонний рабочий стол в окне приложения (если он уже открыт - заново проверяем
-     * его задачу, и лаунчер поднимается поверх открытого из него приложения), иначе наш главный экран. Рабочий стол,
-     * которого больше нет или который отключён, - откат на наш главный.
-     */
-    fun home() {
-        val ref = model.desktopRef
-        if (ref == null) { model.home(); return }
-        if (!desktopUsable(ref)) { desktopFailed("пакета или входа больше нет"); return }
-        if (model.area == Area.App(ref)) { EmbedHost.refresh(EmbedHost.app); return }
-        showApp(ref, Area.App(ref), home = true)
-    }
-
-    private fun desktopUsable(ref: AppRef): Boolean = runCatching {
-        val info = model.context.packageManager.getActivityInfo(ComponentName(ref.pkg, ref.cls), 0)
-        info.enabled && info.applicationInfo.enabled && info.exported
-    }.getOrDefault(false)
-
-    /** Рабочий стол не запустился или пропал: до нового выбора работает наш главный. Выбор в prefs остаётся. */
-    internal fun desktopFailed(why: String) {
-        AppLog.i("LAUNCHER сторонний рабочий стол ${model.desktop}: $why, откат на главный Headswap", false)
-        val onDesktop = model.area == model.homeArea
-        model.launchLock.finish()
-        model.starting = null
-        model.desktopBroken = true
-        if (onDesktop) model.home()
-    }
+    /** Домой, единственная точка возврата на главный экран. */
+    fun home() { model.home() }
     fun openPicker() { model.go(Area.Picker) }
     /** Шестерёнка на рейке: настройки; повторное нажатие - назад. */
     fun openSettings() {
@@ -94,17 +68,10 @@ object LauncherActions {
         if (ref.pkg == model.navigatorPkg) { openNavigatorWindow(); return }
         // тап по уже открытому приложению: экран не меняется, поэтому проверку задачи запускаем руками
         if (model.area == Area.App(ref)) { EmbedHost.refresh(EmbedHost.app); return }
-        showApp(ref, Area.App(ref))
-    }
-
-    /** Приложение в окне справа от рейки: холодный старт блокирует повторный тап, пока не появится. */
-    private fun showApp(ref: AppRef, area: Area, home: Boolean = false) {
-        // прошлый запуск не удался: новый выбор или тап начинают попытки заново
-        if (EmbedHost.app.status == EmbedStatus.FAILED) EmbedHost.retry(EmbedHost.app)
-        model.launchLock.begin(ref.key, model.now())
-        model.starting = model.label(ref) ?: model.packageLabel(ref.pkg)
+        model.launchLock.begin(ref.key, now)
+        model.starting = model.label(ref) ?: ref.pkg
         model.appKey = ref.key
-        if (home) model.home(area) else model.go(area)
+        model.go(Area.App(ref))
     }
 
     /** Тап по телу карточки музыки: приложение плеера на весь экран справа от рейки. */
@@ -158,8 +125,7 @@ object LauncherActions {
 
     /**
      * Кнопка «Назад» рейки: Back в открытое окно (если приложение вышло из корня - на главный); с экрана лаунчера - на
-     * предыдущий экран или главный; на нашем главном ничего. В стороннем рабочем столе Back идёт в его окно, как в любое
-     * приложение: Back из его корня закрывает задачу, и «домой» запускает его заново (один раз на нажатие).
+     * предыдущий экран или главный; на главном ничего.
      */
     fun embeddedBack() {
         AppLog.i("LAUNCHER Назад на рейке: экран=${model.area}", false)
@@ -180,16 +146,7 @@ object LauncherActions {
     }
 
     /** Слот сообщил, что задачи приложения больше нет (процесс убит, Back из корня, окно потеряно): слой убираем. */
-    internal fun embedGone(slot: EmbedSlot) {
-        // рабочий стол умер сам (не по «Назад»): второй раз подряд за 15 с - не перезапускаем, чтобы не крутить по кругу
-        if (slot === EmbedHost.app && model.desktopRef != null && model.area == model.homeArea) {
-            val now = model.now()
-            val loop = DesktopPick.crashLoop(model.desktopGoneAt, now)
-            model.desktopGoneAt = now
-            if (loop) { desktopFailed("задача пропала дважды за ${DesktopPick.RESTART_WINDOW_MS / 1000} с"); return }
-        }
-        backClosed(slot)
-    }
+    internal fun embedGone(slot: EmbedSlot) = backClosed(slot)
 
     /** Аппаратный Back ГУ - то же, что «Назад» на рейке. */
     fun hardwareBack() {

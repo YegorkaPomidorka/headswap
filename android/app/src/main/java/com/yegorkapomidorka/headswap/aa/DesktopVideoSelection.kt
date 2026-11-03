@@ -69,4 +69,16 @@ class DesktopVideoSelection(val resolution: DesktopResolution, val densityOverri
         result
     }
     fun densityFor(mode: VideoGeometry): Int = if (densityOverride == 0) mode.density else densityOverride
+
+    companion object {
+        /**
+         * Размер дисплея рабочего стола из настройки «Видео» AA ([video] - то, что там показано, уже с учётом
+         * перекодирования): тот же outW×outH. Размер вне пределов виртуального дисплея (2240×976 и т.п.) - Авто:
+         * как просит магнитола, при невалидном INIT 1280×720.
+         */
+        fun forAaVideo(video: VideoGeometry, densityOverride: Int): DesktopVideoSelection =
+            if (DesktopGeometryPolicy.accepts(video.outW, video.outH))
+                DesktopVideoSelection(DesktopResolution.CUSTOM, densityOverride, video.outW, video.outH)
+            else DesktopVideoSelection(DesktopResolution.AUTO, densityOverride)
+    }
 }

@@ -11,10 +11,13 @@
     <string name="desk_recovery_screen_busy">Предыдущий экран ещё не освобождён; автоматический запуск отменён</string>
 
     <!-- Активация с самого телефона (беспроводная отладка), Настройки - Режим -->
-    <string name="pa_title">Активация с телефона</string>
-    <string name="pa_hint">«Для разработчиков» → «Отладка по Wi-Fi» → «Подключить устройство с кодом сопряжения». Код введите в уведомлении Headswap.</string>
-    <string name="pa_hint_paired">Телефон сопряжён, код не нужен.</string>
-    <string name="pa_button">Активировать с телефона</string>
+    <string name="pa_title">Активируйте Headswap</string>
+    <string name="pa_step_1">Откройте «Для разработчиков» → «Отладка по Wi-Fi» и включите её.</string>
+    <string name="pa_step_2">Нажмите «Подключить устройство с кодом сопряжения».</string>
+    <string name="pa_step_3">Введите код в уведомлении Headswap.</string>
+    <string name="pa_step_paired">Нажмите «Активировать». Телефон уже сопряжён, код не нужен.</string>
+    <string name="pa_hint">Активацию нужно повторять после перезагрузки телефона.</string>
+    <string name="pa_button">Активировать</string>
     <string name="pa_button_again">Активировать снова</string>
     <string name="pa_cancel">Отмена</string>
     <string name="pa_manual_toggle">Ввести порт и код вручную</string>
