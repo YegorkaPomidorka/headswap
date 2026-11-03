@@ -471,8 +471,8 @@ private fun systemInfo(): List<Pair<String, String>> {
     return listOf(
         stringResource(R.string.l_s_hu) to hu,
         stringResource(R.string.l_s_link) to link,
-        // в Headswap Desktop телефон кодирует свой экран сам, прямого проброса нет
-        stringResource(R.string.l_s_video) to "H.264",
+        // телефон кодирует свой экран один раз и отдаёт ГУ готовый H.264 - по сути прямой проброс
+        stringResource(R.string.l_s_video) to stringResource(R.string.set_direct_title),
         stringResource(R.string.l_s_res) to res,
     )
 }

@@ -44,6 +44,7 @@
     <string name="set_direct_desc">Видео АА уходит в ГУ как есть. Широкие экраны ГУ обрезает сама, без телефона.</string>
     <string name="set_direct_plus">+ Меньше задержка, нагрев и расход батареи</string>
     <string name="set_direct_minus">− Частота кадров не регулируется</string>
+    <string name="set_direct_desktop_desc">В режиме «Свой лаунчер» телефон сам кодирует свой экран один раз и отдаёт ГУ готовый поток H.264, без перекодирования.</string>
 
     <string name="set_resolution">Разрешение видео</string>
     <string name="set_res_pick">Выбрать разрешение</string>

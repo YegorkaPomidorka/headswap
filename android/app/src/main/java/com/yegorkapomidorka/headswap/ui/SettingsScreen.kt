@@ -874,10 +874,18 @@ class SettingsSectionScreen(host: MainActivity, val section: SettingsSection) : 
     private fun buildVideo() {
         val c = ctx
         body.addView(c.sectionTitle(c.getString(R.string.set_mode)))
-        val seg = Segmented(c, listOf(c.getString(R.string.set_transcode_title), c.getString(R.string.set_direct_title)), 15f) { setTranscode(it == 0) }
-        transcodeSeg = seg
-        body.addView(seg.view, lp(MATCH, WRAP))
-        body.addView(modeDescription(), lp(MATCH, WRAP).margins(c, 8, 4, 8, 0))
+        if (BridgeMode.effective(aa.bridgeMode, Build.VERSION.SDK_INT) == BridgeMode.DESKTOP) {
+            // «Свой лаунчер»: телефон кодирует экран один раз и отдаёт ГУ готовый H.264 - выбирать нечего, это и есть проброс.
+            // Настройку AA (aa.transcode) не трогаем: она снова работает при возврате в режим Android Auto.
+            body.addView(Segmented(c, listOf(c.getString(R.string.set_direct_title)), 15f) {}.apply { setSelected(0) }.view, lp(MATCH, WRAP))
+            body.addView(c.text(c.getString(R.string.set_direct_desktop_desc), 13f, 400, c.clr(R.color.on2)).apply { setLineSpacing(0f, 1.4f) },
+                lp(MATCH, WRAP).margins(c, 8, 4, 8, 0))
+        } else {
+            val seg = Segmented(c, listOf(c.getString(R.string.set_transcode_title), c.getString(R.string.set_direct_title)), 15f) { setTranscode(it == 0) }
+            transcodeSeg = seg
+            body.addView(seg.view, lp(MATCH, WRAP))
+            body.addView(modeDescription(), lp(MATCH, WRAP).margins(c, 8, 4, 8, 0))
+        }
 
         body.addView(c.sectionTitle(c.getString(R.string.set_resolution)))
         customResNote = note("").apply { visibility = View.GONE }
