@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- One-time window after updating to 4.0: the “Own launcher” mode -->
+<resources>
+    <string name="u40_title">Your own launcher on the car screen</string>
+    <string name="u40_lead">New mode: your own home screen on the car display instead of Android Auto. Android Auto stays the default, nothing has changed for you.</string>
+    <string name="u40_pros">What you can do</string>
+    <string name="u40_pro_1">Headswap home screen: music, navigation and your apps</string>
+    <string name="u40_pro_2">Any car launcher from your phone, e.g. CarDash</string>
+    <string name="u40_pro_3">Run phone apps right on the car screen</string>
+    <string name="u40_needs">What it takes</string>
+    <string name="u40_need_1">Developer options and Wireless debugging. These are risky settings, you enable them at your own risk</string>
+    <string name="u40_need_2">After a phone restart, activate again: it takes half a minute</string>
+    <string name="u40_need_3">Sound only over the head unit Bluetooth for now</string>
+    <string name="u40_where">Settings → Mode</string>
+    <string name="u40_ok">Got it</string>
+    <string name="u40_try">Try own launcher</string>
+</resources>
