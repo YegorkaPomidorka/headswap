@@ -46,6 +46,14 @@ class AaPrefs(ctx: Context) {
         get() = TouchDecimation.parse(sp.getString("touchDecimation", TouchDecimation.DEFAULT.name))
         set(v) = sp.edit().putString("touchDecimation", v.name).apply()
 
+    /**
+     * Свой IDR раз в 2 с в прямом проброске (IdrSplice, ADR 0005), раздел для разработчиков. По умолчанию включён;
+     * выключают на ГУ, которые сами возвращают картинку после камеры (VW). Ключ новый: старый idrSplice был выключен по умолчанию.
+     */
+    var ownIdr: Boolean
+        get() = sp.getBoolean("ownIdr", true)
+        set(v) = sp.edit().putBoolean("ownIdr", v).apply()
+
     /** Видео моста: passthrough H.264 AA как есть (по умолчанию с 3.0) или перекодирование. */
     var transcode: Boolean
         get() = sp.getBoolean("transcode", false)

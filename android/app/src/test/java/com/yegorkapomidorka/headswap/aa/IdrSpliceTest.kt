@@ -441,7 +441,7 @@ class IdrSpliceBridgeTest {
         assertTrue(logs.toString(), logs.any { it.contains("пауза ${AaBridgeCore.SPLICE_BACKOFF_MS} мс, потом снова") })
         assertFalse(logs.toString(), logs.any { it.contains("выключен до конца AA-сессии") })
         assertFalse(dec.stopped)
-        assertFalse(core.spliceWorks)                           // h529 и h295 - страховка на время паузы
+        assertFalse(core.spliceWorks)                           // h529 - страховка на время паузы
         // пауза: кадры не держим, свой IDR не пробуем
         val sent = link.sent.size
         now += AaBridgeCore.SPLICE_BACKOFF_MS - 1000

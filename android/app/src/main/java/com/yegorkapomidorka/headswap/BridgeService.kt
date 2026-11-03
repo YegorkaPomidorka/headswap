@@ -859,11 +859,11 @@ class BridgeService : Service() {
             AppLog.i("BRIDGE видео: ${if (transcode) "перекодирование включаю принудительно (режим хоста ${h.core.videoMode.label})" else "возвращаю passthrough по настройке"}")
             h.core.transcodeEnabled = transcode
         }
-        if (!transcode && transport.caps == TransportCaps.TCP6) AppLog.i("BRIDGE видео: воздух, прямой проброс со своим IDR (битрейт не регулируется)")
-        // свой IDR только в passthrough: при перекодировании его нет
-        val spliceMs = if (transcode) 0L else IDR_SPLICE_MS
+        if (!transcode && transport.caps == TransportCaps.TCP6) AppLog.i("BRIDGE видео: воздух, прямой проброс${if (aaPrefs.ownIdr) " со своим IDR" else ""} (битрейт не регулируется)")
+        // свой IDR только в passthrough: при перекодировании его нет; выключается галкой для разработчиков
+        val spliceMs = if (transcode || !aaPrefs.ownIdr) 0L else IDR_SPLICE_MS
         if (h.core.spliceMs != spliceMs) {
-            AppLog.i("BRIDGE свой IDR в passthrough: ${if (spliceMs > 0) "раз в $spliceMs мс" else "выключен (перекодирование)"}")
+            AppLog.i("BRIDGE свой IDR в passthrough: ${if (spliceMs > 0) "раз в $spliceMs мс" else if (transcode) "выключен (перекодирование)" else "выключен в настройках для разработчиков"}")
             h.core.spliceMs = spliceMs
         }
         h.core.carVwId = aaPrefs.carPreset == CarPreset.VW_ID_UNYX

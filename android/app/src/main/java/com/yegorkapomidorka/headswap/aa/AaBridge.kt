@@ -119,10 +119,7 @@ class AaBridgeCore(
     private var placeholderText = TEXT_CONNECTING
     private var waitSince = 0L
     private var lastKeyframeRequest = NEVER
-    private var lastIdrSentMs = NEVER              // когда в CarLife ушёл последний IDR passthrough (h295)
-    private var h295TouchAt = NEVER                // когда тач запросил keyframe-цикл; NEVER = IDR после тача не ждём
-    private var h295LastTrigger = NEVER
-    private var h295LastTouchAt = NEVER            // последний тач от ГУ любого action
+    private var lastIdrSentMs = NEVER              // когда в CarLife ушёл последний IDR passthrough
 
     var dropped = 0L
         private set
@@ -214,8 +211,6 @@ class AaBridgeCore(
     @Volatile var huHyundaiCn7 = false         // ГУ Hyundai CN7 (product wp_cn7cpe_cn, h218): в режиме «Авто» музыка 32 кГц с ресэмплом 48→32
         private set
     @Volatile var huPioneerRm56 = false        // ГУ Pioneer RM56E8B (Dongfeng DF6, h277): 4-5 Мбит/с рвут USB EIO за 25-30 с, живёт на ~1 Мбит/с и fps ≤ 15
-        private set
-    @Volatile var huHonda20772121 = false      // Honda Civic 11 (channel 20772121, h295): после камеры/меню ГУ молча сбрасывает декодер, passthrough ждёт IDR
         private set
     @Volatile var huMazda20622111 = false      // Mazda Connect 2 из Китая (channel 20622111, h238/h359): VIDEO_DATA > ~16 КиБ вешает чтение USB
         private set
@@ -433,7 +428,6 @@ class AaBridgeCore(
         vwIdChannel = null
         huHyundaiCn7 = false                   // HU_INFO придёт заново в этой сессии
         huPioneerRm56 = false                  // HU_INFO придёт заново в этой сессии
-        huHonda20772121 = false                // HU_INFO / STATISTIC_INFO придут заново в этой сессии
         huMazda20622111 = false                // STATISTIC_INFO придёт заново в этой сессии
         huMobisNx4c = false                    // HU_INFO / STATISTIC_INFO придут заново в этой сессии
         huVwCns2Delphi = false                 // STATISTIC_INFO придёт заново в этой сессии
@@ -443,9 +437,6 @@ class AaBridgeCore(
         touchDecimationLogged = 1
         touchPacer.reset()
         touchPacerLogged = false
-        h295TouchAt = NEVER
-        h295LastTrigger = NEVER
-        h295LastTouchAt = NEVER
         sessionKickDone = false
         spliceCancel("новая CarLife-сессия")
         latStats.resetSession()
@@ -491,7 +482,6 @@ class AaBridgeCore(
             return
         }
         gotIdr = false
-        h295TouchAt = NEVER
         spsCropKickAt = NEVER
         waitSince = if (aaVideoSeen) clockMs() - KEYFRAME_WAIT_MS else 0L
         lastKeyframeRequest = NEVER
@@ -744,7 +734,6 @@ class AaBridgeCore(
     fun onHuStatistic(channel: String?) {
         if (channel == MOBIS_NX4C_CHANNEL) enableMobisNx4c()
         if (channel == DESAY_G6S_CHANNEL) huDesayG6S = true
-        if (channel == HONDA_20772121_CHANNEL || channel == HONDA_20832125_CHANNEL) huHonda20772121 = true
         if (channel == HONDA_20832125_CHANNEL) huHondaVezel = true
         if (channel == HONDA_20772104_CHANNEL) huHonda20772104 = true
         if (channel == KIA_20032131_CHANNEL && !huKia20032131) {
@@ -849,7 +838,6 @@ class AaBridgeCore(
             log("BRIDGE тач: прореживание MOVE ${if (every > 1) "×$every" else "выкл"} (настройка)", true)
         }
         touchDecimator.onTouch(action, x, y, px, py, every)
-        onHuTouch(action and 0xFF)                                            // вне touchLock: вложенных блокировок нет
     }
 
     /** Выход прореживателя: на Delphi через пейсер пачек, на остальных ГУ сразу в AA. */
@@ -863,47 +851,6 @@ class AaBridgeCore(
         } else {
             dispatchTouch(action, x, y, px, py)
         }
-    }
-
-    /**
-     * h295, Honda Civic 11 (20772121): ГУ после камеры заднего хода / меню машины молча сбрасывает декодер и ничего не шлёт
-     * (ни PAUSE, ни START), а AA в passthrough даёт IDR раз в минуты. Камера/меню - пауза в тачах CarLife, при обычной
-     * работе тапы идут чаще. DOWN после паузы >= [H295_TOUCH_IDLE_MS] при старом IDR - вероятно, чёрный экран: сразу просим
-     * у AA ключевой кадр полным циклом NATIVE -> PROJECTED (мягкий PROJECTED на Samsung IDR не давал), gate не закрываем,
-     * P-кадры идут. Пришедший IDR в [onFrame] получает SPS/PPS из CODEC_CONFIG: после сброса декодера ГУ голый IDR может не принять.
-     * Время прошлого тача читаем до обновления, поэтому второй DOWN-дубль ГУ (~2 мс) триггер не повторяет.
-     */
-    @Synchronized
-    private fun onHuTouch(act: Int) {
-        val now = clockMs()
-        val firstTouch = h295LastTouchAt == NEVER
-        val sinceTouch = now - h295LastTouchAt
-        h295LastTouchAt = now
-        if (act != AapMessages.TOUCH_DOWN) return
-        if (!huHonda20772121 || transcoder != null || !carlifeStarted || !gotIdr) return
-        if (spliceWorks) return     // свой IDR и так раз в 2 с, цикл NATIVE -> PROJECTED только дёргает картинку под пальцем
-        val sinceIdr = now - lastIdrSentMs
-        if (sinceIdr <= H295_IDR_STALE_MS || sinceTouch < H295_TOUCH_IDLE_MS || now - h295LastTrigger < H295_TRIGGER_MIN_MS) return
-        h295LastTrigger = now
-        h295TouchAt = now
-        lastKeyframeRequest = now
-        keyframeRequests++
-        log("BRIDGE h295: тач после $sinceIdr мс без IDR, ${if (firstTouch) "первый тач в сессии" else "пауза в тачах $sinceTouch мс"} -> keyframe-цикл", true)
-        peer?.requestKeyFrame()
-    }
-
-    /** h295: IDR после цикла так и не пришёл за [H295_WAIT_GIVEUP_MS] - не вешаем на него чужой IDR в логе и склейке. */
-    private fun h295GiveUp(now: Long) {
-        if (h295TouchAt == NEVER || now - h295TouchAt <= H295_WAIT_GIVEUP_MS) return
-        log("BRIDGE h295: IDR после тача не пришёл за ${H295_WAIT_GIVEUP_MS / 1000} с", true)
-        h295TouchAt = NEVER
-    }
-
-    /** h295: IDR, которого ждали после тача, уходит с SPS/PPS из CODEC_CONFIG, если в кадре их нет. Иначе кадр как есть. */
-    private fun h295Prepare(b: ByteArray, types: List<Int>): ByteArray {
-        if (h295TouchAt == NEVER || 5 !in types || (AnnexB.startsWithSps(b) && 8 in types)) return b
-        val cfg = aaConfig ?: return b
-        return AnnexB.glue(cfg, b)
     }
 
     private var spsCropKickAt = NEVER              // h529: когда запросить повторный IDR после первого в CarLife-сессии
@@ -978,12 +925,6 @@ class AaBridgeCore(
             stubCropDst = cropSps(sps, " заглушки")
         }
         stubCropDst ?: sps
-    }
-
-    private fun h295IdrSeen(before: ByteArray, after: ByteArray) {
-        if (h295TouchAt == NEVER) return
-        log("BRIDGE h295: IDR через ${lastIdrSentMs - h295TouchAt} мс после тача, nal=${AnnexB.nalTypes(before)} -> ${AnnexB.nalTypes(after)}", true)
-        h295TouchAt = NEVER
     }
 
     private fun dispatchTouch(action: Int, x: Int, y: Int, px: Int, py: Int) = synchronized(touchLock) {
@@ -1875,7 +1816,6 @@ class AaBridgeCore(
                 spsCropKickBase = lastIdrSentMs
                 spsCropKickDeferred = false
             }
-            h295IdrSeen(b, payload)
             if (active != Source.AA) {
                 active = Source.AA
                 log("BRIDGE источник -> AA (первый IDR ${payload.size} Б, nal=${AnnexB.nalTypes(payload)})", true)
@@ -1886,7 +1826,7 @@ class AaBridgeCore(
             AaState.status = "мост: AA -> CarLife"
             return
         }
-        val out = h295Prepare(b, types).let { if (5 in types) spsCrop(it) else it }
+        val out = if (5 in types) spsCrop(b) else b
         if (!link.sendVideo(out)) {
             // кадр потерян: декодер ГУ поплывёт, ждём новый IDR
             gotIdr = false
@@ -1899,7 +1839,6 @@ class AaBridgeCore(
         if (5 in types) {
             idrSent++
             lastIdrSentMs = clockMs()
-            h295IdrSeen(b, out)
         }
         AaState.bridgeSent = sent
     }
@@ -1924,7 +1863,6 @@ class AaBridgeCore(
         val now = clockMs()
         if (spliceOn) spliceTick(now)
         latStats.logIfDue(now)
-        h295GiveUp(now)
         if (spsCropKickAt != NEVER && now >= spsCropKickAt && spliceKickNeeded(now)) {
             spsCropKickAt = NEVER
             lastKeyframeRequest = now
@@ -2001,7 +1939,7 @@ class AaBridgeCore(
 
     /**
      * Свой IDR реально возможен: декодер уже отдал картинку, поток подходит, пауза после пропусков кончилась. Тогда
-     * повторный IDR от AA (встряска) не нужен. Пока паузы или вставший декодер - false: h529 и h295 работают как страховка.
+     * повторный IDR от AA (встряска) не нужен. Пока паузы или вставший декодер - false: h529 работает как страховка.
      */
     internal val spliceWorks: Boolean
         get() = spliceOn && spliceDisabled == null && refDecoder != null && refPicSeq > 0 &&
@@ -2099,7 +2037,7 @@ class AaBridgeCore(
 
     /**
      * Декодер встал: кадры AA идут, а его вывод не двигается и отстаёт больше чем на 2 дольше [SPLICE_STALL_MS]. Без этого
-     * своего IDR нет, а [spliceWorks] (картинка когда-то была) глушил бы h295. Декодер останавливается, новый создаст
+     * своего IDR нет, а [spliceWorks] (картинка когда-то была) глушил бы повтор IDR от AA (h529). Декодер останавливается, новый создаст
      * [spliceTrack] на следующем кадре AA; ему нужен IDR от AA, до него картинок нет ([refPicSeq] 0, [spliceWorks] false).
      * Пока вывода у нового декодера не было ([refOutSeq] 0), он просто ждёт IDR - не вставший, повторно не перезапускаем.
      * AA молчит дольше [SPLICE_STALL_IDLE_MS] (статика, декодер держит последние кадры) - отсчёт идёт заново.
@@ -2135,7 +2073,7 @@ class AaBridgeCore(
 
     /**
      * Вставка невозможна до конца AA-сессии: декодер стоп, кадры AA больше не придерживаются, повтор IDR от AA (h529)
-     * и цикл h295 работают как без галки. Сдвиг frame_num после уже ушедшего своего IDR держится до IDR от AA.
+     * работает как без галки. Сдвиг frame_num после уже ушедшего своего IDR держится до IDR от AA.
      */
     private fun spliceDisable(why: String) {
         if (spliceDisabled != null) return
@@ -2739,8 +2677,8 @@ class AaBridgeCore(
 
         fun isHondaChannel(channel: String?) =
             channel != null && channel.length == 8 && HONDA_CHANNEL_PREFIXES.any { channel.startsWith(it) }
-        const val HONDA_20772121_CHANNEL = "20772121"     // Honda Civic 11 2023 (Китай, h295): после камеры/меню ГУ не просит IDR
-        const val HONDA_20832125_CHANNEL = "20832125"     // Honda Vezel (ГУ Егора): то же после заднего хода в passthrough, лог 26.10
+        const val HONDA_20772121_CHANNEL = "20772121"     // Honda Civic 11 2023 (Китай, h295): без обходов, в тестах - «другая Honda без флага»
+        const val HONDA_20832125_CHANNEL = "20832125"     // Honda Vezel (ГУ Егора)
         const val HONDA_20772104_CHANNEL = "20772104"     // Honda Civic 2021 (Китай, h588/h629): после задней просит MUSIC=1
         /** Mazda Connect 2 (Китай, CarLife 1.0, HU_INFO из заглушек, h238/h359): VIDEO_DATA 16163 Б прошёл, 16518 и 19104 Б - ГУ перестала читать USB. */
         const val MAZDA_20622111_CHANNEL = "20622111"
@@ -2790,11 +2728,6 @@ class AaBridgeCore(
         const val SPLICE_KICK_GRACE_MS = 1500L   // h529-повтор IDR от AA откладывается на столько, если свой IDR вот-вот уйдёт
         const val SPLICE_RETRY_MS = 1000L        // пауза между попытками (без IDR на ГУ, после отказа, пропуска, таймаута)
 
-        /** h295: тач на ГУ 20772121 при IDR старше этого порога в passthrough - вероятно, ГУ сбросил декодер (камера/меню). */
-        const val H295_IDR_STALE_MS = 2500L
-        const val H295_TRIGGER_MIN_MS = 3000L
-        const val H295_TOUCH_IDLE_MS = 4000L      // пауза в тачах от ГУ перед триггером (камера/меню)
-        const val H295_WAIT_GIVEUP_MS = 10_000L   // после цикла ждём IDR для лога и склейки SPS/PPS не дольше этого
         private const val NEVER = Long.MIN_VALUE / 4
     }
 }
