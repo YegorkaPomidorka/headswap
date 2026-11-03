@@ -28,12 +28,18 @@ class PhoneActivationBlock(
     /** Пункты для несопряжённого телефона; null - pa_step_1..3 из «Режима». */
     private val unpairedSteps: List<String>? = null,
     private val hintRes: Int = R.string.pa_hint,
+    /**
+     * Шаг онбординга: заголовок ([titleView]) ставит экран на место заголовка шагов, кнопки «Активировать», «Отмена» и
+     * «Ввести порт и код вручную» тоже на экране (внизу, как у остальных шагов), в блоке остаются статус, макет, пункты и поля ручного ввода.
+     */
+    private val embedded: Boolean = false,
 ) {
     private val c = host
     private val state = PhoneActivationState(c)
     val view: LinearLayout = c.vbox(8)
     /** «Активируйте Headswap», после активации - зелёное «Активировано». */
     private val title: TextView
+    val titleView: TextView get() = title
     /** Ход попытки и ошибки; пусто, когда всё сказал заголовок. */
     private val status: TextView
     private val steps: LinearLayout
@@ -50,16 +56,19 @@ class PhoneActivationBlock(
     /** Доступ активирован и попытка не идёт: заголовок стал зелёным «Активировано». Обновляется в [refresh]. */
     var ready = false
         private set
+    /** Подпись основной кнопки: «Активировать» или «Активировать снова». Обновляется в [refresh]. */
+    var activateLabel: String = c.getString(R.string.pa_button)
+        private set
     /** Номер попытки, для которой журнал уже запрошен в этой сессии экрана: тик идёт каждые 500 мс. */
     private var collected: String? = null
 
     init {
         // та же раскладка, что у шагов онбординга (StepParts): заголовок, ход попытки, макет экрана, нумерованный список, пояснение, кнопки
         title = c.text(c.getString(R.string.pa_title), 24f, 600).apply { letterSpacing = -0.01f; lineHeight = c.dp(30) }
-        view.addView(title, lp(MATCH, WRAP).margins(c, 8, 12, 8, 0))
-        status = c.text("", 16f, 600).also { view.addView(it, lp(WRAP, WRAP).margins(c, 8, 0, 8, 8)) }
+        if (!embedded) view.addView(title, lp(MATCH, WRAP).margins(c, 8, 12, 8, 0))
+        status = c.text("", 16f, 600).also { view.addView(it, lp(WRAP, WRAP).margins(c, if (embedded) 0 else 8, 0, 8, 8)) }
         view.addView(c.stepMockCard(Mocks.developerOptions(c), compact = true), lp(MATCH, WRAP))
-        steps = c.vbox().also { view.addView(it, lp(MATCH, WRAP).margins(c, 0, 10, 0, 0)) }
+        steps = c.vbox().also { view.addView(it, lp(MATCH, WRAP).margins(c, 0, if (embedded) 18 else 10, 0, 0)) }
         view.addView(c.stepHint(c.getString(hintRes)), lp(MATCH, WRAP))
         activate = c.primaryButton(c.getString(R.string.pa_button)).apply { setOnClickListener { onActivate() } }
         view.addView(activate, c.lpDp(MATCH, 64).margins(c, 0, 8, 0, 0))
@@ -118,10 +127,11 @@ class PhoneActivationBlock(
                 else unpairedSteps ?: listOf(R.string.pa_step_1, R.string.pa_step_2, R.string.pa_step_3).map { c.getString(it) }
             steps.addView(c.numberedList(items), lp(MATCH, WRAP))
         }
-        (activate.getChildAt(0) as TextView).text = c.getString(if (paired || access == DelegatedDesktopAccess.Status.READY) R.string.pa_button_again else R.string.pa_button)
-        activate.visibility = if (busy) View.GONE else View.VISIBLE
-        cancel.visibility = if (busy) View.VISIBLE else View.GONE
-        manualToggle.visibility = if (busy) View.GONE else View.VISIBLE
+        activateLabel = c.getString(if (paired || access == DelegatedDesktopAccess.Status.READY) R.string.pa_button_again else R.string.pa_button)
+        (activate.getChildAt(0) as TextView).text = activateLabel
+        activate.visibility = if (busy || embedded) View.GONE else View.VISIBLE
+        cancel.visibility = if (busy && !embedded) View.VISIBLE else View.GONE
+        manualToggle.visibility = if (busy || embedded) View.GONE else View.VISIBLE
         if (busy) manualBox.visibility = View.GONE
         forget.visibility = if (paired && !busy) View.VISIBLE else View.GONE
     }
@@ -171,6 +181,16 @@ class PhoneActivationBlock(
         // Android 17: без разрешения mDNS-поиск портов режется молча, сам loopback к adbd его не требует
         if (Build.VERSION.SDK_INT >= 37 && c.checkSelfPermission(Manifest.permission.ACCESS_LOCAL_NETWORK) != PackageManager.PERMISSION_GRANTED)
             add(Manifest.permission.ACCESS_LOCAL_NETWORK)
+    }
+
+    /** Кнопки шага онбординга: те же действия, что у кнопок блока. */
+    fun activateNow() = onActivate()
+
+    fun cancelNow() = PhoneActivation.cancel(c)
+
+    fun toggleManual() {
+        if (PhoneActivation.busy) return
+        manualBox.visibility = if (manualBox.visibility == View.VISIBLE) View.GONE else View.VISIBLE
     }
 
     private fun onActivate() {

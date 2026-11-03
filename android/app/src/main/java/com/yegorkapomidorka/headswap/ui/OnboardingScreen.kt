@@ -17,6 +17,7 @@ import com.yegorkapomidorka.headswap.R
 import com.yegorkapomidorka.headswap.aa.AaPrefs
 import com.yegorkapomidorka.headswap.aa.BridgeMode
 import com.yegorkapomidorka.headswap.aa.CarPreset
+import com.yegorkapomidorka.headswap.dex.PhoneActivation
 
 /**
  * Онбординг (Onboarding.dc.html) и чеклист готовности. Первый шаг - выбор режима, дальше путь зависит от него
@@ -39,6 +40,8 @@ class OnboardingScreen(host: MainActivity, private val showAll: Boolean, startAt
     /** Блок активации живёт между перерисовками шага: идущая попытка и введённые порты не теряются. */
     private var activation: PhoneActivationBlock? = null
     private var renderedReady = false
+    private var renderedBusy = false
+    private var renderedLabel = ""
     private var checklist = false
 
     /** Шаг открыт из чеклиста: после него возвращаемся в чеклист. */
@@ -65,7 +68,8 @@ class OnboardingScreen(host: MainActivity, private val showAll: Boolean, startAt
         val block = activation ?: return
         if (checklist || current()?.id != StepId.ACTIVATE) return
         block.refresh()
-        if (block.ready != renderedReady) render()      // «Дальше» открывается, когда заголовок стал «Активировано»
+        if (block.ready && !renderedReady) { next(); return }      // активация прошла, пока шаг был открыт: идём дальше сами
+        if (block.ready != renderedReady || PhoneActivation.busy != renderedBusy || block.activateLabel != renderedLabel) render()
     }
 
     override fun onShow() {
@@ -213,32 +217,41 @@ class OnboardingScreen(host: MainActivity, private val showAll: Boolean, startAt
     }
 
     /**
-     * Шаг активации лаунчера: заголовок, статус, макет, пункты и кнопки ведёт PhoneActivationBlock (тот же поток, что в «Режиме»).
-     * «Дальше» открывается, когда заголовок стал зелёным «Активировано»; пока нет - «Позже».
+     * Шаг активации лаунчера: статус, макет, пункты и поля ручного ввода ведёт PhoneActivationBlock (тот же поток, что в «Режиме»),
+     * заголовок и кнопки - как у остальных шагов. Внизу «Активировать» (во время попытки «Отмена») и «Ввести порт и код вручную».
+     * Когда активация прошла, пока шаг открыт, онбординг идёт дальше сам (tick); если шаг открыт уже активированным - «Дальше».
      */
     private fun renderActivate(s: StepInfo) {
         val c = ctx
-        val block = activation ?: PhoneActivationBlock(host, c.resources.getStringArray(s.list!!).toList(), s.hint!!).also { activation = it }
+        val block = activation ?: PhoneActivationBlock(host, c.resources.getStringArray(s.list!!).toList(), s.hint!!, embedded = true).also { activation = it }
         block.refresh()
+        val ready = block.ready
+        val busy = PhoneActivation.busy
         shownDone = Readiness.isDone(c, s.id)
-        renderedReady = block.ready
+        renderedReady = ready
+        renderedBusy = busy
+        renderedLabel = block.activateLabel
         renderProgress(s)
+        (block.titleView.parent as? ViewGroup)?.removeView(block.titleView)
+        root.addView(block.titleView, lp(MATCH, WRAP).margins(c, 0, 4, 0, 16))
         (block.view.parent as? ViewGroup)?.removeView(block.view)
         val body = c.vbox().apply {
-            pad(c, 0, 0, 0, 36)
+            pad(c, 0, 4, 0, 36)
             addView(block.view, lp(MATCH, WRAP))
         }
         root.addView(fadingScroll(body), lp(MATCH, 0, 1f))
-        val ready = block.ready
         val buttons = c.vbox(4)
-        buttons.addView(c.primaryButton(c.getString(R.string.onb_next)).apply {
-            isEnabled = ready
-            alpha = if (ready) 1f else 0.45f
-            setOnClickListener { if (ready) next() }
-        })
-        buttons.addView(c.linkButton(c.getString(if (ready) R.string.onb_back else s.skip), 48).apply {
-            setOnClickListener { if (ready) stepBack() else next() }
-        })
+        when {
+            ready -> {
+                buttons.addView(c.primaryButton(c.getString(R.string.onb_next)).apply { setOnClickListener { next() } })
+                buttons.addView(c.linkButton(c.getString(R.string.onb_back), 48).apply { setOnClickListener { stepBack() } })
+            }
+            busy -> buttons.addView(c.primaryButton(c.getString(R.string.pa_cancel)).apply { setOnClickListener { block.cancelNow() } })
+            else -> {
+                buttons.addView(c.primaryButton(block.activateLabel).apply { setOnClickListener { block.activateNow() } })
+                buttons.addView(c.containerButton(c.getString(R.string.pa_manual_toggle)).apply { setOnClickListener { block.toggleManual() } })
+            }
+        }
         root.addView(buttons, lp(MATCH, WRAP))
     }
 
