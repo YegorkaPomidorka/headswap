@@ -971,6 +971,8 @@ class AaBridgeCore(
     }
 
     private val touchLock = Any()
+    private var lastDownMs = NEVER          // под touchLock: время последнего DOWN, для дубля Vezel
+    private var dupDowns = 0
 
     /** Активные пальцы в порядке индекса MotionEvent ГУ: x,y TOUCH_ACTION - индекс 0, pointerx/pointery - индекс 1. */
     private val fingers = ArrayList<Finger>(2)
@@ -1154,6 +1156,15 @@ class AaBridgeCore(
                 fingers.clear()
             }
             AapMessages.TOUCH_DOWN -> {
+                // Vezel шлёт каждый DOWN дважды через 1-25 мс; в Desktop дубль становится CANCEL+DOWN = двойной тап
+                val now = clockMs()
+                if (huHondaVezel && desktopInputEnabled && isDuplicateDown(fingers.singleOrNull()?.let { it.x to it.y },
+                        now - lastDownMs, x, y)) {
+                    dupDowns++
+                    log("BRIDGE тач DOWN $x,$y: дубль через ${now - lastDownMs} мс, подавлен (всего $dupDowns)", false)
+                    return@synchronized
+                }
+                lastDownMs = now
                 fingers.clear()
                 fingers.add(Finger(0, x, y))
                 sendFingers(p, act, 0, name)
@@ -2908,6 +2919,12 @@ class AaBridgeCore(
     }
 
     companion object {
+        const val DUP_DOWN_MS = 30L
+
+        /** DOWN - дубль, если прошлый DOWN той же точки ещё не отпущен и пришёл не раньше [DUP_DOWN_MS] назад. */
+        fun isDuplicateDown(held: Pair<Int, Int>?, sinceDownMs: Long, x: Int, y: Int): Boolean =
+            held != null && held.first == x && held.second == y && sinceDownMs in 0..DUP_DOWN_MS
+
         /** CarlifeThemeState.themeModes (SkinDisplayModeManager в CarLife 8.6.7). */
         const val THEME_LIGHT = 0
         const val THEME_DARK = 1
