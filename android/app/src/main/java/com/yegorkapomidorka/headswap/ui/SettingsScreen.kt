@@ -195,6 +195,8 @@ class SettingsScreen(host: MainActivity) : Screen(host) {
             addView(link(R.drawable.ic_check, c.getString(R.string.set_check_ready), null, false) { host.showOnboarding(checklist = true) })
             addView(c.divider())
             addView(link(R.drawable.ic_terminal, c.getString(R.string.set_for_devs), null, true) { host.showDev() })
+            addView(c.divider())
+            addView(link(R.drawable.ic_logo, c.getString(R.string.about_title), c.getString(R.string.about_note), false) { host.showAbout() })
         }
         body.addView(links, lp(MATCH, WRAP))
 

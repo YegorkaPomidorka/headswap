@@ -21,6 +21,7 @@ import com.yegorkapomidorka.headswap.aa.AaProbe
 import com.yegorkapomidorka.headswap.link.car.CarPairing
 import com.yegorkapomidorka.headswap.link.diag.NetProbe
 import com.yegorkapomidorka.headswap.ui.Actions
+import com.yegorkapomidorka.headswap.ui.AboutScreen
 import com.yegorkapomidorka.headswap.ui.DevScreen
 import com.yegorkapomidorka.headswap.ui.DiagScreen
 import com.yegorkapomidorka.headswap.ui.HomeScreen
@@ -222,6 +223,8 @@ class MainActivity : Activity() {
 
     fun showDiag() = push("diag", DiagScreen(this))
 
+    fun showAbout() = push("about", AboutScreen(this))
+
     /** rerun = показать все шаги; checklist = сразу чеклист готовности. */
     fun showOnboarding(rerun: Boolean = false, checklist: Boolean = false, startAt: StepId? = null) {
         push(if (checklist) "checklist" else if (rerun) "onboarding_all" else "onboarding", OnboardingScreen(this, rerun, checklist, startAt))
@@ -235,6 +238,7 @@ class MainActivity : Activity() {
                 "settings" -> showSettings()
                 "dev" -> showDev()
                 "diag" -> showDiag()
+                "about" -> showAbout()
                 "onboarding" -> showOnboarding()
                 "onboarding_all" -> showOnboarding(rerun = true)
                 "checklist" -> showOnboarding(checklist = true)

@@ -94,6 +94,16 @@ internal object LauncherModel {
     var appKey by mutableStateOf<String?>(null)
     /** Страница настроек, с которой открыть экран (выбор навигатора по тапу на пустую карточку). */
     var settingsPage by mutableStateOf(SettingsPage.LOOK)
+    /** Лицензия (индекс в About.licenses), чей полный текст открыт в «О приложении»; null - список. */
+    var aboutLicense by mutableStateOf<Int?>(null)
+
+    /** «Назад» внутри настроек (см. [BackNav.settingsStep]); false - шагов нет, выходить с экрана. */
+    fun settingsBack(): Boolean {
+        val (page, licenseOpen) = BackNav.settingsStep(settingsPage, aboutLicense != null) ?: return false
+        settingsPage = page
+        if (!licenseOpen) aboutLicense = null
+        return true
+    }
     /** Плотность дисплея ГУ: дочерние окна живут с ней же. */
     var densityDpi = 160
     /** Страница «Все приложения» запоминается между заходами. */

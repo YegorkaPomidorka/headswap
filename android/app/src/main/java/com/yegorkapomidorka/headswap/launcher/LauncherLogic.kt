@@ -160,6 +160,16 @@ object BackNav {
     /** Куда ведёт Назад с экрана [current]; [previous] - запомненный предыдущий экран. */
     fun target(current: Area, previous: Area?): Area = previous?.takeIf { isScreen(it) && it != current } ?: Area.Home
 
+    /**
+     * Шаг «Назад» внутри настроек: текст лицензии -> список лицензий -> «Система». Результат - страница и открыт ли текст;
+     * null - шагов внутри настроек нет, «Назад» выходит с экрана настроек.
+     */
+    fun settingsStep(page: SettingsPage, licenseOpen: Boolean): Pair<SettingsPage, Boolean>? = when {
+        page != SettingsPage.ABOUT -> null
+        licenseOpen -> SettingsPage.ABOUT to false
+        else -> SettingsPage.SYSTEM to false
+    }
+
     /** Серый «Назад» - только на главном: идти некуда. */
     fun enabled(current: Area): Boolean = current != Area.Home
 }

@@ -200,6 +200,13 @@ class LauncherLogicTest {
         assertNull(BackNav.remembered(Area.App(AppRef("a.b", "c"))))
     }
 
+    @Test fun backInsideAboutStepsLicenseThenSystemThenLeaves() {
+        // открыт текст лицензии -> список лицензий -> «Система» -> шагов внутри настроек больше нет
+        assertEquals(SettingsPage.ABOUT to false, BackNav.settingsStep(SettingsPage.ABOUT, licenseOpen = true))
+        assertEquals(SettingsPage.SYSTEM to false, BackNav.settingsStep(SettingsPage.ABOUT, licenseOpen = false))
+        for (p in SettingsPage.entries.filter { it != SettingsPage.ABOUT }) assertNull(BackNav.settingsStep(p, licenseOpen = false))
+    }
+
     @Test fun railBackIsGreyOnlyOnHome() {
         assertFalse(BackNav.enabled(Area.Home))
         assertTrue(BackNav.enabled(Area.Navigator))

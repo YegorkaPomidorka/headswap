@@ -271,4 +271,12 @@
     <string name="bm_act_on">Activated</string>
     <string name="bm_act_off">Not activated</string>
     <string name="bm_act_lost">Access lost, activate again</string>
+    <string name="about_title">About</string>
+    <string name="about_note">Authors and licenses</string>
+    <string name="about_authors">Authors</string>
+    <string name="about_opensource">Open source</string>
+    <string name="about_author_yegor">Yegor</string>
+    <string name="about_author_ildar">Ildar Sadykov</string>
+    <string name="about_open_project">Project page</string>
+    <string name="about_license_unavailable">License text is not available. See the project page.</string>
 </resources>

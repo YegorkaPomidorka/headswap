@@ -21,6 +21,7 @@ object LauncherActions {
     fun openSettings() {
         if (model.area == Area.Settings) { model.back(); return }
         model.settingsPage = SettingsPage.LOOK
+        model.aboutLicense = null
         model.go(Area.Settings)
     }
     /** Тап по карточке «Телефон»: экран «Вызовы»; пропущенные считаются просмотренными. */
@@ -120,12 +121,13 @@ object LauncherActions {
 
     fun openNavigatorChoice() {
         model.settingsPage = SettingsPage.NAVIGATOR
+        model.aboutLicense = null
         model.go(Area.Settings)
     }
 
     /**
      * Кнопка «Назад» рейки: Back в открытое окно (если приложение вышло из корня - на главный); с экрана лаунчера - на
-     * предыдущий экран или главный; на главном ничего.
+     * предыдущий экран или главный (в «О приложении» сначала шаг внутри настроек); на главном ничего.
      */
     fun embeddedBack() {
         AppLog.i("LAUNCHER Назад на рейке: экран=${model.area}", false)
@@ -133,6 +135,7 @@ object LauncherActions {
             is Area.App -> EmbedHost.back(EmbedHost.app) { backClosed(EmbedHost.app) }
             Area.Navigator -> EmbedHost.back(EmbedHost.nav) { backClosed(EmbedHost.nav) }
             Area.Home -> Unit
+            Area.Settings -> if (!model.settingsBack()) model.back()
             else -> model.back()
         }
     }

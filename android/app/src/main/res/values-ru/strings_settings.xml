@@ -268,4 +268,12 @@
     <string name="bm_act_on">Активировано</string>
     <string name="bm_act_off">Не активировано</string>
     <string name="bm_act_lost">Доступ потерян, активируйте заново</string>
+    <string name="about_title">О приложении</string>
+    <string name="about_note">Авторы и лицензии</string>
+    <string name="about_authors">Авторы</string>
+    <string name="about_opensource">Открытый код</string>
+    <string name="about_author_yegor">Егор</string>
+    <string name="about_author_ildar">Ильдар Садыков</string>
+    <string name="about_open_project">Страница проекта</string>
+    <string name="about_license_unavailable">Текст лицензии недоступен. Смотрите страницу проекта.</string>
 </resources>

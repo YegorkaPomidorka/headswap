@@ -17,16 +17,23 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.produceState
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
@@ -36,15 +43,18 @@ import androidx.compose.ui.text.rememberTextMeasurer
 import com.yegorkapomidorka.headswap.BuildConfig
 import com.yegorkapomidorka.headswap.CarLifeState
 import com.yegorkapomidorka.headswap.R
+import com.yegorkapomidorka.headswap.about.About
+import com.yegorkapomidorka.headswap.about.OpenSource
 import com.yegorkapomidorka.headswap.dex.DexPrefs
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToInt
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-/** Раздел настроек (колонка слева). */
-enum class SettingsPage { LOOK, NAVIGATOR, MUSIC, HOME, SYSTEM }
+/** Раздел настроек (колонка слева). ABOUT - «О приложении», вложен в «Система»: своей кнопки нет, подсвечена «Система». */
+enum class SettingsPage { LOOK, NAVIGATOR, MUSIC, HOME, SYSTEM, ABOUT }
 
 /** Навигаторы раздела «Навигатор», плитки 2x2 в порядке макета. */
 private val NAV_TILES = listOf(
@@ -108,8 +118,9 @@ fun LauncherSettingsScreen() {
             }
             Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(m.dp(s.g))) {
                 Box(Modifier.width(m.dp(d.catW)).fillMaxHeight()) {
-                    for ((i, page) in SettingsPage.entries.withIndex()) {
-                        CategoryButton(page, model.settingsPage == page, d, cell(i).fillMaxWidth())
+                    for ((i, page) in SettingsPage.entries.filter { it != SettingsPage.ABOUT }.withIndex()) {
+                        val selected = model.settingsPage == page || (page == SettingsPage.SYSTEM && model.settingsPage == SettingsPage.ABOUT)
+                        CategoryButton(page, selected, d, cell(i).fillMaxWidth())
                     }
                 }
                 Box(Modifier.weight(1f).fillMaxHeight()) {
@@ -141,7 +152,9 @@ fun LauncherSettingsScreen() {
                         SettingsPage.SYSTEM -> {
                             val info = systemInfo()
                             for ((i, row) in info.withIndex()) InfoCard(row.first, row.second, d, cell(i).fillMaxWidth())
+                            AboutLinkCard(d, cell(info.size).fillMaxWidth())
                         }
+                        SettingsPage.ABOUT -> AboutPanel(d, rowH)
                     }
                 }
             }
@@ -159,10 +172,10 @@ private fun CategoryButton(page: SettingsPage, selected: Boolean, d: SettingsDim
         SettingsPage.NAVIGATOR -> R.string.l_sec_nav
         SettingsPage.MUSIC -> R.string.l_sec_music
         SettingsPage.HOME -> R.string.l_sec_home
-        SettingsPage.SYSTEM -> R.string.l_sec_system
+        SettingsPage.SYSTEM, SettingsPage.ABOUT -> R.string.l_sec_system
     })
     OptionBox(selected, modifier, RoundedCornerShape(m.dp(s.radius)), description = label, unselected = Pal.SURFACE,
-        onTap = { LauncherModel.settingsPage = page }) {
+        onTap = { LauncherModel.settingsPage = page; LauncherModel.aboutLicense = null }) {
         Row(Modifier.fillMaxSize().padding(horizontal = m.dp(d.padStart)), verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(m.dp(d.catGap))) {
             when (page) {
@@ -170,7 +183,7 @@ private fun CategoryButton(page: SettingsPage, selected: Boolean, d: SettingsDim
                 SettingsPage.NAVIGATOR -> SvgIcon(Ico.NAV, d.catIcon, Pal.TEXT, fill = true)
                 SettingsPage.MUSIC -> SvgIcon(Ico.MUSIC, d.catIcon, Pal.TEXT, stroke = 2f)
                 SettingsPage.HOME -> SvgIcon(Ico.LAYOUT, d.catIcon, Pal.TEXT, stroke = 2f)
-                SettingsPage.SYSTEM -> SvgIcon(Ico.SCREEN, d.catIcon, Pal.TEXT, stroke = 2f)
+                SettingsPage.SYSTEM, SettingsPage.ABOUT -> SvgIcon(Ico.SCREEN, d.catIcon, Pal.TEXT, stroke = 2f)
             }
             Txt(label, s.f2, color = Pal.TEXT, weight = FontWeight.SemiBold, ellipsis = false)
         }
@@ -444,7 +457,7 @@ private fun InfoCard(label: String, value: String, d: SettingsDims, modifier: Mo
     }
 }
 
-/** Сведения «Системы» из текущей сессии; ничего не меняется (режим видео - в настройках самого Headswap). */
+/** Сведения «Системы» из текущей сессии; ничего не меняется (режим видео - в настройках самого Headswap). Версия - карточкой [AboutLinkCard]. */
 @Composable
 private fun systemInfo(): List<Pair<String, String>> {
     val dash = "—"
@@ -458,6 +471,151 @@ private fun systemInfo(): List<Pair<String, String>> {
         // в Headswap Desktop видео всегда перекодируется (прямого проброса нет)
         stringResource(R.string.l_s_video) to stringResource(R.string.l_s_transcode),
         stringResource(R.string.l_s_res) to res,
-        stringResource(R.string.l_s_version) to "Headswap ${BuildConfig.VERSION_NAME}",
     )
+}
+
+/** Последняя строка «Системы»: версия Headswap, тап открывает «О приложении». */
+@Composable
+private fun AboutLinkCard(d: SettingsDims, modifier: Modifier) {
+    val m = LocalMetrics.current
+    val s = m.spec
+    val label = stringResource(R.string.l_s_version)
+    val value = "Headswap ${BuildConfig.VERSION_NAME} · ${stringResource(R.string.about_title)}"
+    Pressable(modifier.clip(RoundedCornerShape(m.dp(s.radius))).background(Pal.SURFACE), description = value,
+        onTap = { LauncherModel.settingsPage = SettingsPage.ABOUT }) { pressed ->
+        if (pressed) Box(Modifier.matchParentSize().background(Pal.SURFACE_PRESSED))
+        Row(Modifier.fillMaxSize().padding(start = m.dp(d.padStart), end = m.dp(d.padEnd)), verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(m.dp(s.g))) {
+            Txt(label, s.f2, ellipsis = false)
+            Txt(value, s.f2, Modifier.weight(1f), color = Pal.SEC, weight = FontWeight.SemiBold, mono = true,
+                align = androidx.compose.ui.text.style.TextAlign.End)
+            SvgIcon(Ico.CHEV_R, d.catIcon, Pal.SEC, stroke = 2.6f)
+        }
+    }
+}
+
+/**
+ * «О приложении»: авторы двумя карточками и лицензии страницами по ряду сетки (скролла в лаунчере нет, как в «Все
+ * приложения»); тап по лицензии открывает полный текст: он прокручивается и листается стрелками.
+ */
+@Composable
+private fun AboutPanel(d: SettingsDims, rowH: Int) {
+    val m = LocalMetrics.current
+    val s = m.spec
+    val model = LauncherModel
+    val ctx = LocalContext.current
+    var page by remember { mutableIntStateOf(0) }
+    val open = model.aboutLicense?.let { About.licenses.getOrNull(it) }
+    BoxWithConstraints(Modifier.fillMaxSize()) {
+        val gap = d.gap
+        if (open != null) {
+            val text = remember(open.asset) { About.reflow(About.readText(ctx, open.asset)) }
+            val scroll = rememberScrollState()
+            var viewport by remember { mutableIntStateOf(0) }
+            val scope = rememberCoroutineScope()
+            // шаг страницы - окно без одной строки: читать с перехлёстом
+            val step = max(1, (viewport - (d.sub * 1.15).roundToInt()).coerceAtLeast(viewport / 2))
+            val pages = if (scroll.maxValue <= 0) 1 else (scroll.maxValue + step - 1) / step + 1
+            val atEnd = scroll.maxValue > 0 && scroll.value >= scroll.maxValue
+            val current = if (atEnd) pages - 1 else ((scroll.value + step / 2) / step).coerceIn(0, pages - 1)
+            Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(m.dp(gap))) {
+                AboutHeader(d, open.title, current, pages, onBack = { model.settingsBack() },
+                    onPage = { p -> scope.launch { scroll.scrollTo(min(p * step, scroll.maxValue)) } })
+                Card(Modifier.weight(1f).fillMaxWidth().onSizeChanged { viewport = it.height }) {
+                    Column(Modifier.fillMaxSize().verticalScroll(scroll)
+                        .padding(start = m.dp(d.padStart), end = m.dp(d.padEnd), top = m.dp(d.padV), bottom = m.dp(d.padV)),
+                        verticalArrangement = Arrangement.spacedBy(m.dp(d.padV))) {
+                        Txt("${open.license} · ${open.holder}", s.f2, Modifier.fillMaxWidth(), weight = FontWeight.SemiBold, maxLines = Int.MAX_VALUE)
+                        Txt(open.url, d.sub, Modifier.fillMaxWidth(), color = Pal.SEC, mono = true, maxLines = Int.MAX_VALUE)
+                        Txt(text.ifEmpty { stringResource(R.string.about_license_unavailable) }, d.sub, Modifier.fillMaxWidth(),
+                            color = Pal.SEC2, maxLines = Int.MAX_VALUE)
+                    }
+                }
+            }
+        } else {
+            val captionH = d.sub + s.g4
+            // под список остаётся высота без шапки, подписи и ряда авторов; ряд лицензии - как ряд сетки
+            val avail = constraints.maxHeight - d.ctl - captionH - rowH - 3 * gap
+            val perPage = max(1, (avail + gap) / (rowH + gap))
+            val items = About.licenses
+            val current = Pager.clamp(page, items.size, perPage)
+            val shown = Pager.slice(items, current, perPage)
+            Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(m.dp(gap))) {
+                AboutHeader(d, stringResource(R.string.about_title), current, Pager.pageCount(items.size, perPage),
+                    onBack = { model.settingsBack() }, onPage = { page = it })
+                Column(verticalArrangement = Arrangement.spacedBy(m.dp(s.g4))) {
+                    Txt(stringResource(R.string.about_authors), d.sub, color = Pal.SEC, weight = FontWeight.SemiBold)
+                    Row(Modifier.fillMaxWidth().height(m.dp(rowH)), horizontalArrangement = Arrangement.spacedBy(m.dp(gap))) {
+                        for (a in About.authors) AuthorCard(stringResource(a.nameRes), a.handle, d, Modifier.weight(1f).fillMaxHeight())
+                    }
+                }
+                Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(m.dp(gap))) {
+                    for (lic in shown) {
+                        LicenseCard(lic, d, Modifier.fillMaxWidth().height(m.dp(rowH))) { model.aboutLicense = About.licenses.indexOf(lic) }
+                    }
+                }
+            }
+        }
+    }
+}
+
+/** Шапка «О приложении»: «Назад» (к «Система» или к списку), название, страница «1 / 5» и стрелки. Высота контролов - ctl. */
+@Composable
+private fun AboutHeader(d: SettingsDims, title: String, page: Int, pages: Int, onBack: () -> Unit, onPage: (Int) -> Unit) {
+    val m = LocalMetrics.current
+    val s = m.spec
+    val backLabel = stringResource(R.string.l_back)
+    Row(Modifier.fillMaxWidth().height(m.dp(d.ctl)), verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(m.dp(s.g))) {
+        Pressable(Modifier.height(m.dp(d.ctl)).clip(RoundedCornerShape(m.dp(d.ctl / 2))).background(LocalPalette.current.btnSet),
+            description = backLabel, onTap = onBack) { pressed ->
+            if (pressed) Box(Modifier.matchParentSize().background(Pal.SURFACE_PRESSED))
+            Row(Modifier.fillMaxHeight().padding(horizontal = m.dp(d.pillPad)), verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(m.dp(s.g8))) {
+                SvgIcon(Ico.CHEV_L, d.catIcon, Pal.TEXT, stroke = 2.6f)
+                Txt(backLabel, s.f2, weight = FontWeight.SemiBold, ellipsis = false)
+            }
+        }
+        Txt(title, s.f2, Modifier.weight(1f), color = Pal.SEC2, weight = FontWeight.SemiBold)
+        Ltr {
+            Txt("${page + 1} / $pages", s.f2, color = Pal.SEC, weight = FontWeight.SemiBold, mono = true)
+            for ((icon, delta, label) in listOf(Triple(Ico.CHEV_L, -1, R.string.l_prev_page), Triple(Ico.CHEV_R, 1, R.string.l_next_page))) {
+                val enabled = if (delta < 0) page > 0 else page < pages - 1
+                RoundButton(d.ctl, stringResource(label), onTap = { onPage(page + delta) }, enabled = enabled,
+                    background = if (enabled) Pal.SURFACE_HI else Pal.SURFACE) {
+                    SvgIcon(icon, d.catIcon, if (enabled) Pal.TEXT else LocalPalette.current.backOff, stroke = 2.6f)
+                }
+            }
+        }
+    }
+}
+
+/** Автор: имя крупно, ник моноширинным вторичным цветом. Не нажимается: браузера на ГУ нет. */
+@Composable
+private fun AuthorCard(name: String, handle: String, d: SettingsDims, modifier: Modifier) {
+    val m = LocalMetrics.current
+    val s = m.spec
+    Card(modifier) {
+        Column(Modifier.fillMaxSize().padding(horizontal = m.dp(d.padStart)), verticalArrangement = Arrangement.Center) {
+            Txt(name, s.f2, weight = FontWeight.SemiBold)
+            Txt(handle, d.sub, color = Pal.SEC, mono = true)
+        }
+    }
+}
+
+/** Лицензия: «название версия» и лицензия справа, ниже правообладатель и адрес проекта текстом. */
+@Composable
+private fun LicenseCard(lic: OpenSource, d: SettingsDims, modifier: Modifier, onTap: () -> Unit) {
+    val m = LocalMetrics.current
+    val s = m.spec
+    Pressable(modifier.clip(RoundedCornerShape(m.dp(s.radius))).background(Pal.SURFACE), description = lic.title, onTap = onTap) { pressed ->
+        if (pressed) Box(Modifier.matchParentSize().background(Pal.SURFACE_PRESSED))
+        Column(Modifier.fillMaxSize().padding(start = m.dp(d.padStart), end = m.dp(d.padEnd)), verticalArrangement = Arrangement.Center) {
+            Row(horizontalArrangement = Arrangement.spacedBy(m.dp(s.g))) {
+                Txt(lic.title, s.f2, Modifier.weight(1f), weight = FontWeight.SemiBold)
+                Txt(lic.license, s.f2, color = Pal.SEC, mono = true, ellipsis = false)
+            }
+            Txt("${lic.holder} · ${lic.url.removePrefix("https://")}", d.sub, color = Pal.SEC)
+        }
+    }
 }
