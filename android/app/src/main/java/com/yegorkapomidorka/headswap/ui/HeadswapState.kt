@@ -17,7 +17,7 @@ enum class StageState { DONE, ACTIVE, PAUSE, ERR, TODO, PEND }
 
 enum class Tone { PRI, OK, WARN, ERR }
 
-enum class HeroIcon { POWER, PLUG, CAR, CAR_USB, CAR_WIFI, REFRESH, ALERT }
+enum class HeroIcon { POWER, PLUG, CAR, CAR_USB, CAR_WIFI, REFRESH, ALERT, KEY }
 
 enum class PrimaryAction { START_SERVER }
 

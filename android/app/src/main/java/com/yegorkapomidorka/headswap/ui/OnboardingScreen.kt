@@ -153,7 +153,9 @@ class OnboardingScreen(host: MainActivity, private val showAll: Boolean, startAt
             val text = c.vbox(10).apply { pad(c, 0, 18, 0, 36) }     // нижний отступ больше затемнения края: конец текста не тонет в fade
             if (done) text.addView(c.doneChip(c.getString(R.string.onb_done_chip)), lp(WRAP, WRAP))
             text.addView(c.numberedList(s.listItems(c)), lp(MATCH, WRAP))
-            s.hint?.let { text.addView(c.stepHint(c.getString(it)), lp(MATCH, WRAP)) }
+            // В пути лаунчера уведомления нужны прежде всего для кода сопряжения активации.
+            val hint = if (s.id == StepId.NOTIF && chosen == BridgeMode.DESKTOP) R.string.step_notif_hint_launcher else s.hint
+            hint?.let { text.addView(c.stepHint(c.getString(it)), lp(MATCH, WRAP)) }
             addView(text, lp(MATCH, WRAP))
         }
         root.addView(fadingScroll(body), lp(MATCH, 0, 1f))

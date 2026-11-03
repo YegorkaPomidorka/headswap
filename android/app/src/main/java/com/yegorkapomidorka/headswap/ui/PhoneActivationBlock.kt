@@ -217,6 +217,8 @@ class PhoneActivationBlock(
             status.text = c.getString(R.string.pa_need_notif)
             status.setTextColor(c.clr(R.color.warn))
             manualBox.visibility = View.VISIBLE
+            // блок без показа (кнопка на главном экране): статус никто не увидит, говорим всплывающей строкой
+            if (!view.isAttachedToWindow) Toast.makeText(c, R.string.pa_need_notif, Toast.LENGTH_LONG).show()
             return
         }
         PhoneActivation.start(c)

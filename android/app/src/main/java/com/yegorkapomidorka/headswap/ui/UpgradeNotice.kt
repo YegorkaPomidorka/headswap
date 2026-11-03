@@ -22,16 +22,18 @@ import com.yegorkapomidorka.headswap.R
  * сервер ГУ включают вручную. Новички узнают это из онбординга, им окно не нужно.
  */
 object UpgradeNotice {
-    enum class Launch { NONE, ONBOARDING, NOTICE_30, NOTICE }
+    enum class Launch { NONE, ONBOARDING, NOTICE_30, NOTICE, NOTICE_40 }
 
     /**
      * Обычное открытие приложения: что показать, не больше одного окна за запуск. Сначала окно 3.0 ([Upgrade30Notice]),
-     * окно 2.6.0 (если его ещё не видели) - при следующем запуске. Флаг «показано» ставится в каждом случае (см. MainActivity).
+     * окно 2.6.0 (если его ещё не видели) - при следующем запуске, окно 4.0 ([Upgrade40Notice]) - после них: старые
+     * объявления не вытесняются новым. Флаг «показано» ставится в каждом случае (см. MainActivity).
      */
-    fun onLaunch(onboardingDone: Boolean, v30Shown: Boolean, noticeShown: Boolean): Launch = when {
+    fun onLaunch(onboardingDone: Boolean, v30Shown: Boolean, noticeShown: Boolean, v40Shown: Boolean): Launch = when {
         !onboardingDone -> Launch.ONBOARDING
         !v30Shown -> Launch.NOTICE_30
         !noticeShown -> Launch.NOTICE
+        !v40Shown -> Launch.NOTICE_40
         else -> Launch.NONE
     }
 
