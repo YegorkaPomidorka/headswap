@@ -510,6 +510,7 @@ class CarLifeSession(
                 val state = PbReader.parse(m.body)?.let { PbReader.int(it, 1) }
                 bridge.onHuBtHfpConnection(state)
             }
+            Msg.LAUNCH_MODE_PHONE -> bridge.onCarlifeLaunchPhone()
             Msg.MD_EXIT -> close("ГУ прислало MD_EXIT")
             else -> Unit // всё остальное только в логе
         }

@@ -679,6 +679,23 @@ class AaBridgeCoreTest {
     }
 
     @Test
+    fun launchPhoneOnlyOnKia20032131() {
+        val peer = FakePeer()
+        core.peer = peer
+        core.onCarlifeLaunchPhone()                           // чужое ГУ: только лог
+        assertTrue(peer.keys.isEmpty())
+        core.onHuStatistic("20032131")                        // h672 Kia Seltos
+        core.onCarlifeLaunchPhone()
+        now += 200
+        core.onCarlifeLaunchPhone()                           // вторая из пары: глотаем
+        now += 5000
+        core.onCarlifeLaunchPhone()                           // следующее нажатие
+        assertEquals(listOf(5, 5), peer.keys.toList())
+        core.attach(link)
+        assertTrue("новая сессия - флаг заново", !core.huKia20032131)
+    }
+
+    @Test
     fun seekKeysAnswerCall() {
         val peer = FakePeer()
         core.peer = peer
