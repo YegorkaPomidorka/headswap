@@ -84,6 +84,8 @@ fun EmbedLayers() {
     }
 }
 
+private val OFFSCREEN = IntOffset(-100_000, -100_000)
+
 @Composable
 private fun EmbedLayer(
     slot: EmbedSlot, target: Rect?, shown: Boolean, interactive: Boolean, rounded: Boolean, background: Color,
@@ -102,8 +104,11 @@ private fun EmbedLayer(
     val shape = RoundedCornerShape(if (rounded) m.dp(m.spec.radius) else m.dp(0))
     val w = with(density) { rect.width.roundToInt().toDp() }
     val h = with(density) { rect.height.roundToInt().toDp() }
+    // Скрытый слой уводим за экран: AndroidView в Compose забирает касания в своих границах даже с INVISIBLE,
+    // и спрятанная карточка навигатора глушила стрелки «Все приложения». Сам TextureView при этом живёт.
     Box(
-        Modifier.absoluteOffset { IntOffset(rect.left.roundToInt(), rect.top.roundToInt()) }.size(w, h).clip(shape),
+        Modifier.absoluteOffset { if (shown) IntOffset(rect.left.roundToInt(), rect.top.roundToInt()) else OFFSCREEN }
+            .size(w, h).clip(shape),
     ) {
         AndroidView(
             factory = { ctx ->
