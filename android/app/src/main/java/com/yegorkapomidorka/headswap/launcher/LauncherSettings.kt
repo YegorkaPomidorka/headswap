@@ -495,8 +495,9 @@ private fun AboutLinkCard(d: SettingsDims, modifier: Modifier) {
 }
 
 /**
- * «О приложении»: авторы двумя карточками и лицензии страницами по ряду сетки (скролла в лаунчере нет, как в «Все
- * приложения»); тап по лицензии открывает полный текст: он прокручивается и листается стрелками.
+ * «О приложении» без шапки (назад - «Назад» рейки и аппаратная): авторы и лицензии плитками в две колонки. Плитки
+ * сжимаются, чтобы уместились все; ниже двух строк текста не сжимаются - тогда список прокручивается. Тап по лицензии
+ * открывает полный текст с прокруткой.
  */
 @Composable
 private fun AboutPanel(d: SettingsDims, rowH: Int) {
@@ -504,86 +505,46 @@ private fun AboutPanel(d: SettingsDims, rowH: Int) {
     val s = m.spec
     val model = LauncherModel
     val ctx = LocalContext.current
-    var page by remember { mutableIntStateOf(0) }
     val open = model.aboutLicense?.let { About.licenses.getOrNull(it) }
     BoxWithConstraints(Modifier.fillMaxSize()) {
         val gap = d.gap
         if (open != null) {
             val text = remember(open.asset) { About.reflow(About.readText(ctx, open.asset)) }
-            val scroll = rememberScrollState()
-            var viewport by remember { mutableIntStateOf(0) }
-            val scope = rememberCoroutineScope()
-            // шаг страницы - окно без одной строки: читать с перехлёстом
-            val step = max(1, (viewport - (d.sub * 1.15).roundToInt()).coerceAtLeast(viewport / 2))
-            val pages = if (scroll.maxValue <= 0) 1 else (scroll.maxValue + step - 1) / step + 1
-            val atEnd = scroll.maxValue > 0 && scroll.value >= scroll.maxValue
-            val current = if (atEnd) pages - 1 else ((scroll.value + step / 2) / step).coerceIn(0, pages - 1)
-            Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(m.dp(gap))) {
-                AboutHeader(d, open.title, current, pages, onBack = { model.settingsBack() },
-                    onPage = { p -> scope.launch { scroll.scrollTo(min(p * step, scroll.maxValue)) } })
-                Card(Modifier.weight(1f).fillMaxWidth().onSizeChanged { viewport = it.height }) {
-                    Column(Modifier.fillMaxSize().verticalScroll(scroll)
-                        .padding(start = m.dp(d.padStart), end = m.dp(d.padEnd), top = m.dp(d.padV), bottom = m.dp(d.padV)),
-                        verticalArrangement = Arrangement.spacedBy(m.dp(d.padV))) {
-                        Txt("${open.license} · ${open.holder}", s.f2, Modifier.fillMaxWidth(), weight = FontWeight.SemiBold, maxLines = Int.MAX_VALUE)
-                        Txt(open.url, d.sub, Modifier.fillMaxWidth(), color = Pal.SEC, mono = true, maxLines = Int.MAX_VALUE)
-                        Txt(text.ifEmpty { stringResource(R.string.about_license_unavailable) }, d.sub, Modifier.fillMaxWidth(),
-                            color = Pal.SEC2, maxLines = Int.MAX_VALUE)
-                    }
+            Card(Modifier.fillMaxSize()) {
+                Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())
+                    .padding(start = m.dp(d.padStart), end = m.dp(d.padEnd), top = m.dp(d.padV), bottom = m.dp(d.padV)),
+                    verticalArrangement = Arrangement.spacedBy(m.dp(d.padV))) {
+                    Txt(open.title, s.f2, Modifier.fillMaxWidth(), weight = FontWeight.SemiBold, maxLines = Int.MAX_VALUE)
+                    Txt("${open.license} · ${open.holder}", d.sub, Modifier.fillMaxWidth(), color = Pal.SEC, maxLines = Int.MAX_VALUE)
+                    Txt(open.url, d.sub, Modifier.fillMaxWidth(), color = Pal.SEC, mono = true, maxLines = Int.MAX_VALUE)
+                    Txt(text.ifEmpty { stringResource(R.string.about_license_unavailable) }, d.sub, Modifier.fillMaxWidth(),
+                        color = Pal.SEC2, maxLines = Int.MAX_VALUE)
                 }
             }
         } else {
+            val cols = 2
+            val authorRows = (About.authors.size + cols - 1) / cols
+            val licenseRows = (About.licenses.size + cols - 1) / cols
+            val rows = authorRows + licenseRows
             val captionH = d.sub + s.g4
-            // под список остаётся высота без шапки, подписи и ряда авторов; ряд лицензии - как ряд сетки
-            val avail = constraints.maxHeight - d.ctl - captionH - rowH - 3 * gap
-            val perPage = max(1, (avail + gap) / (rowH + gap))
-            val items = About.licenses
-            val current = Pager.clamp(page, items.size, perPage)
-            val shown = Pager.slice(items, current, perPage)
-            Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(m.dp(gap))) {
-                AboutHeader(d, stringResource(R.string.about_title), current, Pager.pageCount(items.size, perPage),
-                    onBack = { model.settingsBack() }, onPage = { page = it })
-                Column(verticalArrangement = Arrangement.spacedBy(m.dp(s.g4))) {
-                    Txt(stringResource(R.string.about_authors), d.sub, color = Pal.SEC, weight = FontWeight.SemiBold)
-                    Row(Modifier.fillMaxWidth().height(m.dp(rowH)), horizontalArrangement = Arrangement.spacedBy(m.dp(gap))) {
-                        for (a in About.authors) AuthorCard(stringResource(a.nameRes), a.handle, d, Modifier.weight(1f).fillMaxHeight())
+            // две подписи («Авторы», «Открытый код») и зазоры между всеми рядами
+            val fitH = (constraints.maxHeight - 2 * captionH - (rows + 1) * gap) / rows
+            val minH = ((s.f2 + d.sub) * 1.35).roundToInt() + 2 * s.g8
+            val tileH = fitH.coerceIn(minH, rowH)
+            Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(m.dp(gap))) {
+                Txt(stringResource(R.string.about_authors), d.sub, color = Pal.SEC, weight = FontWeight.SemiBold)
+                for (row in About.authors.chunked(cols)) {
+                    Row(Modifier.fillMaxWidth().height(m.dp(tileH)), horizontalArrangement = Arrangement.spacedBy(m.dp(gap))) {
+                        for (a in row) AuthorCard(stringResource(a.nameRes), a.handle, d, Modifier.weight(1f).fillMaxHeight())
+                        repeat(cols - row.size) { Spacer(Modifier.weight(1f)) }
                     }
                 }
-                Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(m.dp(gap))) {
-                    for (lic in shown) {
-                        LicenseCard(lic, d, Modifier.fillMaxWidth().height(m.dp(rowH))) { model.aboutLicense = About.licenses.indexOf(lic) }
+                Txt(stringResource(R.string.about_opensource), d.sub, color = Pal.SEC, weight = FontWeight.SemiBold)
+                for (row in About.licenses.chunked(cols)) {
+                    Row(Modifier.fillMaxWidth().height(m.dp(tileH)), horizontalArrangement = Arrangement.spacedBy(m.dp(gap))) {
+                        for (lic in row) LicenseCard(lic, d, Modifier.weight(1f).fillMaxHeight()) { model.aboutLicense = About.licenses.indexOf(lic) }
+                        repeat(cols - row.size) { Spacer(Modifier.weight(1f)) }
                     }
-                }
-            }
-        }
-    }
-}
-
-/** Шапка «О приложении»: «Назад» (к «Система» или к списку), название, страница «1 / 5» и стрелки. Высота контролов - ctl. */
-@Composable
-private fun AboutHeader(d: SettingsDims, title: String, page: Int, pages: Int, onBack: () -> Unit, onPage: (Int) -> Unit) {
-    val m = LocalMetrics.current
-    val s = m.spec
-    val backLabel = stringResource(R.string.l_back)
-    Row(Modifier.fillMaxWidth().height(m.dp(d.ctl)), verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(m.dp(s.g))) {
-        Pressable(Modifier.height(m.dp(d.ctl)).clip(RoundedCornerShape(m.dp(d.ctl / 2))).background(LocalPalette.current.btnSet),
-            description = backLabel, onTap = onBack) { pressed ->
-            if (pressed) Box(Modifier.matchParentSize().background(Pal.SURFACE_PRESSED))
-            Row(Modifier.fillMaxHeight().padding(horizontal = m.dp(d.pillPad)), verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(m.dp(s.g8))) {
-                SvgIcon(Ico.CHEV_L, d.catIcon, Pal.TEXT, stroke = 2.6f)
-                Txt(backLabel, s.f2, weight = FontWeight.SemiBold, ellipsis = false)
-            }
-        }
-        Txt(title, s.f2, Modifier.weight(1f), color = Pal.SEC2, weight = FontWeight.SemiBold)
-        Ltr {
-            Txt("${page + 1} / $pages", s.f2, color = Pal.SEC, weight = FontWeight.SemiBold, mono = true)
-            for ((icon, delta, label) in listOf(Triple(Ico.CHEV_L, -1, R.string.l_prev_page), Triple(Ico.CHEV_R, 1, R.string.l_next_page))) {
-                val enabled = if (delta < 0) page > 0 else page < pages - 1
-                RoundButton(d.ctl, stringResource(label), onTap = { onPage(page + delta) }, enabled = enabled,
-                    background = if (enabled) Pal.SURFACE_HI else Pal.SURFACE) {
-                    SvgIcon(icon, d.catIcon, if (enabled) Pal.TEXT else LocalPalette.current.backOff, stroke = 2.6f)
                 }
             }
         }
@@ -603,7 +564,7 @@ private fun AuthorCard(name: String, handle: String, d: SettingsDims, modifier: 
     }
 }
 
-/** Лицензия: «название версия» и лицензия справа, ниже правообладатель и адрес проекта текстом. */
+/** Лицензия плиткой: «название версия», ниже лицензия и правообладатель; адрес проекта - в полном тексте. */
 @Composable
 private fun LicenseCard(lic: OpenSource, d: SettingsDims, modifier: Modifier, onTap: () -> Unit) {
     val m = LocalMetrics.current
@@ -611,11 +572,8 @@ private fun LicenseCard(lic: OpenSource, d: SettingsDims, modifier: Modifier, on
     Pressable(modifier.clip(RoundedCornerShape(m.dp(s.radius))).background(Pal.SURFACE), description = lic.title, onTap = onTap) { pressed ->
         if (pressed) Box(Modifier.matchParentSize().background(Pal.SURFACE_PRESSED))
         Column(Modifier.fillMaxSize().padding(start = m.dp(d.padStart), end = m.dp(d.padEnd)), verticalArrangement = Arrangement.Center) {
-            Row(horizontalArrangement = Arrangement.spacedBy(m.dp(s.g))) {
-                Txt(lic.title, s.f2, Modifier.weight(1f), weight = FontWeight.SemiBold)
-                Txt(lic.license, s.f2, color = Pal.SEC, mono = true, ellipsis = false)
-            }
-            Txt("${lic.holder} · ${lic.url.removePrefix("https://")}", d.sub, color = Pal.SEC)
+            Txt(lic.title, s.f2, weight = FontWeight.SemiBold)
+            Txt("${lic.license} · ${lic.holder}", d.sub, color = Pal.SEC)
         }
     }
 }
