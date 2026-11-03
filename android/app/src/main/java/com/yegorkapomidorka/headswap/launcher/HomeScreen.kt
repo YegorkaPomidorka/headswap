@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
@@ -56,20 +57,26 @@ fun HomeScreen() {
     Column(Modifier.fillMaxSize().padding(start = m.dp(s.g), top = m.dp(s.g8), end = m.dp(s.m), bottom = m.dp(if (s.strip) s.m else 0))) {
         StatusBar()
         Spacer(Modifier.height(m.dp(s.g8)))
+        // «Карта слева»: оба ряда в обратном порядке (row-reverse), рейка и содержимое карточек не зеркалятся
+        val mirror = LauncherModel.mapLeft
         Row(Modifier.weight(1f).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(m.dp(s.g))) {
-            MusicCard(Modifier.width(m.dp(s.music)).fillMaxHeight())
-            NavCard(Modifier.weight(1f).fillMaxHeight())
-            if (s.strip) {
-                CardBox(Modifier.fillMaxHeight()) { AppsGrid(columns = 2, rows = 3) }
+            val top = buildList<@Composable RowScope.() -> Unit> {
+                add { MusicCard(Modifier.width(m.dp(s.music)).fillMaxHeight()) }
+                add { NavCard(Modifier.weight(1f).fillMaxHeight()) }
+                if (s.strip) add { CardBox(Modifier.fillMaxHeight()) { AppsGrid(columns = 2, rows = 3) } }
             }
+            for (cell in if (mirror) top.asReversed() else top) cell(this)
         }
         if (!s.strip) {
             Spacer(Modifier.height(m.dp(s.g)))
             val r = m.dp(s.radius)
             val topOnly = RoundedCornerShape(topStart = r, topEnd = r)
             Row(Modifier.height(m.dp(s.bottomH)).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(m.dp(s.g))) {
-                CardBox(Modifier.weight(1f).fillMaxHeight(), shape = topOnly) { QuickAppsRow() }
-                PhoneCard(Modifier.width(m.dp(s.phone)).fillMaxHeight(), topOnly)
+                val bottom = listOf<@Composable RowScope.() -> Unit>(
+                    { CardBox(Modifier.weight(1f).fillMaxHeight(), shape = topOnly) { QuickAppsRow() } },
+                    { PhoneCard(Modifier.width(m.dp(s.phone)).fillMaxHeight(), topOnly) },
+                )
+                for (cell in if (mirror) bottom.asReversed() else bottom) cell(this)
             }
         }
     }
@@ -179,7 +186,7 @@ fun AppTile(
 fun AppCircle(ref: AppRef, sizePx: Int) {
     val m = LocalMetrics.current
     val icon = rememberAppIcon(ref)
-    Box(Modifier.size(m.dp(sizePx)).clip(CircleShape).background(Color(0xFF2E3C45))) {
+    Box(Modifier.size(m.dp(sizePx)).clip(CircleShape).background(Pal.SURFACE_HI)) {
         if (icon != null) Image(icon, null, Modifier.fillMaxSize())
     }
 }

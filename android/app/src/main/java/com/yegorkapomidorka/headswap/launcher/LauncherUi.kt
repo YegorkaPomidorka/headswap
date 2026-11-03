@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -63,20 +64,69 @@ class LauncherMetrics(val spec: LauncherSpec, private val density: Density) {
 val LocalMetrics = staticCompositionLocalOf<LauncherMetrics> { error("LauncherMetrics not provided") }
 val LocalAccent = staticCompositionLocalOf { Pal.GOLD }
 
+/** Палитра темы лаунчера: THEMES из Teyes.dc.html и Settings.dc.html. Обложка музыки и чип плееров тёмные в обеих. */
+class LauncherPalette(
+    val light: Boolean,
+    /** Фон 118deg: стопы градиента и альфа левого и правого золотого свечения. */
+    val bgStops: List<Pair<Float, Color>>, val glowLeft: Float, val glowRight: Float,
+    val fg: Color, val fg2: Color, val fg3: Color,
+    val surf: Color, val btn2: Color, val pressed: Color,
+    /** Кнопки вариантов и трек выключенного переключателя в настройках (в тёмной на .02 тише кнопок главного). */
+    val btnSet: Color,
+    /** Часы, лого и активный «Назад» на рейке: в светлой приглушены, чёрный выбивается. */
+    val railFg: Color,
+    val missed: Color, val backOff: Color, val tagBg: Color, val mapBg: Color,
+    /** Сплошной фон под двойным кольцом выбранной иконки и под окнами поверх экрана. */
+    val bgSolid: Color,
+    /** Подложка миниатюр «Карта на главном». */
+    val mini: Color,
+)
+
+object Palettes {
+    val DARK = LauncherPalette(
+        light = false,
+        bgStops = listOf(0f to Color(0xFF0A0F14), 0.42f to Color(0xFF111A21), 0.70f to Color(0xFF1A232B), 1f to Color(0xFF121920)),
+        glowLeft = 0.22f, glowRight = 0.12f,
+        fg = Color(0xFFF2F5F7), fg2 = Color(0xFFC8D1F0), fg3 = Color(0xFFA9B4D6),
+        surf = Color(1f, 1f, 1f, 0.07f), btn2 = Color(1f, 1f, 1f, 0.12f), pressed = Color(1f, 1f, 1f, 0.20f),
+        btnSet = Color(1f, 1f, 1f, 0.10f), railFg = Color(0xFFF2F5F7),
+        missed = Color(0xFFFFB4A9), backOff = Color(0xFF5F6A80), tagBg = Color(14, 20, 26, 153), mapBg = Color(0xFF172026),
+        bgSolid = Color(0xFF1A232B), mini = Color(0xFF0E151B),
+    )
+    private val BROWN = Color(90, 70, 20)
+    val LIGHT = LauncherPalette(
+        light = true,
+        bgStops = listOf(0f to Color(0xFFFBF7EC), 0.5f to Color(0xFFF4EDDB), 1f to Color(0xFFEDE3CB)),
+        glowLeft = 0.30f, glowRight = 0.18f,
+        // основной текст #463D2E и на главном, и в настройках (решение Егора 03.11)
+        fg = Color(0xFF463D2E), fg2 = Color(0xFF5C5340), fg3 = Color(0xFF6E6450),
+        surf = BROWN.copy(alpha = 0.08f), btn2 = BROWN.copy(alpha = 0.12f), pressed = BROWN.copy(alpha = 0.20f),
+        btnSet = BROWN.copy(alpha = 0.12f), railFg = Color(0xFF5C5340),
+        missed = Color(0xFFB3361F), backOff = Color(0xFFA89F88), tagBg = Color(1f, 1f, 1f, 0.88f), mapBg = Color(0xFFEEE9DC),
+        bgSolid = Color(0xFFF4EDDB), mini = Color(0xFFFBF7EC),
+    )
+}
+
+val LocalPalette = staticCompositionLocalOf { Palettes.DARK }
+
 object Pal {
     val GOLD = Color(0xFFD4AF37)
     val ON_GOLD = Color(0xFF201A05)
-    val TEXT = Color(0xFFF2F5F7)
-    val SEC = Color(0xFFA9B4D6)
-    val SEC2 = Color(0xFFC8D1F0)
-    val SURFACE = Color(1f, 1f, 1f, 0.07f)
-    val SURFACE_HI = Color(1f, 1f, 1f, 0.12f)
-    val SURFACE_PRESSED = Color(1f, 1f, 1f, 0.20f)
     val GREEN = Color(0xFF22C55E)
     val ON_GREEN = Color(0xFF06230F)
     val RED = Color(0xFFE03A3A)
-    val MISSED = Color(0xFFFFB4A9)
+    /** Белый на обложке, на зелёной и красной кнопках - в обеих темах. */
     val WHITE = Color(0xFFFFFFFF)
+
+    // цвета темы: из текущей палитры
+    val TEXT: Color @Composable @ReadOnlyComposable get() = LocalPalette.current.fg
+    val SEC: Color @Composable @ReadOnlyComposable get() = LocalPalette.current.fg3
+    val SEC2: Color @Composable @ReadOnlyComposable get() = LocalPalette.current.fg2
+    val SURFACE: Color @Composable @ReadOnlyComposable get() = LocalPalette.current.surf
+    val SURFACE_HI: Color @Composable @ReadOnlyComposable get() = LocalPalette.current.btn2
+    val SURFACE_PRESSED: Color @Composable @ReadOnlyComposable get() = LocalPalette.current.pressed
+    val MISSED: Color @Composable @ReadOnlyComposable get() = LocalPalette.current.missed
+    val RAIL: Color @Composable @ReadOnlyComposable get() = LocalPalette.current.railFg
 
     /** Тёмный или светлый текст на акценте: порог яркости как в макете. */
     fun onAccent(c: Color): Color {
@@ -85,8 +135,8 @@ object Pal {
     }
 }
 
-/** Графит под углом 118deg и золотое свечение слева и справа. Статичный. */
-fun Modifier.launcherBackground(glow: Boolean): Modifier = drawBehind {
+/** Фон под углом 118deg и золотое свечение слева и справа по палитре темы. Статичный. */
+fun Modifier.launcherBackground(pal: LauncherPalette): Modifier = drawBehind {
     val w = size.width
     val h = size.height
     val rad = Math.toRadians(118.0)
@@ -94,10 +144,8 @@ fun Modifier.launcherBackground(glow: Boolean): Modifier = drawBehind {
     val dy = (-cos(rad)).toFloat()
     val len = abs(w * dx) + abs(h * dy)
     val c = Offset(w / 2, h / 2)
-    drawRect(Brush.linearGradient(
-        0f to Color(0xFF0A0F14), 0.42f to Color(0xFF111A21), 0.70f to Color(0xFF1A232B), 1f to Color(0xFF121920),
+    drawRect(Brush.linearGradient(*pal.bgStops.toTypedArray(),
         start = Offset(c.x - dx * len / 2, c.y - dy * len / 2), end = Offset(c.x + dx * len / 2, c.y + dy * len / 2)))
-    if (!glow) return@drawBehind
     fun glowAt(cx: Float, cy: Float, rx: Float, ry: Float, color: Color) {
         withTransform({
             translate(cx, cy)
@@ -109,8 +157,8 @@ fun Modifier.launcherBackground(glow: Boolean): Modifier = drawBehind {
     }
     // два приглушённых свечения по бокам: ellipse 26% 70% at 0% 55% и 22% 70% at 100% 55%
     val gold = Color(0xFFD4AF37)
-    glowAt(0f, h * 0.55f, w * 0.26f, h * 0.70f, gold.copy(alpha = 0.22f))
-    glowAt(w, h * 0.55f, w * 0.22f, h * 0.70f, gold.copy(alpha = 0.12f))
+    glowAt(0f, h * 0.55f, w * 0.26f, h * 0.70f, gold.copy(alpha = pal.glowLeft))
+    glowAt(w, h * 0.55f, w * 0.22f, h * 0.70f, gold.copy(alpha = pal.glowRight))
 }
 
 /** Иконки из макета (viewBox 24x24); пути в SVG-синтаксисе, рисуем без библиотеки иконок. */
@@ -145,6 +193,11 @@ object Ico {
     val MUSIC = listOf("M9 18V5l12-2v13", circle(6, 18, 3), circle(18, 16, 3))
     val HOME = listOf("m3 11 9-8 9 8", "M5 10v10h14V10")
     val CHECK = listOf("m5 12 5 5 9-10")
+    /** Разделы настроек: «Главный экран» (раскладка) и «Система» (экран ГУ). */
+    val LAYOUT = listOf(roundRectPath(3f, 4f, 18f, 16f, 2f), "M8 4v16", "M8 14h13")
+    val SCREEN = listOf(roundRectPath(2f, 5f, 20f, 13f, 2f), "M8 21h8")
+    /** «Последний» во втором слоте плеера. */
+    val REPEAT = listOf("M20 11a8 8 0 0 0-14.5-4.5L4 8", "M4 3v5h5", "M4 13a8 8 0 0 0 14.5 4.5L20 16", "M20 21v-5h-5")
 }
 
 /** Прямоугольник со скруглением в SVG-синтаксисе (rect rx из макета рисуется как path). */
@@ -171,6 +224,12 @@ object VIco {
         roundRectPath(2f, 16f, 4f, 5f, 1f), roundRectPath(7.5f, 12f, 4f, 9f, 1f),
         roundRectPath(13f, 8f, 4f, 13f, 1f), roundRectPath(18.5f, 3f, 4f, 18f, 1f),
     ).mapIndexed { i, d -> VPath(d, fill = true, alpha = if (i < level) 1f else 0.35f) }
+
+    /** Раздел «Вид»: круг, закрашенный наполовину. */
+    val HALF_CIRCLE = listOf(
+        VPath("M3 12a9 9 0 1 0 18 0 9 9 0 1 0-18 0", strokeW = 2f),
+        VPath("M12 3a9 9 0 0 0 0 18z", fill = true, strokeW = 2f),
+    )
 
     /** YouTube Music на чипе плееров: круг с треугольником. */
     val YT_MUSIC = listOf(

@@ -185,14 +185,37 @@ object PlayerChip {
         else -> Kind.VK
     }
 
-    fun slots(installed: Set<String>, chosen: String?, lastOnline: String?): List<Slot> = buildList {
-        add(Slot(Kind.PHONE, null, chosen == null))
-        val online = lastOnline?.takeIf { it in installed && it in ONLINE } ?: ONLINE.firstOrNull { it in installed }
-        if (online != null) add(Slot(kindOf(online), online, chosen == online))
-    }
+    /**
+     * @param local первый слот из настроек (свой плеер); null - любая активная сессия
+     * @param fixedOnline второй слот из настроек; null - «Последний»
+     */
+    fun slots(installed: Set<String>, chosen: String?, lastOnline: String?, local: String? = null, fixedOnline: String? = null): List<Slot> =
+        buildList {
+            add(Slot(Kind.PHONE, local, chosen == null || (local != null && chosen == local)))
+            val online = onlineSlot(installed, lastOnline, fixedOnline)
+            if (online != null) add(Slot(kindOf(online), online, chosen == online))
+        }
+
+    /** Пакет второго слота: закреплённый в настройках, иначе последний услышанный, иначе первый установленный. */
+    fun onlineSlot(installed: Set<String>, lastOnline: String?, fixedOnline: String?): String? =
+        fixedOnline?.takeIf { it in installed && it in ONLINE }
+            ?: lastOnline?.takeIf { it in installed && it in ONLINE } ?: ONLINE.firstOrNull { it in installed }
+
+    /** Свои плееры для первого слота: всё найденное на телефоне, кроме онлайн-сервисов второго. */
+    fun localPlayers(players: List<String>): List<String> = players.filter { it !in ONLINE }
 
     /** Последний онлайн-плеер после того, как выбрали или услышали [pkg]: меняется, только если это онлайн-плеер. */
     fun lastOnline(previous: String?, pkg: String?): String? = pkg?.takeIf { it in ONLINE } ?: previous
+}
+
+/**
+ * Сетка экрана настроек: 5 рядов на всю высоту, общая для колонки разделов и карточек справа - границы совпадают
+ * (главное требование Егора). Карточка на span рядов занимает от top(start) до bottom(start + span - 1).
+ */
+object SettingsGrid {
+    const val ROWS = 5
+    fun top(row: Int, height: Int, gap: Int): Int = Math.round(row * (height + gap).toDouble() / ROWS).toInt()
+    fun bottom(row: Int, height: Int, gap: Int): Int = top(row + 1, height, gap) - gap
 }
 
 /** Подпись типа сети в рейке. Типы - константы TelephonyManager.NETWORK_TYPE_*. */

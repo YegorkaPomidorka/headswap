@@ -161,7 +161,7 @@ private fun PlayerChipColumn(modifier: Modifier) {
     val m = LocalMetrics.current
     val s = m.spec
     val accent = LocalAccent.current
-    val slots = PlayerChip.slots(model.installedPackages, model.musicPlayer, model.lastOnlinePlayer)
+    val slots = PlayerChip.slots(model.installedPackages, model.musicPlayer, model.lastOnlinePlayer, model.localPlayer, model.onlinePlayer)
     val shape = RoundedCornerShape(m.dp(s.pcB))
     // backdrop-blur макета в Compose не повторить (blur размывает своё содержимое, а не фон) - только стекло и обводка
     Column(
@@ -231,7 +231,7 @@ private fun PackageTile(pkg: String, iconPx: Int, selected: Boolean, onTap: () -
         if (pressed) Box(Modifier.matchParentSize().background(Pal.SURFACE_PRESSED))
         Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(m.dp(s.g4)),
             modifier = Modifier.padding(m.dp(s.g4))) {
-            Box(Modifier.size(m.dp(iconPx)).clip(CircleShape).background(Color(0xFF2E3C45))) {
+            Box(Modifier.size(m.dp(iconPx)).clip(CircleShape).background(Pal.SURFACE_HI)) {
                 if (icon != null) Image(icon, null, Modifier.fillMaxSize())
             }
             Txt(label, s.appLbl, color = Pal.TEXT, weight = FontWeight.Medium, align = TextAlign.Center)

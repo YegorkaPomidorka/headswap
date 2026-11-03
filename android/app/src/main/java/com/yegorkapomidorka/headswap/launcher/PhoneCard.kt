@@ -75,7 +75,7 @@ private fun PhoneButton(b: PhoneBtn, number: String?) {
             SvgIcon(Ico.PHONE, s.ic, Pal.WHITE, stroke = 2.4f, modifier = Modifier.rotate(135f))
         }
         else -> RoundButton(s.t, desc, onTap, background = Pal.SURFACE_HI) {
-            SvgIcon(when (b) { PhoneBtn.MUTE -> Ico.MIC_OFF; PhoneBtn.ALLOW -> Ico.DEVICE; else -> Ico.CONTACT }, s.ic, Pal.WHITE)
+            SvgIcon(when (b) { PhoneBtn.MUTE -> Ico.MIC_OFF; PhoneBtn.ALLOW -> Ico.DEVICE; else -> Ico.CONTACT }, s.ic, Pal.TEXT)
         }
     }
 }
@@ -87,7 +87,7 @@ private fun PhoneButton(b: PhoneBtn, number: String?) {
 private class PhoneView(
     val head: String, val headColor: Color, val headMono: Boolean = false,
     val name: String, val sub: String = "",
-    val nameColor: Color = Pal.TEXT, val small: Boolean = false, val line2: String = "", val line2Color: Color = Pal.SEC,
+    val nameColor: Color? = null, val small: Boolean = false, val line2: String = "", val line2Color: Color? = null,
     val full: List<PhoneBtn>, val compact: List<PhoneBtn> = full.take(1),
     /** Входящий в компактном виде: значок звонка вместо текста. */
     val ringIcon: Boolean = false,
@@ -128,8 +128,8 @@ fun PhoneCard(modifier: Modifier, shape: Shape? = null) {
                     Spacer(Modifier.weight(1f))
                 }
                 s.phoneCompact -> Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(m.dp(s.g4))) {
-                    Txt(v.name, if (v.small) s.f2 else s.f1, color = v.nameColor, weight = FontWeight.Bold, ellipsis = false)
-                    if (v.line2.isNotEmpty()) Txt(v.line2, s.f2, color = v.line2Color, weight = FontWeight.SemiBold, mono = true, ellipsis = false)
+                    Txt(v.name, if (v.small) s.f2 else s.f1, color = v.nameColor ?: Pal.TEXT, weight = FontWeight.Bold, ellipsis = false)
+                    if (v.line2.isNotEmpty()) Txt(v.line2, s.f2, color = v.line2Color ?: Pal.SEC, weight = FontWeight.SemiBold, mono = true, ellipsis = false)
                 }
                 else -> Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(m.dp(s.g4))) {
                     Txt(v.head, s.f2, color = v.headColor, weight = if (v.headMono) FontWeight.SemiBold else FontWeight.Normal, mono = v.headMono)
@@ -243,13 +243,13 @@ private fun TabPill(text: String, selected: Boolean, onTap: () -> Unit) {
     val shape = RoundedCornerShape(m.dp(s.t / 2))
     Pressable(
         Modifier.height(m.dp(s.t)).clip(shape)
-            .background(if (selected) accent.copy(alpha = 0.32f) else Color(1f, 1f, 1f, 0.10f))
+            .background(if (selected) accent.copy(alpha = 0.32f) else LocalPalette.current.btnSet)
             .then(if (selected) Modifier.border(m.dp(2), accent, shape) else Modifier),
         description = text, onTap = onTap,
     ) { pressed ->
         if (pressed) Box(Modifier.matchParentSize().background(Pal.SURFACE_PRESSED))
         Box(Modifier.fillMaxHeight().padding(horizontal = m.dp((s.t * 0.4f).toInt())), contentAlignment = Alignment.Center) {
-            Txt(text, s.f1, color = if (selected) Pal.WHITE else Pal.TEXT, weight = if (selected) FontWeight.Bold else FontWeight.SemiBold)
+            Txt(text, s.f1, color = Pal.TEXT, weight = if (selected) FontWeight.Bold else FontWeight.SemiBold)
         }
     }
 }

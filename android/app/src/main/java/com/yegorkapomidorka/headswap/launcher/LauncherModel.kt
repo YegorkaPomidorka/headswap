@@ -49,8 +49,18 @@ internal object LauncherModel {
     val context: Context get() = appCtx
 
     var area by mutableStateOf<Area>(Area.Home)
-    var theme by mutableStateOf(ThemeChoice.GOLD)
-    var rightHand by mutableStateOf(false)
+    var theme by mutableStateOf(ThemeChoice.DARK)
+    var mapLeft by mutableStateOf(false)
+    var animations by mutableStateOf(true)
+    var autoplay by mutableStateOf(true)
+    var localPlayer by mutableStateOf<String?>(null)
+    var onlinePlayer by mutableStateOf<String?>(null)
+    /** Режим темы ГУ (CHANGE_MD_THEME, 0 день, 1 ночь, 2 авто); null - ГУ ещё не присылала. Обновляет [LauncherRoot]. */
+    var huTheme by mutableStateOf<Int?>(null)
+    /** Дисплей, на котором музыку уже включили автоматически: автозапуск один раз на рабочий стол. */
+    var autoplayedDisplay = -1
+    /** Светлая ли палитра сейчас: выбор «Тема» и, для «Авто», режим фар машины. */
+    val lightTheme: Boolean get() = ThemeChoice.light(theme, huTheme)
     var cardView by mutableStateOf(CardView.NAVIGATOR)
     var apps by mutableStateOf<List<AppRef>>(emptyList())
     var savedNavigator by mutableStateOf<String?>(null)
@@ -68,7 +78,7 @@ internal object LauncherModel {
     /** Ключ «пакет/класс» приложения в окне приложения; null - ещё ни разу не открывали. */
     var appKey by mutableStateOf<String?>(null)
     /** Страница настроек, с которой открыть экран (выбор навигатора по тапу на пустую карточку). */
-    var settingsPage by mutableStateOf(SettingsPage.MAIN)
+    var settingsPage by mutableStateOf(SettingsPage.LOOK)
     /** Плотность дисплея ГУ: дочерние окна живут с ней же. */
     var densityDpi = 160
     /** Страница «Все приложения» запоминается между заходами. */
@@ -84,7 +94,11 @@ internal object LauncherModel {
         appCtx = ctx.applicationContext
         prefs = LauncherPrefs(appCtx)
         theme = prefs.theme
-        rightHand = prefs.rightHand
+        mapLeft = prefs.mapLeft
+        animations = prefs.animations
+        autoplay = prefs.autoplay
+        localPlayer = prefs.localPlayer
+        onlinePlayer = prefs.onlinePlayer
         cardView = prefs.cardView
         apps = prefs.apps
         savedNavigator = prefs.navigator
@@ -141,7 +155,11 @@ internal object LauncherModel {
     fun removeApp(ref: AppRef) { apps = AppList.remove(apps, ref).also { prefs.apps = it } }
 
     fun chooseTheme(value: ThemeChoice) { theme = value; prefs.theme = value }
-    fun chooseHand(right: Boolean) { rightHand = right; prefs.rightHand = right }
+    fun chooseMapLeft(left: Boolean) { mapLeft = left; prefs.mapLeft = left }
+    fun chooseAnimations(on: Boolean) { animations = on; prefs.animations = on }
+    fun chooseAutoplay(on: Boolean) { autoplay = on; prefs.autoplay = on }
+    fun chooseLocalPlayer(pkg: String?) { localPlayer = pkg; prefs.localPlayer = pkg }
+    fun chooseOnlinePlayer(pkg: String?) { onlinePlayer = pkg; prefs.onlinePlayer = pkg }
     fun nextCardView() { cardView = cardView.next().also { prefs.cardView = it } }
     fun setNavigator(pkg: String?) { savedNavigator = pkg; prefs.navigator = pkg }
     fun chooseMusicPlayer(pkg: String?) { musicPlayer = pkg; prefs.musicPlayer = pkg; noteOnlinePlayer(pkg) }

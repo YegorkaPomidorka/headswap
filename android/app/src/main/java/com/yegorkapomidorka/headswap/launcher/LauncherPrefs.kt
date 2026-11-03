@@ -1,17 +1,24 @@
 package com.yegorkapomidorka.headswap.launcher
 
 import android.content.Context
-import androidx.compose.ui.graphics.Color
 
-/** Тема лаунчера: акцент и подсветка углов. Светлой нет. */
-enum class ThemeChoice(val accent: Color, val glow: Boolean) {
-    GOLD(Color(0xFFD4AF37), true),
-    GOLD_DEEP(Color(0xFFC9A227), true),
-    GOLD_LIGHT(Color(0xFFE8C65A), true),
-    DARK(Color(0xFFD4AF37), false);
+/** Тема лаунчера: тёмное или светлое золото; «Авто» - по режиму фар машины (CHANGE_MD_THEME от ГУ). */
+enum class ThemeChoice {
+    DARK, LIGHT, AUTO;
 
     companion object {
-        fun restore(name: String?): ThemeChoice = entries.firstOrNull { it.name == name } ?: GOLD
+        /** Старые темы-акценты (GOLD, GOLD_DEEP, GOLD_LIGHT - золото на тёмном) становятся тёмным золотом. */
+        fun restore(name: String?): ThemeChoice = entries.firstOrNull { it.name == name } ?: DARK
+
+        /**
+         * Светлая ли палитра. «Авто» светлое только по дневному режиму ГУ (themeModes 0); ночь, «авто» ГУ и
+         * «ГУ ещё ничего не прислала» - тёмное.
+         */
+        fun light(choice: ThemeChoice, huTheme: Int?): Boolean = when (choice) {
+            DARK -> false
+            LIGHT -> true
+            AUTO -> huTheme == 0
+        }
     }
 }
 
@@ -27,10 +34,30 @@ class LauncherPrefs(context: Context) {
         get() = ThemeChoice.restore(prefs.getString("theme", null))
         set(value) { prefs.edit().putString("theme", value.name).apply() }
 
-    /** Правый руль: раскладка зеркальная, рейка и блок навигации справа. */
-    var rightHand: Boolean
-        get() = prefs.getBoolean("right_hand", false)
-        set(value) { prefs.edit().putBoolean("right_hand", value).apply() }
+    /** «Карта на главном» слева: ряды главного зеркальные, рейка остаётся слева. Новый ключ: старый right_hand двигал рейку. */
+    var mapLeft: Boolean
+        get() = prefs.getBoolean("map_left", false)
+        set(value) { prefs.edit().putBoolean("map_left", value).apply() }
+
+    /** «Анимации кнопок» рейки. */
+    var animations: Boolean
+        get() = prefs.getBoolean("animations", true)
+        set(value) { prefs.edit().putBoolean("animations", value).apply() }
+
+    /** «Включать музыку автоматически»: при старте сессии сразу играет, как в Android Auto. */
+    var autoplay: Boolean
+        get() = prefs.getBoolean("autoplay", true)
+        set(value) { prefs.edit().putBoolean("autoplay", value).apply() }
+
+    /** Первый слот чипа плееров: свой плеер на телефоне; null - первый найденный. */
+    var localPlayer: String?
+        get() = prefs.getString("local_player", null)
+        set(value) { prefs.edit().putString("local_player", value).apply() }
+
+    /** Второй слот: закреплённый онлайн-плеер; null - «Последний» (что слушали последним). */
+    var onlinePlayer: String?
+        get() = prefs.getString("online_player", null)
+        set(value) { prefs.edit().putString("online_player", value).apply() }
 
     var cardView: CardView
         get() = CardView.restore(prefs.getString("card_view", null))

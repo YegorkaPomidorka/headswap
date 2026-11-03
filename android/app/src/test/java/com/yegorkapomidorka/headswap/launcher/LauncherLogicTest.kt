@@ -240,10 +240,60 @@ class LauncherLogicTest {
         assertEquals(listOf(false, false), PlayerChip.slots(setOf(PlayerChip.YANDEX), "com.spotify", null).map { it.selected })
     }
 
+    @Test fun playerChipSlotsFromSettings() {
+        val all = setOf(PlayerChip.YANDEX, PlayerChip.YT_MUSIC, PlayerChip.VK, "com.aimp")
+        // закреплённый второй слот важнее последнего услышанного
+        assertEquals(PlayerChip.YT_MUSIC, PlayerChip.slots(all, null, PlayerChip.VK, fixedOnline = PlayerChip.YT_MUSIC)[1].pkg)
+        // закреплённый удалён - снова последний
+        assertEquals(PlayerChip.VK, PlayerChip.onlineSlot(all - PlayerChip.YT_MUSIC, PlayerChip.VK, PlayerChip.YT_MUSIC))
+        // первый слот - свой плеер из настроек, выбран и когда играет он, и когда плеер не задан
+        val local = PlayerChip.slots(all, "com.aimp", null, local = "com.aimp")
+        assertEquals("com.aimp", local[0].pkg)
+        assertTrue(local[0].selected)
+        assertEquals(listOf("com.aimp", "x"), PlayerChip.localPlayers(listOf(PlayerChip.YANDEX, "com.aimp", PlayerChip.VK, "x")))
+    }
+
     @Test fun lastOnlineChangesOnlyOnOnlinePlayers() {
         assertEquals(PlayerChip.VK, PlayerChip.lastOnline(PlayerChip.YANDEX, PlayerChip.VK))
         assertEquals(PlayerChip.YANDEX, PlayerChip.lastOnline(PlayerChip.YANDEX, "com.spotify"))
         assertEquals(PlayerChip.YANDEX, PlayerChip.lastOnline(PlayerChip.YANDEX, null))
         assertEquals(null, PlayerChip.lastOnline(null, null))
+    }
+
+    @Test fun settingsGridBordersMatchOnAllResolutions() {
+        for (row in LauncherSpecs.TABLE) {
+            val s = LauncherSpecs.forSize(row[0], row[1])
+            val h = row[1] - s.g8 - s.statusH - s.g8 - s.m // высота сетки под статусом
+            val gap = s.g8
+            assertEquals(0, SettingsGrid.top(0, h, gap))
+            assertEquals(h, SettingsGrid.bottom(SettingsGrid.ROWS - 1, h, gap))
+            for (i in 0 until SettingsGrid.ROWS - 1) {
+                // между рядами ровно зазор, ряды одной высоты +-1 px
+                assertEquals(gap, SettingsGrid.top(i + 1, h, gap) - SettingsGrid.bottom(i, h, gap))
+                val a = SettingsGrid.bottom(i, h, gap) - SettingsGrid.top(i, h, gap)
+                val b = SettingsGrid.bottom(i + 1, h, gap) - SettingsGrid.top(i + 1, h, gap)
+                assertTrue("${row[0]}x${row[1]}", kotlin.math.abs(a - b) <= 1)
+            }
+        }
+    }
+
+    @Test fun themeChoiceRestoresOldNamesAsDarkAndAutoFollowsHeadlights() {
+        assertEquals(ThemeChoice.DARK, ThemeChoice.restore("GOLD_LIGHT"))
+        assertEquals(ThemeChoice.DARK, ThemeChoice.restore("GOLD"))
+        assertEquals(ThemeChoice.LIGHT, ThemeChoice.restore("LIGHT"))
+        assertFalse(ThemeChoice.light(ThemeChoice.AUTO, null)) // ГУ ещё ничего не прислала
+        assertTrue(ThemeChoice.light(ThemeChoice.AUTO, 0)) // день
+        assertFalse(ThemeChoice.light(ThemeChoice.AUTO, 1)) // ночь
+        assertFalse(ThemeChoice.light(ThemeChoice.AUTO, 2))
+        assertTrue(ThemeChoice.light(ThemeChoice.LIGHT, 1))
+    }
+
+    @Test fun navArrowStopsInAnotherDirection() {
+        for (k in 1..7) {
+            val next = NavSpinLogic.next(90f, k)
+            assertTrue(next - 90f >= 720f + 45f)
+            assertTrue((next - 90f) % 360f != 0f)
+            assertEquals(0f, (next - 90f) % 45f)
+        }
     }
 }

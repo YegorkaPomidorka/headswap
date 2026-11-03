@@ -5,6 +5,7 @@ import android.content.Intent
 import android.view.Display
 import com.yegorkapomidorka.headswap.AppLog
 import com.yegorkapomidorka.headswap.MainActivity
+import com.yegorkapomidorka.headswap.dex.DexState
 
 /** Действия кнопок лаунчера в одном месте: переходы между экранами, запуск приложений, назад. */
 object LauncherActions {
@@ -16,7 +17,7 @@ object LauncherActions {
     /** Шестерёнка на рейке: настройки; повторное нажатие - назад. */
     fun openSettings() {
         if (model.area == Area.Settings) { model.back(); return }
-        model.settingsPage = SettingsPage.MAIN
+        model.settingsPage = SettingsPage.LOOK
         model.go(Area.Settings)
     }
     /** Тап по карточке «Телефон»: экран «Вызовы»; пропущенные считаются просмотренными. */
@@ -79,12 +80,26 @@ object LauncherActions {
 
     fun openPlayers() { model.go(Area.Players) }
 
+    /** Старт сессии с «Включать музыку автоматически»: играет активная сессия, иначе выбранный или свой плеер. Главный поток. */
+    fun autoplay() {
+        val display = DexState.displayId
+        if (!model.autoplay || display < 0 || display == model.autoplayedDisplay) return
+        model.autoplayedDisplay = display
+        val st = MusicController.state
+        val pkg = model.musicPlayer ?: model.localPlayer
+        AppLog.i("LAUNCHER автозапуск музыки: ${if (st.playing) "уже играет" else st.pkg ?: pkg ?: "плеера нет"}", false)
+        if (st.playing) return
+        if (st.hasSession) MusicController.playPause(model.context, null) else pkg?.let { MusicController.startPlayer(model.context, it) }
+    }
+
     /** «Плеер телефона» на чипе: без выбранного приложения, играет любая активная сессия. */
     fun choosePhonePlayer() { model.chooseMusicPlayer(null) }
 
     /** Выбранный плеер запоминается и становится текущим: играет сразу, если у него есть сессия или MediaBrowserService. */
     fun choosePlayer(pkg: String) {
         model.chooseMusicPlayer(pkg)
+        // свой плеер из списка всех плееров становится первым слотом чипа
+        if (pkg !in PlayerChip.ONLINE) model.chooseLocalPlayer(pkg)
         MusicController.startPlayer(model.context, pkg) // главный поток: MediaBrowser создаёт Handler, connect асинхронный
         model.home()
     }

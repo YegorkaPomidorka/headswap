@@ -392,6 +392,9 @@ class CarLifeSession(
                 PbReader.parse(m.body)?.let {
                     WLog.ev(WLog.HS, "HU_INFO", "manufacturer" to PbReader.str(it, 13), "model" to PbReader.str(it, 14))
                     bridge.onHuInfo(PbReader.str(it, 13), PbReader.str(it, 14), PbReader.str(it, 15), PbReader.str(it, 2))
+                    CarLifeState.huName = listOfNotNull(PbReader.str(it, 13), PbReader.str(it, 14))
+                        .filter { s -> s.isNotBlank() }.joinToString(" ").ifEmpty { null }
+                    CarLifeState.huCarlifeVersion = PbReader.str(it, 24)?.takeIf { s -> s.isNotBlank() }
                 }
                 applyMobis()
                 logDesay()
@@ -482,7 +485,9 @@ class CarLifeSession(
             }
             Msg.CHANGE_MD_THEME -> {
                 AppLog.i("== CHANGE_MD_THEME ${PbText.render(m.body, Schemas.themeState)}")
-                bridge.onCarlifeTheme(PbReader.parse(m.body)?.let { PbReader.int(it, 1) })
+                val mode = PbReader.parse(m.body)?.let { PbReader.int(it, 1) }
+                if (mode != null) CarLifeState.huTheme = mode
+                bridge.onCarlifeTheme(mode)
             }
             Msg.HU_AUTHEN_RESULT -> {
                 val f = PbReader.parse(m.body)

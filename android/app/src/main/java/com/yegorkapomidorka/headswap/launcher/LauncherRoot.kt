@@ -23,6 +23,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.platform.LocalDensity
@@ -30,12 +31,13 @@ import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.LayoutDirection
+import com.yegorkapomidorka.headswap.CarLifeState
 import com.yegorkapomidorka.headswap.R
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 
-/** Корень лаунчера: фон, рейка слева (справа при правом руле) и область содержимого. */
+/** Корень лаунчера: фон по теме, рейка слева (всегда) и область содержимого. */
 @Composable
 fun LauncherRoot(connected: Boolean) {
     val density = LocalDensity.current
@@ -43,6 +45,8 @@ fun LauncherRoot(connected: Boolean) {
     LaunchedEffect(Unit) {
         while (true) {
             model.status = withContext(Dispatchers.Default) { StatusReader.read(model.context) }
+            // режим фар от ГУ для темы «Авто»
+            model.huTheme = CarLifeState.huTheme
             delay(1000)
         }
     }
@@ -53,29 +57,34 @@ fun LauncherRoot(connected: Boolean) {
             delay(1000)
         }
     }
+    // «Включать музыку автоматически»: один раз на рабочий стол (новый дисплей = новая сессия), не на каждую рекомпозицию
+    LaunchedEffect(connected) {
+        if (connected) {
+            delay(2000) // первый опрос сессий MusicController
+            LauncherActions.autoplay()
+        }
+    }
     BoxWithConstraints(Modifier.fillMaxSize()) {
         val w = constraints.maxWidth
         val h = constraints.maxHeight
         val spec = remember(w, h) { LauncherSpecs.forSize(w, h) }
         val metrics = remember(spec, density) { LauncherMetrics(spec, density) }
-        val theme = model.theme
-        CompositionLocalProvider(LocalMetrics provides metrics, LocalAccent provides theme.accent) {
-            Box(Modifier.fillMaxSize().launcherBackground(theme.glow)) {
+        val pal = if (model.lightTheme) Palettes.LIGHT else Palettes.DARK
+        CompositionLocalProvider(LocalMetrics provides metrics, LocalAccent provides Pal.GOLD, LocalPalette provides pal) {
+            Box(Modifier.fillMaxSize().launcherBackground(pal)) {
                 if (!connected) {
                     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         Txt(stringResource(R.string.l_connecting), spec.f1, color = Pal.SEC)
                     }
                 } else {
-                    val dir = if (model.rightHand) LayoutDirection.Rtl else LayoutDirection.Ltr
-                    CompositionLocalProvider(LocalLayoutDirection provides dir) {
-                        Row(Modifier.fillMaxSize()) {
-                            Rail()
-                            Box(Modifier.weight(1f).fillMaxHeight().onGloballyPositioned { model.areaRect = it.boundsInRoot() }) {
-                                AreaContent()
-                            }
+                    // рейка всегда слева; «Карта слева» переставляет только ряды главного (HomeScreen)
+                    Row(Modifier.fillMaxSize()) {
+                        Rail()
+                        Box(Modifier.weight(1f).fillMaxHeight().onGloballyPositioned { model.areaRect = it.boundsInRoot() }) {
+                            AreaContent()
                         }
                     }
-                    CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
+                    run {
                         EmbedLayers()
                         // входящий звонок поверх чужого приложения или экрана без карточки «Телефон»
                         if (PhoneController.callState == CallState.RINGING && (model.area != Area.Home || spec.strip)) {
@@ -107,8 +116,6 @@ private fun AreaContent() {
     }
 }
 
-/** Серый «Назад» на рейке, когда идти некуда (макет v2). */
-private val BackIdle = Color(0xFF5F6A80)
 
 /** Рейка на всю высоту (S-образно распределена) и под ней отдельный золотой блок навигации. Макет v2. */
 @Composable
@@ -127,12 +134,12 @@ private fun Rail() {
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.SpaceBetween,
         ) {
-            Txt(status.time, s.f1, color = Pal.TEXT, weight = FontWeight.SemiBold, mono = true)
+            Txt(status.time, s.f1, color = Pal.RAIL, weight = FontWeight.SemiBold, mono = true)
             // «Назад» виден всегда: белый везде, кроме главного, где идти некуда (серый, без анимации)
             val back = rememberPressAnim(600)
             RoundButton(s.rb, stringResource(R.string.l_back), onTap = { LauncherActions.embeddedBack() }, enabled = canBack,
                 onPress = back::play) {
-                BackIcon(s.backIc, if (canBack) Pal.WHITE else BackIdle) { back.progress }
+                BackIcon(s.backIc, if (canBack) Pal.RAIL else LocalPalette.current.backOff) { back.progress }
             }
             // лого: на главном - «Все приложения», на любом другом экране - домой
             val logo = rememberPressAnim(1000)
@@ -145,24 +152,31 @@ private fun Rail() {
                         0f to accent.copy(alpha = 0.6f), 0.4f to accent.copy(alpha = 0.25f), 0.7f to accent.copy(alpha = 0f),
                         center = center, radius = size.minDimension * 0.7071f))
                 }, contentAlignment = Alignment.Center) {
-                    LogoIcon(s.logoIn, Pal.WHITE) { logo.progress }
+                    LogoIcon(s.logoIn, Pal.RAIL) { logo.progress }
                 }
             }
+            // на экране настроек шестерёнка подсвечена: текущий экран
             val gear = rememberPressAnim(900)
-            RoundButton(s.rb, stringResource(R.string.l_settings), onTap = { LauncherActions.openSettings() }, onPress = gear::play) {
-                GearIcon(s.ric, Pal.SEC2) { gear.progress }
+            val inSettings = model.area == Area.Settings
+            RoundButton(s.rb, stringResource(R.string.l_settings), onTap = { LauncherActions.openSettings() }, onPress = gear::play,
+                background = if (inSettings) accent.copy(alpha = 0.32f) else Color.Transparent) {
+                GearIcon(s.ric, if (inSettings) Pal.RAIL else Pal.SEC2) { gear.progress }
             }
             // в ленте «Вид карточки» - стеклянная кнопка на карте
             if (!s.strip) CardViewButton(s.rb, s.ric, Color.Transparent, Pal.SEC2)
         }
+        // стрелка навигации: 2 оборота и стоп в случайной другой стороне света
+        val spin = rememberNavSpin()
         Pressable(
             Modifier.width(m.dp(s.rail)).height(m.dp(s.navH))
                 .clip(RoundedCornerShape(topEnd = m.dp(s.radius))).background(accent),
             description = stringResource(R.string.l_navigation), onTap = { LauncherActions.openNavigator() },
+            onPress = spin::play,
         ) { pressed ->
             if (pressed) Box(Modifier.matchParentSize().background(Color(0x33000000)))
             Box(Modifier.matchParentSize(), contentAlignment = Alignment.Center) {
-                SvgIcon(Ico.NAV, s.icBig, Pal.onAccent(accent), fill = true)
+                SvgIcon(Ico.NAV, s.icBig, Pal.onAccent(accent), fill = true,
+                    modifier = Modifier.graphicsLayer { rotationZ = spin.degrees })
             }
         }
     }
@@ -180,7 +194,7 @@ fun CardViewButton(sizePx: Int, iconPx: Int, background: Color, color: Color, mo
 
 /** Строка статуса справа сверху: дата, Bluetooth, Wi-Fi, сеть, громкость медиа. Ничего не нажимается, погоды нет. */
 @Composable
-fun StatusBar() {
+fun StatusBar(title: String? = null, showNet: Boolean = true) {
     val m = LocalMetrics.current
     val s = m.spec
     val st = LauncherModel.status
@@ -188,12 +202,14 @@ fun StatusBar() {
         Modifier.fillMaxWidth().height(m.dp(s.statusH)), verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(m.dp(s.g), Alignment.End),
     ) {
+        // заголовок экрана слева (настройки), статус справа
+        if (title != null) Txt(title, s.fs, Modifier.weight(1f), color = Pal.TEXT, weight = FontWeight.SemiBold)
         Ltr {
             Txt(st.date, s.fs, color = Pal.SEC2)
             SvgIcon(Ico.BT, s.fs, if (st.bluetooth) Pal.SEC2 else Pal.SEC2.copy(alpha = 0.3f))
             SvgIcon(Ico.WIFI, s.fs, if (st.wifi) Pal.SEC2 else Pal.SEC2.copy(alpha = 0.3f))
             // сеть с уровнем сигнала - здесь, рядом с Wi-Fi, а не в рейке
-            if (st.signal >= 0) Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(m.dp(s.g4))) {
+            if (showNet && st.signal >= 0) Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(m.dp(s.g4))) {
                 VectorIcon(VIco.signal(st.signal), 24f, s.fs, Pal.SEC2)
                 Txt(st.net, s.fs, color = Pal.SEC2)
             }

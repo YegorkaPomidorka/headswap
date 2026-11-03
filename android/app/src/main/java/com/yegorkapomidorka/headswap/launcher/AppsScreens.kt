@@ -72,8 +72,8 @@ private fun PageArrow(icon: List<String>, description: String, enabled: Boolean,
     val m = LocalMetrics.current
     val s = m.spec
     RoundButton(s.t, description, onTap, enabled = enabled,
-        background = if (enabled) Color(0x24FFFFFF) else Color(0x0FFFFFFF)) {
-        SvgIcon(icon, s.ic, if (enabled) Pal.WHITE else Color(0xFF5F6A80), stroke = 2.6f)
+        background = if (enabled) Pal.SURFACE_HI else Pal.SURFACE) {
+        SvgIcon(icon, s.ic, if (enabled) Pal.TEXT else LocalPalette.current.backOff, stroke = 2.6f)
     }
 }
 
@@ -162,7 +162,7 @@ fun RemoveConfirm() {
     Pressable(Modifier.fillMaxSize().background(Color(0xAA000000)), onTap = { LauncherModel.confirmRemove = null }) {
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             Pressable(
-                Modifier.clip(RoundedCornerShape(m.dp(s.radius))).background(Color(0xFF1A232B)),
+                Modifier.clip(RoundedCornerShape(m.dp(s.radius))).background(LocalPalette.current.bgSolid),
                 onTap = {},
             ) {
                 Column(Modifier.padding(m.dp(s.g * 2)), horizontalAlignment = Alignment.CenterHorizontally,
