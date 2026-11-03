@@ -4,6 +4,7 @@ import android.Manifest
 import android.app.NotificationManager
 import android.content.pm.PackageManager
 import android.os.Build
+import android.provider.Settings
 import android.text.InputType
 import android.util.TypedValue
 import android.view.View
@@ -213,6 +214,16 @@ class PhoneActivationBlock(
 
     private fun begin() {
         val needsCode = !state.paired
+        // Android сам гасит «Отладку по Wi-Fi» при смене сети и перезагрузке: сопряжённый телефон тогда стучится в
+        // старый порт и за секунду падает с REFUSED (лог 2026-11-03) - ведём на экран отладки и говорим, что включить
+        if (!needsCode && Settings.Global.getInt(c.contentResolver, ADB_WIFI_ENABLED, 1) == 0) {
+            status.text = c.getString(R.string.pa_need_wifi_debug)
+            status.setTextColor(c.clr(R.color.warn))
+            status.visibility = View.VISIBLE
+            if (!view.isAttachedToWindow) Toast.makeText(c, R.string.pa_need_wifi_debug, Toast.LENGTH_LONG).show()
+            runCatching { c.startActivity(PhoneActivation.developerSettingsIntent()) }
+            return
+        }
         if (needsCode && !c.getSystemService(NotificationManager::class.java).areNotificationsEnabled()) {
             status.text = c.getString(R.string.pa_need_notif)
             status.setTextColor(c.clr(R.color.warn))
@@ -248,6 +259,9 @@ class PhoneActivationBlock(
     private companion object {
         /** Уведомления (ввод кода) и локальная сеть (mDNS-поиск портов) перед активацией; 38-41 заняты в SettingsSectionScreen и CarPairing. */
         const val REQ_PHONE_ACTIVATION = 42
+
+        /** Settings.Global.ADB_WIFI_ENABLED - скрытая константа, читать её приложению можно. */
+        const val ADB_WIFI_ENABLED = "adb_wifi_enabled"
     }
 
     private fun field(hintRes: Int): EditText = EditText(c).apply {

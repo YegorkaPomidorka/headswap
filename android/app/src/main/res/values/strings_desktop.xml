@@ -30,6 +30,7 @@
     <string name="pa_forget">Pair again</string>
     <string name="pa_forget_done">Pairing forgotten. Next time Headswap asks for a new code.</string>
     <string name="pa_need_notif">Allow Headswap notifications: the pairing code is typed into one. Or enter the port and code by hand.</string>
+    <string name="pa_need_wifi_debug">Turn on Wireless debugging in Developer options (any Wi-Fi network works, no internet needed), then tap Activate again.</string>
     <string name="pa_field_bad_port">Port: 1 to 65535</string>
     <string name="pa_field_bad_code">Six digits</string>
 

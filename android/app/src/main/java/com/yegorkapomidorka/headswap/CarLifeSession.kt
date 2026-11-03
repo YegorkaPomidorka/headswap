@@ -406,6 +406,8 @@ class CarLifeSession(
                 PbReader.parse(m.body)?.let {
                     WLog.ev(WLog.HS, "STATISTIC_INFO", "channel" to PbReader.str(it, 4))
                     bridge.onHuStatistic(PbReader.str(it, 4))
+                    CarLifeState.huChannel = PbReader.str(it, 4)?.takeIf { s -> s.isNotBlank() }
+                    CarLifeState.huStatVersion = PbReader.str(it, 2)?.takeIf { s -> s.isNotBlank() }
                 }
                 applyMobis()
                 scheduleMobisMic()

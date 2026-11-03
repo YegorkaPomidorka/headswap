@@ -26,6 +26,10 @@ object CarLifeState {
     @Volatile var huName: String? = null
     @Volatile var huCarlifeVersion: String? = null
 
+    /** STATISTIC_INFO: channel и versionName - запасное имя ГУ, когда HU_INFO пустой (Honda Vezel). */
+    @Volatile var huChannel: String? = null
+    @Volatile var huStatVersion: String? = null
+
     /** Последний themeModes из CHANGE_MD_THEME (0 день, 1 ночь, 2 авто); null - ГУ не присылала. Тема «Авто» лаунчера. */
     @Volatile var huTheme: Int? = null
 

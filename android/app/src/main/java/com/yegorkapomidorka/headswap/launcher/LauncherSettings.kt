@@ -461,15 +461,18 @@ private fun InfoCard(label: String, value: String, d: SettingsDims, modifier: Mo
 @Composable
 private fun systemInfo(): List<Pair<String, String>> {
     val dash = "—"
-    val hu = CarLifeState.huName?.let { name -> CarLifeState.huCarlifeVersion?.let { "$name · CarLife $it" } ?: name } ?: dash
+    // Honda Vezel шлёт пустой HU_INFO: тогда имя - канал из STATISTIC_INFO, версия CarLife - его versionName
+    val name = CarLifeState.huName ?: CarLifeState.huChannel?.let { stringResource(R.string.l_s_hu_channel, it) }
+    val version = CarLifeState.huCarlifeVersion ?: CarLifeState.huStatVersion
+    val hu = name?.let { n -> version?.let { "$n · CarLife $it" } ?: n } ?: dash
     val link = if (!CarLifeState.running) dash else if (CarLifeState.wirelessSession) "Wi-Fi" else "USB"
     val fps = DexPrefs(LauncherModel.context).desktopFps.fixed ?: 30
     val res = CarLifeState.videoMode?.let { stringResource(R.string.l_s_fps, "${it.outW}×${it.outH}", fps) } ?: dash
     return listOf(
         stringResource(R.string.l_s_hu) to hu,
         stringResource(R.string.l_s_link) to link,
-        // в Headswap Desktop видео всегда перекодируется (прямого проброса нет)
-        stringResource(R.string.l_s_video) to stringResource(R.string.l_s_transcode),
+        // в Headswap Desktop телефон кодирует свой экран сам, прямого проброса нет
+        stringResource(R.string.l_s_video) to "H.264",
         stringResource(R.string.l_s_res) to res,
     )
 }

@@ -29,6 +29,7 @@
     <string name="pa_forget">Сопрячь заново</string>
     <string name="pa_forget_done">Сопряжение забыто. В следующий раз Headswap попросит новый код.</string>
     <string name="pa_need_notif">Разрешите уведомления Headswap: код сопряжения вводится в уведомлении. Или введите порт и код вручную.</string>
+    <string name="pa_need_wifi_debug">Включите «Отладку по Wi-Fi» в настройках разработчика (нужна любая сеть Wi-Fi, интернет не обязателен) и нажмите «Активировать» ещё раз.</string>
     <string name="pa_field_bad_port">Порт: от 1 до 65535</string>
     <string name="pa_field_bad_code">Шесть цифр</string>
 

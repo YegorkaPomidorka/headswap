@@ -90,7 +90,7 @@
     <string name="l_sec_look">Вид</string>
     <string name="l_sec_nav">Навигатор</string>
     <string name="l_sec_music">Музыка</string>
-    <string name="l_sec_home">Главный экран</string>
+    <string name="l_sec_home">Экран</string>
     <string name="l_sec_system">Система</string>
     <string name="l_s_theme">Тема</string>
     <string name="l_s_theme_dark">Тёмное золото</string>
@@ -111,7 +111,7 @@
     <string name="l_s_video">Видео</string>
     <string name="l_s_res">Разрешение и частота</string>
     <string name="l_s_version">Версия</string>
-    <string name="l_s_transcode">Перекодирование</string>
+    <string name="l_s_hu_channel">Канал %1$s</string>
     <string name="l_s_fps">%1$s · %2$d к/с</string>
     <string name="l_nav_yandex_navi">Яндекс Навигатор</string>
     <string name="l_nav_2gis">2ГИС</string>
