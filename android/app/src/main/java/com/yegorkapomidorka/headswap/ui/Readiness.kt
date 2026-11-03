@@ -14,9 +14,18 @@ import android.provider.Settings
 import com.yegorkapomidorka.headswap.AppLog
 import com.yegorkapomidorka.headswap.R
 import com.yegorkapomidorka.headswap.aa.AaPrefs
+import com.yegorkapomidorka.headswap.dex.DelegatedDesktopAccess
 
 /** Всё, что надо включить перед поездкой: порядок, тексты, автоопределение «уже сделано». Общее для онбординга и чеклиста. */
 enum class StepId(val key: String) {
+    /** Первый шаг: Android Auto или свой лаунчер. Дальше путь зависит от выбора (OnboardingPath). */
+    MODE("mode"),
+
+    /** Только для своего лаунчера: режим разработчика Android (нужен «Отладке по Wi-Fi»). */
+    DEVMODE("devmode"),
+
+    /** Только для своего лаунчера: активация Headswap через «Отладку по Wi-Fi» (PhoneActivationBlock). */
+    ACTIVATE("activate"),
     AA_DEV("aa_dev"),
     AA_UNKNOWN("aa_unknown"),
     AUTOSTART("autostart"),
@@ -98,7 +107,24 @@ object Readiness {
         ),
     )
 
-    fun info(id: StepId): StepInfo = STEPS.first { it.id == id }
+    /** Шаги выбора режима и пути лаунчера: в [STEPS] их нет, чтобы чеклист и путь Android Auto остались прежними. */
+    val EXTRA_STEPS: List<StepInfo> = listOf(
+        StepInfo(
+            StepId.MODE, R.string.step_mode_title, null, R.string.step_mode_subtitle, null,
+            R.string.step_mode_primary, null, R.string.onb_back, R.string.step_mode_short,
+        ),
+        StepInfo(
+            StepId.DEVMODE, R.string.step_devmode_title, R.array.step_devmode_list, null, R.string.step_devmode_hint,
+            R.string.step_devmode_primary, null, R.string.onb_already_done, R.string.step_devmode_short,
+        ),
+        // заголовок и кнопки рисует PhoneActivationBlock; список и подсказку блок берёт отсюда
+        StepInfo(
+            StepId.ACTIVATE, R.string.pa_title, R.array.step_activate_list, null, R.string.step_activate_hint,
+            R.string.pa_button, null, R.string.onb_later, R.string.step_activate_short,
+        ),
+    )
+
+    fun info(id: StepId): StepInfo = STEPS.firstOrNull { it.id == id } ?: EXTRA_STEPS.first { it.id == id }
 
     fun isXiaomi(): Boolean {
         val m = Build.MANUFACTURER.lowercase()
@@ -112,6 +138,8 @@ object Readiness {
         StepId.MIC -> ctx.checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
         StepId.BACKGROUND -> batteryOk(ctx)
         StepId.CAR -> if (AaPrefs(ctx).carPreset != null) true else null      // пропуск - ручная отметка
+        StepId.DEVMODE -> devSettingsEnabled(ctx)
+        StepId.ACTIVATE -> DelegatedDesktopAccess.isReady(ctx)
         StepId.LOCATION -> try {
             ctx.getSystemService(LocationManager::class.java).isLocationEnabled
         } catch (_: Exception) {
@@ -119,6 +147,10 @@ object Readiness {
         }
         else -> null
     }
+
+    /** Режим разработчика включён (семь нажатий на «Номер сборки»). */
+    fun devSettingsEnabled(ctx: Context): Boolean =
+        Settings.Global.getInt(ctx.contentResolver, Settings.Global.DEVELOPMENT_SETTINGS_ENABLED, 0) == 1
 
     fun batteryOk(ctx: Context): Boolean =
         ctx.getSystemService(PowerManager::class.java).isIgnoringBatteryOptimizations(ctx.packageName)
@@ -175,6 +207,9 @@ object Readiness {
     fun openLocationSettings(ctx: Context) = openSettings(ctx, Settings.ACTION_LOCATION_SOURCE_SETTINGS)
 
     fun openBluetoothSettings(ctx: Context) = openSettings(ctx, Settings.ACTION_BLUETOOTH_SETTINGS)
+
+    /** «О телефоне»: там «Номер сборки». */
+    fun openDeviceInfo(ctx: Context) = openSettings(ctx, Settings.ACTION_DEVICE_INFO_SETTINGS)
 
     private fun openSettings(ctx: Context, action: String) {
         try {

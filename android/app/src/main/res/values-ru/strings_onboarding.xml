@@ -110,4 +110,34 @@
     <string name="step_car_title">Какой у вас автомобиль?</string>
     <string name="step_car_short">Автомобиль</string>
     <string name="step_car_body">Подставим настройки, проверенные сообществом на этой машине. Опытные пользователи могут пропустить шаг.</string>
+
+    <!-- Выбор режима и путь «Свой лаунчер» (OnboardingMode.dc.html) -->
+    <string name="step_mode_title">Выберите режим</string>
+    <string name="step_mode_subtitle">Что показывать на магнитоле. Сменить можно в Настройках в любой момент.</string>
+    <string name="step_mode_aa_body">Стандартный AA: карты, музыка и звонки из Android Auto. Работает через его сервер ГУ.</string>
+    <string name="step_mode_own_body">На магнитоле свой рабочий стол Headswap или автолаунчер с телефона.</string>
+    <string name="step_mode_warn_title">Внимание</string>
+    <string name="step_mode_warn_body">Для этого режима понадобятся режим разработчика Android и активация Headswap через «Отладку по Wi-Fi».</string>
+    <string name="step_mode_warn_risk">Это рискованные настройки. Включаете их на свой страх и риск.</string>
+    <string name="step_mode_primary">Далее</string>
+    <string name="step_mode_short">Режим</string>
+
+    <string name="step_devmode_title">Включите режим разработчика</string>
+    <string-array name="step_devmode_list">
+        <item>Нажмите «Открыть настройки», откроется «О телефоне»</item>
+        <item>7 раз нажмите на «Номер сборки», пока не появится «Вы стали разработчиком»</item>
+        <item>Если телефон попросит, введите его PIN-код</item>
+    </string-array>
+    <string name="step_devmode_hint">Режим разработчика нужен только для «Отладки по Wi-Fi». Если он уже включён, нажмите «Уже сделано».</string>
+    <string name="step_devmode_primary">Открыть настройки</string>
+    <string name="step_devmode_short">Режим разработчика</string>
+
+    <!-- Пункты и подсказка шага активации; заголовок, кнопки и статус - PhoneActivationBlock -->
+    <string-array name="step_activate_list">
+        <item>Нажмите «Активировать», откроется «Для разработчиков» (на Xiaomi: Расширенные настройки → Для разработчиков)</item>
+        <item>Включите «Отладку по Wi-Fi» и нажмите «Подключить устройство с кодом сопряжения»</item>
+        <item>Введите показанный код в уведомление Headswap</item>
+    </string-array>
+    <string name="step_activate_hint">После перезагрузки телефона активация слетает. Headswap сам попросит повторить, это полминуты.</string>
+    <string name="step_activate_short">Активация Headswap</string>
 </resources>

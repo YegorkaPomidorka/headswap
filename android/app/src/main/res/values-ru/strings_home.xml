@@ -102,6 +102,9 @@
     <string name="mock_dev_title">Для разработчиков</string>
     <string name="mock_dev_wifi">Отладка по Wi-Fi</string>
     <string name="mock_dev_pair">Подключить устройство с кодом сопряжения</string>
+    <string name="mock_about_title">О телефоне</string>
+    <string name="mock_about_build">Номер сборки</string>
+    <string name="mock_about_build_sub">на Xiaomi: «Версия ОС»</string>
     <string name="mock_cancel">Отмена</string>
     <string name="mock_ok">ОК</string>
 

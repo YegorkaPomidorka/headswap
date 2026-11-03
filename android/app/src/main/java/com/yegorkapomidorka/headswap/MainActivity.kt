@@ -276,7 +276,7 @@ class MainActivity : Activity() {
                 "screen_dev" -> { toHome(); showDev() }
                 "onboarding" -> {
                     toHome()
-                    // --es step autostart|notif|... открывает онбординг сразу с нужного шага
+                    // --es step mode|devmode|activate|autostart|notif|... открывает онбординг сразу с нужного шага
                     val step = StepId.values().firstOrNull { it.key == intent.getStringExtra("step") }
                     showOnboarding(rerun = true, startAt = step)
                 }

@@ -23,7 +23,12 @@ import com.yegorkapomidorka.headswap.dex.PhoneActivationState
  * «Активация с телефона» в разделе «Режим»: статус попытки, кнопка, ручной ввод портов и кода. Сама работа идёт в
  * PhoneActivationService (приложение при активации перезапускается), здесь только запуск и показ.
  */
-class PhoneActivationBlock(private val host: MainActivity) {
+class PhoneActivationBlock(
+    private val host: MainActivity,
+    /** Пункты для несопряжённого телефона; null - pa_step_1..3 из «Режима». */
+    private val unpairedSteps: List<String>? = null,
+    private val hintRes: Int = R.string.pa_hint,
+) {
     private val c = host
     private val state = PhoneActivationState(c)
     val view: LinearLayout = c.vbox(8)
@@ -42,6 +47,9 @@ class PhoneActivationBlock(private val host: MainActivity) {
     private val code: EditText
     private val connectPort: EditText
     private var awaitingPermission = false
+    /** Доступ активирован и попытка не идёт: заголовок стал зелёным «Активировано». Обновляется в [refresh]. */
+    var ready = false
+        private set
     /** Номер попытки, для которой журнал уже запрошен в этой сессии экрана: тик идёт каждые 500 мс. */
     private var collected: String? = null
 
@@ -52,7 +60,7 @@ class PhoneActivationBlock(private val host: MainActivity) {
         status = c.text("", 16f, 600).also { view.addView(it, lp(WRAP, WRAP).margins(c, 8, 0, 8, 8)) }
         view.addView(c.stepMockCard(Mocks.developerOptions(c), compact = true), lp(MATCH, WRAP))
         steps = c.vbox().also { view.addView(it, lp(MATCH, WRAP).margins(c, 0, 10, 0, 0)) }
-        view.addView(c.stepHint(c.getString(R.string.pa_hint)), lp(MATCH, WRAP))
+        view.addView(c.stepHint(c.getString(hintRes)), lp(MATCH, WRAP))
         activate = c.primaryButton(c.getString(R.string.pa_button)).apply { setOnClickListener { onActivate() } }
         view.addView(activate, c.lpDp(MATCH, 64).margins(c, 0, 8, 0, 0))
         cancel = c.tonalButton(c.getString(R.string.pa_cancel)).apply {
@@ -95,7 +103,7 @@ class PhoneActivationBlock(private val host: MainActivity) {
             else -> attempt(access, state)
         }
         // заголовок и статус в одном: «Активировано» встаёт на место призыва, отдельная строка - только ход попытки и ошибки
-        val ready = !busy && access == DelegatedDesktopAccess.Status.READY
+        ready = !busy && access == DelegatedDesktopAccess.Status.READY
         title.text = c.getString(if (ready) R.string.bm_act_on else R.string.pa_title)
         title.setTextColor(c.clr(if (ready) R.color.ok else R.color.on))
         val plain = ready || (!busy && text == c.getString(R.string.bm_act_off))
@@ -107,7 +115,7 @@ class PhoneActivationBlock(private val host: MainActivity) {
             stepsPaired = paired
             steps.removeAllViews()
             val items = if (paired) listOf(c.getString(R.string.pa_step_paired))
-                else listOf(R.string.pa_step_1, R.string.pa_step_2, R.string.pa_step_3).map { c.getString(it) }
+                else unpairedSteps ?: listOf(R.string.pa_step_1, R.string.pa_step_2, R.string.pa_step_3).map { c.getString(it) }
             steps.addView(c.numberedList(items), lp(MATCH, WRAP))
         }
         (activate.getChildAt(0) as TextView).text = c.getString(if (paired || access == DelegatedDesktopAccess.Status.READY) R.string.pa_button_again else R.string.pa_button)

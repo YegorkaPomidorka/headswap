@@ -105,6 +105,9 @@
     <string name="mock_dev_title">Developer options</string>
     <string name="mock_dev_wifi">Wireless debugging</string>
     <string name="mock_dev_pair">Pair device with pairing code</string>
+    <string name="mock_about_title">About phone</string>
+    <string name="mock_about_build">Build number</string>
+    <string name="mock_about_build_sub">on Xiaomi: “OS version”</string>
     <string name="mock_cancel">Cancel</string>
     <string name="mock_ok">OK</string>
 
