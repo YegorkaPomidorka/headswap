@@ -64,7 +64,9 @@ class PhoneActivationService : Service() {
             }
             ACTION_CODE -> {
                 val typed = RemoteInput.getResultsFromIntent(intent)?.getCharSequence(KEY_CODE)?.toString().orEmpty()
-                if (worker?.isAlive == true) codes.offer(typed.trim()) else stopSelf()
+                // ответ принят: обновить уведомление, иначе шторка держит его с крутилкой и после cancel()
+                codeReceived()
+                if (worker?.isAlive == true) codes.offer(typed.trim()) else { manager.cancel(ID_CODE); stopSelf() }
             }
             ACTION_CANCEL -> {
                 cancelled = true
@@ -297,6 +299,21 @@ class PhoneActivationService : Service() {
             .setContentIntent(settings)
             .setOngoing(true)
             .addAction(reply)
+            .build())
+    }
+
+    /**
+     * Код из поля ответа получен. Пока уведомление не обновлено, SystemUI крутит индикатор отправки и продлевает ему
+     * жизнь даже после cancel(): шторка показывала крутилку рядом с «Headswap Desktop активирован». Обновление без поля
+     * ответа индикатор снимает; при неверном коде showCodeNotification вернёт поле.
+     */
+    private fun codeReceived() {
+        manager.notify(ID_CODE, Notification.Builder(this, CHANNEL_CODE)
+            .setSmallIcon(R.drawable.ic_stat_headswap)
+            .setContentTitle(getString(R.string.pa_notif_code_title))
+            .setContentText(getString(R.string.pa_s_pairing))
+            .setOnlyAlertOnce(true)
+            .setOngoing(true)
             .build())
     }
 
