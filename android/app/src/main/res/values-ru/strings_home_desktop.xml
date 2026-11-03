@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Главный экран в режиме «Свой лаунчер» -->
+<resources>
+    <string name="home_desk_stage_activation">Активация</string>
+    <string name="home_desk_stage_headunit">Магнитола</string>
+    <string name="home_desk_stage_desktop">Рабочий стол</string>
+    <string name="home_desk_stage_video">Видео</string>
+    <string name="home_desk_stage_audio">Звук</string>
+
+    <string name="home_desk_st_active">активен</string>
+    <string name="home_desk_st_needed">нужна</string>
+    <string name="home_desk_st_needed_again">нужна снова</string>
+    <string name="home_desk_st_error">ошибка</string>
+
+    <string name="home_desk_title_activate">Активируйте Headswap</string>
+    <string name="home_desk_title_error">Рабочий стол не запустился</string>
+
+    <string name="home_desk_sub_activate">Нужна разовая активация через «Отладку по Wi-Fi».</string>
+    <string name="home_desk_sub_activate_paired">После перезагрузки телефона активация слетает. Повторить через «Отладку по Wi-Fi» — полминуты.</string>
+    <string name="home_desk_sub_ok">%1$s на экране машины. Телефон можно убрать.</string>
+    <string name="home_desk_sub_starting">Запускаю рабочий стол.</string>
+
+    <string name="home_desk_btn_activate">Активировать</string>
+    <string name="home_desk_btn_stop">Остановить</string>
+</resources>

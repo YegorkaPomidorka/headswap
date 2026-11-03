@@ -37,6 +37,7 @@
         <item>Tap “Allow” in the Android window “Allow Headswap to send you notifications?”</item>
     </string-array>
     <string name="step_notif_hint">The notification shade shows how the connection is going, and Android will not unload Headswap while the screen is off.</string>
+    <string name="step_notif_hint_launcher">The Headswap activation code is entered right in the notification. The notification shade also shows how the connection to the head unit is going.</string>
     <string name="step_notif_short">Notifications</string>
 
     <!-- Items 3-4 (autostart) are shown on Xiaomi only -->
