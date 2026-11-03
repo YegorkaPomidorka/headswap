@@ -69,21 +69,28 @@ internal object DesktopMusicPlayback {
         // The selected media-key session API is Android 13+, like the whole delegated access.
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return@onMain
         if (receivingVideo()) link.markReady() // The first frame may arrive between readiness polls.
-        if (!link.consumePhysicalDetach(serviceOwner, SystemClock.elapsedRealtime())) return@onMain
-        if (policy.hasPending) return@onMain
+        fun skip(why: String) = AppLog.i("DESKTOP MUSIC: no pause on physical USB detach ($why)", false)
+        if (!link.consumePhysicalDetach(serviceOwner, SystemClock.elapsedRealtime())) { skip("desktop was not ready"); return@onMain }
+        if (policy.hasPending) { skip("resume already pending"); return@onMain }
         try {
-            if (app.checkSelfPermission(android.Manifest.permission.MEDIA_CONTENT_CONTROL) != PackageManager.PERMISSION_GRANTED) return@onMain
+            if (app.checkSelfPermission(android.Manifest.permission.MEDIA_CONTENT_CONTROL) != PackageManager.PERMISSION_GRANTED) {
+                skip("no MEDIA_CONTENT_CONTROL"); return@onMain
+            }
             val manager = app.getSystemService(MediaSessionManager::class.java)
-            val selected = manager.mediaKeyEventSession ?: return@onMain
+            val selected = manager.mediaKeyEventSession ?: run { skip("no media-key session"); return@onMain }
             val active = manager.getActiveSessions(null)
             val playing = active.filter { it.playbackState?.state == PlaybackState.STATE_PLAYING }
-            val target = playing.singleOrNull()?.takeIf { it.sessionToken == selected } ?: return@onMain
+            val target = playing.singleOrNull()?.takeIf { it.sessionToken == selected } ?: run {
+                skip("playing=${playing.size}: ${playing.joinToString { it.packageName }}, selected=${manager.mediaKeyEventSessionPackageName}"); return@onMain
+            }
             val info = target.playbackInfo
             if (info.playbackType != MediaController.PlaybackInfo.PLAYBACK_TYPE_LOCAL ||
-                info.audioAttributes.usage != AudioAttributes.USAGE_MEDIA) return@onMain
-            val before = snapshot(target) ?: return@onMain
+                info.audioAttributes.usage != AudioAttributes.USAGE_MEDIA) {
+                skip("${target.packageName}: type=${info.playbackType} usage=${info.audioAttributes.usage}"); return@onMain
+            }
+            val before = snapshot(target) ?: run { skip("no playback state"); return@onMain }
             releaseObserver()
-            if (!policy.pause(before, SystemClock.elapsedRealtime())) return@onMain
+            if (!policy.pause(before, SystemClock.elapsedRealtime())) { skip("policy refused"); return@onMain }
             if (!policy.hasPending) {
                 target.transportControls.pause()
                 AppLog.i("DESKTOP MUSIC: paused current session; item cannot be safely resumed", false)

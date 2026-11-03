@@ -106,6 +106,7 @@ class DelegatedDexConnector(context: Context, private val core: AaBridgeCore,
                 core.onAaConnecting()
                 core.peer = this
                 core.enableDesktopSurface(this)
+                core.desktopMedia = DesktopMediaControl(context)
                 status("Запускаю рабочий стол…")
             } catch (e: Exception) { fail(e.message ?: "Не удалось подготовить рабочий стол"); return }
         }

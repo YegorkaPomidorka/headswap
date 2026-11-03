@@ -9,6 +9,13 @@ import java.util.concurrent.Executors
 import java.util.concurrent.ScheduledExecutorService
 import java.util.concurrent.TimeUnit
 
+/** Плеер телефона в режиме рабочего стола (реализует dex.DesktopMediaControl). */
+interface DesktopMedia {
+    fun isPlaying(): Boolean
+    fun pause()
+    fun resume()
+}
+
 /** Что мост требует от CarLife-стороны (реализует CarLifeSession). */
 interface CarlifeLink {
     /** Одно видео-сообщение CarLife (0x20001, Annex-B). false = не принято (очередь переполнена, сессия закрыта). */
@@ -163,6 +170,9 @@ class AaBridgeCore(
     /** Desktop source bitrate exceeds CarLife's limit, so encoder failure must never bypass it. */
     @Volatile var desktopVideoError: String? = null
         private set
+
+    /** Desktop: музыку играет плеер телефона, а не AA - MUSIC=0/1 от ГУ ставят на паузу и возвращают его. */
+    @Volatile var desktopMedia: DesktopMedia? = null
 
     @Volatile var desktopSurfaceEnabled: Boolean = false
         private set
@@ -437,7 +447,8 @@ class AaBridgeCore(
     @Volatile private var lastUserInputMs = NEVER   // последний тач DOWN / клавиша / шайба / голос с ГУ
     @Volatile private var lastVoiceKeyMs = NEVER    // последний KEYCODE_SEARCH в AA (антидребезг h425)
     private var lastHfpConnectMs = NEVER       // ГУ прислало BT_HFP_CONNECTION=connected (дальше AA сам запускает автоплей по BT)
-    private var lastPauseKeyMs = NEVER         // когда последний раз слали AA KEYCODE 127
+    private var lastPauseKeyMs = NEVER         // когда последний раз слали AA KEYCODE 127 (desktop: паузу плееру телефона)
+    private var lastDesktopPlayCheckMs = NEVER // desktop: когда спрашивали «играет ли плеер» при закрытом MEDIA
     private var lastExternalStopMs = NEVER     // плеер AA встал не от нашего 127 и не от ввода пользователя (Honda 20772104)
     private var naviSent = false               // MODULE_STATUS NAVI=1 ушёл (держит TTS и/или маршрут)
     private var naviEndPending = false           // маршрут кончился, пока NAVI=1 держал TTS: NAVI=0 уйдёт после TTS STOP
@@ -664,6 +675,7 @@ class AaBridgeCore(
             log("BRIDGE Honda 20772104: MODULE_CONTROL MUSIC=$status, звук по BT - AA не трогаю, CarLife-музыки нет", true)
             return false
         }
+        desktopMedia?.let { return onDesktopMusicControl(it, status) }
         if (HU_MUSIC_FOLLOW_ENABLED && status == 0 && carlifeStarted) {
             val p = peer
             if (meta.playing && !huPausedAa && p != null) {
@@ -712,6 +724,61 @@ class AaBridgeCore(
             if (now - lastHuResumeMs < HU_RESUME_ANSWER_MS) return true   // повтор MUSIC=1, пока AA раскачивается
         }
         return musicActive
+    }
+
+    /**
+     * MODULE_CONTROL MUSIC в режиме рабочего стола: AA нет, музыку играет плеер телефона. MUSIC=0 - ГУ ушло на свой
+     * источник или гаснет (Vezel шлёт его за ~1 с до обрыва USB при выключении машины, лог 2026-11-03): плеер на паузу.
+     * MUSIC=1 - ГУ вернулось на CarLife-музыку: MEDIA снова пересылаем, а Desay G6S/Vezel после нашей паузы - play.
+     */
+    private fun onDesktopMusicControl(media: DesktopMedia, status: Int?): Boolean {
+        val now = clockMs()
+        if (HU_MUSIC_FOLLOW_ENABLED && status == 0 && carlifeStarted) {
+            if (!huPausedAa) {
+                if (media.isPlaying()) {
+                    log("BRIDGE ГУ ушло на свой источник (MUSIC=0): плеер телефона на паузу", true)
+                    lastPauseKeyMs = now
+                    media.pause()
+                    resumeOnHuMusic = true
+                } else {
+                    log("BRIDGE ГУ ушло на свой источник (MUSIC=0), плеер телефона не играет: хвост MEDIA не пересылаю до play", true)
+                    resumeOnHuMusic = false
+                }
+            }
+            huPausedAa = true
+            requestMediaPause("ГУ MODULE_CONTROL MUSIC=0")
+            return false
+        }
+        if (status == 1 && huPausedAa) {
+            huPausedAa = false
+            callPausedAa = false
+            if (HU_MUSIC_RESUME_ENABLED && resumeOnHuMusic && (huDesayG6S || huHondaVezel)) {
+                resumeOnHuMusic = false
+                lastHuResumeMs = now
+                lastUserInputMs = now
+                log("BRIDGE ГУ вернулось на CarLife-музыку (MUSIC=1) после нашей паузы: play плееру телефона", true)
+                media.resume()
+                return true
+            }
+            resumeOnHuMusic = false
+            log("BRIDGE ГУ вернулось на CarLife-музыку (MUSIC=1): MEDIA снова пересылаю", true)
+            return musicActive
+        }
+        if (status == 1 && now - lastHuResumeMs < HU_RESUME_ANSWER_MS) return true   // пачка MUSIC=1, пока плеер раскачивается
+        return musicActive
+    }
+
+    /** Desktop: плеер телефона снова играет после MUSIC=0 (play на телефоне или на рабочем столе) - звук опять пересылаем. */
+    private fun releaseDesktopPauseIfPlaying() {
+        val media = desktopMedia ?: return
+        val now = clockMs()
+        if (now - lastPauseKeyMs < DESKTOP_RESUME_GUARD_MS || now - lastDesktopPlayCheckMs < DESKTOP_PLAY_CHECK_MS) return
+        lastDesktopPlayCheckMs = now
+        if (!media.isPlaying()) return
+        huPausedAa = false
+        callPausedAa = false
+        resumeOnHuMusic = false
+        log("BRIDGE плеер телефона снова играет после MUSIC=0: MEDIA снова пересылаю", true)
     }
 
     private fun sendPauseKey(p: AaPeer) {
@@ -1723,6 +1790,7 @@ class AaBridgeCore(
 
     /** Пускать ли MEDIA_DATA дальше; нет = данные отброшены (голос / ждём INIT после TTS). */
     private fun admitMedia(): Boolean {
+        if (huPausedAa && !callPausedAa) releaseDesktopPauseIfPlaying()
         val why = when {
             VOICE_SESSION_ENABLED && voice -> "идёт голосовая сессия"
             huPausedAa -> "ГУ на своём источнике, AA на паузе (хвост буфера)"
@@ -2971,6 +3039,12 @@ class AaBridgeCore(
 
         /** Сколько отвечать MUSIC=1 на пачку MUSIC=1 после нашего play, пока MEDIA INIT ещё не пришёл. */
         const val HU_RESUME_ANSWER_MS = 3_000L
+
+        /** Desktop: после нашей паузы плеер ещё доигрывает хвост - «снова играет» не раньше этого. */
+        const val DESKTOP_RESUME_GUARD_MS = 2_000L
+
+        /** Desktop: «играет ли плеер» - binder-вызов, при закрытом MEDIA спрашиваем не чаще раза в секунду. */
+        const val DESKTOP_PLAY_CHECK_MS = 1_000L
 
         /**
          * Mazda CX-5: AA сам запускает музыку через 5-9 с после BT_HFP_CONNECTION. Пока ГУ на своём источнике, такой play
