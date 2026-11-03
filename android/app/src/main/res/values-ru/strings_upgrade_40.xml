@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Одноразовое окно после обновления до 4.0: режим «Свой лаунчер» -->
+<resources>
+    <string name="u40_title">Свой лаунчер на магнитоле</string>
+    <string name="u40_lead">Новый режим: вместо Android Auto на экране машины свой рабочий стол. Android Auto остаётся по умолчанию, у вас ничего не поменялось.</string>
+    <string name="u40_pros">Что можно</string>
+    <string name="u40_pro_1">Рабочий стол Headswap: музыка, навигатор и ваши приложения</string>
+    <string name="u40_pro_2">Любой автолаунчер с телефона, например CarDash</string>
+    <string name="u40_pro_3">Запускать приложения телефона прямо на экране машины</string>
+    <string name="u40_needs">Что понадобится</string>
+    <string name="u40_need_1">Режим разработчика и «Отладка по Wi-Fi». Это рискованные настройки, включаете их на свой страх и риск</string>
+    <string name="u40_need_2">После перезагрузки телефона активацию повторить, это полминуты</string>
+    <string name="u40_need_3">Звук пока только через Bluetooth магнитолы</string>
+    <string name="u40_where">Настройки → Режим</string>
+    <string name="u40_ok">Понятно</string>
+    <string name="u40_try">Попробовать свой лаунчер</string>
+</resources>

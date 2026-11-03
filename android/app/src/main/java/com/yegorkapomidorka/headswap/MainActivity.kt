@@ -5,6 +5,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.content.pm.PackageManager
 import android.hardware.usb.UsbAccessory
 import android.hardware.usb.UsbManager
 import android.os.Build
@@ -17,9 +18,11 @@ import android.widget.FrameLayout
 import com.yegorkapomidorka.headswap.aa.AaCreds
 import com.yegorkapomidorka.headswap.aa.AaPrefs
 import com.yegorkapomidorka.headswap.aa.AaProbe
+import com.yegorkapomidorka.headswap.aa.BridgeMode
 import com.yegorkapomidorka.headswap.link.car.CarPairing
 import com.yegorkapomidorka.headswap.link.diag.NetProbe
 import com.yegorkapomidorka.headswap.ui.Actions
+import com.yegorkapomidorka.headswap.ui.AboutScreen
 import com.yegorkapomidorka.headswap.ui.DevScreen
 import com.yegorkapomidorka.headswap.ui.DiagScreen
 import com.yegorkapomidorka.headswap.ui.HomeScreen
@@ -31,6 +34,7 @@ import com.yegorkapomidorka.headswap.ui.SettingsSectionScreen
 import com.yegorkapomidorka.headswap.ui.StepId
 import com.yegorkapomidorka.headswap.ui.UiPrefs
 import com.yegorkapomidorka.headswap.ui.Upgrade30Notice
+import com.yegorkapomidorka.headswap.ui.Upgrade40Notice
 import com.yegorkapomidorka.headswap.ui.UpgradeNotice
 import com.yegorkapomidorka.headswap.update.Updater
 
@@ -91,11 +95,14 @@ class MainActivity : Activity() {
         val fromUsb = intent?.action == UsbManager.ACTION_USB_ACCESSORY_ATTACHED
         if (savedInstanceState == null && !hadCmd && !fromUsb) {
             val prefs = UiPrefs(this)
-            when (UpgradeNotice.onLaunch(prefs.onboardingDone, prefs.v30NoticeShown, prefs.a11yNoticeShown)) {
+            // «Свой лаунчер» есть с Android 13: ниже окно про него не нужно, флаг ставим сразу
+            if (!BridgeMode.desktopSupported(Build.VERSION.SDK_INT)) prefs.v40NoticeShown = true
+            when (UpgradeNotice.onLaunch(prefs.onboardingDone, prefs.v30NoticeShown, prefs.a11yNoticeShown, prefs.v40NoticeShown)) {
                 UpgradeNotice.Launch.ONBOARDING -> {
                     showOnboarding()
                     prefs.a11yNoticeShown = true         // новичок узнает всё из онбординга, окна ему не нужны
                     prefs.v30NoticeShown = true
+                    prefs.v40NoticeShown = true
                 }
                 UpgradeNotice.Launch.NOTICE_30 -> {
                     prefs.v30NoticeShown = true          // одного показа достаточно, даже если смахнули
@@ -104,6 +111,10 @@ class MainActivity : Activity() {
                 UpgradeNotice.Launch.NOTICE -> {
                     prefs.a11yNoticeShown = true         // одного показа достаточно, даже если смахнули
                     UpgradeNotice.show(this)
+                }
+                UpgradeNotice.Launch.NOTICE_40 -> {
+                    prefs.v40NoticeShown = true          // одного показа достаточно, даже если смахнули
+                    Upgrade40Notice.show(this)
                 }
                 UpgradeNotice.Launch.NONE -> {}
             }
@@ -221,6 +232,8 @@ class MainActivity : Activity() {
 
     fun showDiag() = push("diag", DiagScreen(this))
 
+    fun showAbout() = push("about", AboutScreen(this))
+
     /** rerun = показать все шаги; checklist = сразу чеклист готовности. */
     fun showOnboarding(rerun: Boolean = false, checklist: Boolean = false, startAt: StepId? = null) {
         push(if (checklist) "checklist" else if (rerun) "onboarding_all" else "onboarding", OnboardingScreen(this, rerun, checklist, startAt))
@@ -234,6 +247,7 @@ class MainActivity : Activity() {
                 "settings" -> showSettings()
                 "dev" -> showDev()
                 "diag" -> showDiag()
+                "about" -> showAbout()
                 "onboarding" -> showOnboarding()
                 "onboarding_all" -> showOnboarding(rerun = true)
                 "checklist" -> showOnboarding(checklist = true)
@@ -255,6 +269,11 @@ class MainActivity : Activity() {
                 // проба локальной сети для беспровода: маяк UDP 7999, ответчик 8999 (--ei seconds N --es to <ip>)
                 "net_probe" -> NetProbe.run(this, intent.getIntExtra("seconds", 20), intent.getStringExtra("to"))
                 "net_perm" -> requestLocalNetwork()
+                // кнопка «Открыть запрос на телефоне» карточки «Телефон» лаунчера Headswap Desktop
+                "phone_card_perm" -> {
+                    val ask = com.yegorkapomidorka.headswap.launcher.PhoneController.PERMISSIONS.filter { checkSelfPermission(it) != PackageManager.PERMISSION_GRANTED }
+                    if (ask.isNotEmpty()) requestPermissions(ask.toTypedArray(), REQ_PHONE_CARD)
+                }
                 "open_aa" -> Actions.openAaSettings(this)
                 // автостарт беспровода без Bluetooth машины: то же, что ACL_CONNECTED / ACL_DISCONNECTED выбранной машины
                 "car_auto" -> startForegroundService(Intent(this, BridgeService::class.java).setAction(BridgeService.ACTION_WIFI_B_AUTO))
@@ -270,7 +289,7 @@ class MainActivity : Activity() {
                 "screen_dev" -> { toHome(); showDev() }
                 "onboarding" -> {
                     toHome()
-                    // --es step autostart|notif|... открывает онбординг сразу с нужного шага
+                    // --es step mode|devmode|activate|autostart|notif|... открывает онбординг сразу с нужного шага
                     val step = StepId.values().firstOrNull { it.key == intent.getStringExtra("step") }
                     showOnboarding(rerun = true, startAt = step)
                 }
@@ -278,11 +297,12 @@ class MainActivity : Activity() {
                 "update_check" -> Updater.check(this, manual = true)      // проверить релиз на GitHub сейчас, не дожидаясь интервала
                 "a11y_notice" -> UpgradeNotice.show(this)      // окно «Отказ от спецвозможностей» принудительно, флаг не трогает
                 "v30_notice" -> Upgrade30Notice.show(this)     // окно «Прямой проброс видео» (3.0) принудительно, флаг не трогает
+                "v40_notice" -> Upgrade40Notice.show(this)     // окно «Свой лаунчер на магнитоле» (4.0) принудительно, флаг не трогает
                 "theme" -> {                                   // --es mode system|light|medium|dark
                     AppTheme.set(this, intent.getStringExtra("mode") ?: AppTheme.SYSTEM)
                     recreate()
                 }
-                else -> AppLog.i("неизвестная команда '$cmd' (есть aa_selftest, aa_probe, net_probe, net_perm, mic_test, transcode_test, open_aa, car_auto, car_auto_off, a11y_notice, v30_notice)")
+                else -> AppLog.i("неизвестная команда '$cmd' (есть aa_selftest, aa_probe, net_probe, net_perm, mic_test, transcode_test, open_aa, car_auto, car_auto_off, a11y_notice, v30_notice, v40_notice)")
             }
             if (intent.hasExtra("scroll_y")) current()?.scrollTo(intent.getIntExtra("scroll_y", 0))     // отладка: снимки нижней части экрана
             return
@@ -306,6 +326,8 @@ class MainActivity : Activity() {
 
         /** adb shell am start -n com.yegorkapomidorka.headswap/.MainActivity --es cmd aa_selftest */
         const val EXTRA_CMD = "cmd"
+        /** Разрешения карточки «Телефон» лаунчера; тот же код, что SettingsScreen.REQ_PHONE_CARD. */
+        const val REQ_PHONE_CARD = 41
         private const val STATE_SCREENS = "screens"
 
         /** Все поля аксессуара одной строкой. Серийник без разрешения на аксессуар бросает SecurityException. */

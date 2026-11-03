@@ -374,6 +374,58 @@ class AaBridgeCoreTest {
     }
 
     @Test
+    fun desktopCancelReleasesBothPointersAndStartsFreshGesture() {
+        val peer = FakePeer()
+        core.peer = peer
+        core.desktopInputEnabled = true
+        core.onCarlifeTouch(0, 100, 100)
+        core.onCarlifeTouch(261, 100, 100, 300, 300)
+        core.onCarlifeTouch(3, 0, 0)
+        assertEquals(Triple(3, 0, pts(0, 100, 100, 1, 300, 300)), peer.events.last())
+        core.onCarlifeTouch(3, 0, 0) // A second cancellation must not synthesize a contact.
+        assertEquals(3, peer.events.size)
+        core.onCarlifeTouch(0, 50, 60)
+        core.onCarlifeTouch(1, 50, 60)
+        assertEquals(Triple(0, 0, pts(0, 50, 60)), peer.events[3])
+        assertEquals(Triple(1, 0, pts(0, 50, 60)), peer.events[4])
+    }
+
+    @Test
+    fun desktopDetachCancelsContactsWithoutReplayingBufferedMoves() {
+        val peer = FakePeer()
+        core.peer = peer
+        core.desktopInputEnabled = true
+        core.touchDecimationProvider = { TouchDecimation.X2 }
+        core.onCarlifeTouch(0, 10, 10)
+        core.onCarlifeTouch(2, 11, 11)
+        core.onCarlifeTouch(2, 12, 12) // Buffered, not sent to the desktop yet.
+        core.onCarlifeClosed(FakeLink()) // Stale session must not cancel the current gesture.
+        assertEquals(2, peer.events.size)
+        core.onCarlifeClosed(link)
+        assertEquals(Triple(3, 0, pts(0, 11, 11)), peer.events.last())
+        core.attach(FakeLink())
+        core.onCarlifeTouch(0, 20, 20)
+        assertEquals(listOf(0, 2, 3, 0), peer.events.map { it.first })
+        assertEquals(Triple(0, 0, pts(0, 20, 20)), peer.events.last())
+    }
+
+    @Test
+    fun desktopCancelDropsPendingMovePacerTimer() {
+        val timers = FakeTimers()
+        val c = AaBridgeCore({ _, _ -> }, { timers.now }, audioSchedule = timers::schedule).also { it.attach(link) }
+        val peer = FakePeer()
+        c.peer = peer
+        c.desktopInputEnabled = true
+        c.onHuStatistic("20082114") // Delphi smoothing queues the second move.
+        c.onCarlifeTouch(0, 10, 10)
+        c.onCarlifeTouch(2, 11, 11)
+        c.onCarlifeTouch(2, 12, 12)
+        c.onCarlifeTouch(3, 0, 0)
+        timers.advance(TouchBurstPacer.DEFAULT_INTERVAL_MS * 2)
+        assertEquals(listOf(0, 2, 3), peer.events.map { it.first })
+    }
+
+    @Test
     fun vwCns2DelphiSpreadsMoveBurst() {
         val timers = FakeTimers()
         val c = AaBridgeCore({ l, _ -> logs.add(l) }, { timers.now }, audioSchedule = timers::schedule).also { it.attach(link) }
@@ -509,6 +561,29 @@ class AaBridgeCoreTest {
         core.onCarlifeHardKey(16)                             // AA не подключён: игнор без исключений
         assertEquals(3, peer.keys.size)
         assertTrue(AaBridgeCore.HARD_KEY_TO_ANDROID.values.all { it in AapMessages.KEYCODES_SUPPORTED })
+    }
+
+    @Test
+    fun desktopHomeMappingIsOptInAndKeepsMainAndBackKeys() {
+        val peer = FakePeer()
+        core.peer = peer
+        core.onCarlifeHardKey(0x01) // CarLife HOME belongs to the HU in AA mode.
+        assertTrue(peer.keys.isEmpty())
+        core.onCarlifeHardKey(0x1E) // MAIN already maps to Android HOME.
+        assertEquals(listOf(3), peer.keys.toList())
+
+        core.mapHomeKey = true
+        core.onCarlifeHardKey(0x01)
+        core.onCarlifeHardKey(0x0E)
+        assertEquals(listOf(3, 3, 4), peer.keys.toList())
+
+        core.mapHomeKey = false
+        core.onCarlifeHardKey(0x01)
+        assertEquals(listOf(3, 3, 4), peer.keys.toList())
+        core.mapHomeKey = true
+        core.peer = null
+        core.onCarlifeHardKey(0x01) // Disconnected desktop must not crash or queue a stale key.
+        assertEquals(listOf(3, 3, 4), peer.keys.toList())
     }
 
     @Test

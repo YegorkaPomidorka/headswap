@@ -17,6 +17,7 @@
     <color name="onok">#00391F</color>
     <color name="warn">#FFB68C</color>
     <color name="warnc">#5A2500</color>
+    <color name="onwarnc">#FFDCC6</color>
     <color name="err">#FFB4A9</color>
     <color name="errc">#6E1912</color>
     <color name="onerr">#690003</color>

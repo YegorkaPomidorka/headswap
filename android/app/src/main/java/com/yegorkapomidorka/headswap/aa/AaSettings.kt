@@ -47,6 +47,14 @@ class AaPrefs(ctx: Context) {
         set(v) = sp.edit().putString("touchDecimation", v.name).apply()
 
     /**
+     * Режим моста (ключ BridgeMode, по умолчанию Android Auto): сырое сохранённое значение, на Android ниже 13 оно
+     * может быть DESKTOP - применяемый режим даёт [BridgeMode.effective]. Читается один раз на подключение.
+     */
+    var bridgeMode: BridgeMode
+        get() = BridgeMode.parse(sp.getString("bridgeMode", BridgeMode.DEFAULT.key))
+        set(v) = sp.edit().putString("bridgeMode", v.key).apply()
+
+    /**
      * Свой IDR раз в 2 с в прямом проброске (IdrSplice, ADR 0005), раздел для разработчиков. По умолчанию включён;
      * выключают на ГУ, которые сами возвращают картинку после камеры (VW). Ключ новый: старый idrSplice был выключен по умолчанию.
      */

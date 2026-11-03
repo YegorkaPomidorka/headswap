@@ -9,7 +9,8 @@ import com.yegorkapomidorka.headswap.R
 enum class FpsSetting(val titleRes: Int, val subRes: Int, val fixed: Int?) {
     AUTO(R.string.fps_auto_title, R.string.fps_auto_sub, null),
     FPS15(R.string.fps_15_title, R.string.fps_15_sub, 15),
-    FPS30(R.string.fps_30_title, R.string.fps_30_sub, 30);
+    FPS30(R.string.fps_30_title, R.string.fps_30_sub, 30),
+    FPS60(R.string.fps_60_title, R.string.fps_60_sub, 60);
 
     companion object {
         val DEFAULT = AUTO
@@ -22,18 +23,19 @@ enum class FpsSetting(val titleRes: Int, val subRes: Int, val fixed: Int?) {
 /**
  * Гейт кадров перед энкодером: по таймстемпам решает, отдавать ли кадр. Энкодер с Surface-входом кодирует
  * каждый swap, поэтому KEY_FRAME_RATE частоту не ограничивает - её режет только этот гейт.
- * Цель >= 30 (или <= 0) - пропускает всё: вход AA быстрее 30 не бывает, а допуск по таймстемпам на 30/30 терял бы кадры
+ * По умолчанию цель >= 30 (или <= 0) пропускает всё; прямой Surface рабочего стола задаёт limitHighFps=true.
+ * Для AA: вход AA быстрее 30 не бывает, а допуск по таймстемпам на 30/30 терял бы кадры
  * от джиттера входа. Ниже 30 - сетка слотов: слот каждые period, кадр берётся за полпериода до слота и позже.
  * Вызывается с одной нити (GL-реле); targetFps можно менять с любой.
  */
-class FrameGate(initialFps: Int) {
+class FrameGate(initialFps: Int, private val limitHighFps: Boolean = false) {
     @Volatile var targetFps: Int = initialFps
     private var nextNs = NONE
 
     /** true = кадр отдать, false = пропустить. */
     fun shouldEmit(nowNs: Long): Boolean {
         val fps = targetFps
-        if (fps <= 0 || fps >= PASS_ALL_FPS) {
+        if (fps <= 0 || (!limitHighFps && fps >= PASS_ALL_FPS)) {
             nextNs = NONE           // при переключении на меньшую цель сетка начнётся заново
             return true
         }
@@ -42,7 +44,10 @@ class FrameGate(initialFps: Int) {
             nextNs = nowNs + period
             return true
         }
-        if (nowNs < nextNs - period / 2) return false
+        // High-refresh desktop input needs a narrow rounding tolerance, not AA's
+        // half-period jitter allowance (which can emit adjacent fast frames).
+        val tolerance = if (limitHighFps) minOf(1_000_000L, period / 2) else period / 2
+        if (nowNs < nextNs - tolerance) return false
         nextNs += period
         if (nowNs - nextNs > period) nextNs = nowNs + period     // отстали больше чем на период (вход медленнее цели): сетка заново
         return true

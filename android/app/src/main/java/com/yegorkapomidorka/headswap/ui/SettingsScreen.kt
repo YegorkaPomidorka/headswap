@@ -25,6 +25,7 @@ import android.widget.PopupWindow
 import android.widget.ScrollView
 import android.widget.SeekBar
 import android.widget.TextView
+import android.widget.Toast
 import com.yegorkapomidorka.headswap.AppLocale
 import com.yegorkapomidorka.headswap.AppLog
 import com.yegorkapomidorka.headswap.AppTheme
@@ -35,6 +36,7 @@ import com.yegorkapomidorka.headswap.MainActivity
 import com.yegorkapomidorka.headswap.R
 import com.yegorkapomidorka.headswap.aa.AaDensity
 import com.yegorkapomidorka.headswap.aa.AaPrefs
+import com.yegorkapomidorka.headswap.aa.BridgeMode
 import com.yegorkapomidorka.headswap.aa.CAR_MAKES
 import com.yegorkapomidorka.headswap.aa.CallStateSource
 import com.yegorkapomidorka.headswap.aa.CarPreset
@@ -50,6 +52,10 @@ import com.yegorkapomidorka.headswap.aa.FpsSetting
 import com.yegorkapomidorka.headswap.aa.MicMode
 import com.yegorkapomidorka.headswap.aa.MusicRate
 import com.yegorkapomidorka.headswap.aa.VideoMode
+import com.yegorkapomidorka.headswap.desktop.DesktopAppCatalog
+import com.yegorkapomidorka.headswap.dex.DelegatedDesktopAccess
+import com.yegorkapomidorka.headswap.dex.DesktopPick
+import com.yegorkapomidorka.headswap.dex.DexPrefs
 import com.yegorkapomidorka.headswap.link.car.CarNetwork
 import com.yegorkapomidorka.headswap.link.car.CarPairing
 import com.yegorkapomidorka.headswap.link.car.CarProfile
@@ -76,6 +82,8 @@ fun scaffold(ctx: Context, title: String, onBack: () -> Unit, body: View): Linea
 
 /** Разделы настроек: на главном экране по строке на каждый, внутри — свой экран (SettingsSectionScreen). */
 enum class SettingsSection(val key: String, val titleRes: Int, val iconRes: Int) {
+    /** Режим моста: Android Auto / Headswap Desktop и активация рабочего стола с ПК. */
+    MODE("mode", R.string.bm_title, R.drawable.ic_plug),
     APPEARANCE("appearance", R.string.set_sec_appearance, R.drawable.ic_palette),
     VIDEO("video", R.string.set_video, R.drawable.ic_video),
     SOUND("sound", R.string.set_sec_sound, R.drawable.ic_mic),
@@ -92,8 +100,10 @@ enum class SettingsSection(val key: String, val titleRes: Int, val iconRes: Int)
     UPDATES("updates", R.string.upd_title, R.drawable.ic_download);
 
     companion object {
-        /** Разделы этой сборки: без беты беспровода его нет ни в меню, ни по ключу. */
-        fun shown(): List<SettingsSection> = values().filter { it != WIRELESS || BuildConfig.WIRELESS_BETA }
+        /** Разделы этой сборки: без беты беспровода его нет ни в меню, ни по ключу; без обновлений - их раздела. */
+        fun shown(): List<SettingsSection> = values().filter {
+            (it != WIRELESS || BuildConfig.WIRELESS_BETA) && (it != UPDATES || Updater.ENABLED)
+        }
 
         fun byKey(key: String?): SettingsSection? = shown().firstOrNull { it.key == key }
 
@@ -131,6 +141,13 @@ private val EQ_PRESETS = listOf(
 )
 
 private fun Context.eqPresetName(p: EqPreset): String = getString(EQ_PRESETS.first { it.first == p }.second)
+
+/** Состояние активации рабочего стола с ПК: подпись и цвет. Дёшево (проверка четырёх разрешений), годится для тикера. */
+private fun Context.desktopActivation(): Pair<String, Int> = when (DelegatedDesktopAccess.status(this)) {
+    DelegatedDesktopAccess.Status.READY -> getString(R.string.bm_act_on) to R.color.ok
+    DelegatedDesktopAccess.Status.PERMISSION_LOST -> getString(R.string.bm_act_lost) to R.color.warn
+    DelegatedDesktopAccess.Status.INACTIVE -> getString(R.string.bm_act_off) to R.color.warn
+}
 
 private fun Context.micMissing(aa: AaPrefs): Boolean =
     aa.micMode != MicMode.CAR && checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED
@@ -178,6 +195,8 @@ class SettingsScreen(host: MainActivity) : Screen(host) {
             addView(link(R.drawable.ic_check, c.getString(R.string.set_check_ready), null, false) { host.showOnboarding(checklist = true) })
             addView(c.divider())
             addView(link(R.drawable.ic_terminal, c.getString(R.string.set_for_devs), null, true) { host.showDev() })
+            addView(c.divider())
+            addView(link(R.drawable.ic_logo, c.getString(R.string.about_title), c.getString(R.string.about_note), false) { host.showAbout() })
         }
         body.addView(links, lp(MATCH, WRAP))
 
@@ -235,6 +254,14 @@ class SettingsScreen(host: MainActivity) : Screen(host) {
             if (tv.text.toString() != text) tv.text = text
             tv.setTextColor(c.clr(color))
         }
+        val bridgeMode = BridgeMode.effective(aa.bridgeMode, Build.VERSION.SDK_INT)
+        if (bridgeMode == BridgeMode.DESKTOP) {
+            val (act, actColor) = c.desktopActivation()
+            set(SettingsSection.MODE, c.getString(R.string.bm_sum_state, c.getString(R.string.bm_desktop), act), actColor)
+        } else {
+            set(SettingsSection.MODE, c.getString(R.string.bm_aa))
+        }
+
         val lang = c.getString(LANGS.firstOrNull { it.first == AppLocale.get(c) }?.second ?: R.string.lang_system)
         val theme = c.getString(THEMES.firstOrNull { it.first == AppTheme.get(c) }?.second ?: R.string.theme_system)
         set(SettingsSection.APPEARANCE, c.getString(R.string.set_sum_appearance, lang, theme))
@@ -359,6 +386,10 @@ class SettingsSectionScreen(host: MainActivity, val section: SettingsSection) : 
     private val micRows = HashMap<MicMode, RadioRow>()
     private val rateRows = LinkedHashMap<MusicRate, RadioRow>()
     private var makeValue: TextView? = null
+    private var modeSeg: Segmented? = null
+    private var actHost: LinearLayout? = null
+    private var phoneCardNote: TextView? = null
+    private var phoneActivation: PhoneActivationBlock? = null
     private var transcodeSeg: Segmented? = null
     private var transcodeDesc: View? = null
     private var directDesc: View? = null
@@ -412,6 +443,7 @@ class SettingsSectionScreen(host: MainActivity, val section: SettingsSection) : 
 
     init {
         when (section) {
+            SettingsSection.MODE -> buildMode()
             SettingsSection.APPEARANCE -> buildAppearance()
             SettingsSection.VIDEO -> buildVideo()
             SettingsSection.SOUND -> buildSound()
@@ -425,6 +457,7 @@ class SettingsSectionScreen(host: MainActivity, val section: SettingsSection) : 
     }
 
     override fun onShow() {
+        if (section == SettingsSection.MODE) refreshMode()      // активацию могли выполнить, пока экран был закрыт
         if (section == SettingsSection.VIDEO) refreshVideoMode()      // своё разрешение могли поменять в разделе для разработчиков
         refreshMic()
         refreshEq()
@@ -440,12 +473,15 @@ class SettingsSectionScreen(host: MainActivity, val section: SettingsSection) : 
     }
 
     override fun tick() {
+        if (section == SettingsSection.MODE) refreshMode()
         refreshUpdate()
         refreshWireless()
     }
 
     override fun onPermissionResult() {
         refreshMic()
+        refreshPhoneCardPermissions()
+        phoneActivation?.onPermissionResult()
         onCallsPermissionResult()
         if (wlAwaitingPermission) {
             wlAwaitingPermission = false
@@ -651,6 +687,12 @@ class SettingsSectionScreen(host: MainActivity, val section: SettingsSection) : 
         const val REQ_CAR_BT = 39
         /** READ_PHONE_STATE при включении «Сообщать ГУ о звонках»; тот же код, что MainActivity.REQ_PHONE_STATE (лог результата). */
         const val REQ_PHONE_STATE = 40
+        /** Разрешения карточки «Телефон» лаунчера Headswap Desktop. */
+        const val REQ_PHONE_CARD = 41
+        val PHONE_CARD_PERMISSIONS = listOf(
+            Manifest.permission.READ_PHONE_STATE, Manifest.permission.READ_CALL_LOG, Manifest.permission.READ_CONTACTS,
+            Manifest.permission.CALL_PHONE, Manifest.permission.ANSWER_PHONE_CALLS,
+        )
         /** Проверка Wi-Fi машины из настроек: сколько ждём одобрения и входа, и сколько держим сеть после входа. */
         const val CW_CHECK_TIMEOUT_MS = 60_000L
         const val CW_CHECK_HOLD_MS = 5_000L
@@ -664,6 +706,124 @@ class SettingsSectionScreen(host: MainActivity, val section: SettingsSection) : 
 
     private fun note(text: String, color: Int = R.color.on2): TextView =
         ctx.text(text, 13f, 400, ctx.clr(color)).also { body.addView(it, lp(WRAP, WRAP).margins(ctx, 8, 2, 8, 0)) }
+
+    // --- режим моста ---
+
+    private fun buildMode() {
+        val c = ctx
+        body.addView(c.sectionTitle(c.getString(R.string.bm_title)))
+        if (!BridgeMode.desktopSupported(Build.VERSION.SDK_INT)) {
+            // ниже Android 13 режим DESKTOP недоступен и трактуется как Android Auto
+            body.addView(c.text(c.getString(R.string.bm_need_13), 16f, 600, c.clr(R.color.warn)), lp(WRAP, WRAP).margins(c, 8, 4, 8, 0))
+            note(c.getString(R.string.bm_aa_note))
+            return
+        }
+        val seg = Segmented(c, listOf(c.getString(R.string.bm_aa), c.getString(R.string.bm_own_launcher)), 15f) { setBridgeMode(BridgeMode.values()[it]) }
+        modeSeg = seg
+        body.addView(seg.view, lp(MATCH, WRAP))
+        actHost = c.vbox(8).also { body.addView(it, lp(MATCH, WRAP)) }
+        refreshMode()
+    }
+
+    private fun setBridgeMode(m: BridgeMode) {
+        if (aa.bridgeMode == m) return
+        aa.bridgeMode = m
+        val running = BridgeService.alive && CarLifeState.running
+        AppLog.i("настройка: режим моста -> ${m.key}" + if (running) ", применится к следующему подключению (текущая сессия не прерывается)" else "")
+        refreshMode()
+    }
+
+    private fun refreshMode() {
+        val c = ctx
+        val seg = modeSeg ?: return
+        val desktop = aa.bridgeMode == BridgeMode.DESKTOP
+        seg.setSelected(if (desktop) 1 else 0)
+        val box = actHost ?: return
+        if (!desktop) {
+            box.visibility = View.GONE
+            return
+        }
+        box.visibility = View.VISIBLE
+        if (box.childCount == 0) buildActivation(box)      // токен создаётся только когда блок впервые понадобился
+        phoneActivation?.refresh()
+    }
+
+    /** Блок раздела «Режим» для своего лаунчера: выбор лаунчера, под ним разрешения карточки «Телефон» (только у Headswap), активация. */
+    private fun buildActivation(box: LinearLayout) {
+        val c = ctx
+        // карточка «Телефон» есть только у нашего лаунчера: журнал вызовов, контакты, звонок и ответ с экрана ГУ
+        val permBox = c.vbox().apply { visibility = View.GONE }
+        buildDesktopLauncher(box) { ownLauncher -> permBox.visibility = if (ownLauncher) View.VISIBLE else View.GONE }
+        permBox.addView(c.tonalButton(c.getString(R.string.l_perm_button)).apply {
+            setOnClickListener { requestPhoneCardPermissions() }
+        }, c.lpDp(MATCH, 52).margins(c, 0, 12, 0, 0))
+        phoneCardNote = c.text(c.getString(R.string.l_perm_summary), 13f, 400, c.clr(R.color.on2))
+            .also { permBox.addView(it, lp(WRAP, WRAP).margins(c, 8, 2, 8, 0)) }
+        box.addView(permBox, lp(MATCH, WRAP))
+        phoneActivation = PhoneActivationBlock(host).also { box.addView(it.view, lp(MATCH, WRAP)) }
+        refreshPhoneCardPermissions()
+    }
+
+    /**
+     * Лаунчер на ГУ: наш Headswap или любой установленный HOME-лаунчер (CarDash, DriveDeck) в окне над нашей панелью
+     * «Назад / Домой / Недавние». Выбор пишется в DexPrefs и применяется к идущему сеансу через showDesktop: наш
+     * LauncherActivity по onNewIntent перечитывает выбор. Список читаем не на главном потоке.
+     */
+    private fun buildDesktopLauncher(box: LinearLayout, onSelected: (ownLauncher: Boolean) -> Unit) {
+        val c = ctx
+        val dex = DexPrefs(c)
+        var options = emptyList<DesktopAppCatalog.Entry>()
+        var loaded = false      // пока список лаунчеров не прочитан, выбранный чужой не считаем пропавшим
+        val rows = LinkedHashMap<String?, RadioRow>()      // ключ - «пакет/класс», null - Headswap
+        fun mark() {
+            val current = DesktopPick.selected(dex.desktopComponent, options)?.key      // лаунчер пропал: показываем Headswap, он и запустится
+            for ((key, row) in rows) row.setSelected(key == current)
+            onSelected(current == null && (loaded || dex.desktopComponent == null))
+        }
+        val list = c.vbox(8)
+        fun add(key: String?, title: String) {
+            val row = RadioRow(c, title, "") {
+                if (dex.desktopComponent == key) return@RadioRow
+                dex.desktopComponent = key
+                AppLog.i("настройка: лаунчер на ГУ -> ${key ?: "Headswap"}")
+                mark()
+                if (BridgeService.alive) BridgeService.requestDesktopHome(c)
+            }
+            rows[key] = row
+            list.addView(row.view, lp(MATCH, WRAP))
+        }
+        add(null, c.getString(R.string.bm_launcher_own))
+        mark()
+        box.addView(c.sectionTitle(c.getString(R.string.bm_launcher_title)))
+        box.addView(list, lp(MATCH, WRAP))
+        Thread({
+            val found = DesktopPick.installed(c)
+            Handler(Looper.getMainLooper()).post {
+                options = found
+                loaded = true
+                for (e in found) add(e.key, e.label)
+                mark()
+            }
+        }, "desktop-launchers").apply { isDaemon = true; start() }
+    }
+
+    private fun missingPhoneCardPermissions(): List<String> = PHONE_CARD_PERMISSIONS.filter {
+        ctx.checkSelfPermission(it) != PackageManager.PERMISSION_GRANTED
+    }
+
+    private fun requestPhoneCardPermissions() {
+        val ask = missingPhoneCardPermissions()
+        if (ask.isEmpty()) {
+            Toast.makeText(ctx, R.string.l_perm_granted, Toast.LENGTH_SHORT).show()
+            return
+        }
+        host.requestPermissions(ask.toTypedArray(), REQ_PHONE_CARD)
+    }
+
+    private fun refreshPhoneCardPermissions() {
+        val granted = missingPhoneCardPermissions().isEmpty()
+        phoneCardNote?.text = ctx.getString(if (granted) R.string.l_perm_granted else R.string.l_perm_summary)
+    }
 
     // --- язык и тема ---
 
@@ -715,10 +875,18 @@ class SettingsSectionScreen(host: MainActivity, val section: SettingsSection) : 
     private fun buildVideo() {
         val c = ctx
         body.addView(c.sectionTitle(c.getString(R.string.set_mode)))
-        val seg = Segmented(c, listOf(c.getString(R.string.set_transcode_title), c.getString(R.string.set_direct_title)), 15f) { setTranscode(it == 0) }
-        transcodeSeg = seg
-        body.addView(seg.view, lp(MATCH, WRAP))
-        body.addView(modeDescription(), lp(MATCH, WRAP).margins(c, 8, 4, 8, 0))
+        if (BridgeMode.effective(aa.bridgeMode, Build.VERSION.SDK_INT) == BridgeMode.DESKTOP) {
+            // «Свой лаунчер»: телефон кодирует экран один раз и отдаёт ГУ готовый H.264 - выбирать нечего, это и есть проброс.
+            // Настройку AA (aa.transcode) не трогаем: она снова работает при возврате в режим Android Auto.
+            body.addView(Segmented(c, listOf(c.getString(R.string.set_direct_title)), 15f) {}.apply { setSelected(0) }.view, lp(MATCH, WRAP))
+            body.addView(c.text(c.getString(R.string.set_direct_desktop_desc), 13f, 400, c.clr(R.color.on2)).apply { setLineSpacing(0f, 1.4f) },
+                lp(MATCH, WRAP).margins(c, 8, 4, 8, 0))
+        } else {
+            val seg = Segmented(c, listOf(c.getString(R.string.set_transcode_title), c.getString(R.string.set_direct_title)), 15f) { setTranscode(it == 0) }
+            transcodeSeg = seg
+            body.addView(seg.view, lp(MATCH, WRAP))
+            body.addView(modeDescription(), lp(MATCH, WRAP).margins(c, 8, 4, 8, 0))
+        }
 
         body.addView(c.sectionTitle(c.getString(R.string.set_resolution)))
         customResNote = note("").apply { visibility = View.GONE }
@@ -730,7 +898,7 @@ class SettingsSectionScreen(host: MainActivity, val section: SettingsSection) : 
         note(c.getString(R.string.set_aa_density_note))
 
         body.addView(c.sectionTitle(c.getString(R.string.set_fps)))
-        val fps = FpsSetting.values()
+        val fps = FpsSetting.values().filter { it != FpsSetting.FPS60 }
         val fSeg = Segmented(c, fps.map { c.getString(it.titleRes) }, 15f) { setFps(fps[it]) }
         fpsSeg = fSeg
         body.addView(fSeg.view, lp(MATCH, WRAP))
@@ -1039,7 +1207,7 @@ class SettingsSectionScreen(host: MainActivity, val section: SettingsSection) : 
     /** В прямом пробросе частоту задаёт AA: переключатель затемнён и не нажимается, выбор в prefs остаётся. */
     private fun refreshFps() {
         val direct = !aa.transcode
-        fpsSeg?.setSelected(FpsSetting.values().indexOf(aa.fpsSetting))
+        fpsSeg?.setSelected(FpsSetting.values().filter { it != FpsSetting.FPS60 }.indexOf(aa.fpsSetting).coerceAtLeast(0))
         fpsSeg?.setEnabled(!direct)
         fpsNote?.text = ctx.getString(if (direct) R.string.set_fps_direct else aa.fpsSetting.subRes)
     }

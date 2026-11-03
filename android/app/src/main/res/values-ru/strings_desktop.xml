@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- BridgeService, режим Headswap Desktop -->
+    <string name="desk_not_activated">Headswap Desktop не активирован: откройте Настройки > Режим и нажмите «Активировать»</string>
+    <string name="desk_cert_na">не требуется (рабочий стол)</string>
+    <string name="desk_connecting">Подключаю рабочий стол…</string>
+    <string name="desk_waiting_frame">Рабочий стол: жду кадр…</string>
+    <string name="desk_disconnected">Рабочий стол отключился. Остановите и подключите заново.</string>
+    <string name="desk_recovering">Восстанавливаю рабочий стол (%1$d/2)…</string>
+    <string name="desk_recovery_stopped">Восстановление остановлено. Проверьте USB, доступ к рабочему столу и разблокировку телефона</string>
+    <string name="desk_recovery_screen_busy">Предыдущий экран ещё не освобождён; автоматический запуск отменён</string>
+
+    <!-- Активация с самого телефона (беспроводная отладка), Настройки - Режим -->
+    <string name="pa_title">Активируйте Headswap</string>
+    <string name="pa_step_1">Откройте «Для разработчиков» → «Отладка по Wi-Fi» и включите её.</string>
+    <string name="pa_step_2">Нажмите «Подключить устройство с кодом сопряжения».</string>
+    <string name="pa_step_3">Введите код в уведомлении Headswap.</string>
+    <string name="pa_step_paired">Нажмите «Активировать». Телефон уже сопряжён, код не нужен.</string>
+    <string name="pa_hint">Активацию нужно повторять после перезагрузки телефона.</string>
+    <string name="pa_button">Активировать</string>
+    <string name="pa_button_again">Активировать снова</string>
+    <string name="pa_cancel">Отмена</string>
+    <string name="pa_manual_toggle">Ввести порт и код вручную</string>
+    <string name="pa_manual_hint">Порт и код из окна сопряжения. После сопряжения хватит порта отладки.</string>
+    <string name="pa_field_pair_port">Порт сопряжения</string>
+    <string name="pa_field_code">Код из шести цифр</string>
+    <string name="pa_field_connect_port">Порт отладки по Wi-Fi</string>
+    <string name="pa_manual_go">Активировать с этими данными</string>
+    <string name="pa_forget">Сопрячь заново</string>
+    <string name="pa_forget_done">Сопряжение забыто. В следующий раз Headswap попросит новый код.</string>
+    <string name="pa_need_notif">Разрешите уведомления Headswap: код сопряжения вводится в уведомлении. Или введите порт и код вручную.</string>
+    <string name="pa_need_wifi_debug">Включите «Отладку по Wi-Fi» в настройках разработчика (нужна любая сеть Wi-Fi, интернет не обязателен) и нажмите «Активировать» ещё раз.</string>
+    <string name="pa_field_bad_port">Порт: от 1 до 65535</string>
+    <string name="pa_field_bad_code">Шесть цифр</string>
+
+    <string name="pa_s_searching">Ищу отладку по Wi-Fi…</string>
+    <string name="pa_s_wait_code">Жду код сопряжения: введите его в уведомлении Headswap.</string>
+    <string name="pa_s_pairing">Сопрягаю…</string>
+    <string name="pa_s_connecting">Подключаюсь к отладке по Wi-Fi…</string>
+    <string name="pa_s_starting">Включаю рабочий стол. Headswap может перезапуститься.</string>
+    <string name="pa_s_pending">Жду, пока перезапущенный Headswap подтвердит доступ…</string>
+    <string name="pa_s_failed">Не активировано: %1$s</string>
+    <string name="pa_s_expired">Активация не завершилась. Откройте Настройки > Режим и нажмите «Активировать» ещё раз.</string>
+    <string name="pa_s_expired_why">Активация не завершилась: %1$s</string>
+
+    <string name="pa_notif_channel_progress">Активация с телефона</string>
+    <string name="pa_notif_channel_code">Код сопряжения</string>
+    <string name="pa_notif_title">Активация Headswap Desktop</string>
+    <string name="pa_notif_cancel">Отмена</string>
+    <string name="pa_notif_code_title">Введите код сопряжения</string>
+    <string name="pa_notif_code_text">В «Отладке по Wi-Fi» нажмите «Подключить устройство с кодом сопряжения» и введите шесть цифр здесь.</string>
+    <string name="pa_notif_code_error">%1$s Введите код ещё раз.</string>
+    <string name="pa_notif_code_label">Код из шести цифр</string>
+    <string name="pa_notif_reply">Ввести код</string>
+    <string name="pa_notif_done">Headswap Desktop активирован</string>
+
+    <string name="pa_err_no_wifi">Нет Wi-Fi. Отладка по Wi-Fi работает только через Wi-Fi: подключитесь к сети и повторите.</string>
+    <string name="pa_err_port">Порт — число от 1 до 65535.</string>
+    <string name="pa_err_code">Код — шесть цифр из системного окна сопряжения.</string>
+    <string name="pa_err_no_pair_port">Окно сопряжения не найдено. Не закрывайте «Подключить устройство с кодом сопряжения», пока вводите код. На Android 17 разрешите Headswap доступ к локальной сети или введите порт вручную.</string>
+    <string name="pa_err_no_connect_port">Отладка по Wi-Fi выключена или не найдена. Включите её в «Для разработчиков» (Wi-Fi должен быть включён) или введите порт вручную.</string>
+    <string name="pa_err_refused">Порт закрыт: отладка по Wi-Fi выключена или порт сменился. Посмотрите экран «Отладка по Wi-Fi».</string>
+    <string name="pa_err_timeout">Нет ответа за отведённое время. Проверьте Wi-Fi и что отладка по Wi-Fi включена.</string>
+    <string name="pa_err_permission">Android запретил сетевое подключение. Разрешите Headswap доступ к локальной сети и повторите.</string>
+    <string name="pa_err_pair_rejected">Код неверный или окно сопряжения закрыто. Откройте его заново и введите новый код.</string>
+    <string name="pa_err_not_paired">Телефон больше не знает это устройство. Сопрягите заново с новым кодом.</string>
+    <string name="pa_err_tls">Защищённое соединение отклонено. Проверьте отладку по Wi-Fi и при необходимости сопрягите заново.</string>
+    <string name="pa_err_tls_provider">Системный TLS-компонент не справился. Сохраните журнал и сообщите о проблеме.</string>
+    <string name="pa_err_closed">Телефон закрыл соединение. Проверьте порт на экране «Отладка по Wi-Fi».</string>
+    <string name="pa_err_identity">Не удалось прочитать сохранённый ключ ADB. Сопрягите заново.</string>
+    <string name="pa_err_shell">Отладка по Wi-Fi не дала доступ к shell. Проверьте список сопряжённых устройств.</string>
+    <string name="pa_err_package">Установленный Headswap изменился. Откройте приложение заново и повторите.</string>
+    <string name="pa_err_unsupported">Эта прошивка не умеет запускать активацию с телефона.</string>
+    <string name="pa_err_dispatch">Запуск не подтверждён. Откройте Настройки > Режим и нажмите «Активировать» ещё раз.</string>
+    <string name="pa_err_io">Сбой обмена с отладкой по Wi-Fi. Сохраните журнал и повторите.</string>
+    <string name="pa_err_internal">Внутренняя ошибка подготовки подключения. Сохраните журнал и повторите.</string>
+</resources>

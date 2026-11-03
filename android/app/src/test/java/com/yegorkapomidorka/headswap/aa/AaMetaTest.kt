@@ -1646,4 +1646,67 @@ class AaMetaTest {
             AaBridgeCore.TTS_DEBOUNCE_ENABLED = was
         }
     }
+
+    private class FakeDesktopMedia(var playing: Boolean) : DesktopMedia {
+        val calls = ArrayList<String>()
+        override fun isPlaying() = playing
+        override fun pause() { calls.add("pause"); playing = false }
+        override fun resume() { calls.add("resume"); playing = true }
+    }
+
+    @Test
+    fun desktopMusicOffPausesPhonePlayerAndVezelMusicOnResumes() {
+        // Vezel (лог 2026-11-03): MUSIC=0 за секунду до обрыва USB при выключении машины
+        val r = Rig()
+        val media = FakeDesktopMedia(playing = true)
+        r.core.desktopMedia = media
+        r.core.onHuInfo("", "")
+        r.core.onHuStatistic("20832125")
+        r.start()
+        assertFalse(r.core.onCarlifeMusicControl(0))
+        r.core.onCarlifeMusicControl(0)
+        assertEquals("пауза один раз", listOf("pause"), media.calls)
+        r.core.onAudioData(M.CH_AUDIO_MEDIA, ByteArray(640), 0)
+        assertEquals("хвост MEDIA не пересылаем", 0, r.link.audio.count { it == CarlifeAudio.MEDIA_DATA })
+
+        r.now += 500
+        assertTrue(r.core.onCarlifeMusicControl(1))
+        assertEquals(listOf("pause", "resume"), media.calls)
+        r.core.onAudioData(M.CH_AUDIO_MEDIA, ByteArray(640), 0)
+        assertEquals("после MUSIC=1 MEDIA снова идёт", 1, r.link.audio.count { it == CarlifeAudio.MEDIA_DATA })
+    }
+
+    @Test
+    fun desktopMusicOffWhenNotPlayingReleasesOnPhonePlay() {
+        val r = Rig()
+        val media = FakeDesktopMedia(playing = false)
+        r.core.desktopMedia = media
+        r.start()
+        assertFalse(r.core.onCarlifeMusicControl(0))
+        assertTrue("не играл - паузу не шлём", media.calls.isEmpty())
+        r.core.onAudioData(M.CH_AUDIO_MEDIA, ByteArray(640), 0)
+        assertEquals(0, r.link.audio.count { it == CarlifeAudio.MEDIA_DATA })
+
+        // пользователь включил музыку на телефоне: MEDIA снова пересылаем
+        media.playing = true
+        r.now += AaBridgeCore.DESKTOP_RESUME_GUARD_MS
+        r.core.onAudioData(M.CH_AUDIO_MEDIA, ByteArray(640), 0)
+        r.core.onAudioData(M.CH_AUDIO_MEDIA, ByteArray(640), 0)
+        assertTrue(r.link.audio.count { it == CarlifeAudio.MEDIA_DATA } >= 1)
+        // MUSIC=1 у не-Vezel/G6S play не шлёт
+        assertTrue(media.calls.isEmpty())
+    }
+
+    @Test
+    fun desktopTailAfterOurPauseStaysDroppedWithinGuard() {
+        val r = Rig()
+        val media = FakeDesktopMedia(playing = true)
+        r.core.desktopMedia = media
+        r.start()
+        r.core.onCarlifeMusicControl(0)
+        media.playing = true                       // плеер ещё доигрывает хвост
+        r.now += AaBridgeCore.DESKTOP_RESUME_GUARD_MS - 1
+        r.core.onAudioData(M.CH_AUDIO_MEDIA, ByteArray(640), 0)
+        assertEquals(0, r.link.audio.count { it == CarlifeAudio.MEDIA_DATA })
+    }
 }

@@ -44,6 +44,7 @@
     <string name="set_direct_desc">Видео АА уходит в ГУ как есть. Широкие экраны ГУ обрезает сама, без телефона.</string>
     <string name="set_direct_plus">+ Меньше задержка, нагрев и расход батареи</string>
     <string name="set_direct_minus">− Частота кадров не регулируется</string>
+    <string name="set_direct_desktop_desc">В режиме «Свой лаунчер» телефон сам кодирует свой экран один раз и отдаёт ГУ готовый поток H.264, без перекодирования.</string>
 
     <string name="set_resolution">Разрешение видео</string>
     <string name="set_res_pick">Выбрать разрешение</string>
@@ -191,6 +192,8 @@
     <string name="fps_15_sub">Легче для слабых ГУ и канала</string>
     <string name="fps_30_title">30 кадров/с</string>
     <string name="fps_30_sub">Плавнее, но тяжелее</string>
+    <string name="fps_60_title">60 кадров/с</string>
+    <string name="fps_60_sub">Повышенная частота; нужна поддержка телефона и магнитолы</string>
 
     <!-- Беспровод (ветка B) -->
     <string name="wl_title">По воздуху</string>
@@ -261,4 +264,23 @@
     <string name="car_auto">Авто</string>
     <string name="car_value_keep">Без изменений</string>
     <string name="car_apply">Применить</string>
+
+    <!-- Режим моста: Android Auto / Headswap Desktop (SettingsSection.MODE) -->
+    <string name="bm_title">Режим</string>
+    <string name="bm_aa_note">Магнитола показывает Android Auto с телефона.</string>
+    <string name="bm_own_launcher">Свой лаунчер</string>
+    <string name="bm_launcher_title">Лаунчер</string>
+    <string name="bm_need_13">Нужен Android 13+</string>
+    <string name="bm_sum_state">%1$s · %2$s</string>
+    <string name="bm_act_on">Активировано</string>
+    <string name="bm_act_off">Не активировано</string>
+    <string name="bm_act_lost">Доступ потерян, активируйте заново</string>
+    <string name="about_title">О приложении</string>
+    <string name="about_note">Авторы и лицензии</string>
+    <string name="about_authors">Авторы</string>
+    <string name="about_opensource">Открытый код</string>
+    <string name="about_author_yegor">Егор</string>
+    <string name="about_author_ildar">Ильдар Садыков</string>
+    <string name="about_open_project">Страница проекта</string>
+    <string name="about_license_unavailable">Текст лицензии недоступен. Смотрите страницу проекта.</string>
 </resources>

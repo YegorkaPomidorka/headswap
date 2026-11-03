@@ -61,6 +61,7 @@ object AppTheme {
         R.color.onok to R.color.onok_mid,
         R.color.warn to R.color.warn_mid,
         R.color.warnc to R.color.warnc_mid,
+        R.color.onwarnc to R.color.onwarnc_mid,
         R.color.err to R.color.err_mid,
         R.color.errc to R.color.errc_mid,
         R.color.onerr to R.color.onerr_mid,

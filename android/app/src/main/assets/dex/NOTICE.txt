@@ -1,0 +1,9 @@
+Headswap activates Headswap Desktop from the phone itself over Android wireless debugging.
+
+The ADB client dependency is Kadb 2.1.5, copyright Flyfish Studio and contributors.
+Project: https://github.com/flyfishxu/Kadb/tree/2.1.5
+License: Apache-2.0; see KADB-LICENSE.txt.
+Kadb includes work derived from Dadb, libadb-android and spake2-java.
+
+The pairing, the keystore-held ADB identity, the local mDNS discovery and the loopback-only address rules are
+ported from SadykovIV/headswap_desk (GPL-3.0), copyright Ildar Sadykov.

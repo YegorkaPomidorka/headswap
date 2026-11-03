@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Android 6-11: пароль Wi-Fi машины (car_wifi.xml) не уходит в облачный бэкап; остальное как по умолчанию -->
+<!-- Android 6-11: пароль Wi-Fi машины (car_wifi.xml) и токен активации с компьютера (headswap_activation.xml) не уходят в облачный бэкап; остальное как по умолчанию -->
 <full-backup-content>
     <exclude domain="sharedpref" path="car_wifi.xml" />
+    <exclude domain="sharedpref" path="headswap_activation.xml" />
 </full-backup-content>

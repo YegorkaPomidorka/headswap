@@ -9,6 +9,13 @@ import java.util.concurrent.Executors
 import java.util.concurrent.ScheduledExecutorService
 import java.util.concurrent.TimeUnit
 
+/** Плеер телефона в режиме рабочего стола (реализует dex.DesktopMediaControl). */
+interface DesktopMedia {
+    fun isPlaying(): Boolean
+    fun pause()
+    fun resume()
+}
+
 /** Что мост требует от CarLife-стороны (реализует CarLifeSession). */
 interface CarlifeLink {
     /** Одно видео-сообщение CarLife (0x20001, Annex-B). false = не принято (очередь переполнена, сессия закрыта). */
@@ -41,6 +48,9 @@ interface CarlifeLink {
 
     /** Создать и запустить транскодер (AA H.264 -> декодер -> энкодер). null = MediaCodec не поднялся, работаем passthrough. */
     fun createTranscoder(out: TranscodeOutput): VideoTranscoder? = null
+
+    /** Native desktop surface -> GL pacing -> the same CarLife encoder, without an input decoder. */
+    fun createSurfaceEncoder(out: TranscodeOutput): VideoTranscoder? = null
 
     /**
      * Попросить ГУ начать (true) / закончить (false) запись микрофона, как Baidu MD (VrManager): CMD
@@ -94,6 +104,9 @@ class AaBridgeCore(
     private val clockUs: () -> Long = { System.nanoTime() / 1_000 },
     micSchedule: ((Long, Runnable) -> MicTimerHandle)? = null,
     audioSchedule: ((Long, Runnable) -> MicTimerHandle)? = null,
+    private val connectingText: String = TEXT_CONNECTING,
+    private val waitingText: String = TEXT_WAIT_FRAME,
+    private val disconnectedText: String = TEXT_AA_LOST,
 ) : AaVideoSink, AaAudioSink, AaMicSink, AaMetaSink, TranscodeOutput, RefPictureSink {
     enum class Source { PLACEHOLDER, AA }
 
@@ -116,7 +129,7 @@ class AaBridgeCore(
     private var aaVideoSeen = false
     private var gotIdr = false
     private var active = Source.PLACEHOLDER
-    private var placeholderText = TEXT_CONNECTING
+    private var placeholderText = connectingText
     private var waitSince = 0L
     private var lastKeyframeRequest = NEVER
     private var lastIdrSentMs = NEVER              // когда в CarLife ушёл последний IDR passthrough
@@ -144,6 +157,139 @@ class AaBridgeCore(
 
     /** Ручной DPI интерфейса AA, снятый вместе с videoMode (AaDensity.AUTO = density режима). Только SDR, на кроп и тач не влияет. */
     @Volatile var densityOverride: Int = AaDensity.AUTO
+
+    /** Desktop sources handle CarLife HOME themselves; AA leaves that key to the head unit. */
+    @Volatile var mapHomeKey: Boolean = false
+
+    /** Desktop input accepts explicit CANCEL and releases contacts when CarLife disconnects. */
+    @Volatile var desktopInputEnabled: Boolean = false
+
+    /** Desktop source bitrate exceeds CarLife's limit, so encoder failure must never bypass it. */
+    @Volatile var desktopVideoError: String? = null
+        private set
+
+    /** Desktop: музыку играет плеер телефона, а не AA - MUSIC=0/1 от ГУ ставят на паузу и возвращают его. */
+    @Volatile var desktopMedia: DesktopMedia? = null
+
+    @Volatile var desktopSurfaceEnabled: Boolean = false
+        private set
+    private var desktopSurfaceListener: DesktopSurfaceListener? = null
+    private var desktopSurfaceExecutor: ExecutorService? = null
+    private var desktopSurfaceSequence = 0L
+    private var desktopSurfaceGeneration = 0L
+    private var desktopSurfaceReady = false
+    private var desktopSurfaceFirstFrame = false
+    private var desktopSurfaceCsdVerified = false
+    private var desktopSurfaceCreating = false
+    private var desktopSurfaceStopped = false
+    private var desktopSurfaceStopComplete = false
+    private val desktopSurfaceStopCallbacks = ArrayList<() -> Unit>()
+    private data class RetiredSurfaceEncoder(val encoder: VideoTranscoder, val listener: DesktopSurfaceListener?)
+    private val retiredSurfaceEncoders = LinkedHashMap<Long, RetiredSurfaceEncoder>()
+    private val closedSurfaceProducers = HashSet<Long>()
+
+    /** Register before CarLife START. The source receives a new lease after every USB reconnect. */
+    @Synchronized
+    fun enableDesktopSurface(listener: DesktopSurfaceListener) {
+        check(!desktopSurfaceStopped) { "Desktop surface source was already stopped" }
+        check(desktopSurfaceListener == null || desktopSurfaceListener === listener) { "Desktop surface source is already registered" }
+        check(transcoder == null || desktopSurfaceEnabled) { "Compressed source encoder is already active" }
+        desktopSurfaceListener = listener
+        desktopSurfaceEnabled = true
+        desktopInputEnabled = true
+        transcodeEnabled = true
+        if (carlifeStarted) startTranscoder()
+    }
+
+    /** Call only after the source has created and verified its own native desktop display. */
+    @Synchronized
+    fun desktopSurfaceReady(generation: Long): Boolean {
+        if (!desktopSurfaceEnabled || desktopSurfaceStopped || generation != desktopSurfaceGeneration ||
+            generation == 0L || transcoder == null || !carlifeStarted || desktopVideoError != null) return false
+        desktopSurfaceReady = true
+        aaVideoSeen = true
+        gotIdr = true // No compressed source IDR exists in this mode.
+        outputEnabled = !carlifePaused
+        outGotIdr = false
+        waitSince = 0L
+        transcoder?.requestSyncFrame()
+        return true
+    }
+
+    @Synchronized
+    fun desktopSurfaceFailed(generation: Long, message: String) {
+        if (generation != 0L && generation == desktopSurfaceGeneration && !desktopSurfaceStopped) stopDesktopVideo(message)
+    }
+
+    /** Callback runs after source closure and encoder disposal, outside the bridge monitor. */
+    @Synchronized
+    fun stopDesktopSurface(onDone: () -> Unit) {
+        if (desktopSurfaceStopComplete) {
+            Thread(onDone, "dex-surface-stopped").start()
+            return
+        }
+        desktopSurfaceStopCallbacks.add(onDone)
+        if (desktopSurfaceStopped) return
+        desktopSurfaceStopped = true
+        stopTranscoderAsync()
+        desktopSurfaceWorker().execute { finishDesktopSurfaceStop() }
+    }
+
+    /** Keep the current CarLife handshake, but never reuse a producer/encoder generation.
+     * The owner may call this only after its source stop callback has completed. */
+    @Synchronized
+    fun rearmDesktopSurfaceAfterStop(): Boolean {
+        if (!desktopSurfaceEnabled || !desktopSurfaceStopped || !desktopSurfaceStopComplete ||
+            desktopSurfaceCreating || transcoder != null || desktopSurfaceGeneration != 0L ||
+            retiredSurfaceEncoders.isNotEmpty() || desktopSurfaceStopCallbacks.isNotEmpty() || link === NoLink) return false
+        desktopSurfaceEnabled = false
+        desktopSurfaceStopped = false
+        desktopSurfaceStopComplete = false
+        desktopSurfaceListener = null
+        desktopSurfaceExecutor = null
+        desktopVideoError = null
+        closedSurfaceProducers.clear()
+        // desktopSurfaceSequence deliberately survives: old codec/death callbacks stay stale.
+        return true
+    }
+
+    /** Proof from the producer's Binder death recipient. Safe before, during, or after a failed close. */
+    @Synchronized
+    fun desktopSurfaceProducerClosed(generation: Long) {
+        if (generation <= 0L || generation > desktopSurfaceSequence || desktopSurfaceStopComplete) return
+        closedSurfaceProducers.add(generation)
+        if (generation in retiredSurfaceEncoders) {
+            desktopSurfaceWorker().execute { disposeRetiredSurfaceEncoder(generation) }
+        }
+    }
+
+    /** Lifecycle-worker only. A failed source close never authorizes releasing its consumer surface. */
+    private fun disposeRetiredSurfaceEncoder(generation: Long) {
+        val retired = synchronized(this) {
+            if (generation in closedSurfaceProducers) retiredSurfaceEncoders[generation] else null
+        } ?: return
+        try { retired.encoder.stop() } finally {
+            synchronized(this) { retiredSurfaceEncoders.remove(generation); closedSurfaceProducers.remove(generation) }
+            finishDesktopSurfaceStop()
+        }
+    }
+
+    private fun finishDesktopSurfaceStop() {
+        val (callbacks, worker) = synchronized(this) {
+            if (!desktopSurfaceStopped || desktopSurfaceStopComplete || retiredSurfaceEncoders.isNotEmpty() || desktopSurfaceCreating) return
+            desktopSurfaceStopComplete = true
+            desktopSurfaceStopCallbacks.toList().also { desktopSurfaceStopCallbacks.clear() } to desktopSurfaceExecutor
+        }
+        // Capture/retire the old worker before callbacks can rearm the same live CarLife link.
+        worker?.shutdown()
+        callbacks.forEach { runCatching { it() } }
+    }
+
+    private fun desktopSurfaceWorker(): ExecutorService {
+        return desktopSurfaceExecutor ?: Executors.newSingleThreadExecutor { task ->
+            Thread(task, "dex-surface-lifecycle").also { it.isDaemon = true }
+        }.also { desktopSurfaceExecutor = it }
+    }
 
     /** SDR ушёл с полями целиком справа и снизу (h529, ui_config): SPS-кроп режет только справа и снизу. Снимается вместе с videoMode. */
     @Volatile var marginsAtBottom = false
@@ -300,7 +446,8 @@ class AaBridgeCore(
     @Volatile private var lastUserInputMs = NEVER   // последний тач DOWN / клавиша / шайба / голос с ГУ
     @Volatile private var lastVoiceKeyMs = NEVER    // последний KEYCODE_SEARCH в AA (антидребезг h425)
     private var lastHfpConnectMs = NEVER       // ГУ прислало BT_HFP_CONNECTION=connected (дальше AA сам запускает автоплей по BT)
-    private var lastPauseKeyMs = NEVER         // когда последний раз слали AA KEYCODE 127
+    private var lastPauseKeyMs = NEVER         // когда последний раз слали AA KEYCODE 127 (desktop: паузу плееру телефона)
+    private var lastDesktopPlayCheckMs = NEVER // desktop: когда спрашивали «играет ли плеер» при закрытом MEDIA
     private var lastExternalStopMs = NEVER     // плеер AA встал не от нашего 127 и не от ввода пользователя (Honda 20772104)
     private var naviSent = false               // MODULE_STATUS NAVI=1 ушёл (держит TTS и/или маршрут)
     private var naviEndPending = false           // маршрут кончился, пока NAVI=1 держал TTS: NAVI=0 уйдёт после TTS STOP
@@ -402,6 +549,7 @@ class AaBridgeCore(
      */
     @Synchronized
     fun attach(link: CarlifeLink) {
+        if (desktopSurfaceEnabled && this.link !== link) stopTranscoderAsync()
         this.link = link
         active = Source.PLACEHOLDER
         carlifeStarted = false
@@ -444,7 +592,7 @@ class AaBridgeCore(
         mediaChunkLogged = CarlifeAudio.MAX_CHUNK
         voiceChunkLogged = CarlifeAudio.MAX_CHUNK
         resampler?.reset()
-        if (aaVideoSeen) placeholderText = TEXT_WAIT_FRAME
+        if (aaVideoSeen) placeholderText = waitingText
         meta.onAttach()
         link.showPlaceholder(placeholderText)
         log("BRIDGE CarLife-сессия подключена: источник = заглушка '$placeholderText' (AA ${if (aaVideoSeen) "жива" else "нет видео"})", true)
@@ -472,6 +620,11 @@ class AaBridgeCore(
         carlifePaused = false
         if (warm) log("BRIDGE CarLife START без PAUSE: звук не трогаю, INIT не повторяю", true)
         else resetAudio()                      // новый START: MEDIA/TTS init заново на первом пакете
+        if (desktopSurfaceEnabled) {
+            startTranscoder()
+            if (!warm) meta.onCarlifeStart()
+            return
+        }
         if (resume) {
             lastKeyframeRequest = NEVER
             log("BRIDGE CarLife START после PAUSE (воздух): декодер жив, сразу IDR энкодера, AA не жду", true)
@@ -519,6 +672,7 @@ class AaBridgeCore(
             log("BRIDGE Honda 20772104: MODULE_CONTROL MUSIC=$status, звук по BT - AA не трогаю, CarLife-музыки нет", true)
             return false
         }
+        desktopMedia?.let { return onDesktopMusicControl(it, status) }
         if (HU_MUSIC_FOLLOW_ENABLED && status == 0 && carlifeStarted) {
             val p = peer
             if (meta.playing && !huPausedAa && p != null) {
@@ -567,6 +721,61 @@ class AaBridgeCore(
             if (now - lastHuResumeMs < HU_RESUME_ANSWER_MS) return true   // повтор MUSIC=1, пока AA раскачивается
         }
         return musicActive
+    }
+
+    /**
+     * MODULE_CONTROL MUSIC в режиме рабочего стола: AA нет, музыку играет плеер телефона. MUSIC=0 - ГУ ушло на свой
+     * источник или гаснет (Vezel шлёт его за ~1 с до обрыва USB при выключении машины, лог 2026-11-03): плеер на паузу.
+     * MUSIC=1 - ГУ вернулось на CarLife-музыку: MEDIA снова пересылаем, а Desay G6S/Vezel после нашей паузы - play.
+     */
+    private fun onDesktopMusicControl(media: DesktopMedia, status: Int?): Boolean {
+        val now = clockMs()
+        if (HU_MUSIC_FOLLOW_ENABLED && status == 0 && carlifeStarted) {
+            if (!huPausedAa) {
+                if (media.isPlaying()) {
+                    log("BRIDGE ГУ ушло на свой источник (MUSIC=0): плеер телефона на паузу", true)
+                    lastPauseKeyMs = now
+                    media.pause()
+                    resumeOnHuMusic = true
+                } else {
+                    log("BRIDGE ГУ ушло на свой источник (MUSIC=0), плеер телефона не играет: хвост MEDIA не пересылаю до play", true)
+                    resumeOnHuMusic = false
+                }
+            }
+            huPausedAa = true
+            requestMediaPause("ГУ MODULE_CONTROL MUSIC=0")
+            return false
+        }
+        if (status == 1 && huPausedAa) {
+            huPausedAa = false
+            callPausedAa = false
+            if (HU_MUSIC_RESUME_ENABLED && resumeOnHuMusic && (huDesayG6S || huHondaVezel)) {
+                resumeOnHuMusic = false
+                lastHuResumeMs = now
+                lastUserInputMs = now
+                log("BRIDGE ГУ вернулось на CarLife-музыку (MUSIC=1) после нашей паузы: play плееру телефона", true)
+                media.resume()
+                return true
+            }
+            resumeOnHuMusic = false
+            log("BRIDGE ГУ вернулось на CarLife-музыку (MUSIC=1): MEDIA снова пересылаю", true)
+            return musicActive
+        }
+        if (status == 1 && now - lastHuResumeMs < HU_RESUME_ANSWER_MS) return true   // пачка MUSIC=1, пока плеер раскачивается
+        return musicActive
+    }
+
+    /** Desktop: плеер телефона снова играет после MUSIC=0 (play на телефоне или на рабочем столе) - звук опять пересылаем. */
+    private fun releaseDesktopPauseIfPlaying() {
+        val media = desktopMedia ?: return
+        val now = clockMs()
+        if (now - lastPauseKeyMs < DESKTOP_RESUME_GUARD_MS || now - lastDesktopPlayCheckMs < DESKTOP_PLAY_CHECK_MS) return
+        lastDesktopPlayCheckMs = now
+        if (!media.isPlaying()) return
+        huPausedAa = false
+        callPausedAa = false
+        resumeOnHuMusic = false
+        log("BRIDGE плеер телефона снова играет после MUSIC=0: MEDIA снова пересылаю", true)
     }
 
     private fun sendPauseKey(p: AaPeer) {
@@ -626,6 +835,7 @@ class AaBridgeCore(
     @Synchronized
     fun onCarlifePause() {
         carlifePaused = true
+        if (desktopSurfaceEnabled) outputEnabled = false
         if (exitPending) {
             // ГУ ушёл с CarLife после нашего GO_TO_DESKTOP: говорим AA, что проекции нет (NATIVE), возврат - через START
             exitPending = false
@@ -807,7 +1017,14 @@ class AaBridgeCore(
         stopTranscoderAsync()
         active = Source.PLACEHOLDER
         link = NoLink
-        synchronized(touchLock) { fingers.clear() }
+        if (desktopInputEnabled) {
+            touchDecimator.reset()
+            touchPacer.reset()
+        }
+        synchronized(touchLock) {
+            if (desktopInputEnabled && fingers.isNotEmpty()) peer?.let { sendFingers(it, 3, 0, "CANCEL") }
+            fingers.clear()
+        }
         log("BRIDGE CarLife закрыт (AA ${if (aaVideoSeen) "жива" else "без видео"}, держим)", true)
         return true
     }
@@ -821,6 +1038,8 @@ class AaBridgeCore(
     }
 
     private val touchLock = Any()
+    private var lastDownMs = NEVER          // под touchLock: время последнего DOWN, для дубля Vezel
+    private var dupDowns = 0
 
     /** Активные пальцы в порядке индекса MotionEvent ГУ: x,y TOUCH_ACTION - индекс 0, pointerx/pointery - индекс 1. */
     private val fingers = ArrayList<Finger>(2)
@@ -832,6 +1051,13 @@ class AaBridgeCore(
      * [VideoMode.mapTouch] (без margin-ов 1:1). Один палец уходит в AA так же, как до мультитача (id 0, action_index 0).
      */
     fun onCarlifeTouch(action: Int, x: Int, y: Int, px: Int = 0, py: Int = 0) {
+        if (desktopInputEnabled && action and 0xFF == 3) {
+            // Discard delayed MOVE events instead of replaying them into an already cancelled gesture.
+            touchDecimator.reset()
+            touchPacer.reset()
+            dispatchTouch(action, x, y, px, py)
+            return
+        }
         val every = touchDecimationProvider().every
         if (every != touchDecimationLogged) {
             touchDecimationLogged = every
@@ -931,7 +1157,7 @@ class AaBridgeCore(
         val act = action and 0xFF
         val idx = action ushr 8
         if (act == AapMessages.TOUCH_DOWN || act == AapMessages.TOUCH_POINTER_DOWN) lastUserInputMs = clockMs()
-        val name = TOUCH_NAMES[act]
+        val name = if (desktopInputEnabled && act == 3) "CANCEL" else TOUCH_NAMES[act]
         if (name == null) {
             log("BRIDGE тач action=$action x=$x y=$y не передаю (нет аналога в AA)", false)
             return@synchronized
@@ -944,7 +1170,20 @@ class AaBridgeCore(
         }
         val second = px != 0 || py != 0
         when (act) {
+            3 -> {
+                if (fingers.isNotEmpty()) sendFingers(p, act, 0, name)
+                fingers.clear()
+            }
             AapMessages.TOUCH_DOWN -> {
+                // Vezel шлёт каждый DOWN дважды через 1-25 мс; в Desktop дубль становится CANCEL+DOWN = двойной тап
+                val now = clockMs()
+                if (huHondaVezel && desktopInputEnabled && isDuplicateDown(fingers.singleOrNull()?.let { it.x to it.y },
+                        now - lastDownMs, x, y)) {
+                    dupDowns++
+                    log("BRIDGE тач DOWN $x,$y: дубль через ${now - lastDownMs} мс, подавлен (всего $dupDowns)", false)
+                    return@synchronized
+                }
+                lastDownMs = now
                 fingers.clear()
                 fingers.add(Finger(0, x, y))
                 sendFingers(p, act, 0, name)
@@ -1060,7 +1299,7 @@ class AaBridgeCore(
         }
         val call = if (huVwCns2Delphi) currentCall() else PhoneCall.IDLE
         if (code == HARD_KEY_MEDIA_STOP) muteMediaOnCall("ГУ прислало keycode=$code")
-        val android = delphiKey(code, call) ?: HARD_KEY_TO_ANDROID[code]
+        val android = if (mapHomeKey && code == 0x01) 3 else delphiKey(code, call) ?: HARD_KEY_TO_ANDROID[code]
         if (call == PhoneCall.ACTIVE && code == HARD_KEY_SEEK_SUB) {
             log("BRIDGE руль keycode=$code: идёт звонок, назад не шлю", true)
             return
@@ -1140,7 +1379,7 @@ class AaBridgeCore(
         gotIdr = false
         aaConfig = null
         aaVideoSeen = false
-        if (established || wasAa) placeholderText = TEXT_AA_LOST
+        if (established || wasAa) placeholderText = disconnectedText
         if (wasAa || established) {
             active = Source.PLACEHOLDER
             log("BRIDGE AA завершился: источник -> заглушка '$placeholderText'", true)
@@ -1536,6 +1775,7 @@ class AaBridgeCore(
 
     /** Пускать ли MEDIA_DATA дальше; нет = данные отброшены (голос / ждём INIT после TTS). */
     private fun admitMedia(): Boolean {
+        if (huPausedAa && !callPausedAa) releaseDesktopPauseIfPlaying()
         val why = when {
             VOICE_SESSION_ENABLED && voice -> "идёт голосовая сессия"
             huPausedAa -> "ГУ на своём источнике, AA на паузе (хвост буфера)"
@@ -1697,6 +1937,7 @@ class AaBridgeCore(
     // --- видео AA ---
     @Synchronized
     override fun onCodecConfig(annexB: ByteArray) {
+        if (desktopSurfaceEnabled) return
         aaVideoSeen = true
         aaConfig = AnnexB.normalize(annexB)
         log("BRIDGE AA CODEC_CONFIG ${annexB.size} Б nal=${AnnexB.nalTypes(aaConfig!!)}", true)
@@ -1708,6 +1949,7 @@ class AaBridgeCore(
 
     @Synchronized
     override fun onFrame(annexB: ByteArray, ptsUs: Long) {
+        if (desktopSurfaceEnabled) return
         aaVideoSeen = true
         AaState.frames.incrementAndGet()
         AaState.bytes += annexB.size
@@ -1719,6 +1961,10 @@ class AaBridgeCore(
     }
 
     private fun aaFrame(annexB: ByteArray, ptsUs: Long) {
+        if (desktopInputEnabled && desktopVideoError != null) {
+            drop("desktop video stopped after encoder failure")
+            return
+        }
         // свой IDR: декодер опорных картинок и разбор заголовков видят каждый кадр AA, и до START тоже
         val spliced = if (spliceOn) spliceTrack(AnnexB.normalize(annexB)) else null
         if (!carlifeStarted) {
@@ -1860,6 +2106,7 @@ class AaBridgeCore(
     private fun tickLocked() {
         logStats()
         if (!carlifeStarted) return
+        if (desktopSurfaceEnabled) return // Direct input has no upstream compressed stream to recover.
         val now = clockMs()
         if (spliceOn) spliceTick(now)
         latStats.logIfDue(now)
@@ -2322,6 +2569,11 @@ class AaBridgeCore(
 
     // --- перекодирование ---
     private fun startTranscoder() {
+        if (desktopSurfaceEnabled) {
+            startDesktopSurfaceEncoder()
+            return
+        }
+        if (desktopInputEnabled && desktopVideoError != null) return
         outGotIdr = false
         outputEnabled = false
         var t = transcoder
@@ -2329,6 +2581,10 @@ class AaBridgeCore(
             t = link.createTranscoder(this)
             transcoder = t
             if (t == null) {
+                if (desktopInputEnabled) {
+                    stopDesktopVideo("Не удалось создать энкодер CarLife")
+                    return
+                }
                 log("BRIDGE !!!!!! транскодер не поднялся (MediaCodec), откат на passthrough", true)
                 val g = videoMode
                 if (g is CustomVideoMode) {
@@ -2345,12 +2601,129 @@ class AaBridgeCore(
     }
 
     private fun stopTranscoderAsync() {
-        val t = transcoder ?: return
+        val t = transcoder
+        if (t == null && !desktopSurfaceCreating) return
         transcoder = null
         encCsd = null
         outGotIdr = false
         outputEnabled = false
-        Thread({ t.stop() }, "aa-transcoder-stop").start()
+        if (desktopSurfaceEnabled) {
+            val generation = desktopSurfaceGeneration
+            val listener = desktopSurfaceListener
+            desktopSurfaceGeneration = 0L // Invalidate late codec callbacks before publishing a new encoder.
+            desktopSurfaceReady = false
+            desktopSurfaceFirstFrame = false
+            desktopSurfaceCsdVerified = false
+            desktopSurfaceCreating = false
+            if (t != null && generation != 0L) {
+                retiredSurfaceEncoders[generation] = RetiredSurfaceEncoder(t, listener)
+                desktopSurfaceWorker().execute {
+                    try {
+                        listener?.onSurfaceClosing(generation)
+                        synchronized(this) { closedSurfaceProducers.add(generation) }
+                    } catch (e: Exception) {
+                        val confirmed = synchronized(this) { generation in closedSurfaceProducers }
+                        if (!confirmed) synchronized(this) {
+                            stopDesktopVideo("Не подтверждено закрытие экрана DeX; Surface сохранён до завершения службы")
+                        }
+                        log("DEX surface close failed: ${e.javaClass.simpleName}; consumer retained until producer death is confirmed", true)
+                    }
+                    disposeRetiredSurfaceEncoder(generation)
+                }
+            }
+        } else Thread({ t?.stop() }, "aa-transcoder-stop").start()
+    }
+
+    /** Called once before START after the previous transport's encoder has been retired. */
+    @Synchronized fun configureDesktopVideo(owner: CarlifeLink, mode: VideoGeometry, density: Int) {
+        check(link === owner && !carlifeStarted && transcoder == null && !desktopSurfaceCreating) { "Desktop video already started or session retired" }
+        require(DesktopVideoGeometry.matchesNative(mode))
+        DesktopGeometryPolicy.requireDensity(density)
+        videoMode = mode
+        densityOverride = density
+    }
+
+    /** Caller holds the core monitor; source work is deferred to the ordered lifecycle worker. */
+    private fun startDesktopSurfaceEncoder() {
+        if (desktopSurfaceStopped || desktopVideoError != null) return
+        if (!DesktopVideoGeometry.matchesNative(videoMode)) {
+            stopDesktopVideo("Прямой экран DeX требует ${DesktopVideoGeometry.outLabel} без кропа и масштаба")
+            return
+        }
+        val listener = desktopSurfaceListener ?: return
+        outGotIdr = false
+        outputEnabled = desktopSurfaceReady && !carlifePaused
+        transcoder?.let { it.requestSyncFrame(); return }
+        if (desktopSurfaceCreating) return
+        val generation = ++desktopSurfaceSequence
+        val sourceLink = link
+        val sourceMode = videoMode
+        val sourceDensity = sourceMode.densityFor(densityOverride)
+        desktopSurfaceGeneration = generation
+        desktopSurfaceCreating = true
+        desktopSurfaceReady = false
+        desktopSurfaceFirstFrame = false
+        desktopSurfaceCsdVerified = false
+        outputEnabled = false
+        encCsd = null
+        desktopSurfaceWorker().execute {
+            val valid = synchronized(this) {
+                val current = !desktopSurfaceStopped && desktopSurfaceGeneration == generation && link === sourceLink &&
+                    desktopVideoError == null && retiredSurfaceEncoders.isEmpty()
+                if (!current && desktopSurfaceGeneration == generation) desktopSurfaceCreating = false
+                current
+            }
+            if (!valid) return@execute
+            // This runs after the previous source and encoder have both closed. Creating
+            // codecs under the core monitor would also block USB while GL initializes.
+            val t = try { sourceLink.createSurfaceEncoder(DesktopEncoderOutput(generation)) } catch (e: Exception) {
+                log("DEX surface encoder creation failed: ${e.javaClass.simpleName}", true)
+                null
+            }
+            val input = runCatching { t?.surfaceInput }.getOrNull()
+            var disposalQueued = false
+            val adopted = synchronized(this) {
+                if (desktopSurfaceStopped || desktopSurfaceGeneration != generation || link !== sourceLink || desktopVideoError != null) false
+                else {
+                    desktopSurfaceCreating = false
+                    transcoder = t
+                    if (input == null) {
+                        disposalQueued = t != null
+                        stopDesktopVideo("Не удалось создать Surface энкодера CarLife")
+                    }
+                    input != null
+                }
+            }
+            if (!adopted) {
+                // A failed/null-input codec already queued by stopDesktopVideo is disposed
+                // there; a codec created after cancellation has never been published.
+                if (!disposalQueued) t?.stop()
+                return@execute
+            }
+            log("DEX video: native ${videoMode.outW}x${videoMode.outH} Surface -> GL -> H.264 CarLife; one encode, generation=$generation", true)
+            try {
+                listener.onSurfaceAvailable(generation, object : SurfaceVideoInput {
+                    override val surface get() = input!!.surface
+                    override val width = sourceMode.outW
+                    override val height = sourceMode.outH
+                    override val density = sourceDensity
+                })
+            } catch (e: Exception) {
+                log("DEX surface source failed: ${e.javaClass.simpleName}", true)
+                desktopSurfaceFailed(generation, "Не удалось подключить экран DeX к энкодеру CarLife")
+            }
+        }
+    }
+
+    /** A retired codec may emit a final callback while the next USB session is starting. */
+    private inner class DesktopEncoderOutput(private val generation: Long) : TranscodeOutput {
+        private inline fun current(block: () -> Unit) = synchronized(this@AaBridgeCore) {
+            if (generation == desktopSurfaceGeneration && !desktopSurfaceStopped && desktopVideoError == null) block()
+        }
+        override fun onEncoderConfig(csd: ByteArray) = current { this@AaBridgeCore.onEncoderConfig(csd) }
+        override fun onEncoderFrame(data: ByteArray, key: Boolean) = current { this@AaBridgeCore.onEncoderFrame(data, key) }
+        override fun onTranscodeError(msg: String) = current { this@AaBridgeCore.onTranscodeError(msg) }
+        override fun onNeedAaKeyFrame() {} // There is no decoder in direct-surface mode.
     }
 
     private fun resetTranscodeForAa() {
@@ -2389,16 +2762,47 @@ class AaBridgeCore(
 
     @Synchronized
     override fun onEncoderConfig(csd: ByteArray) {
+        if (desktopSurfaceEnabled && (desktopSurfaceStopped || desktopVideoError != null)) return
         encCsd = csd
         log("BRIDGE энкодер: SPS+PPS ${csd.size} Б nal=${AnnexB.nalTypes(csd)}", false)
+        if (desktopSurfaceEnabled && !AnnexB.nalTypes(csd).containsAll(listOf(7, 8))) {
+            stopDesktopVideo("Энкодер CarLife не выдал SPS/PPS")
+            return
+        }
+        if (desktopInputEnabled) for (nal in IdrSplicer.nals(csd)) {
+            if (nal[0].toInt() and 0x1f != 7) continue
+            try {
+                val info = SpsCrop.parse(nal)
+                val matches = info.visibleW == videoMode.outW && info.visibleH == videoMode.outH
+                log("DEX geometry stage=carlife-encoder-sps coded=${info.codedW}x${info.codedH} visible=${info.visibleW}x${info.visibleH} " +
+                    "expected=${videoMode.outW}x${videoMode.outH} crop=${info.left},${info.right},${info.top},${info.bottom} matches=$matches", true)
+                if (!matches) {
+                    stopDesktopVideo("Энкодер CarLife выдал ${info.visibleW}×${info.visibleH} вместо ${videoMode.outW}×${videoMode.outH}")
+                    return
+                }
+                if (desktopSurfaceEnabled) desktopSurfaceCsdVerified = true
+            } catch (e: Exception) {
+                log("DEX geometry stage=carlife-encoder-sps unverified=${e.javaClass.simpleName}", true)
+                stopDesktopVideo("Не удалось проверить размер H.264 CarLife")
+                return
+            }
+        }
     }
 
     /** Кадр энкодера -> CarLife. Первое сообщение источника = SPS+PPS+IDR (SPS/PPS склеиваем), P до IDR выбрасываем. */
     @Synchronized
     override fun onEncoderFrame(data: ByteArray, key: Boolean) {
+        if (desktopSurfaceEnabled && (!desktopSurfaceReady || !desktopSurfaceCsdVerified || desktopVideoError != null)) {
+            encDropped++
+            return
+        }
         if (!outputEnabled || !carlifeStarted) {
             encDropped++
             return
+        }
+        if (desktopSurfaceEnabled) {
+            lastAaFrameAt = clockMs()
+            aaFrames++
         }
         val types = AnnexB.nalTypes(data)
         val idr = 5 in types
@@ -2426,12 +2830,23 @@ class AaBridgeCore(
             idrSent++
             if (active != Source.AA) {
                 active = Source.AA
-                log("BRIDGE источник -> AA (перекодирование, первый IDR ${payload.size} Б, nal=${AnnexB.nalTypes(payload)})", true)
+                log("BRIDGE источник -> ${if (desktopSurfaceEnabled) "DeX Surface" else "AA"} (первый IDR ${payload.size} Б, nal=${AnnexB.nalTypes(payload)})", true)
                 link.hidePlaceholder()
             } else {
                 log("BRIDGE IDR энкодера -> CarLife ${payload.size} Б nal=${AnnexB.nalTypes(payload)}", true)
             }
-            AaState.status = "мост: AA -> CarLife (перекодирование)"
+            AaState.status = if (desktopSurfaceEnabled) "мост: DeX -> CarLife (${videoMode.outLabel}, одно кодирование)" else "мост: AA -> CarLife (перекодирование)"
+            if (desktopSurfaceEnabled && !desktopSurfaceFirstFrame) {
+                desktopSurfaceFirstFrame = true
+                val generation = desktopSurfaceGeneration
+                val listener = desktopSurfaceListener
+                desktopSurfaceWorker().execute {
+                    val valid = synchronized(this) {
+                        generation != 0L && generation == desktopSurfaceGeneration && !desktopSurfaceStopped
+                    }
+                    if (valid) listener?.onFirstFrame(generation)
+                }
+            }
             if (huVw20082138 || huMobisNx4c) link.onEncodedKeyFrame(payload.size)
             return
         }
@@ -2484,10 +2899,27 @@ class AaBridgeCore(
 
     @Synchronized
     override fun onTranscodeError(msg: String) {
+        if (desktopInputEnabled) {
+            stopDesktopVideo("Ошибка энкодера CarLife: $msg")
+            return
+        }
         log("BRIDGE !!!!!! ошибка транскодера: $msg. Откат на passthrough", true)
         stopTranscoderAsync()
         gotIdr = false
         waitSince = clockMs()
+    }
+
+    /** Called under the core monitor; block frames before the connector observes the failure. */
+    private fun stopDesktopVideo(message: String) {
+        if (desktopVideoError != null) return
+        desktopVideoError = message
+        outputEnabled = false
+        gotIdr = false
+        stopTranscoderAsync()
+        active = Source.PLACEHOLDER
+        placeholderText = "DeX: $message"
+        link.showPlaceholder(placeholderText)
+        log("DEX video stopped: $message; passthrough disabled", true)
     }
 
     /** ГУ просит ключевой кадр (VIDEO_ENCODER_RESET и т.п.). */
@@ -2525,10 +2957,11 @@ class AaBridgeCore(
         val channel = if (ls == null) "" else
             "; канал: ${if (t != null) "энкодер ${t.currentBitrate / 1000} кбит/с, " else ""}слив %.0f КиБ/с, бэклог ${ls.backlogMs} мс, очередь ${ls.queueFrames} кадр/${ls.queueBytes / 1024} КБ, запросов IDR из-за переполнения $idrReq за окно"
                 .format(ls.drainBytesPerSec / 1024)
-        log(
-            "BRIDGE видео[${if (t != null) "перекодирование" else "passthrough"}]: AA вход %.1f fps, выход в CarLife %.1f fps ($target), отброшено энкодер/гейт $encDropped/$dropped$idle".format(aaFps, fps) +
-                channel + (if (t != null) "; ${t.statsLine()}" else ""), true
-        )
+        val summary = if (desktopSurfaceEnabled)
+            "BRIDGE видео[Surface, одно кодирование]: выход в CarLife %.1f fps ($target), отброшено энкодер/гейт $encDropped/$dropped".format(fps)
+        else
+            "BRIDGE видео[${if (t != null) "перекодирование" else "passthrough"}]: AA вход %.1f fps, выход в CarLife %.1f fps ($target), отброшено энкодер/гейт $encDropped/$dropped$idle".format(aaFps, fps)
+        log(summary + channel + (if (t != null) "; ${t.statsLine()}" else ""), true)
         lastStatsAt = now
         lastStatsSent = sent
         lastStatsAaFrames = aaFrames
@@ -2536,6 +2969,12 @@ class AaBridgeCore(
     }
 
     companion object {
+        const val DUP_DOWN_MS = 30L
+
+        /** DOWN - дубль, если прошлый DOWN той же точки ещё не отпущен и пришёл не раньше [DUP_DOWN_MS] назад. */
+        fun isDuplicateDown(held: Pair<Int, Int>?, sinceDownMs: Long, x: Int, y: Int): Boolean =
+            held != null && held.first == x && held.second == y && sinceDownMs in 0..DUP_DOWN_MS
+
         /** CarlifeThemeState.themeModes (SkinDisplayModeManager в CarLife 8.6.7). */
         const val THEME_LIGHT = 0
         const val THEME_DARK = 1
@@ -2582,6 +3021,12 @@ class AaBridgeCore(
 
         /** Сколько отвечать MUSIC=1 на пачку MUSIC=1 после нашего play, пока MEDIA INIT ещё не пришёл. */
         const val HU_RESUME_ANSWER_MS = 3_000L
+
+        /** Desktop: после нашей паузы плеер ещё доигрывает хвост - «снова играет» не раньше этого. */
+        const val DESKTOP_RESUME_GUARD_MS = 2_000L
+
+        /** Desktop: «играет ли плеер» - binder-вызов, при закрытом MEDIA спрашиваем не чаще раза в секунду. */
+        const val DESKTOP_PLAY_CHECK_MS = 1_000L
 
         /**
          * Mazda CX-5: AA сам запускает музыку через 5-9 с после BT_HFP_CONNECTION. Пока ГУ на своём источнике, такой play

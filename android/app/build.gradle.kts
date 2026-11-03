@@ -2,6 +2,7 @@ import java.util.Properties
 
 plugins {
     id("com.android.application")
+    id("org.jetbrains.kotlin.plugin.compose")
 }
 
 // Release key lives outside the project: %USERPROFILE%\.android-keys\headswap-release.properties
@@ -18,14 +19,16 @@ android {
         applicationId = "com.yegorkapomidorka.headswap"
         minSdk = 29
         targetSdk = 37
-        versionCode = 65
-        versionName = "3.1.0"
+        versionCode = 67
+        versionName = "4.0.0-beta6"
         // «По воздуху» (беспровод): с 2.0.0 включён во всех сборках; выключить для проверки: gradlew assembleRelease -Pwlbeta=false
         buildConfigField("boolean", "WIRELESS_BETA", (project.findProperty("wlbeta") != "false").toString())
     }
 
     buildFeatures {
         buildConfig = true
+        aidl = true
+        compose = true
     }
 
     signingConfigs {
@@ -69,6 +72,11 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 
+    packaging {
+        // Bouncy Castle из Kadb кладёт одинаковые уведомления в несколько модулей; сохраняем их, а не падаем на дубликатах.
+        resources.merges += setOf("META-INF/LICENSE.md", "META-INF/NOTICE.md")
+    }
+
     testOptions {
         unitTests.isReturnDefaultValues = true
     }
@@ -103,6 +111,17 @@ androidComponents {
 }
 
 dependencies {
+    implementation("androidx.annotation:annotation:1.8.1")
+    // активация Headswap Desktop с самого телефона: пейринг и подключение к своему adbd по беспроводной отладке
+    implementation("com.flyfishxu:kadb:2.1.5")
+    // Kadb.pair - suspend; зовём из рабочего потока через runBlocking
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.11.0")
+    // лаунчер Headswap Desktop: без material3 и иконок, свой дизайн на foundation
+    implementation(platform("androidx.compose:compose-bom:2025.10.01"))
+    implementation("androidx.compose.ui:ui")
+    implementation("androidx.compose.foundation:foundation")
+    implementation("androidx.compose.runtime:runtime")
+    implementation("androidx.activity:activity-compose:1.11.0")
     testImplementation("junit:junit:4.13.2")
     // В unit-тестах android.jar — заглушки (isReturnDefaultValues), настоящий org.json нужен LogDiag
     testImplementation("org.json:json:20240303")

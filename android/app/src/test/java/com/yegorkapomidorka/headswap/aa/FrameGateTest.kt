@@ -82,4 +82,28 @@ class FrameGateTest {
         assertTrue(g.shouldEmit(170_000_000L))
         assertTrue(g.shouldEmit(171_000_000L))
     }
+    @Test fun desktop120HzIsActuallyLimitedTo30WithoutChangingLegacyAa30() {
+        assertEquals(300.0, passed(FrameGate(30, limitHighFps = true), 120, 10).toDouble(), 1.0)
+        assertEquals(300.0, passed(FrameGate(30, limitHighFps = true), 60, 10).toDouble(), 1.0)
+        assertEquals(150.0, passed(FrameGate(15, limitHighFps = true), 120, 10).toDouble(), 1.0)
+        assertEquals(1200, passed(FrameGate(30), 120, 10))
+        assertEquals(100, passed(FrameGate(30, limitHighFps = true), 10, 10))
+    }
+    @Test fun directFrameGateDoesNotBurstAfterIdleAndStillCapsAfterTargetChange() {
+        val gate = FrameGate(30, limitHighFps = true)
+        assertTrue(gate.shouldEmit(0))
+        assertFalse(gate.shouldEmit(1_000_000))
+        assertTrue(gate.shouldEmit(2_000_000_000))
+        assertFalse(gate.shouldEmit(2_001_000_000))
+        gate.targetFps = 15
+        assertFalse(gate.shouldEmit(2_001_000_001))
+        gate.reset()
+        assertTrue(gate.shouldEmit(2_001_000_002))
+    }
+
+    @Test fun desktopSixtyTargetIsNotSilentlyReducedToThirty() {
+        assertEquals(600.0, passed(FrameGate(60, limitHighFps = true), 120, 10).toDouble(), 1.0)
+        assertEquals(600, passed(FrameGate(60, limitHighFps = true), 60, 10))
+        assertEquals(100, passed(FrameGate(60, limitHighFps = true), 10, 10))
+    }
 }

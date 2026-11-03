@@ -22,6 +22,17 @@ object CarLifeState {
     /** Текущая сессия идёт по Wi-Fi (TCP), а не по кабелю; false - сессии нет или она по USB. */
     @Volatile var wirelessSession: Boolean = false
 
+    /** ГУ из HU_INFO: «производитель модель» и carlifeversion (раздел «Система» лаунчера); null - ещё не приходило. */
+    @Volatile var huName: String? = null
+    @Volatile var huCarlifeVersion: String? = null
+
+    /** STATISTIC_INFO: channel и versionName - запасное имя ГУ, когда HU_INFO пустой (Honda Vezel). */
+    @Volatile var huChannel: String? = null
+    @Volatile var huStatVersion: String? = null
+
+    /** Последний themeModes из CHANGE_MD_THEME (0 день, 1 ночь, 2 авто); null - ГУ не присылала. Тема «Авто» лаунчера. */
+    @Volatile var huTheme: Int? = null
+
     /** Беспровод (бета, ветка B): что сейчас происходит, для экрана; null - режим не включён. */
     @Volatile var wireless: String? = null
 

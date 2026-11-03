@@ -417,6 +417,65 @@ class AaTranscodeCoreTest {
     }
 
     @Test
+    fun desktopEncoderFailureNeverSendsHighBitrateSourceDirectly() {
+        core.desktopInputEnabled = true
+        core.onCarlifeStart()
+        core.onCodecConfig(aaCfg)
+        core.onFrame(aaIdr, 1)
+        core.onTranscodeError("encoder failed")
+        assertNotNull(core.desktopVideoError)
+        assertFalse(core.isTranscoding)
+        core.onFrame(aaP, 2)
+        core.onFrame(aaIdr, 3)
+        core.onEncoderFrame(encIdr, true)
+        core.onCarlifeStart()
+        core.onFrame(aaIdr, 4)
+        assertTrue(link.sent.isEmpty())
+        assertTrue(link.texts.last().contains("encoder failed"))
+        assertEquals(1, link.created)
+    }
+
+    @Test
+    fun desktopEncoderCreationFailureNeverFallsBackToPassthrough() {
+        core.desktopInputEnabled = true
+        link.transcoder = null
+        core.onCarlifeStart()
+        core.onCodecConfig(aaCfg)
+        core.onFrame(aaIdr, 1)
+        assertNotNull(core.desktopVideoError)
+        assertTrue(link.sent.isEmpty())
+        assertFalse(logs.any { it.contains("откат на passthrough") })
+    }
+
+    @Test
+    fun desktopRejectsUnexpectedEncodedOutputSize() {
+        core.desktopInputEnabled = true
+        core.onCarlifeStart()
+        core.onCodecConfig(aaCfg)
+        core.onFrame(aaIdr, 1)
+        val actual1080Sps = Golden.hex("00000001 6742c028d900780227e5c044000003000400000300f03c60c920")
+        core.onEncoderConfig(actual1080Sps)
+        core.onEncoderFrame(encIdr, true)
+        core.onFrame(aaIdr, 2)
+        assertTrue(core.desktopVideoError!!.contains("1920×1080"))
+        assertTrue(link.sent.isEmpty())
+    }
+
+    @Test
+    fun desktopNative720OutputStillReachesCarLife() {
+        core.desktopInputEnabled = true
+        core.onCarlifeStart()
+        core.onCodecConfig(aaCfg)
+        core.onFrame(aaIdr, 1)
+        val actual720Config = Golden.hex("00000001 6742801fda014016e9a8283028368509a8 00000001 68ce3c80")
+        core.onEncoderConfig(actual720Config)
+        core.onEncoderFrame(encIdr, true)
+        assertNull(core.desktopVideoError)
+        assertArrayEquals(actual720Config + encIdr, link.sent.single())
+        assertTrue(logs.any { it.contains("stage=carlife-encoder-sps") && it.contains("visible=1280x720") && it.contains("matches=true") })
+    }
+
+    @Test
     fun statsLogIsEmittedEveryFiveSecondsWithMode() {
         core.onCarlifeStart()
         core.onCodecConfig(aaCfg)

@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- BridgeService, режим Headswap Desktop -->
+    <string name="desk_notif_title" translatable="false">Headswap Desktop</string>
+    <string name="desk_not_activated">Headswap Desktop is not activated: open Settings > Mode and tap Activate</string>
+    <string name="desk_cert_na">not required (desktop)</string>
+    <string name="desk_connecting">Starting the desktop…</string>
+    <string name="desk_waiting_frame">Desktop: waiting for a frame…</string>
+    <string name="desk_disconnected">The desktop disconnected. Stop and connect again.</string>
+    <string name="desk_recovering">Restoring the desktop (%1$d/2)…</string>
+    <string name="desk_recovery_stopped">Restore stopped. Check USB, desktop access and unlock the phone</string>
+    <string name="desk_recovery_screen_busy">The previous screen is not released yet; automatic restore cancelled</string>
+
+    <!-- Activation from the phone itself (wireless debugging), Settings - Mode -->
+    <string name="pa_title">Activate Headswap</string>
+    <string name="pa_step_1">Open “Developer options” → “Wireless debugging” and turn it on.</string>
+    <string name="pa_step_2">Tap “Pair device with pairing code”.</string>
+    <string name="pa_step_3">Type the code into the Headswap notification.</string>
+    <string name="pa_step_paired">Tap “Activate”. The phone is already paired, no code needed.</string>
+    <string name="pa_hint">Repeat the activation after the phone reboots.</string>
+    <string name="pa_button">Activate</string>
+    <string name="pa_button_again">Activate again</string>
+    <string name="pa_cancel">Cancel</string>
+    <string name="pa_manual_toggle">Enter the port and code by hand</string>
+    <string name="pa_manual_hint">Port and code from the pairing dialog. Once paired, the debugging port is enough.</string>
+    <string name="pa_field_pair_port">Pairing port</string>
+    <string name="pa_field_code">Six-digit code</string>
+    <string name="pa_field_connect_port">Wireless debugging port</string>
+    <string name="pa_manual_go">Activate with these values</string>
+    <string name="pa_forget">Pair again</string>
+    <string name="pa_forget_done">Pairing forgotten. Next time Headswap asks for a new code.</string>
+    <string name="pa_need_notif">Allow Headswap notifications: the pairing code is typed into one. Or enter the port and code by hand.</string>
+    <string name="pa_need_wifi_debug">Turn on Wireless debugging in Developer options (any Wi-Fi network works, no internet needed), then tap Activate again.</string>
+    <string name="pa_field_bad_port">Port: 1 to 65535</string>
+    <string name="pa_field_bad_code">Six digits</string>
+
+    <string name="pa_s_searching">Looking for wireless debugging…</string>
+    <string name="pa_s_wait_code">Waiting for the pairing code: type it into the Headswap notification.</string>
+    <string name="pa_s_pairing">Pairing…</string>
+    <string name="pa_s_connecting">Connecting to wireless debugging…</string>
+    <string name="pa_s_starting">Turning the desktop on. Headswap may restart.</string>
+    <string name="pa_s_pending">Waiting for the restarted Headswap to confirm access…</string>
+    <string name="pa_s_failed">Not activated: %1$s</string>
+    <string name="pa_s_expired">Activation did not finish. Open Settings > Mode and tap Activate again.</string>
+    <string name="pa_s_expired_why">Activation did not finish: %1$s</string>
+
+    <string name="pa_notif_channel_progress">Activation from the phone</string>
+    <string name="pa_notif_channel_code">Pairing code</string>
+    <string name="pa_notif_title">Headswap Desktop activation</string>
+    <string name="pa_notif_cancel">Cancel</string>
+    <string name="pa_notif_code_title">Enter the pairing code</string>
+    <string name="pa_notif_code_text">In Wireless debugging tap “Pair device with pairing code”, then type the six digits here.</string>
+    <string name="pa_notif_code_error">%1$s Type the code again.</string>
+    <string name="pa_notif_code_label">Six-digit code</string>
+    <string name="pa_notif_reply">Enter code</string>
+    <string name="pa_notif_done">Headswap Desktop is activated</string>
+
+    <string name="pa_err_no_wifi">No Wi-Fi. Wireless debugging works only over Wi-Fi: connect to a network and try again.</string>
+    <string name="pa_err_port">The port must be a number from 1 to 65535.</string>
+    <string name="pa_err_code">The code is six digits from the system pairing dialog.</string>
+    <string name="pa_err_no_pair_port">The pairing dialog is not found. Keep “Pair device with pairing code” open while you type the code. On Android 17 allow local network access for Headswap, or enter the port by hand.</string>
+    <string name="pa_err_no_connect_port">Wireless debugging is off or not found. Turn on “Wireless debugging” in Developer options (Wi-Fi must be on), or enter the port by hand.</string>
+    <string name="pa_err_refused">The port is closed: wireless debugging is off or the port has changed. Check the Wireless debugging screen.</string>
+    <string name="pa_err_timeout">No answer in time. Check Wi-Fi and that wireless debugging is on.</string>
+    <string name="pa_err_permission">Android blocked the network connection. Allow Headswap access to the local network and try again.</string>
+    <string name="pa_err_pair_rejected">The code is wrong or the pairing dialog was closed. Open it again and use the new code.</string>
+    <string name="pa_err_not_paired">The phone does not know this device any more. Pair again with a new code.</string>
+    <string name="pa_err_tls">The secure connection was refused. Check wireless debugging and pair again if needed.</string>
+    <string name="pa_err_tls_provider">The system TLS component failed. Save the log and report it.</string>
+    <string name="pa_err_closed">The phone closed the connection. Check the port on the Wireless debugging screen.</string>
+    <string name="pa_err_identity">The saved ADB key cannot be read. Pair again.</string>
+    <string name="pa_err_shell">Wireless debugging did not give shell access. Check the list of paired devices.</string>
+    <string name="pa_err_package">The installed Headswap changed. Open the app again and retry.</string>
+    <string name="pa_err_unsupported">This firmware cannot start the activation from the phone.</string>
+    <string name="pa_err_dispatch">The launch was not confirmed. Open Settings > Mode and tap Activate again.</string>
+    <string name="pa_err_io">Communication with wireless debugging failed. Save the log and retry.</string>
+    <string name="pa_err_internal">Internal error while preparing the connection. Save the log and retry.</string>
+</resources>
