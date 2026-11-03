@@ -29,11 +29,13 @@
 
 
     <string name="dev_section_video">Video (applies on reconnect)</string>
+    <string name="dev_own_idr_title">Own keyframe in direct passthrough</string>
+    <string name="dev_own_idr_sub">Every 2 s the phone sends the head unit its own keyframe: the picture comes back after the reverse camera and the car menu. Turn off if the head unit recovers on its own (e.g. VW): less traffic and phone load</string>
     <string name="dev_custom_res_title">Custom resolution</string>
     <string name="dev_custom_res_sub">Instead of the mode from video settings</string>
     <string name="dev_custom_w">Width</string>
     <string name="dev_custom_h">Height</string>
-    <string name="dev_custom_hint">Width 640–2240, height 640–1080, even numbers</string>
+    <string name="dev_custom_hint">Width 640–2240, height 640–1080 (portrait: the other way round), even numbers</string>
     <string name="dev_custom_from_hu">As the head unit asks · %1$d×%2$d</string>
     <string name="dev_custom_k_plate">AA canvas</string>
     <string name="dev_custom_k_margins">Margins</string>
@@ -43,10 +45,9 @@
     <string name="dev_custom_v_scale_one">1:1</string>
     <string name="dev_custom_v_scale">×%1$.2f</string>
     <string name="dev_custom_v_bitrate">up to %1$.1f Mbit/s</string>
-    <string name="dev_custom_err_width">Width is outside 640–2240</string>
-    <string name="dev_custom_err_height">Height is outside 640–1080</string>
+    <string name="dev_custom_err_width">Width is outside the range</string>
+    <string name="dev_custom_err_height">Height is outside the range</string>
     <string name="dev_custom_err_odd">Values must be even</string>
-    <string name="dev_custom_err_portrait">Portrait screens are not supported</string>
     <string name="dev_custom_err_encoder">The phone cannot encode this size</string>
     <string name="dev_custom_err_fmt">%1$s. Not saved</string>
     <string name="dev_custom_warn_16">Not a multiple of 16: the encoder on some phones may refuse this size</string>

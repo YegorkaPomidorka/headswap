@@ -49,6 +49,7 @@ object Msg {
     const val SCREEN_ON = 0x00010018
     const val FOREGROUND = 0x0001001B
     const val LAUNCH_MODE_NORMAL = 0x0001801D
+    const val LAUNCH_MODE_PHONE = 0x0001801E
     const val GO_TO_DESKTOP = 0x00010021
     const val MIC_RECORD_WAKEUP_START = 0x00010022
     const val MIC_RECORD_END = 0x00010023
@@ -56,6 +57,8 @@ object Msg {
     const val MODULE_STATUS = 0x00010026
     const val STATISTIC_INFO = 0x00018027
     const val MODULE_CONTROL = 0x00018028
+    /** ГУ -> MD: передача, поле 1 (2 P, 3 D, 5 R, 0 зажигание выкл; Kia 20032131, h672). */
+    const val HU_GEAR_INFO = 0x00018029
     const val GEAR_INFO = 0x00010029
     const val NAVI_NEXT_TURN_INFO = 0x00010030
     const val MEDIA_INFO = 0x00010035
@@ -137,7 +140,7 @@ object Msg {
         FOREGROUND to "FOREGROUND",
         0x0001001C to "BACKGROUND",
         LAUNCH_MODE_NORMAL to "LAUNCH_MODE_NORMAL",
-        0x0001801E to "LAUNCH_MODE_PHONE",
+        LAUNCH_MODE_PHONE to "LAUNCH_MODE_PHONE",
         0x0001801F to "LAUNCH_MODE_MAP",
         0x00018020 to "LAUNCH_MODE_MUSIC",
         GO_TO_DESKTOP to "GO_TO_DESKTOP",
@@ -149,6 +152,7 @@ object Msg {
         STATISTIC_INFO to "STATISTIC_INFO",
         MODULE_CONTROL to "MODULE_CONTROL",
         GEAR_INFO to "GEAR_INFO",
+        HU_GEAR_INFO to "HU_GEAR_INFO",
         NAVI_NEXT_TURN_INFO to "NAVI_NEXT_TURN_INFO",
         0x00010031 to "CAR_DATA_SUBSCRIBE",
         0x00010032 to "CAR_DATA_SUBSCRIBE_DONE(C++)",

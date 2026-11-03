@@ -18,7 +18,7 @@ private val KOREAN = CarSettings(musicRate = MusicRate.HZ32)
  * Подтверждённые машины (README, «Совместимость») и проверенные сообществом настройки для каждой.
  * Выбор машины разом пишет [settings] в AaPrefs, дальше любую настройку можно поменять вручную.
  * Всем машинам одинаково: прямой проброс и кадры «Авто» (по умолчанию 1280×720, у машин с особым экраном - своё разрешение), музыка «Авто»; отдельные значения только проверенные живьём.
- * Исключение - Elantra 7: перекодирование и 15 кадров.
+ * Исключения - Elantra 7: перекодирование и 15 кадров; Tucson NX4c: перекодирование (вертикальный кадр с полями по обеим осям).
  * Особенности ГУ, которые мост определяет сам (Hyundai CN7 - музыка 32 кГц в «Авто», VW ID - потолок битрейта), здесь не дублируются.
  * Имя элемента хранится в prefs: не переименовывать.
  */
@@ -40,6 +40,8 @@ enum class CarPreset(val titleRes: Int, val settings: CarSettings = CarSettings(
     HYUNDAI_ELANTRA_7(R.string.car_hyundai_elantra_7, KOREAN.copy(transcode = true, videoMode = VideoMode.WIDE, fps = FpsSetting.FPS15)),
     /** HSAE, вертикальный экран: 1280×480 работает шустро (h86). */
     HYUNDAI_IX35_2021(R.string.car_hyundai_ix35_2021, KOREAN.copy(videoMode = VideoMode.WIDE)),
+    /** Вертикальный экран 960×1280, CarLife модифицирован на весь экран, внизу климат 130 px: 960×1152 с перекодированием - без растяжения (h670). */
+    HYUNDAI_TUCSON_NX4C(R.string.car_hyundai_tucson_nx4c, KOREAN.copy(transcode = true, videoMode = VideoMode.PORTRAIT_1152)),
     JETTA_VS(R.string.car_jetta_vs),
     KIA_K3_2023(R.string.car_kia_k3_2023, KOREAN),
     KIA_SPORTAGE_ACE(R.string.car_kia_sportage_ace, KOREAN),

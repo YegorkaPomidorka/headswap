@@ -321,147 +321,6 @@ class AaBridgeCoreTest {
         assertEquals(2, logs.count { it.contains("повторный ключевой кадр") })
     }
 
-    /** Passthrough, IDR ушёл в now=0, затем P-кадры; peer подключён. */
-    private fun h295Setup(hondaFlag: Boolean): FakePeer {
-        val peer = FakePeer()
-        core.peer = peer
-        if (hondaFlag) core.onHuStatistic(AaBridgeCore.HONDA_20772121_CHANNEL)
-        core.onCarlifeStart()
-        core.onCodecConfig(cfg)
-        core.onFrame(idr, 1)
-        core.onFrame(p1, 2)
-        return peer
-    }
-
-    @Test
-    fun h295TouchAfterIdleAndStaleIdrRequestsKeyframeCycleAndKeepsGateOpen() {
-        val peer = h295Setup(true)
-        val sentBefore = link.sent.size
-        now = 5000
-        core.onCarlifeTouch(0, 10, 10)
-        assertEquals("тач ушёл в AA", 1, peer.touches.size)
-        assertEquals("сразу полный цикл", 1, peer.keyframes)
-        assertTrue(logs.any { it == "BRIDGE h295: тач после 5000 мс без IDR, первый тач в сессии -> keyframe-цикл" })
-        core.onFrame(p1, 3)                                   // gate открыт: P-кадр проходит
-        assertEquals(sentBefore + 1, link.sent.size)
-        assertArrayEquals(p1, link.sent.last())
-        core.onTouch(0)                                       // второй DOWN ГУ (~2 мс): пауза в тачах ~0, триггера нет
-        assertEquals(1, peer.keyframes)
-        core.tick()                                           // отдельного h295-фолбэка нет; тик отдаёт лишь повторный кадр h529 (с IDR в 0 прошло > 2 с)
-        assertEquals(2, peer.keyframes)
-        core.tick()
-        assertEquals("повторный кадр одноразовый", 2, peer.keyframes)
-        now = 5400
-        core.onFrame(idr, 4)                                  // IDR в обычной ветке (gate открыт), без takeover
-        assertEquals(1, link.takeovers)
-        assertEquals(1, link.hides)
-        core.onFrame(p1, 5)
-        assertArrayEquals(p1, link.sent.last())
-    }
-
-    @Test
-    fun h295AwaitedBareIdrIsGluedWithAaConfig() {
-        h295Setup(true)
-        now = 5000
-        core.onTouch(0)
-        now = 7500
-        core.onFrame(idr, 4)
-        assertArrayEquals(cfg + idr, link.sent.last())
-        assertEquals(listOf(7, 8, 5), types(link.sent.last()))
-        assertTrue(logs.any { it.startsWith("BRIDGE h295: IDR через 2500 мс после тача, nal=[5] -> [7, 8, 5]") })
-        now = 7600
-        core.onFrame(idr, 5)                                  // ожидание закончено: следующий IDR как в main
-        assertArrayEquals(idr, link.sent.last())
-        core.onFrame(p1, 6)
-        assertArrayEquals(p1, link.sent.last())
-    }
-
-    @Test
-    fun h295AwaitedIdrWithInlineSpsPpsIsNotGluedAgain() {
-        h295Setup(true)
-        now = 5000
-        core.onTouch(0)
-        now = 6000
-        core.onFrame(cfg + idr, 4)
-        assertArrayEquals(cfg + idr, link.sent.last())
-        assertTrue(logs.any { it.startsWith("BRIDGE h295: IDR через 1000 мс после тача, nal=[7, 8, 5] -> [7, 8, 5]") })
-    }
-
-    @Test
-    fun h295IdrWithoutTriggerIsNotGlued() {
-        h295Setup(true)
-        now = 100
-        core.onFrame(idr, 4)
-        assertArrayEquals(idr, link.sent.last())
-        now = 2000                                            // IDR свежий: триггера нет и после паузы
-        core.onTouch(0)
-        core.onFrame(idr, 5)
-        assertArrayEquals(idr, link.sent.last())
-        assertTrue(logs.none { it.startsWith("BRIDGE h295: IDR через") })
-    }
-
-    @Test
-    fun h295PFramesAfterTriggerAreNotTouched() {
-        h295Setup(true)
-        now = 5000
-        core.onTouch(0)
-        core.onFrame(p1, 3)
-        assertArrayEquals(p1, link.sent.last())
-    }
-
-    @Test
-    fun h295IdrAfterGiveUpIsNotGlued() {
-        h295Setup(true)
-        now = 5000
-        core.onTouch(0)
-        now = 15_100
-        core.tick()                                           // 10.1 с без IDR: ожидание сброшено
-        core.onFrame(idr, 4)
-        assertArrayEquals(idr, link.sent.last())
-        assertTrue(logs.none { it.startsWith("BRIDGE h295: IDR через") })
-    }
-
-    @Test
-    fun h295NoTriggerIfPreviousTouchWasLessThanIdleAgo() {
-        val peer = h295Setup(true)
-        now = 1000
-        core.onTouch(0)                                       // IDR свежий, но тач запомнен
-        now = 3000
-        core.onTouch(2)                                       // MOVE тоже считается тачем
-        now = 6900                                            // IDR старый, прошлый тач 3.9 с назад (< 4 с)
-        core.onTouch(0)
-        assertEquals("пауза 3.9 с < 4 с", 0, peer.keyframes)
-        now = 10_900                                          // прошлый тач ровно 4 с назад
-        core.onTouch(0)
-        assertEquals(1, peer.keyframes)
-    }
-
-    @Test
-    fun h295FreshIdrDoesNotTriggerEvenAfterIdle() {
-        val peer = h295Setup(true)
-        now = 2000                                            // IDR 2 с назад (<= 2.5 с)
-        core.onTouch(0)
-        assertEquals(0, peer.keyframes)
-    }
-
-    @Test
-    fun h295RateLimitsRepeatedTriggers() {
-        val peer = h295Setup(true)
-        now = 5000
-        core.onTouch(0)
-        assertEquals(1, peer.keyframes)
-        now = 9100                                            // пауза 4.1 с, но с триггера 4.1 с > 3 с: можно снова
-        core.onTouch(0)
-        assertEquals(2, peer.keyframes)
-        now = 13_200
-        core.onFrame(idr, 4)
-        now = 20_000
-        core.tick()
-        assertEquals("tick добавляет только повторный кадр h529, h295-циклов не добавляет", 3, peer.keyframes)
-        core.tick()
-        assertEquals(3, peer.keyframes)
-    }
-
     @Test
     fun repeatedKeyframe2sAfterFirstIdrWithoutCrop() {
         val peer = FakePeer()
@@ -482,32 +341,6 @@ class AaBridgeCoreTest {
         assertEquals("одноразовый", 1, peer.keyframes)
         assertEquals(1, logs.count { it.contains("повторный ключевой кадр") })
     }
-
-    @Test
-    fun h295DoesNothingWithoutHondaFlag() {
-        val peer = h295Setup(false)
-        now = 60_000
-        core.onTouch(0)
-        assertEquals(0, peer.keyframes)
-        core.onFrame(p1, 3)
-        assertArrayEquals(p1, link.sent.last())               // gate открыт
-    }
-
-    @Test
-    fun h295MoveUpAreNotTriggersAndAttachResetsFlag() {
-        val peer = h295Setup(true)
-        now = 60_000
-        core.onTouch(2)                                       // MOVE - не триггер
-        core.onTouch(1)                                       // UP - не триггер
-        assertEquals(0, peer.keyframes)
-        assertTrue(core.huHonda20772121)
-        core.attach(link)                                     // новая сессия сбрасывает флаг ГУ
-        assertFalse(core.huHonda20772121)
-        core.onHuStatistic(AaBridgeCore.HONDA_20832125_CHANNEL) // Vezel: тот же обход после заднего хода
-        assertTrue(core.huHonda20772121)
-    }
-
-    private fun AaBridgeCore.onTouch(action: Int) = onCarlifeTouch(action, 10, 10)
 
     @Test
     fun keyframeRequestWaitsForDelayWhenAaVideoAppearsAfterStart() {
@@ -751,6 +584,36 @@ class AaBridgeCoreTest {
         core.peer = null
         core.onCarlifeHardKey(0x01) // Disconnected desktop must not crash or queue a stale key.
         assertEquals(listOf(3, 3, 4), peer.keys.toList())
+    }
+
+    @Test
+    fun launchPhoneOnlyOnKia20032131() {
+        val peer = FakePeer()
+        core.peer = peer
+        core.onCarlifeLaunchPhone()                           // чужое ГУ: только лог
+        assertTrue(peer.keys.isEmpty())
+        core.onHuStatistic("20032131")                        // h672 Kia Seltos
+        core.onCarlifeLaunchPhone()
+        now += 200
+        core.onCarlifeLaunchPhone()                           // вторая из пары: глотаем
+        now += 5000
+        core.onCarlifeLaunchPhone()                           // следующее нажатие
+        assertEquals(listOf(5, 5), peer.keys.toList())
+        core.attach(link)
+        assertTrue("новая сессия - флаг заново", !core.huKia20032131)
+    }
+
+    @Test
+    fun keyFrameAfterReverseOnlyOnKia20032131() {
+        assertTrue("чужое ГУ", !core.onHuGear(5) && !core.onHuGear(3))
+        core.onHuStatistic("20032131")
+        assertTrue("P -> R", !core.onHuGear(2) && !core.onHuGear(5))
+        assertTrue("R -> R", !core.onHuGear(5))
+        assertTrue("R -> D", core.onHuGear(3))
+        assertTrue("D -> P", !core.onHuGear(2))
+        core.onHuGear(5)
+        core.attach(link)
+        assertTrue("новая сессия - передача заново", !core.onHuGear(3))
     }
 
     @Test

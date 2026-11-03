@@ -24,6 +24,8 @@ class VideoModeTest {
             VideoMode.WIDE_2_1 to Row("1280x720", 0, 80, 160, 1280, 640, 4_000_000),
             VideoMode.WIDE_976 to Row("1920x1080", 0, 244, 160, 2240, 976, 8_000_000),
             VideoMode.WIDE_836 to Row("1920x1080", 0, 244, 160, 1920, 836, 6_000_000),
+            VideoMode.PORTRAIT_960 to Row("1080x1920", 120, 640, 160, 960, 1280, 6_000_000),
+            VideoMode.PORTRAIT_1152 to Row("1080x1920", 120, 768, 160, 960, 1152, 6_000_000),
         )
         assertEquals(expected.keys, VideoMode.values().toSet())
         for ((m, r) in expected) {
@@ -142,7 +144,29 @@ class VideoModeTest {
         assertTrue(c640.needsTranscode)
         assertEquals("1920×640", c640.outLabel)
         assertEquals(VideoMode.WIDE_640, VideoMode.parse("WIDE_640"))
-        assertEquals(listOf(VideoMode.WIDE, VideoMode.WIDE_MID, VideoMode.WIDE_HD, VideoMode.WIDE_640, VideoMode.WIDE_2_1, VideoMode.WIDE_976, VideoMode.WIDE_836), VideoMode.values().takeLast(7))
+        assertEquals(listOf(VideoMode.WIDE, VideoMode.WIDE_MID, VideoMode.WIDE_HD, VideoMode.WIDE_640, VideoMode.WIDE_2_1, VideoMode.WIDE_976, VideoMode.WIDE_836), VideoMode.values().toList().subList(4, 11))
+    }
+
+    @Test
+    fun portrait() {
+        // те же поля, что считает своё разрешение: пресет и CustomVideoMode дают одну геометрию
+        for (m in listOf(VideoMode.PORTRAIT_960, VideoMode.PORTRAIT_1152)) {
+            val c = CustomVideoMode(m.outW, m.outH)
+            assertEquals(m.name, c.aaResolution, m.aaResolution)
+            assertEquals(m.name, c.marginW to c.marginH, m.marginW to m.marginH)
+            assertTrue(m.name, m.needsTranscode)
+        }
+        val p = VideoMode.PORTRAIT_960
+        assertEquals(60f / 1080f, p.crop.u0, 1e-6f)
+        assertEquals(320f / 1920f, p.crop.v0, 1e-6f)
+        assertEquals(959 to 1279, p.mapTouch(2000, 2000))
+        assertEquals(480 to 640, p.mapTouch(480, 640))
+        assertEquals("960×1280", p.outLabel)
+        // SDR: res=7 (1080x1920), margin_w 120 (78), margin_h 640 (80 05)
+        val sdr = hex(M.serviceDiscoveryResponse(p.sdOptions(false)).payload)
+        assertTrue(sdr, sdr.contains("0807100218782080052" + "8a001"))
+        assertEquals(VideoMode.PORTRAIT_1152, VideoMode.parse("PORTRAIT_1152"))
+        assertEquals("960×1152", VideoMode.PORTRAIT_1152.outLabel)
     }
 
     @Test

@@ -146,6 +146,9 @@ class DevScreen(host: MainActivity) : Screen(host) {
         refreshTouchDecimation()
 
         body.addView(c.sectionTitle(c.getString(R.string.dev_section_video)))
+        body.addView(
+            group(listOf(row(c.getString(R.string.dev_own_idr_title), c.getString(R.string.dev_own_idr_sub), aa.ownIdr) { aa.ownIdr = it })),
+        )
         body.addView(customResCard())
 
         body.addView(c.sectionTitle(c.getString(R.string.dev_section_actions)))
@@ -400,7 +403,6 @@ class DevScreen(host: MainActivity) : Screen(host) {
             CustomResError.WIDTH_RANGE -> R.string.dev_custom_err_width
             CustomResError.HEIGHT_RANGE -> R.string.dev_custom_err_height
             CustomResError.ODD -> R.string.dev_custom_err_odd
-            CustomResError.PORTRAIT -> R.string.dev_custom_err_portrait
             null -> if (encoderSupports(w, h)) 0 else R.string.dev_custom_err_encoder
         }
         if (problem != 0) {

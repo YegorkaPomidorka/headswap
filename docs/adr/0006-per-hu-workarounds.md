@@ -12,7 +12,7 @@
 ## Решение
 
 Каждый обход — отдельный флаг в `AaBridge`: `huDesayG6S`, `huVw20082120`, `huVwBt1420`, `huVwCns2Delphi`,
-`huHyundaiCn7`, `huHonda20772121`, `huMazda20622111`, `huMobisNx4c` (`AaBridge.kt:192-214`). ГУ опознаётся по
+`huHyundaiCn7`, `huMazda20622111`, `huMobisNx4c` (`AaBridge.kt:192-214`). ГУ опознаётся по
 `HU_INFO` (manufacturer/model/product) или `STATISTIC_INFO.channel` (`:642-710`). Флаги сбрасываются при каждой
 новой сессии, пока ГУ не представится заново (`:412-424`). Обход действует только на своём ГУ, в тестовых сборках тоже.
 
