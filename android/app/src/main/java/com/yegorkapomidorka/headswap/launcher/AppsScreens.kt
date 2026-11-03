@@ -144,7 +144,6 @@ fun PickerScreen() {
     PagedApps(
         items, page, onPage = { page = it },
         leading = {
-            PillButton(stringResource(R.string.l_back), { LauncherModel.back() }, icon = Ico.CHEV_L, filled = false)
             Txt(stringResource(R.string.l_choose_app), f1, color = Pal.SEC2)
         },
     ) { ref, iconPx ->
