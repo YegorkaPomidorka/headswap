@@ -14,8 +14,8 @@ class DesktopPickTest {
         val catalog = listOf(entry("ie.claudius.cardash", "ie.claudius.cardash.HomeActivity", "CarDash"),
             entry("com.maps", "com.maps.Main"), entry("only.home", "only.home.Main"))
         val homes = setOf("ie.claudius.cardash/ie.claudius.cardash.HomeActivity", "no.launcher/no.launcher.Home", "only.home/only.home.Home")
-        // карты без HOME и пакет без LAUNCHER в каталоге отсеяны
-        assertEquals(listOf("ie.claudius.cardash/ie.claudius.cardash.HomeActivity", "only.home/only.home.Main"),
+        // карты без HOME, пакет без LAUNCHER и HOME-заглушка с отдельным LAUNCHER-входом (как «Настройки») отсеяны
+        assertEquals(listOf("ie.claudius.cardash/ie.claudius.cardash.HomeActivity"),
             DesktopPick.options(catalog, homes).map { it.key })
     }
 
@@ -23,8 +23,8 @@ class DesktopPickTest {
         val pkg = "ru.drivedeck.launcher"
         val catalog = listOf(entry(pkg, "$pkg.AliasA"), entry(pkg, "$pkg.MainActivity"), entry(pkg, "$pkg.AliasB"))
         assertEquals("$pkg/$pkg.MainActivity", DesktopPick.options(catalog, setOf("$pkg/$pkg.MainActivity")).single().key)
-        // HOME-вход не в списке LAUNCHER: первый LAUNCHER
-        assertEquals("$pkg/$pkg.AliasA", DesktopPick.options(catalog, setOf("$pkg/$pkg.Hidden")).single().key)
+        // HOME-вход не в списке LAUNCHER: не лаунчер
+        assertEquals(emptyList<String>(), DesktopPick.options(catalog, setOf("$pkg/$pkg.Hidden")).map { it.key })
     }
 
     @Test fun componentNeedsPackageAndClass() {

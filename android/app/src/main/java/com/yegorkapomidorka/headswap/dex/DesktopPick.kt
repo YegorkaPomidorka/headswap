@@ -9,14 +9,11 @@ import com.yegorkapomidorka.headswap.launcher.AppRef
 /** Сторонний лаунчер вместо нашего на весь экран ГУ: что предложить в настройках телефона и как разобрать сохранённый выбор. */
 internal object DesktopPick {
     /**
-     * Лаунчеры для выбора: пакеты с входом под HOME ([homeKeys] - «пакет/класс») и exported входом под LAUNCHER (каталог,
-     * наш пакет там уже отфильтрован). Компонент запуска - LAUNCHER-вход, который есть и под HOME, иначе первый LAUNCHER.
+     * Лаунчеры для выбора: exported вход под LAUNCHER (каталог, наш пакет там уже отфильтрован), который сам же стоит под
+     * HOME ([homeKeys] - «пакет/класс»). HOME-заглушки с отдельным LAUNCHER-входом (FallbackHome «Настроек») - не лаунчеры.
      */
-    fun options(catalog: List<DesktopAppCatalog.Entry>, homeKeys: Set<String>): List<DesktopAppCatalog.Entry> {
-        val homePackages = homeKeys.mapTo(HashSet()) { it.substringBefore('/') }
-        return catalog.filter { it.packageName in homePackages }.groupBy { it.packageName }.values
-            .map { list -> list.firstOrNull { it.key in homeKeys } ?: list.first() }
-    }
+    fun options(catalog: List<DesktopAppCatalog.Entry>, homeKeys: Set<String>): List<DesktopAppCatalog.Entry> =
+        catalog.filter { it.key in homeKeys }.distinctBy { it.packageName }
 
     /** Строка вида «пакет/класс» с обеими частями. */
     fun isComponent(value: String?): Boolean = value != null && value.indexOf('/').let { it > 0 && it < value.length - 1 }

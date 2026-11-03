@@ -27,6 +27,9 @@ class PhoneActivationBlock(private val host: MainActivity) {
     private val c = host
     private val state = PhoneActivationState(c)
     val view: LinearLayout = c.vbox(8)
+    /** «Активируйте Headswap», после активации - зелёное «Активировано». */
+    private val title: TextView
+    /** Ход попытки и ошибки; пусто, когда всё сказал заголовок. */
     private val status: TextView
     private val steps: LinearLayout
     private var stepsPaired: Boolean? = null
@@ -43,12 +46,10 @@ class PhoneActivationBlock(private val host: MainActivity) {
     private var collected: String? = null
 
     init {
-        // та же раскладка, что у шагов онбординга (StepParts): статус, заголовок, макет экрана, нумерованный список, пояснение, кнопки
-        status = c.text("", 16f, 600).also { view.addView(it, lp(WRAP, WRAP).margins(c, 8, 12, 8, 0)) }
-        view.addView(
-            c.text(c.getString(R.string.pa_title), 24f, 600).apply { letterSpacing = -0.01f; lineHeight = c.dp(30) },
-            lp(MATCH, WRAP).margins(c, 8, 8, 8, 8),
-        )
+        // та же раскладка, что у шагов онбординга (StepParts): заголовок, ход попытки, макет экрана, нумерованный список, пояснение, кнопки
+        title = c.text(c.getString(R.string.pa_title), 24f, 600).apply { letterSpacing = -0.01f; lineHeight = c.dp(30) }
+        view.addView(title, lp(MATCH, WRAP).margins(c, 8, 12, 8, 0))
+        status = c.text("", 16f, 600).also { view.addView(it, lp(WRAP, WRAP).margins(c, 8, 0, 8, 8)) }
         view.addView(c.stepMockCard(Mocks.developerOptions(c), compact = true), lp(MATCH, WRAP))
         steps = c.vbox().also { view.addView(it, lp(MATCH, WRAP).margins(c, 0, 10, 0, 0)) }
         view.addView(c.stepHint(c.getString(R.string.pa_hint)), lp(MATCH, WRAP))
@@ -93,8 +94,14 @@ class PhoneActivationBlock(private val host: MainActivity) {
                 c.getString(R.string.pa_s_failed, live.detail ?: c.getString(live.reason?.messageRes ?: AdbReason.INTERNAL.messageRes)) to R.color.warn
             else -> attempt(access, state)
         }
+        // заголовок и статус в одном: «Активировано» встаёт на место призыва, отдельная строка - только ход попытки и ошибки
+        val ready = !busy && access == DelegatedDesktopAccess.Status.READY
+        title.text = c.getString(if (ready) R.string.bm_act_on else R.string.pa_title)
+        title.setTextColor(c.clr(if (ready) R.color.ok else R.color.on))
+        val plain = ready || (!busy && text == c.getString(R.string.bm_act_off))
         status.text = text
         status.setTextColor(c.clr(color))
+        status.visibility = if (plain) View.GONE else View.VISIBLE
         if (stepsPaired != paired) {
             // сопряжённому телефону код не нужен: шаги 2 и 3 заменяет одна строка
             stepsPaired = paired
