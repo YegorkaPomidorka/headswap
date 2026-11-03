@@ -696,6 +696,19 @@ class AaBridgeCoreTest {
     }
 
     @Test
+    fun keyFrameAfterReverseOnlyOnKia20032131() {
+        assertTrue("чужое ГУ", !core.onHuGear(5) && !core.onHuGear(3))
+        core.onHuStatistic("20032131")
+        assertTrue("P -> R", !core.onHuGear(2) && !core.onHuGear(5))
+        assertTrue("R -> R", !core.onHuGear(5))
+        assertTrue("R -> D", core.onHuGear(3))
+        assertTrue("D -> P", !core.onHuGear(2))
+        core.onHuGear(5)
+        core.attach(link)
+        assertTrue("новая сессия - передача заново", !core.onHuGear(3))
+    }
+
+    @Test
     fun seekKeysAnswerCall() {
         val peer = FakePeer()
         core.peer = peer

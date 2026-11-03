@@ -57,6 +57,8 @@ object Msg {
     const val MODULE_STATUS = 0x00010026
     const val STATISTIC_INFO = 0x00018027
     const val MODULE_CONTROL = 0x00018028
+    /** ГУ -> MD: передача, поле 1 (2 P, 3 D, 5 R, 0 зажигание выкл; Kia 20032131, h672). */
+    const val HU_GEAR_INFO = 0x00018029
     const val GEAR_INFO = 0x00010029
     const val NAVI_NEXT_TURN_INFO = 0x00010030
     const val MEDIA_INFO = 0x00010035
@@ -150,6 +152,7 @@ object Msg {
         STATISTIC_INFO to "STATISTIC_INFO",
         MODULE_CONTROL to "MODULE_CONTROL",
         GEAR_INFO to "GEAR_INFO",
+        HU_GEAR_INFO to "HU_GEAR_INFO",
         NAVI_NEXT_TURN_INFO to "NAVI_NEXT_TURN_INFO",
         0x00010031 to "CAR_DATA_SUBSCRIBE",
         0x00010032 to "CAR_DATA_SUBSCRIBE_DONE(C++)",
