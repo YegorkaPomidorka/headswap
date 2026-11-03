@@ -33,8 +33,8 @@ interface IDexUserService {
     void injectChildTouchPoints(IBinder childToken, int action, int actionIndex, in int[] pointerIds, in float[] xs, in float[] ys) = 17;
     /** Empty process-lifetime Binder only; exposes no producer operations. */
     IBinder childProducerLifetime(IBinder childToken) = 18;
-    /** Сторонний лаунчер "пакет/класс" на родительском экране вместо нашего; null - наш. Действует со следующего showDesktop / HOME. */
-    void setDesktopComponent(String component) = 19;
+    /** Packages of the tasks on this child's own display, most recent first; null when Android does not tell. */
+    String[] childTaskPackages(IBinder childToken) = 20;
     // Terminal shutdown. The delegated backend releases its producers and keeps its process.
     void destroy() = 16777114;
 }

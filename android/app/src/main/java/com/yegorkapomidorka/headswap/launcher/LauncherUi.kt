@@ -217,6 +217,10 @@ object Ico {
     /** Разделы настроек: «Главный экран» (раскладка) и «Система» (экран ГУ). */
     val LAYOUT = listOf(roundRectPath(3f, 4f, 18f, 16f, 2f), "M8 4v16", "M8 14h13")
     val SCREEN = listOf(roundRectPath(2f, 5f, 20f, 13f, 2f), "M8 21h8")
+    /** Панель навигации чужого лаунчера, как три кнопки Android: контурные треугольник, круг и квадрат со скруглением. */
+    val NAV_BACK = listOf("M17 4 6 12l11 8z")
+    val NAV_HOME = listOf(circle(12, 12, 8))
+    val NAV_RECENTS = listOf(roundRectPath(5f, 5f, 14f, 14f, 3f))
     /** «Последний» во втором слоте плеера. */
     val REPEAT = listOf("M20 11a8 8 0 0 0-14.5-4.5L4 8", "M4 3v5h5", "M4 13a8 8 0 0 0 14.5 4.5L20 16", "M20 21v-5h-5")
 }

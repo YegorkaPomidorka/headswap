@@ -46,6 +46,17 @@ class LauncherSpecTest {
         }
     }
 
+    @Test fun foreignBarFollowsRailButton() {
+        assertEquals(90, LauncherSpecs.forSize(1920, 720).barH)
+        assertEquals(88, LauncherSpecs.forSize(1280, 480).barH)
+        assertEquals(62, LauncherSpecs.forSize(800, 480).barH)
+        for (row in LauncherSpecs.TABLE) {
+            val s = LauncherSpecs.forSize(row[0], row[1])
+            // панель не выше пятой части экрана и не ниже цели касания рейки, иконка влезает
+            assertTrue("${row[0]}x${row[1]}", s.barH in 60..110 && s.barH == s.rb && s.barIc < s.barH && s.barH * 10 <= s.h * 2)
+        }
+    }
+
     @Test fun musicChipAndTransportFollowMockup() {
         val s = LauncherSpecs.forSize(1920, 720)
         assertEquals(65, s.pcB)

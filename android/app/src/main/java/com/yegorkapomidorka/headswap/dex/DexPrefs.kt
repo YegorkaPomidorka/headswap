@@ -27,7 +27,7 @@ class DexPrefs(context: Context) {
             if (it == 0) 0 else it.coerceIn(DesktopGeometryPolicy.MIN_DENSITY, DesktopGeometryPolicy.MAX_DENSITY)
         }
         set(value) { if (value != 0) DesktopGeometryPolicy.requireDensity(value); prefs.edit().putInt("desktop_density", value).apply() }
-    /** Сторонний лаунчер «пакет/класс» на весь экран ГУ вместо нашего LauncherActivity; null - Headswap. */
+    /** Сторонний лаунчер «пакет/класс» в дочернем окне над нашей панелью навигации (LauncherActivity всегда на ГУ); null - Headswap. */
     var desktopComponent: String?
         get() = prefs.getString("desktop_component", null)?.takeIf(DesktopPick::isComponent)
         set(value) { prefs.edit().putString("desktop_component", value?.takeIf(DesktopPick::isComponent)).apply() }

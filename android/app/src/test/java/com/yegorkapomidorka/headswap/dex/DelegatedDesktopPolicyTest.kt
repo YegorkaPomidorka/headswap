@@ -100,6 +100,26 @@ class DelegatedDesktopPolicyTest {
         assertEquals(2, DelegatedDesktopPolicy.taskState(42, 0, "com.example.map", true, listOf(task(u, u, base = "x.y"), task(42))))
     }
 
+    @Test fun childPackagesAreThisDisplaysTasksFreshestFirstWithoutRepeats() {
+        val tasks = listOf(task(42, base = "com.example.map"), task(0, base = "com.example.phone"), task(42, user = 10, base = "x.other"),
+            task(42, base = "com.example.music"), task(42, base = "com.example.map"), task(42, base = null, top = "com.example.top"))
+        assertEquals(listOf("com.example.map", "com.example.music", "com.example.top"),
+            DelegatedDesktopPolicy.childPackages(42, 0, true, tasks))
+        assertEquals(emptyList<String>(), DelegatedDesktopPolicy.childPackages(42, 0, true, emptyList()))
+    }
+
+    @Test fun childPackagesNeverGuessWhenPermissionListOrIdentityIsMissing() {
+        assertNull(DelegatedDesktopPolicy.childPackages(42, 0, false, listOf(task(42))))
+        assertNull(DelegatedDesktopPolicy.childPackages(42, 0, true, null))
+        // нечитаемый экран задачи: пакет мог быть с телефона, списка нет вовсе
+        assertNull(DelegatedDesktopPolicy.childPackages(42, 0, true, listOf(task(42), task(DelegatedDesktopPolicy.UNKNOWN, base = "x.y"))))
+    }
+
+    @Test(expected = IllegalArgumentException::class)
+    fun childPackagesRejectThePhoneDisplay() {
+        DelegatedDesktopPolicy.childPackages(0, 0, true, emptyList())
+    }
+
     @Test(expected = IllegalArgumentException::class)
     fun taskObserverRejectsPhoneEvenWhenQueryPermissionMissing() {
         DelegatedDesktopPolicy.taskState(0, 0, "com.example.map", false, null)

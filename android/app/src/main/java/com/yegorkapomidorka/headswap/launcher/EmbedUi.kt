@@ -89,7 +89,7 @@ fun EmbedLayers() {
 private val OFFSCREEN = IntOffset(-100_000, -100_000)
 
 @Composable
-private fun EmbedLayer(
+internal fun EmbedLayer(
     slot: EmbedSlot, target: Rect?, shown: Boolean, interactive: Boolean, rounded: Boolean, background: Color,
     starting: String, onCardTap: (() -> Unit)?, tag: String? = null, cardViewButton: Boolean = false,
 ) {

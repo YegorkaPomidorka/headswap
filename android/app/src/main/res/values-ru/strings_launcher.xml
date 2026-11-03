@@ -25,7 +25,7 @@
     <string name="l_view_clock">Часы</string>
 
     <string name="l_music_idle">Ничего не играет</string>
-    <string name="l_music_no_access">Нет доступа к плеерам. Активируйте Headswap Desktop с ПК заново.</string>
+    <string name="l_music_no_access">Нет доступа к плеерам. Откройте Настройки > Режим и нажмите «Активировать» ещё раз.</string>
     <string name="l_music_players">Плееры</string>
     <string name="l_music_choose">Выберите плеер</string>
     <string name="l_music_no_players">Плееры не найдены</string>
@@ -77,10 +77,12 @@
     <string name="l_set_apps_empty">Список пуст</string>
 
     <!-- Настройки (интерфейс на телефоне): Режим / Рабочий стол -->
-    <string name="l_perm_button">Разрешения для карточки «Телефон»</string>
+    <string name="l_perm_button">Разрешить доступ к телефону и звонкам</string>
     <string name="l_perm_summary">Звонки, контакты и ответ на вызов с экрана ГУ</string>
     <string name="l_perm_granted">Все разрешения выданы</string>
     <string name="l_home">Домой</string>
+    <string name="l_recents">Недавние</string>
+    <string name="l_recents_empty">Пока ничего не открывали</string>
     <string name="l_player_mine">Мой плеер</string>
     <string name="l_player_vk">VK Музыка</string>
     <string name="l_phone_no_access">Нет доступа</string>

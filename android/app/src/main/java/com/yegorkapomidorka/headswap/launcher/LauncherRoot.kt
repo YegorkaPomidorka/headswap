@@ -76,6 +76,9 @@ fun LauncherRoot(connected: Boolean) {
                     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         Txt(stringResource(R.string.l_connecting), spec.f1, color = Pal.SEC)
                     }
+                } else if (model.foreign != null) {
+                    // чужой лаунчер: только его окно и наша панель навигации, без рейки и оверлеев звонка
+                    ForeignRoot()
                 } else {
                     // рейка всегда слева; «Карта слева» переставляет только ряды главного (HomeScreen)
                     Row(Modifier.fillMaxSize()) {

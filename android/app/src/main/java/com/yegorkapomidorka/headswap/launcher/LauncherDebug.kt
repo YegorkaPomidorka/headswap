@@ -18,11 +18,12 @@ internal object LauncherDebug {
             intent.getStringExtra("theme")?.let { t -> ThemeChoice.entries.firstOrNull { it.name.equals(t, true) }?.let(model::chooseTheme) }
             intent.getStringExtra("map")?.let { model.chooseMapLeft(it == "left") }
             intent.getStringExtra("page")?.let { p -> SettingsPage.entries.firstOrNull { it.name.equals(p, true) }?.let { model.settingsPage = it } }
-            // лаунчер на ГУ «пакет/класс» (DexPrefs); "own" - наш. Идущему сеансу уходит сразу, как из настроек
+            // лаунчер на ГУ «пакет/класс» (DexPrefs); "own" - наш. Применяется тем же путём, что из настроек:
+            // showDesktop -> LauncherActivity.onNewIntent перечитывает выбор
             intent.getStringExtra("desktop")?.let { d ->
                 if (d == "own" || DesktopPick.isComponent(d)) {
                     DexPrefs(ctx).desktopComponent = d.takeUnless { it == "own" }
-                    BridgeService.requestDesktopApply(ctx)
+                    BridgeService.requestDesktopHome(ctx)
                 }
             }
             when (intent.getStringExtra("area")) {

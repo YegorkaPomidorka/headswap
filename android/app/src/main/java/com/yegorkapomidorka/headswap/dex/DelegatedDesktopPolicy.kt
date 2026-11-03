@@ -59,6 +59,18 @@ internal object DelegatedDesktopPolicy {
             else -> 0
         }
     }
+
+    /**
+     * Пакеты задач экрана [id] для «Недавних», свежие первыми, без повторов. null, если права или список недоступны либо
+     * хоть у одной задачи не опознан экран или пользователь: иначе в список попали бы пакеты экрана телефона.
+     */
+    fun childPackages(id: Int, userId: Int, permitted: Boolean, tasks: List<Task>?): List<String>? {
+        require(id > 0) { "Проверка основного экрана запрещена" }
+        if (!permitted || tasks == null) return null
+        if (tasks.any { it.displayId == UNKNOWN || it.userId == UNKNOWN }) return null
+        return tasks.filter { it.displayId == id && it.userId == userId }
+            .mapNotNull { it.basePackage ?: it.topPackage }.distinct()
+    }
 }
 
 /** Every successful caller receives producer-release ACK, including concurrent/repeated destroy. */

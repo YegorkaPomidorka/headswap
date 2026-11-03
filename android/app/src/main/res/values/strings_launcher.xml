@@ -25,7 +25,7 @@
     <string name="l_view_clock">Clock</string>
 
     <string name="l_music_idle">Nothing is playing</string>
-    <string name="l_music_no_access">No access to players. Activate Headswap Desktop from the PC again.</string>
+    <string name="l_music_no_access">No access to players. Open Settings > Mode and tap Activate again.</string>
     <string name="l_music_players">Players</string>
     <string name="l_music_choose">Choose a player</string>
     <string name="l_music_no_players">No players found</string>
@@ -77,10 +77,12 @@
     <string name="l_set_apps_empty">The list is empty</string>
 
     <!-- Settings (phone UI): Mode / Desktop -->
-    <string name="l_perm_button">Permissions for the Phone card</string>
+    <string name="l_perm_button">Allow phone and call access</string>
     <string name="l_perm_summary">Calls, contacts and answering from the car display</string>
     <string name="l_perm_granted">All permissions granted</string>
     <string name="l_home">Home</string>
+    <string name="l_recents">Recents</string>
+    <string name="l_recents_empty">No apps opened yet</string>
     <string name="l_player_mine">My player</string>
     <string name="l_player_vk">VK Music</string>
     <string name="l_phone_no_access">No access</string>

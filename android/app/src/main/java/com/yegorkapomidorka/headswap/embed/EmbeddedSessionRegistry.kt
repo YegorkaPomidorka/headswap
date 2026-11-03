@@ -129,6 +129,11 @@ internal object EmbeddedSessionRegistry {
         if (lease.packageName != packageName) return 0 // Only the app explicitly launched into this lease is tracked.
         return activeCall(lease) { it.childTaskState(lease.token, packageName) }
     }
+    /** Пакеты задач этого окна (свежие первыми) для «Недавних»; null - Android не отдал список. */
+    fun taskPackages(uid: Int, handle: Int): List<String>? {
+        val lease = active(uid, handle)
+        return activeCall(lease) { it.childTaskPackages(lease.token)?.toList() }
+    }
     fun release(uid: Int, handle: Int) {
         val lease = synchronized(lock) { leases[handle] } ?: return // Already stopped with ACK.
         if (lease.uid != uid) throw SecurityException("Чужое встроенное окно")

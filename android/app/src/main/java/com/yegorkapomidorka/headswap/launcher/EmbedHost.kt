@@ -132,6 +132,20 @@ internal object EmbedHost {
         worker.post { slot.recheck = true; reconcile(slot) }
     }
 
+    /** Пакеты задач дочернего дисплея слота (свежие первыми) для «Недавних»; [onResult] на главном потоке, null - не удалось узнать. */
+    fun taskPackages(slot: EmbedSlot, onResult: (List<String>?) -> Unit) {
+        worker.post {
+            val result = if (slot.handle <= 0) null else try {
+                timed(slot, "taskPackages") { EmbeddedSessionRegistry.taskPackages(uid, slot.handle) }
+            } catch (e: Exception) {
+                AppLog.i("EMBED ${slot.name}: taskPackages не удался: ${e.javaClass.simpleName}: ${e.message}", false)
+                if (leaseGone(e)) lostLease(slot)
+                null
+            }
+            main.post { onResult(result) }
+        }
+    }
+
     fun retry(slot: EmbedSlot) {
         worker.post { slot.attempts = 0; slot.createdAt = SystemClock.uptimeMillis(); reconcile(slot) }
     }

@@ -75,6 +75,21 @@ internal object LauncherModel {
     var areaRect by mutableStateOf<Rect?>(null)
     var navCardRect by mutableStateOf<Rect?>(null)
 
+    /** Чужой лаунчер из DexPrefs.desktopComponent в окне над панелью навигации; null - наш рабочий стол. Ведёт [ForeignActions]. */
+    var foreign by mutableStateOf<AppRef?>(null)
+    /** Оверлей «Недавние» на экране. */
+    var recentsOpen by mutableStateOf(false)
+    /** Приложения оверлея; null - список ещё запрашивается. */
+    var recents by mutableStateOf<List<AppRef>?>(null)
+    /** Пакеты, виденные на экране ГУ в этом сеансе, свежие первыми ([ForeignDesktop.mergeHistory]). */
+    var recentsHistory: List<String> = emptyList()
+    /** Последний выбор из DexPrefs, который уже разобрали (пустая строка - ещё не разбирали, null - наш стол). */
+    var foreignSeen: String? = ""
+    /** Метка отката [ForeignDesktop.brokenKey]: этот лаунчер на этом экране ГУ не стартовал. В prefs не пишется. */
+    var foreignBroken: String? = null
+    /** Экран ГУ, для которого собрана история. */
+    var foreignDisplay = -1
+
     /** Ключ «пакет/класс» приложения в окне приложения; null - ещё ни разу не открывали. */
     var appKey by mutableStateOf<String?>(null)
     /** Страница настроек, с которой открыть экран (выбор навигатора по тапу на пустую карточку). */

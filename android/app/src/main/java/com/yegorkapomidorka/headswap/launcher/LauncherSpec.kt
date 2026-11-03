@@ -50,6 +50,9 @@ class LauncherSpec(
     private val railFree = h - navH - g - (g + g8) - f1
     val rb = max(1, min(t, floor((railFree - railButtons * g4) / railButtons.toDouble()).toInt()))
     val ric = min(ic, r(rb * 0.5))
+    /** Панель «Назад / Домой / Недавние» под окном чужого лаунчера: высота как у круглой кнопки рейки (60-110 px по таблице). */
+    val barH = rb
+    val barIc = r(barH * 0.42)
     val logoIn = r(rb * 0.64)
     val backIc = min(r(ric * 1.35), r(rb * 0.66))
     // Стеклянный чип плееров на обложке (и кнопка «Вид карточки» на карте в ленте)

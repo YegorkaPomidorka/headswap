@@ -12,11 +12,12 @@ internal interface DesktopRuntimeAccess {
     fun createChildDisplay(surface: Surface, width: Int, height: Int, density: Int): VirtualDisplay
     fun inject(event: InputEvent, id: Int, actionButton: Int = 0)
     fun childTaskState(id: Int, packageName: String): Int
+    /** Пакеты задач дочернего экрана, свежие первыми; null - Android не отдал или экран не опознан. */
+    fun childTaskPackages(id: Int): List<String>?
     fun registerParentDisplay(id: Int, token: IBinder, width: Int, height: Int) {}
     fun registerChildDisplay(parentId: Int, id: Int, token: IBinder, width: Int, height: Int) {}
     fun resizeRegisteredDisplay(id: Int, token: IBinder, width: Int, height: Int) {}
     fun unregisterDisplay(id: Int, token: IBinder) {}
-    /** [component] - «пакет/класс» стороннего лаунчера вместо нашего; null - наш. */
-    fun launchDesktop(mode: Int, id: Int, component: String?)
+    fun launchDesktop(mode: Int, id: Int)
     fun launchChild(parentId: Int, id: Int, packageName: String, className: String)
 }

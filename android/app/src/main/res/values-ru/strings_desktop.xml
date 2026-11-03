@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <!-- BridgeService, режим Headswap Desktop -->
-    <string name="desk_not_activated">Headswap Desktop не активирован: выполните команду с ПК</string>
+    <string name="desk_not_activated">Headswap Desktop не активирован: откройте Настройки > Режим и нажмите «Активировать»</string>
     <string name="desk_cert_na">не требуется (рабочий стол)</string>
     <string name="desk_connecting">Подключаю рабочий стол…</string>
     <string name="desk_waiting_frame">Рабочий стол: жду кадр…</string>
@@ -39,7 +39,7 @@
     <string name="pa_s_starting">Включаю рабочий стол. Headswap может перезапуститься.</string>
     <string name="pa_s_pending">Жду, пока перезапущенный Headswap подтвердит доступ…</string>
     <string name="pa_s_failed">Не активировано: %1$s</string>
-    <string name="pa_s_expired">Активация не завершилась. Повторите или воспользуйтесь командой с ПК.</string>
+    <string name="pa_s_expired">Активация не завершилась. Откройте Настройки > Режим и нажмите «Активировать» ещё раз.</string>
     <string name="pa_s_expired_why">Активация не завершилась: %1$s</string>
 
     <string name="pa_notif_channel_progress">Активация с телефона</string>
@@ -69,8 +69,8 @@
     <string name="pa_err_identity">Не удалось прочитать сохранённый ключ ADB. Сопрягите заново.</string>
     <string name="pa_err_shell">Отладка по Wi-Fi не дала доступ к shell. Проверьте список сопряжённых устройств.</string>
     <string name="pa_err_package">Установленный Headswap изменился. Откройте приложение заново и повторите.</string>
-    <string name="pa_err_unsupported">Эта прошивка не умеет запускать активацию с телефона. Используйте команду с ПК.</string>
-    <string name="pa_err_dispatch">Запуск не подтверждён. Повторите или воспользуйтесь командой с ПК.</string>
+    <string name="pa_err_unsupported">Эта прошивка не умеет запускать активацию с телефона.</string>
+    <string name="pa_err_dispatch">Запуск не подтверждён. Откройте Настройки > Режим и нажмите «Активировать» ещё раз.</string>
     <string name="pa_err_io">Сбой обмена с отладкой по Wi-Fi. Сохраните журнал и повторите.</string>
     <string name="pa_err_internal">Внутренняя ошибка подготовки подключения. Сохраните журнал и повторите.</string>
 </resources>

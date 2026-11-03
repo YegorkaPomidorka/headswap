@@ -745,31 +745,37 @@ class SettingsSectionScreen(host: MainActivity, val section: SettingsSection) : 
         phoneActivation?.refresh()
     }
 
-    /** Блок раздела «Режим» для своего лаунчера: выбор лаунчера, активация с телефона, разрешения карточки «Телефон». */
+    /** Блок раздела «Режим» для своего лаунчера: выбор лаунчера, под ним разрешения карточки «Телефон» (только у Headswap), активация. */
     private fun buildActivation(box: LinearLayout) {
         val c = ctx
-        buildDesktopLauncher(box)
-        phoneActivation = PhoneActivationBlock(host).also { box.addView(it.view, lp(MATCH, WRAP)) }
-        // карточка «Телефон» лаунчера: журнал вызовов, контакты, звонок и ответ с экрана ГУ
-        box.addView(c.tonalButton(c.getString(R.string.l_perm_button)).apply {
+        // карточка «Телефон» есть только у нашего лаунчера: журнал вызовов, контакты, звонок и ответ с экрана ГУ
+        val permBox = c.vbox().apply { visibility = View.GONE }
+        buildDesktopLauncher(box) { ownLauncher -> permBox.visibility = if (ownLauncher) View.VISIBLE else View.GONE }
+        permBox.addView(c.tonalButton(c.getString(R.string.l_perm_button)).apply {
             setOnClickListener { requestPhoneCardPermissions() }
         }, c.lpDp(MATCH, 52).margins(c, 0, 12, 0, 0))
-        phoneCardNote = note(c.getString(R.string.l_perm_summary))
+        phoneCardNote = c.text(c.getString(R.string.l_perm_summary), 13f, 400, c.clr(R.color.on2))
+            .also { permBox.addView(it, lp(WRAP, WRAP).margins(c, 8, 2, 8, 0)) }
+        box.addView(permBox, lp(MATCH, WRAP))
+        phoneActivation = PhoneActivationBlock(host).also { box.addView(it.view, lp(MATCH, WRAP)) }
         refreshPhoneCardPermissions()
     }
 
     /**
-     * Лаунчер на ГУ: наш Headswap или любой установленный HOME-лаунчер (CarDash, DriveDeck) на весь экран, без рейки и рамки.
-     * Выбор пишется в DexPrefs и сразу применяется к идущему сеансу; список читаем не на главном потоке.
+     * Лаунчер на ГУ: наш Headswap или любой установленный HOME-лаунчер (CarDash, DriveDeck) в окне над нашей панелью
+     * «Назад / Домой / Недавние». Выбор пишется в DexPrefs и применяется к идущему сеансу через showDesktop: наш
+     * LauncherActivity по onNewIntent перечитывает выбор. Список читаем не на главном потоке.
      */
-    private fun buildDesktopLauncher(box: LinearLayout) {
+    private fun buildDesktopLauncher(box: LinearLayout, onSelected: (ownLauncher: Boolean) -> Unit) {
         val c = ctx
         val dex = DexPrefs(c)
         var options = emptyList<DesktopAppCatalog.Entry>()
+        var loaded = false      // пока список лаунчеров не прочитан, выбранный чужой не считаем пропавшим
         val rows = LinkedHashMap<String?, RadioRow>()      // ключ - «пакет/класс», null - Headswap
         fun mark() {
             val current = DesktopPick.selected(dex.desktopComponent, options)?.key      // лаунчер пропал: показываем Headswap, он и запустится
             for ((key, row) in rows) row.setSelected(key == current)
+            onSelected(current == null && (loaded || dex.desktopComponent == null))
         }
         val list = c.vbox(8)
         fun add(key: String?, title: String) {
@@ -778,7 +784,7 @@ class SettingsSectionScreen(host: MainActivity, val section: SettingsSection) : 
                 dex.desktopComponent = key
                 AppLog.i("настройка: лаунчер на ГУ -> ${key ?: "Headswap"}")
                 mark()
-                if (BridgeService.alive) BridgeService.requestDesktopApply(c)
+                if (BridgeService.alive) BridgeService.requestDesktopHome(c)
             }
             rows[key] = row
             list.addView(row.view, lp(MATCH, WRAP))
@@ -791,6 +797,7 @@ class SettingsSectionScreen(host: MainActivity, val section: SettingsSection) : 
             val found = DesktopPick.installed(c)
             Handler(Looper.getMainLooper()).post {
                 options = found
+                loaded = true
                 for (e in found) add(e.key, e.label)
                 mark()
             }

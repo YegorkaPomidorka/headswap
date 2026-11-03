@@ -15,7 +15,7 @@ object LauncherActions {
     fun logo() { if (model.area == Area.Home) model.go(Area.AllApps) else home() }
 
     /** Домой, единственная точка возврата на главный экран. */
-    fun home() { model.home() }
+    fun home() { if (model.foreign != null) ForeignActions.home() else model.home() }
     fun openPicker() { model.go(Area.Picker) }
     /** Шестерёнка на рейке: настройки; повторное нажатие - назад. */
     fun openSettings() {
@@ -146,11 +146,15 @@ object LauncherActions {
     }
 
     /** Слот сообщил, что задачи приложения больше нет (процесс убит, Back из корня, окно потеряно): слой убираем. */
-    internal fun embedGone(slot: EmbedSlot) = backClosed(slot)
+    internal fun embedGone(slot: EmbedSlot) {
+        if (model.foreign != null) { if (slot === EmbedHost.app) ForeignActions.gone(); return }
+        backClosed(slot)
+    }
 
-    /** Аппаратный Back ГУ - то же, что «Назад» на рейке. */
+    /** Аппаратный Back ГУ - то же, что «Назад» на рейке (в режиме чужого лаунчера - ◀ панели). */
     fun hardwareBack() {
         AppLog.i("LAUNCHER аппаратный Back: экран=${model.area}", false)
+        if (model.foreign != null) { ForeignActions.press(ForeignDesktop.NavKey.BACK); return }
         embeddedBack()
     }
 }

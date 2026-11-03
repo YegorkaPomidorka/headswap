@@ -116,13 +116,27 @@ internal class DelegatedInputGateway(context: Context) : IDelegatedInputGateway.
         } finally { (event as? MotionEvent)?.recycle() }
     }
 
-    @Suppress("DEPRECATION")
     @Synchronized override fun childTaskState(displayId: Int, token: IBinder, packageName: String): Int {
         requireActive()
         check(registry.requireDisplay(displayId, token).parent != null) { "Ожидался экран виджета" }
         requireTrustedDisplay(displayId)
         EmbeddedDisplayPolicy.requirePackage(packageName)
         val permitted = DelegatedDesktopAccess.hasPermissions(context)
+        return DelegatedDesktopPolicy.taskState(displayId, context.applicationInfo.uid / 100000, packageName, permitted, readTasks(permitted))
+    }
+
+    /** Пакеты задач дочернего экрана для «Недавних»: только этот экран и этот пользователь, null - не удалось узнать. */
+    @Synchronized override fun childTaskPackages(displayId: Int, token: IBinder): Array<String>? {
+        requireActive()
+        check(registry.requireDisplay(displayId, token).parent != null) { "Ожидался экран виджета" }
+        requireTrustedDisplay(displayId)
+        val permitted = DelegatedDesktopAccess.hasPermissions(context)
+        return DelegatedDesktopPolicy.childPackages(displayId, context.applicationInfo.uid / 100000, permitted, readTasks(permitted))
+            ?.toTypedArray()
+    }
+
+    @Suppress("DEPRECATION")
+    private fun readTasks(permitted: Boolean): List<DelegatedDesktopPolicy.Task>? {
         var tasks: List<DelegatedDesktopPolicy.Task>? = null
         if (!permitted) diag("прав", "нет прав рабочего стола в процессе ${Process.myPid()}")
         else try {
@@ -141,7 +155,7 @@ internal class DelegatedInputGateway(context: Context) : IDelegatedInputGateway.
         } catch (e: Exception) {
             diag("исключение", "getRunningTasks: ${e.javaClass.simpleName}: ${e.message}")
         }
-        return DelegatedDesktopPolicy.taskState(displayId, context.applicationInfo.uid / 100000, packageName, permitted, tasks)
+        return tasks
     }
 
     /** Причина, по которой состояние задач определяется плохо: в лог один раз на каждую смену причины. */

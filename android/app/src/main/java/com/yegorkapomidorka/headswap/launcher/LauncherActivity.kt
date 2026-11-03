@@ -74,6 +74,7 @@ class LauncherActivity : ComponentActivity() {
             addAction(Intent.ACTION_USER_PRESENT)
         }, ContextCompat.RECEIVER_NOT_EXPORTED)
         LauncherModel.init(this)
+        ForeignActions.reload(this, currentDisplayId(), goHome = false) // сразу в чужой лаунчер, если он выбран
         // дочерние окна живут с плотностью дисплея ГУ
         val dpi = resources.displayMetrics.densityDpi.coerceIn(96, 1280)
         LauncherModel.densityDpi = dpi
@@ -86,9 +87,22 @@ class LauncherActivity : ComponentActivity() {
         setContent { LauncherRoot(connected) }
     }
 
+    /**
+     * Сюда приходят HOME ГУ и смена лаунчера в настройках телефона (оба через showDesktop): выбор из DexPrefs перечитывается
+     * и в режиме чужого лаунчера выполняется «Домой».
+     */
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        if (currentDisplayId() <= 0) return
+        AppLog.i("LAUNCHER onNewIntent: HOME или смена лаунчера", false)
+        ForeignActions.reload(this, currentDisplayId(), goHome = true)
+    }
+
     override fun onResume() {
         super.onResume()
         if (currentDisplayId() <= 0) { finish(); return }
+        ForeignActions.reload(this, currentDisplayId(), goHome = false) // «Домой» только по onNewIntent, иначе каждый возврат на экран сбрасывал бы лаунчер
         visible = true
         connected = ownsDisplay()
         AppLog.i("LAUNCHER активность на экране, дисплей=${currentDisplayId()}", false)

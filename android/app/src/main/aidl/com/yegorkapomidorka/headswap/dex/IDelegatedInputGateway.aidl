@@ -11,4 +11,5 @@ interface IDelegatedInputGateway {
     void unregisterDisplay(int displayId, IBinder token);
     void injectInput(int displayId, IBinder token, in InputEvent event, int actionButton);
     int childTaskState(int displayId, IBinder token, String packageName);
+    String[] childTaskPackages(int displayId, IBinder token);
 }
