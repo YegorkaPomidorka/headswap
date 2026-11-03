@@ -224,13 +224,26 @@ class LauncherLogicTest {
         assertFalse(TaskCheck.vanished(-1, seenTop = true))
     }
 
-    @Test fun playerChipAlwaysHasPhoneAndOnlyInstalledServices() {
-        val none = PlayerChip.slots(emptySet(), null)
+    @Test fun playerChipHasPhoneAndLastOnlinePlayer() {
+        val none = PlayerChip.slots(emptySet(), null, null)
         assertEquals(listOf(PlayerChip.Slot(PlayerChip.Kind.PHONE, null, true)), none)
-        val both = PlayerChip.slots(setOf(PlayerChip.YANDEX, PlayerChip.YT_MUSIC, "x"), PlayerChip.YT_MUSIC)
-        assertEquals(listOf(PlayerChip.Kind.PHONE, PlayerChip.Kind.YANDEX, PlayerChip.Kind.YT_MUSIC), both.map { it.kind })
-        assertEquals(listOf(false, false, true), both.map { it.selected })
+        // ничего не слушали: первый установленный онлайн-плеер
+        val all = setOf(PlayerChip.YANDEX, PlayerChip.YT_MUSIC, PlayerChip.VK, "x")
+        assertEquals(listOf(PlayerChip.Kind.PHONE, PlayerChip.Kind.YANDEX), PlayerChip.slots(all, null, null).map { it.kind })
+        // второй слот подменяется тем, что слушали последним
+        val vk = PlayerChip.slots(all, PlayerChip.VK, PlayerChip.VK)
+        assertEquals(listOf(PlayerChip.Kind.PHONE, PlayerChip.Kind.VK), vk.map { it.kind })
+        assertEquals(listOf(false, true), vk.map { it.selected })
+        // последний удалён - снова первый установленный
+        assertEquals(PlayerChip.YT_MUSIC, PlayerChip.slots(setOf(PlayerChip.YT_MUSIC), null, PlayerChip.VK)[1].pkg)
         // выбран другой плеер (не из чипа): подсвечена ни одна кнопка
-        assertEquals(listOf(false, false), PlayerChip.slots(setOf(PlayerChip.YANDEX), "com.spotify").map { it.selected })
+        assertEquals(listOf(false, false), PlayerChip.slots(setOf(PlayerChip.YANDEX), "com.spotify", null).map { it.selected })
+    }
+
+    @Test fun lastOnlineChangesOnlyOnOnlinePlayers() {
+        assertEquals(PlayerChip.VK, PlayerChip.lastOnline(PlayerChip.YANDEX, PlayerChip.VK))
+        assertEquals(PlayerChip.YANDEX, PlayerChip.lastOnline(PlayerChip.YANDEX, "com.spotify"))
+        assertEquals(PlayerChip.YANDEX, PlayerChip.lastOnline(PlayerChip.YANDEX, null))
+        assertEquals(null, PlayerChip.lastOnline(null, null))
     }
 }

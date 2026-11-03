@@ -25,36 +25,45 @@ class LauncherSpec(
     val b4 = max(3, r(4 * k))
     val b6 = max(4, r(8 * k))
     val rail = r(t * 1.5)
-    val navH = r(t * 1.15)
     val icBig = r(t * 0.6)
     val radius = r(t * 0.2)
     val ic = r(t * 0.44)
     val statusH = r(f2 * 1.3)
-    /** Высокий широкий экран (1920x1080, 1600x900): карточка музыки выше, узкая выглядела бы столбиком. */
-    val music = if (wide && h.toDouble() / w >= 0.5) r(t * 4.4) else r(t * (if (strip) 3.4 else if (wide) 3.6 else 3.0))
-    /** 540 px на 1920x720 = 6T; на узких без второй кнопки на T+G уже. */
-    val phone = if (wide) r(t * 6.0) else r(t * 5.0 - g)
+    /** Нижний ряд одной полосой: кнопка навигации, приложения и телефон высотой T плюс воздух по G сверху и снизу. */
+    val bottomH = t + 2 * g
+    /** Блок навигации внизу рейки: в нижнем ряду той же высоты, что ряд; в ленте нижнего ряда нет. */
+    val navH = if (strip) r(t * 1.15) else bottomH
+    /** Сетка 1:2 зеркально: узкая колонка - музыка сверху и телефон снизу, широкая - карта и приложения. */
+    val narrow = r((w - rail - g - m - g) / 3.0)
+    val music = if (strip) r(t * 3.4) else narrow
+    /** В ленте карточки нет, ширина нужна только оверлею входящего: 6T на широких, 5T - G на остальных. */
+    val phone = if (!strip) narrow else if (wide) r(t * 6.0) else r(t * 5.0 - g)
     val cover = r(t * 1.6)
     val tag = max(14, r(f2 * 0.6))
     val appIc = r(t * 0.9)
     val appSvg = r(t * 0.5)
     val appLbl = r(f2 * 0.85)
-    /** Нижний ряд (приложения | телефон): ровно под кнопку T с подписью или заголовком, остальное отдаём верхнему ряду. */
-    val bottomH = r(t * 1.75)
 
-    // Рейка: четыре кнопки по T, но не больше, чем влезает по высоте между часами и блоком навигации.
-    private val railFree = h - navH - g - (g + g8) - (f1 + g8 + f2)
-    val rb = max(1, min(t, floor((railFree - 4 * g4) / 4.0).toInt()))
+    // Рейка: кнопки по T, но не больше, чем влезает по высоте между часами и блоком навигации.
+    // Назад, Домой, Настройки, Вид карточки; в ленте «Вид карточки» на карте.
+    private val railButtons = if (strip) 3 else 4
+    private val railFree = h - navH - g - (g + g8) - f1
+    val rb = max(1, min(t, floor((railFree - railButtons * g4) / railButtons.toDouble()).toInt()))
     val ric = min(ic, r(rb * 0.5))
     val logoIn = r(rb * 0.64)
     val backIc = min(r(ric * 1.35), r(rb * 0.66))
-    // Чип плееров и «Нравится» на обложке
-    val pcH = r(t * 0.6)
-    val pcB = pcH - 2 * b4
-    val pcIc = r(pcB * 0.56)
+    // Стеклянный чип плееров на обложке (и кнопка «Вид карточки» на карте в ленте)
+    val pcB = r(t * 0.72)
+    val pcIc = r(pcB * 0.5)
+    val pcVk = r(pcIc * 0.8)
+    // Транспорт: пауза T, соседние меньше, чтобы между ними был зазор
+    val tp = r(t * 0.78)
+    val tpIc = r(ic * 0.85)
     val titleB = t + g8 + g4
-    /** Сколько приложений в быстром ряду (без плюса). */
-    val quickApps = if (w < 1000) 4 else 5
+    /** Сколько приложений в быстром ряду (без плюса): в ленте сетка 2x3. */
+    val quickApps = if (strip) 5 else 4
+    /** Узкая карточка «Телефон»: имя цветом состояния, ниже время и счётчик, одна кнопка. */
+    val phoneCompact = phone - 2 * g - (if (wide) 2 * t + 2 * g else t + g) < 15 * f2 * 0.55
 
     private fun r(v: Double) = v.roundToInt()
 
@@ -72,7 +81,7 @@ object LauncherSpecs {
         intArrayOf(1920, 1080, 100, 23, 32, 38, 31, 47),
         intArrayOf(1920, 640, 86, 20, 28, 32, 27, 40),
         intArrayOf(1728, 648, 86, 20, 28, 32, 27, 40),
-        intArrayOf(1280, 720, 88, 20, 28, 33, 27, 41),
+        intArrayOf(1280, 720, 96, 20, 28, 36, 30, 44),
         intArrayOf(1280, 640, 85, 20, 28, 32, 27, 40),
         intArrayOf(1280, 480, 92, 21, 31, 35, 29, 43),
         intArrayOf(1024, 600, 74, 17, 22, 27, 22, 34),

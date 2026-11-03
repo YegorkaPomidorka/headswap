@@ -55,6 +55,7 @@ internal object LauncherModel {
     var apps by mutableStateOf<List<AppRef>>(emptyList())
     var savedNavigator by mutableStateOf<String?>(null)
     var musicPlayer by mutableStateOf<String?>(null)
+    var lastOnlinePlayer by mutableStateOf<String?>(null)
     var catalog by mutableStateOf<List<DesktopAppCatalog.Entry>>(emptyList())
     var catalogLoaded by mutableStateOf(false)
     var status by mutableStateOf(StatusInfo())
@@ -88,6 +89,7 @@ internal object LauncherModel {
         apps = prefs.apps
         savedNavigator = prefs.navigator
         musicPlayer = prefs.musicPlayer
+        lastOnlinePlayer = prefs.lastOnlinePlayer
         missedSeenMs = prefs.missedSeenMs
         EmbedHost.onGone = { LauncherActions.embedGone(it) }
         ready = true
@@ -142,7 +144,12 @@ internal object LauncherModel {
     fun chooseHand(right: Boolean) { rightHand = right; prefs.rightHand = right }
     fun nextCardView() { cardView = cardView.next().also { prefs.cardView = it } }
     fun setNavigator(pkg: String?) { savedNavigator = pkg; prefs.navigator = pkg }
-    fun chooseMusicPlayer(pkg: String?) { musicPlayer = pkg; prefs.musicPlayer = pkg }
+    fun chooseMusicPlayer(pkg: String?) { musicPlayer = pkg; prefs.musicPlayer = pkg; noteOnlinePlayer(pkg) }
+    /** Выбрали или услышали [pkg]: если это онлайн-плеер, он становится вторым слотом чипа. */
+    fun noteOnlinePlayer(pkg: String?) {
+        val next = PlayerChip.lastOnline(lastOnlinePlayer, pkg)
+        if (next != lastOnlinePlayer) { lastOnlinePlayer = next; prefs.lastOnlinePlayer = next }
+    }
     /** Пропущенные не новее этого момента просмотрены: счётчик сбрасывается после тапа по карточке. */
     var missedSeenMs by mutableLongStateOf(0L)
         private set

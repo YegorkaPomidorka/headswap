@@ -17,61 +17,65 @@ class LauncherSpecTest {
     @Test fun derivedValuesFollowMockup() {
         val s = LauncherSpecs.forSize(1920, 720)
         assertEquals(135, s.rail)
-        assertEquals(103, s.navH) // 90 * 1.15 = 103.49999..., как Math.round в макете
+        assertEquals(132, s.bottomH) // T + 2G
+        assertEquals(132, s.navH) // блок навигации - одна полоса с нижним рядом
         assertEquals(18, s.radius)
         assertEquals(40, s.ic)
         assertEquals(54, s.icBig)
         assertEquals(81, s.appIc)
-        assertEquals(324, s.music)
-        assertEquals(540, s.phone)
+        assertEquals(571, s.music) // (1920 - 135 - 21 - 29 - 21) / 3
+        assertEquals(571, s.phone)
         assertEquals(36, s.statusH)
+        assertEquals(96, LauncherSpecs.forSize(1280, 720).t)
     }
 
-    @Test fun railFollowsV2Mockup() {
+    @Test fun railFollowsMockup() {
         val s = LauncherSpecs.forSize(1920, 720)
         assertEquals(90, s.rb) // все кнопки рейки по T, пока влезают
         assertEquals(40, s.ric)
         assertEquals(58, s.logoIn)
         assertEquals(54, s.backIc) // белый шеврон 54 px на 1920x720
-        // 1280x480: рейка сжата по высоте, кнопки меньше T
+        // 1280x480: три кнопки, рейка сжата по высоте
         val strip = LauncherSpecs.forSize(1280, 480)
-        assertTrue(strip.rb < strip.t)
-        assertEquals(54, strip.rb)
-        assertEquals(27, strip.ric)
+        assertEquals(106, strip.navH)
+        assertEquals(88, strip.rb)
+        assertEquals(40, strip.ric)
         for (row in LauncherSpecs.TABLE) {
             val r = LauncherSpecs.forSize(row[0], row[1])
             assertTrue("${row[0]}x${row[1]}", r.rb in 1..r.t && r.ric <= r.ic && r.backIc <= r.rb)
         }
     }
 
-    @Test fun musicChipAndTitleFollowV2Mockup() {
+    @Test fun musicChipAndTransportFollowMockup() {
         val s = LauncherSpecs.forSize(1920, 720)
-        assertEquals(54, s.pcH)
-        assertEquals(48, s.pcB)
-        assertEquals(27, s.pcIc)
+        assertEquals(65, s.pcB)
+        assertEquals(33, s.pcIc)
+        assertEquals(26, s.pcVk)
+        assertEquals(70, s.tp)
+        assertEquals(34, s.tpIc)
         assertEquals(109, s.titleB)
         assertEquals(17, s.tag)
     }
 
-    @Test fun tallWideScreensGetTallMusicCard() {
-        // 1920x1080 и реальный экран ГУ 1600x900 (масштаб строки 1920x1080)
-        val full = LauncherSpecs.forSize(1920, 1080)
-        assertEquals(440, full.music)
-        val vezel = LauncherSpecs.forSize(1600, 900)
+    @Test fun gridIsOneToTwo() {
+        val vezel = LauncherSpecs.forSize(1600, 900) // масштаб строки 1920x1080
         assertEquals(83, vezel.t)
-        assertEquals(365, vezel.music)
-        assertEquals(498, vezel.phone)
+        assertEquals(125, vezel.rail)
+        assertEquals(470, vezel.music)
+        assertEquals(470, vezel.phone)
         assertEquals(83, vezel.rb)
-        // 1920x720 и 2240x976 остаются 3.6T
-        assertEquals(324, LauncherSpecs.forSize(1920, 720).music)
-        assertEquals(396, LauncherSpecs.forSize(2240, 976).music)
+        assertEquals(220, LauncherSpecs.forSize(800, 480).music)
+        assertEquals(356, LauncherSpecs.forSize(1280, 720).phone)
     }
 
-    @Test fun phoneCardWidthByScreen() {
-        assertEquals(540, LauncherSpecs.forSize(1920, 720).phone) // 6T
-        val narrow = LauncherSpecs.forSize(1280, 720)
-        assertEquals(88 * 5 - 20, narrow.phone) // 5T - G
-        assertEquals(62 * 5 - 14, LauncherSpecs.forSize(800, 480).phone)
+    @Test fun compactPhoneByFormula() {
+        // на текст меньше 15 * F2 * 0.55
+        val compact = setOf("1280x720", "1280x640", "1024x600", "800x480")
+        for (row in LauncherSpecs.TABLE) {
+            val s = LauncherSpecs.forSize(row[0], row[1])
+            if (s.strip) continue
+            assertEquals("${row[0]}x${row[1]}", "${row[0]}x${row[1]}" in compact, s.phoneCompact)
+        }
     }
 
     @Test fun stripOnlyForShortWideScreens() {
@@ -79,11 +83,13 @@ class LauncherSpecTest {
         assertFalse(LauncherSpecs.forSize(800, 480).strip)
         assertFalse(LauncherSpecs.forSize(1280, 640).strip)
         assertEquals(313, LauncherSpecs.forSize(1280, 480).music)
+        assertEquals(92 * 5 - 21, LauncherSpecs.forSize(1280, 480).phone) // только для оверлея входящего
     }
 
-    @Test fun quickAppsFourOnSmallScreen() {
+    @Test fun quickAppsFourPlusAddOrFiveInStrip() {
         assertEquals(4, LauncherSpecs.forSize(800, 480).quickApps)
-        assertEquals(5, LauncherSpecs.forSize(1024, 600).quickApps)
+        assertEquals(4, LauncherSpecs.forSize(1920, 720).quickApps)
+        assertEquals(5, LauncherSpecs.forSize(1280, 480).quickApps)
     }
 
     @Test fun unknownSizeScalesFromNearest() {

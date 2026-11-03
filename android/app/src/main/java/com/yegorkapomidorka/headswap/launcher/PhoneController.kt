@@ -76,6 +76,12 @@ internal object PhoneController {
         io.execute { reloadCalls(ctx); reloadContacts(ctx) }
     }
 
+    /** Разрешения карточки «Телефон»: запрос открывает кнопка «Открыть запрос на телефоне» (MainActivity, cmd phone_card_perm). */
+    val PERMISSIONS = listOf(
+        Manifest.permission.READ_PHONE_STATE, Manifest.permission.READ_CALL_LOG, Manifest.permission.READ_CONTACTS,
+        Manifest.permission.CALL_PHONE, Manifest.permission.ANSWER_PHONE_CALLS,
+    )
+
     private fun has(ctx: Context, perm: String) = ctx.checkSelfPermission(perm) == PackageManager.PERMISSION_GRANTED
 
     private fun register(ctx: Context) {

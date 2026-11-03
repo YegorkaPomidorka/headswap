@@ -79,9 +79,11 @@ fun LauncherRoot(connected: Boolean) {
                         EmbedLayers()
                         // входящий звонок поверх чужого приложения или экрана без карточки «Телефон»
                         if (PhoneController.callState == CallState.RINGING && (model.area != Area.Home || spec.strip)) {
-                            Box(Modifier.fillMaxSize().padding(end = metrics.dp(spec.m), bottom = metrics.dp(spec.m)),
-                                contentAlignment = Alignment.BottomEnd) {
-                                PhoneCard(Modifier.width(metrics.dp(spec.phone)).height(metrics.dp(spec.t * 9 / 4)))
+                            // как нижняя полоса главного: прибита к низу, скругления только сверху
+                            val r = metrics.dp(spec.radius)
+                            Box(Modifier.fillMaxSize().padding(end = metrics.dp(spec.m)), contentAlignment = Alignment.BottomEnd) {
+                                PhoneCard(Modifier.width(metrics.dp(spec.phone)).height(metrics.dp(spec.bottomH)),
+                                    RoundedCornerShape(topStart = r, topEnd = r))
                             }
                         }
                         RemoveConfirm()
@@ -125,33 +127,33 @@ private fun Rail() {
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.SpaceBetween,
         ) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(m.dp(s.g8))) {
-                Txt(status.time, s.f1, color = Pal.TEXT, weight = FontWeight.SemiBold, mono = true)
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(m.dp(s.g4))) {
-                    if (status.signal >= 0) VectorIcon(VIco.signal(status.signal), 24f, s.fs, Pal.SEC)
-                    Txt(status.net, s.fs, color = Pal.SEC)
-                }
+            Txt(status.time, s.f1, color = Pal.TEXT, weight = FontWeight.SemiBold, mono = true)
+            // «Назад» виден всегда: белый везде, кроме главного, где идти некуда (серый, без анимации)
+            val back = rememberPressAnim(600)
+            RoundButton(s.rb, stringResource(R.string.l_back), onTap = { LauncherActions.embeddedBack() }, enabled = canBack,
+                onPress = back::play) {
+                BackIcon(s.backIc, if (canBack) Pal.WHITE else BackIdle) { back.progress }
             }
-            // «Назад» виден всегда: белый везде, кроме главного, где идти некуда (серый)
-            RoundButton(s.rb, stringResource(R.string.l_back), onTap = { LauncherActions.embeddedBack() }, enabled = canBack) {
-                SvgIcon(Ico.CHEV_BACK, s.backIc, if (canBack) Pal.WHITE else BackIdle, stroke = 2f)
-            }
-            RoundButton(s.rb, stringResource(R.string.l_all_apps), onTap = { LauncherActions.openAllApps() }) {
+            // лого: на главном - «Все приложения», на любом другом экране - домой
+            val logo = rememberPressAnim(1000)
+            val home = model.area == Area.Home
+            RoundButton(s.rb, stringResource(if (home) R.string.l_all_apps else R.string.l_home), onTap = { LauncherActions.logo() },
+                onPress = logo::play) {
                 Box(Modifier.matchParentSize().drawBehind {
                     // как CSS circle farthest-corner: радиус 0.707 стороны, стопы 0 / 40% / 70%
                     drawCircle(Brush.radialGradient(
                         0f to accent.copy(alpha = 0.6f), 0.4f to accent.copy(alpha = 0.25f), 0.7f to accent.copy(alpha = 0f),
                         center = center, radius = size.minDimension * 0.7071f))
                 }, contentAlignment = Alignment.Center) {
-                    VectorIcon(VIco.LOGO, VIco.LOGO_VIEWPORT, s.logoIn, Pal.WHITE)
+                    LogoIcon(s.logoIn, Pal.WHITE) { logo.progress }
                 }
             }
-            RoundButton(s.rb, stringResource(R.string.l_settings), onTap = { LauncherActions.openSettings() }) {
-                SvgIcon(Ico.GEAR, s.ric, Pal.SEC2, stroke = 2f)
+            val gear = rememberPressAnim(900)
+            RoundButton(s.rb, stringResource(R.string.l_settings), onTap = { LauncherActions.openSettings() }, onPress = gear::play) {
+                GearIcon(s.ric, Pal.SEC2) { gear.progress }
             }
-            RoundButton(s.rb, stringResource(R.string.l_card_view), onTap = { LauncherActions.cycleCardView() }) {
-                SvgIcon(Ico.LAYERS, s.ric, Pal.SEC2, stroke = 2f)
-            }
+            // в ленте «Вид карточки» - стеклянная кнопка на карте
+            if (!s.strip) CardViewButton(s.rb, s.ric, Color.Transparent, Pal.SEC2)
         }
         Pressable(
             Modifier.width(m.dp(s.rail)).height(m.dp(s.navH))
@@ -166,7 +168,17 @@ private fun Rail() {
     }
 }
 
-/** Строка статуса справа сверху: дата, Bluetooth, Wi-Fi, громкость медиа. Ничего не нажимается, погоды нет. */
+/** «Вид карточки навигации»: на рейке прозрачная, в ленте - стеклянная на карте. По DOWN падает новая плитка. */
+@Composable
+fun CardViewButton(sizePx: Int, iconPx: Int, background: Color, color: Color, modifier: Modifier = Modifier) {
+    val anim = rememberPressAnim(700)
+    RoundButton(sizePx, stringResource(R.string.l_card_view), onTap = { LauncherActions.cycleCardView() }, modifier = modifier,
+        background = background, onPress = anim::play) {
+        LayersIcon(iconPx, color) { anim.progress }
+    }
+}
+
+/** Строка статуса справа сверху: дата, Bluetooth, Wi-Fi, сеть, громкость медиа. Ничего не нажимается, погоды нет. */
 @Composable
 fun StatusBar() {
     val m = LocalMetrics.current
@@ -180,6 +192,11 @@ fun StatusBar() {
             Txt(st.date, s.fs, color = Pal.SEC2)
             SvgIcon(Ico.BT, s.fs, if (st.bluetooth) Pal.SEC2 else Pal.SEC2.copy(alpha = 0.3f))
             SvgIcon(Ico.WIFI, s.fs, if (st.wifi) Pal.SEC2 else Pal.SEC2.copy(alpha = 0.3f))
+            // сеть с уровнем сигнала - здесь, рядом с Wi-Fi, а не в рейке
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(m.dp(s.g4))) {
+                if (st.signal >= 0) VectorIcon(VIco.signal(st.signal), 24f, s.fs, Pal.SEC2)
+                Txt(st.net, s.fs, color = Pal.SEC2)
+            }
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(m.dp(s.g4))) {
                 SvgIcon(Ico.VOLUME, s.fs, Pal.SEC2)
                 Txt(st.volume.toString(), s.fs, color = Pal.SEC2)

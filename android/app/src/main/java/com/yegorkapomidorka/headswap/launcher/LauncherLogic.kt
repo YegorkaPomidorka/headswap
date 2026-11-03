@@ -165,21 +165,34 @@ object BackNav {
 }
 
 /**
- * Чип плееров на карточке музыки (макет v2): плеер телефона (любая активная сессия) и два известных сервиса,
- * если установлены. Остальные медиаприложения - долгий тап по «ноте» (список плееров).
+ * Чип плееров на карточке музыки: два слота - свой плеер телефона (любая активная сессия) и последний онлайн-плеер
+ * (Я.Музыка, YouTube Music, VK Музыка - что слушали последним, иначе первый установленный). Остальные медиаприложения -
+ * долгий тап по «ноте» (список плееров).
  */
 object PlayerChip {
     const val YANDEX = "ru.yandex.music"
     const val YT_MUSIC = "com.google.android.apps.youtube.music"
+    const val VK = "com.uma.musicvk"
+    /** Онлайн-плееры второго слота; порядок - выбор по умолчанию, пока ничего не слушали. */
+    val ONLINE = listOf(YANDEX, YT_MUSIC, VK)
 
-    enum class Kind { PHONE, YANDEX, YT_MUSIC }
+    enum class Kind { PHONE, YANDEX, YT_MUSIC, VK }
     data class Slot(val kind: Kind, val pkg: String?, val selected: Boolean)
 
-    fun slots(installed: Set<String>, chosen: String?): List<Slot> = buildList {
-        add(Slot(Kind.PHONE, null, chosen == null))
-        if (YANDEX in installed) add(Slot(Kind.YANDEX, YANDEX, chosen == YANDEX))
-        if (YT_MUSIC in installed) add(Slot(Kind.YT_MUSIC, YT_MUSIC, chosen == YT_MUSIC))
+    private fun kindOf(pkg: String): Kind = when (pkg) {
+        YANDEX -> Kind.YANDEX
+        YT_MUSIC -> Kind.YT_MUSIC
+        else -> Kind.VK
     }
+
+    fun slots(installed: Set<String>, chosen: String?, lastOnline: String?): List<Slot> = buildList {
+        add(Slot(Kind.PHONE, null, chosen == null))
+        val online = lastOnline?.takeIf { it in installed && it in ONLINE } ?: ONLINE.firstOrNull { it in installed }
+        if (online != null) add(Slot(kindOf(online), online, chosen == online))
+    }
+
+    /** Последний онлайн-плеер после того, как выбрали или услышали [pkg]: меняется, только если это онлайн-плеер. */
+    fun lastOnline(previous: String?, pkg: String?): String? = pkg?.takeIf { it in ONLINE } ?: previous
 }
 
 /** Подпись типа сети в рейке. Типы - константы TelephonyManager.NETWORK_TYPE_*. */

@@ -27,19 +27,21 @@ data class ContactRecord(val id: Long, val name: String, val number: String)
 /** Состояние звонка по TelephonyManager: CALL_STATE_IDLE/RINGING/OFFHOOK. */
 object CallState { const val IDLE = 0; const val RINGING = 1; const val OFFHOOK = 2 }
 
-/** Что показывает карточка «Телефон» (PhoneStates.dc.html, состояния А-Е). */
+/** Что показывает карточка «Телефон» (PhoneStates.dc.html, состояния А-Ж). */
 sealed interface PhoneCardModel {
     /** А: есть пропущенные. */
     data class Missed(val count: Int, val last: CallRecord) : PhoneCardModel
     /** Б: пропущенных нет, есть последний вызов. */
     data class LastCall(val last: CallRecord) : PhoneCardModel
-    /** В: звонков нет или нет разрешений. */
-    data class Empty(val needPermission: Boolean) : PhoneCardModel
-    /** Г: входящий. */
+    /** В: звонков нет. */
+    data object Empty : PhoneCardModel
+    /** Г: нет доступа к журналу звонков - кнопка открывает запрос разрешений на телефоне. */
+    data object NoAccess : PhoneCardModel
+    /** Д: входящий. */
     data class Incoming(val title: String) : PhoneCardModel
-    /** Д: разговор. */
+    /** Е: разговор. */
     data class InCall(val title: String, val elapsedSec: Int) : PhoneCardModel
-    /** Е: исходящий, ещё не ответили. */
+    /** Ж: исходящий, ещё не ответили. */
     data class Outgoing(val title: String) : PhoneCardModel
 }
 
@@ -65,10 +67,10 @@ object PhoneLogic {
                 PhoneCardModel.InCall(callTitle, if (ringed) offhookSec else offhookSec - OUTGOING_PHASE_SEC)
             else PhoneCardModel.Outgoing(callTitle)
         }
-        if (!permitted) return PhoneCardModel.Empty(needPermission = true)
+        if (!permitted) return PhoneCardModel.NoAccess
         val missed = calls.filter { it.type == CallType.MISSED && it.timeMs > missedSeenMs }
         if (missed.isNotEmpty()) return PhoneCardModel.Missed(missed.size, missed.first())
-        val last = calls.firstOrNull() ?: return PhoneCardModel.Empty(needPermission = false)
+        val last = calls.firstOrNull() ?: return PhoneCardModel.Empty
         return PhoneCardModel.LastCall(last)
     }
 

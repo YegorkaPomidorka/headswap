@@ -85,7 +85,7 @@ object Pal {
     }
 }
 
-/** Графит под углом 118deg и золотое свечение во всех четырёх углах. Статичный. */
+/** Графит под углом 118deg и золотое свечение слева и справа. Статичный. */
 fun Modifier.launcherBackground(glow: Boolean): Modifier = drawBehind {
     val w = size.width
     val h = size.height
@@ -107,12 +107,10 @@ fun Modifier.launcherBackground(glow: Boolean): Modifier = drawBehind {
                 radius = rx, center = Offset.Zero)
         }
     }
+    // два приглушённых свечения по бокам: ellipse 26% 70% at 0% 55% и 22% 70% at 100% 55%
     val gold = Color(0xFFD4AF37)
-    val light = Color(0xFFE8C65A)
-    glowAt(w * 0.07f, h * 0.38f, w * 0.38f, h * 0.55f, gold.copy(alpha = 0.34f))
-    glowAt(w * 0.06f, h, w * 0.30f, h * 0.40f, light.copy(alpha = 0.30f))
-    glowAt(w * 0.96f, h * 0.02f, w * 0.34f, h * 0.50f, gold.copy(alpha = 0.30f))
-    glowAt(w * 0.97f, h, w * 0.30f, h * 0.42f, light.copy(alpha = 0.28f))
+    glowAt(0f, h * 0.55f, w * 0.26f, h * 0.70f, gold.copy(alpha = 0.22f))
+    glowAt(w, h * 0.55f, w * 0.22f, h * 0.70f, gold.copy(alpha = 0.12f))
 }
 
 /** Иконки из макета (viewBox 24x24); пути в SVG-синтаксисе, рисуем без библиотеки иконок. */
@@ -131,6 +129,10 @@ object Ico {
     val VOLUME = listOf("M11 5 6 9H2v6h4l5 4z", "M15.5 8.5a5 5 0 0 1 0 7")
     val PHONE = listOf("M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2")
     val CONTACT = listOf(circle(12, 8, 4), "M4 21a8 8 0 0 1 16 0")
+    /** Входящий в компактной карточке «Телефон»: трубка с волнами. */
+    val PHONE_RING = PHONE + listOf("M15 3a6 6 0 0 1 6 6", "M15 7a2 2 0 0 1 2 2")
+    /** «Открыть запрос на телефоне»: силуэт телефона. */
+    val DEVICE = listOf(roundRectPath(6.5f, 2.5f, 11f, 19f, 2.5f), "M11 18.5h2")
     val MIC_OFF = listOf("M9 9v2a3 3 0 0 0 5 2.2", "M15 9.3V5a3 3 0 0 0-5.7-1.3", "M19 11a7 7 0 0 1-1.2 3.9",
         "M5 11a7 7 0 0 0 11.6 5.3", "M12 18v3", "m3 3 18 18")
     val MIC = listOf("M12 3a3 3 0 0 0-3 3v5a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3z", "M19 11a7 7 0 0 1-14 0", "M12 18v3")
@@ -220,12 +222,14 @@ fun Pressable(
     enabled: Boolean = true,
     description: String? = null,
     onLong: (() -> Unit)? = null,
+    onPress: (() -> Unit)? = null,
     onTap: () -> Unit,
     content: @Composable BoxScope.(pressed: Boolean) -> Unit,
 ) {
     var pressed by remember { mutableStateOf(false) }
     val tap = rememberUpdatedState(onTap)
     val long = rememberUpdatedState(onLong)
+    val press = rememberUpdatedState(onPress)
     val on = rememberUpdatedState(enabled)
     Box(
         modifier
@@ -241,6 +245,8 @@ fun Pressable(
                     if (!on.value) return@awaitEachGesture
                     down.consume()
                     pressed = true
+                    // анимация нажатия стартует по DOWN: UP с ГУ приходит на 200-500 мс позже
+                    press.value?.invoke()
                     var up: PointerInputChange? = null
                     while (true) {
                         val change = awaitPointerEvent().changes.firstOrNull { it.id == down.id } ?: break
@@ -263,12 +269,14 @@ fun Pressable(
 fun RoundButton(
     sizePx: Int, description: String, onTap: () -> Unit, modifier: Modifier = Modifier,
     background: Color = Color.Transparent, enabled: Boolean = true, onLong: (() -> Unit)? = null,
+    onPress: (() -> Unit)? = null,
     content: @Composable BoxScope.() -> Unit,
 ) {
     val m = LocalMetrics.current
     Pressable(
         modifier.size(m.dp(sizePx)).clip(CircleShape)
             .background(background), enabled = enabled, description = description, onTap = onTap, onLong = onLong,
+        onPress = onPress,
     ) { pressed ->
         if (pressed) Box(Modifier.matchParentSize().background(Pal.SURFACE_PRESSED))
         Box(Modifier.matchParentSize(), contentAlignment = Alignment.Center, content = content)
@@ -279,6 +287,7 @@ fun RoundButton(
 fun Txt(
     text: String, sizePx: Int, modifier: Modifier = Modifier, color: Color = Pal.TEXT,
     weight: FontWeight = FontWeight.Normal, mono: Boolean = false, maxLines: Int = 1, align: TextAlign = TextAlign.Start,
+    ellipsis: Boolean = true,
 ) {
     val m = LocalMetrics.current
     BasicText(
@@ -288,7 +297,7 @@ fun Txt(
             fontFamily = if (mono) FontFamily.Monospace else FontFamily.SansSerif,
             lineHeight = m.sp((sizePx * 1.15f).toInt()), textAlign = align,
         ),
-        maxLines = maxLines, softWrap = maxLines > 1, overflow = TextOverflow.Ellipsis,
+        maxLines = maxLines, softWrap = maxLines > 1, overflow = if (ellipsis) TextOverflow.Ellipsis else TextOverflow.Clip,
     )
 }
 

@@ -80,4 +80,9 @@
     <string name="l_perm_button">Permissions for the Phone card</string>
     <string name="l_perm_summary">Calls, contacts and answering from the car display</string>
     <string name="l_perm_granted">All permissions granted</string>
+    <string name="l_home">Home</string>
+    <string name="l_player_mine">My player</string>
+    <string name="l_player_vk">VK Music</string>
+    <string name="l_phone_no_access">No access</string>
+    <string name="l_phone_open_request">Open the request on the phone</string>
 </resources>

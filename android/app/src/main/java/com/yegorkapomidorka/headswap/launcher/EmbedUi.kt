@@ -3,6 +3,8 @@ package com.yegorkapomidorka.headswap.launcher
 import android.graphics.SurfaceTexture
 import android.view.TextureView
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -19,6 +21,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.zIndex
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.boundsInRoot
@@ -76,7 +79,8 @@ fun EmbedLayers() {
     val navTag = if (area != Area.Navigator && navPkg != null) remember(navPkg) { LauncherModel.packageLabel(navPkg) } else null
     EmbedLayer(EmbedHost.nav, navTarget, shown = navShown, interactive = area == Area.Navigator,
         rounded = area != Area.Navigator, background = NavBg,
-        starting = stringResource(R.string.l_nav_starting), onCardTap = { LauncherActions.openNavigator() }, tag = navTag)
+        starting = stringResource(R.string.l_nav_starting), onCardTap = { LauncherActions.openNavigator() }, tag = navTag,
+        cardViewButton = area == Area.Home && LocalMetrics.current.spec.strip)
     if (appKey != null) {
         val label = model.starting ?: ""
         EmbedLayer(EmbedHost.app, areaRect, shown = area is Area.App, interactive = true, rounded = false, background = ScreenBg,
@@ -89,7 +93,7 @@ private val OFFSCREEN = IntOffset(-100_000, -100_000)
 @Composable
 private fun EmbedLayer(
     slot: EmbedSlot, target: Rect?, shown: Boolean, interactive: Boolean, rounded: Boolean, background: Color,
-    starting: String, onCardTap: (() -> Unit)?, tag: String? = null,
+    starting: String, onCardTap: (() -> Unit)?, tag: String? = null, cardViewButton: Boolean = false,
 ) {
     var last by remember(slot) { mutableStateOf<Rect?>(null) }
     if (target != null) last = target
@@ -156,6 +160,8 @@ private fun EmbedLayer(
                         .padding(horizontal = m.dp(m.spec.g8), vertical = m.dp(m.spec.b4)),
                 ) { Txt(tag, m.spec.tag, color = Pal.SEC2) }
             }
+            // лента: «Вид карточки» на карте поверх окна навигатора (в рейке ему места нет)
+            if (cardViewButton) MapCardViewButton(Modifier.align(Alignment.TopEnd))
         }
     }
 }
@@ -167,6 +173,8 @@ fun NavCard(modifier: Modifier) {
     val m = LocalMetrics.current
     val s = m.spec
     CardBox(modifier.onGloballyPositioned { if (model.cardView == CardView.NAVIGATOR) model.navCardRect = it.boundsInRoot() }, background = NavBg) {
+        // копия кнопки ленты для часов и выбора навигатора: окна навигатора поверх нет, а значит, нет и его копии
+        if (s.strip) MapCardViewButton(Modifier.align(Alignment.TopEnd).zIndex(1f))
         when {
             model.cardView == CardView.CLOCK -> ClockFace()
             model.navigatorPkg == null -> Pressable(Modifier.fillMaxSize(), onTap = { LauncherActions.openNavigatorChoice() }) { pressed ->
@@ -183,6 +191,15 @@ fun NavCard(modifier: Modifier) {
             else -> Unit
         }
     }
+}
+
+/** Стеклянная кнопка «Вид карточки» в правом верхнем углу карты (только лента 1280x480). */
+@Composable
+private fun MapCardViewButton(modifier: Modifier) {
+    val m = LocalMetrics.current
+    val s = m.spec
+    CardViewButton(s.pcB, s.pcIc, GlassBg, Pal.WHITE.copy(alpha = 0.75f),
+        modifier.padding(top = m.dp(s.g8), end = m.dp(s.g8)).border(m.dp(1), GlassBorder, CircleShape))
 }
 
 /** Вид «Часы»: крупные часы и дата. */

@@ -80,4 +80,9 @@
     <string name="l_perm_button">Разрешения для карточки «Телефон»</string>
     <string name="l_perm_summary">Звонки, контакты и ответ на вызов с экрана ГУ</string>
     <string name="l_perm_granted">Все разрешения выданы</string>
+    <string name="l_home">Домой</string>
+    <string name="l_player_mine">Мой плеер</string>
+    <string name="l_player_vk">VK Музыка</string>
+    <string name="l_phone_no_access">Нет доступа</string>
+    <string name="l_phone_open_request">Открыть запрос на телефоне</string>
 </resources>

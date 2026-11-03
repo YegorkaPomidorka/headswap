@@ -46,6 +46,11 @@ class LauncherPrefs(context: Context) {
         get() = prefs.getString("music_player", null)
         set(value) { prefs.edit().putString("music_player", value).apply() }
 
+    /** Последний онлайн-плеер (второй слот чипа плееров): что слушали или выбирали последним. */
+    var lastOnlinePlayer: String?
+        get() = prefs.getString("last_online_player", null)
+        set(value) { prefs.edit().putString("last_online_player", value).apply() }
+
     /** Пропущенные не новее этого момента уже просмотрены (тап по карточке «Телефон»). */
     var missedSeenMs: Long
         get() = prefs.getLong("missed_seen", 0L)

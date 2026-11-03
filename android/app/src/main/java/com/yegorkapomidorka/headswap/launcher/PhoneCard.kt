@@ -4,9 +4,9 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -27,6 +27,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import com.yegorkapomidorka.headswap.R
 
 @Composable
@@ -40,35 +41,65 @@ private fun typeLabel(type: CallType): String = stringResource(when (type) {
 private fun whenText(timeMs: Long): String =
     PhoneLogic.whenLabel(System.currentTimeMillis(), timeMs, yesterday = stringResource(R.string.l_yesterday))
 
-@Composable
-private fun CallButton(sizePx: Int, desc: String, onTap: () -> Unit) {
-    val s = LocalMetrics.current.spec
-    RoundButton(sizePx, desc, onTap, background = Pal.GREEN) { SvgIcon(Ico.PHONE, s.ic, Pal.ON_GREEN, stroke = 2.4f) }
-}
+/** Кнопки карточки «Телефон» (PhoneStates.dc.html): все размером T. */
+private enum class PhoneBtn { CALL, RECALL, ACCEPT, DECLINE, END, CANCEL, CONTACTS, MUTE, ALLOW }
 
 @Composable
-private fun HangupButton(sizePx: Int, desc: String, onTap: () -> Unit) {
+private fun PhoneButton(b: PhoneBtn, number: String?) {
     val s = LocalMetrics.current.spec
-    RoundButton(sizePx, desc, onTap, background = Pal.RED) {
-        SvgIcon(Ico.PHONE, s.ic, Pal.WHITE, stroke = 2.4f, modifier = Modifier.rotate(135f))
+    val ctx = LauncherModel.context
+    val desc = stringResource(when (b) {
+        PhoneBtn.CALL -> R.string.l_call
+        PhoneBtn.RECALL -> R.string.l_call_back
+        PhoneBtn.ACCEPT -> R.string.l_accept
+        PhoneBtn.DECLINE -> R.string.l_decline
+        PhoneBtn.END -> R.string.l_hangup
+        PhoneBtn.CANCEL -> R.string.l_cancel_call
+        PhoneBtn.CONTACTS -> R.string.l_calls_contacts
+        PhoneBtn.MUTE -> R.string.l_mute
+        PhoneBtn.ALLOW -> R.string.l_phone_open_request
+    })
+    val onTap: () -> Unit = when (b) {
+        PhoneBtn.CALL, PhoneBtn.RECALL -> ({ number?.let { LauncherActions.callBack(it) } })
+        PhoneBtn.ACCEPT -> ({ PhoneController.accept(ctx) })
+        PhoneBtn.DECLINE, PhoneBtn.END, PhoneBtn.CANCEL -> ({ PhoneController.end(ctx) })
+        PhoneBtn.CONTACTS -> ({ LauncherActions.openCalls() })
+        PhoneBtn.MUTE -> ({ PhoneController.toggleMute(ctx) })
+        PhoneBtn.ALLOW -> ({ LauncherActions.openPhoneRequest() })
+    }
+    when (b) {
+        PhoneBtn.CALL, PhoneBtn.RECALL, PhoneBtn.ACCEPT -> RoundButton(s.t, desc, onTap, background = Pal.GREEN) {
+            SvgIcon(Ico.PHONE, s.ic, Pal.ON_GREEN, stroke = 2.4f)
+        }
+        PhoneBtn.DECLINE, PhoneBtn.END, PhoneBtn.CANCEL -> RoundButton(s.t, desc, onTap, background = Pal.RED) {
+            SvgIcon(Ico.PHONE, s.ic, Pal.WHITE, stroke = 2.4f, modifier = Modifier.rotate(135f))
+        }
+        else -> RoundButton(s.t, desc, onTap, background = Pal.SURFACE_HI) {
+            SvgIcon(when (b) { PhoneBtn.MUTE -> Ico.MIC_OFF; PhoneBtn.ALLOW -> Ico.DEVICE; else -> Ico.CONTACT }, s.ic, Pal.WHITE)
+        }
     }
 }
 
-@Composable
-private fun ContactsButton(sizePx: Int, onTap: () -> Unit) {
-    val s = LocalMetrics.current.spec
-    RoundButton(sizePx, stringResource(R.string.l_calls_contacts), onTap, background = Pal.SURFACE_HI) {
-        SvgIcon(Ico.CONTACT, s.ic, Pal.WHITE)
-    }
-}
+/**
+ * Что нарисовать в карточке. Полный вид: шапка цветом состояния, имя и время в строку. Компактный (узкая карточка):
+ * имя цветом состояния, ниже [line2], без многоточий; [small] - длинная фраза вместо имени, шрифт F2.
+ */
+private class PhoneView(
+    val head: String, val headColor: Color, val headMono: Boolean = false,
+    val name: String, val sub: String = "",
+    val nameColor: Color = Pal.TEXT, val small: Boolean = false, val line2: String = "", val line2Color: Color = Pal.SEC,
+    val full: List<PhoneBtn>, val compact: List<PhoneBtn> = full.take(1),
+    /** Входящий в компактном виде: значок звонка вместо текста. */
+    val ringIcon: Boolean = false,
+    val number: String? = null,
+)
 
-/** Карточка «Телефон»: состояния А-Е из PhoneStates.dc.html. Тап по телу - экран «Вызовы». */
+/** Карточка «Телефон»: состояния А-Ж из PhoneStates.dc.html, полный и компактный вид. Тап по телу - экран «Вызовы». */
 @Composable
 fun PhoneCard(modifier: Modifier, shape: Shape? = null) {
     val model = LauncherModel
     val m = LocalMetrics.current
     val s = m.spec
-    val ctx = model.context
     val phone = PhoneLogic.model(
         PhoneController.logPermitted, PhoneController.callState, PhoneController.callTitle, PhoneController.ringed,
         PhoneController.offhookSec, PhoneController.calls, model.missedSeenMs,
@@ -77,77 +108,75 @@ fun PhoneCard(modifier: Modifier, shape: Shape? = null) {
     val incoming = phone is PhoneCardModel.Incoming
     val ongoing = phone is PhoneCardModel.Incoming || phone is PhoneCardModel.InCall || phone is PhoneCardModel.Outgoing
     val cardShape = shape ?: RoundedCornerShape(m.dp(s.radius))
+    val v = phoneView(phone, accent)
     CardBox(modifier, background = if (incoming) accent.copy(alpha = 0.14f) else Pal.SURFACE, shape = cardShape) {
         if (!ongoing) Pressable(Modifier.fillMaxSize(), description = stringResource(R.string.l_phone), onTap = { LauncherActions.openCalls() }) {}
-        if (incoming) Box(Modifier.fillMaxSize().border(m.dp(s.b4), accent, cardShape))
-        Column(
-            Modifier.fillMaxSize().padding(horizontal = m.dp(if (incoming) s.g - s.b4 else s.g), vertical = m.dp(if (incoming) s.g8 - s.b4 else s.g8)),
-            verticalArrangement = Arrangement.spacedBy(m.dp(s.g4)),
+        // рамка входящего: inset 4px акцентом
+        if (incoming) Box(Modifier.fillMaxSize().border(m.dp(4), accent, cardShape))
+        Row(
+            Modifier.fillMaxSize().padding(horizontal = m.dp(s.g), vertical = m.dp(s.g8)),
+            verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(m.dp(s.g)),
         ) {
-            when (phone) {
-                is PhoneCardModel.Missed -> {
-                    Txt(stringResource(R.string.l_phone_missed, phone.count), s.fs, color = Pal.MISSED)
-                    Body(phone.last.title, whenText(phone.last.timeMs), mono = true) {
-                        CallButton(s.t, stringResource(R.string.l_call_back)) { LauncherActions.callBack(phone.last.number) }
-                        if (s.wide) ContactsButton(s.t) { LauncherActions.openCalls() }
-                    }
+            val buttons = when {
+                s.phoneCompact -> v.compact
+                s.wide || incoming -> v.full
+                else -> v.full.take(1)
+            }
+            when {
+                s.phoneCompact && v.ringIcon -> {
+                    SvgIcon(Ico.PHONE_RING, (s.t * 0.65f).toInt(), accent)
+                    Spacer(Modifier.weight(1f))
                 }
-                is PhoneCardModel.LastCall -> {
-                    Txt(stringResource(R.string.l_phone), s.fs, color = Pal.SEC)
-                    Body(phone.last.title, "${typeLabel(phone.last.type)} · ${whenText(phone.last.timeMs)}") {
-                        CallButton(s.t, stringResource(R.string.l_call)) { LauncherActions.callBack(phone.last.number) }
-                        if (s.wide) ContactsButton(s.t) { LauncherActions.openCalls() }
-                    }
+                s.phoneCompact -> Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(m.dp(s.g4))) {
+                    Txt(v.name, if (v.small) s.f2 else s.f1, color = v.nameColor, weight = FontWeight.Bold, ellipsis = false)
+                    if (v.line2.isNotEmpty()) Txt(v.line2, s.f2, color = v.line2Color, weight = FontWeight.SemiBold, mono = true, ellipsis = false)
                 }
-                is PhoneCardModel.Empty -> {
-                    Txt(stringResource(R.string.l_phone), s.fs, color = Pal.SEC)
-                    Body(stringResource(R.string.l_phone_none), if (phone.needPermission) stringResource(R.string.l_phone_grant) else "") {
-                        ContactsButton(s.t) { LauncherActions.openCalls() }
-                    }
-                }
-                is PhoneCardModel.Incoming -> {
-                    Txt(stringResource(R.string.l_phone_incoming), s.fs, color = accent)
-                    Body(phone.title.ifEmpty { stringResource(R.string.l_phone) }, "") {
-                        CallButton(s.t, stringResource(R.string.l_accept)) { PhoneController.accept(ctx) }
-                        HangupButton(s.t, stringResource(R.string.l_decline)) { PhoneController.end(ctx) }
-                    }
-                }
-                is PhoneCardModel.InCall -> {
-                    Txt(stringResource(R.string.l_phone_talk, PhoneLogic.timer(phone.elapsedSec)), s.fs, color = Pal.GREEN,
-                        weight = FontWeight.SemiBold, mono = true)
-                    Body(phone.title.ifEmpty { stringResource(R.string.l_phone) }, "") {
-                        RoundButton(s.t, stringResource(R.string.l_mute), { PhoneController.toggleMute(ctx) }, background = Pal.SURFACE_HI) {
-                            SvgIcon(Ico.MIC_OFF, s.ic, Pal.WHITE)
-                        }
-                        HangupButton(s.t, stringResource(R.string.l_hangup)) { PhoneController.end(ctx) }
-                    }
-                }
-                is PhoneCardModel.Outgoing -> {
-                    Txt(stringResource(R.string.l_phone_calling), s.fs, color = Pal.SEC)
-                    Body(phone.title.ifEmpty { stringResource(R.string.l_phone) }, "") {
-                        HangupButton(s.t, stringResource(R.string.l_cancel_call)) { PhoneController.end(ctx) }
+                else -> Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(m.dp(s.g4))) {
+                    Txt(v.head, s.f2, color = v.headColor, weight = if (v.headMono) FontWeight.SemiBold else FontWeight.Normal, mono = v.headMono)
+                    Row(horizontalArrangement = Arrangement.spacedBy(m.dp(s.g8))) {
+                        Txt(v.name, s.f1, Modifier.weight(1f, fill = false).alignByBaseline(), weight = FontWeight.Bold)
+                        if (v.sub.isNotEmpty()) Txt(v.sub, s.f2, Modifier.alignByBaseline(), color = Pal.SEC,
+                            weight = FontWeight.SemiBold, mono = true)
                     }
                 }
             }
+            for (b in buttons) PhoneButton(b, v.number)
         }
     }
 }
 
-/** Имя и подпись слева, кнопки справа. */
 @Composable
-private fun Body(name: String, sub: String, mono: Boolean = false, buttons: @Composable () -> Unit) {
-    val m = LocalMetrics.current
-    val s = m.spec
-    Row(Modifier.fillMaxSize(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(m.dp(s.g))) {
-        Column(Modifier.weight(1f)) {
-            Txt(name, s.f1, weight = FontWeight.Bold)
-            if (sub.isNotEmpty()) Txt(sub, s.fs, color = Pal.SEC, weight = if (mono) FontWeight.SemiBold else FontWeight.Normal, mono = mono)
+private fun phoneView(phone: PhoneCardModel, accent: Color): PhoneView {
+    val unknown = stringResource(R.string.l_phone)
+    return when (phone) {
+        is PhoneCardModel.Missed -> {
+            val time = whenText(phone.last.timeMs)
+            PhoneView(stringResource(R.string.l_phone_missed, phone.count), Pal.MISSED, name = phone.last.title, sub = time,
+                nameColor = Pal.MISSED, line2 = "$time · ${phone.count}",
+                full = listOf(PhoneBtn.RECALL, PhoneBtn.CONTACTS), number = phone.last.number)
         }
-        buttons()
+        is PhoneCardModel.LastCall -> {
+            val time = whenText(phone.last.timeMs)
+            PhoneView(typeLabel(phone.last.type), Pal.SEC, name = phone.last.title, sub = time, line2 = time,
+                full = listOf(PhoneBtn.CALL, PhoneBtn.CONTACTS), number = phone.last.number)
+        }
+        PhoneCardModel.Empty -> PhoneView(unknown, Pal.SEC, name = stringResource(R.string.l_phone_none), small = true,
+            full = listOf(PhoneBtn.CONTACTS))
+        PhoneCardModel.NoAccess -> PhoneView(stringResource(R.string.l_phone_grant), Pal.SEC,
+            name = stringResource(R.string.l_phone_no_access), small = true, full = listOf(PhoneBtn.ALLOW))
+        is PhoneCardModel.Incoming -> PhoneView(stringResource(R.string.l_phone_incoming), accent, name = phone.title.ifEmpty { unknown },
+            full = listOf(PhoneBtn.ACCEPT, PhoneBtn.DECLINE), compact = listOf(PhoneBtn.ACCEPT, PhoneBtn.DECLINE), ringIcon = true)
+        is PhoneCardModel.InCall -> {
+            val timer = PhoneLogic.timer(phone.elapsedSec)
+            PhoneView(stringResource(R.string.l_phone_talk, timer), Pal.GREEN, headMono = true, name = phone.title.ifEmpty { unknown },
+                line2 = timer, line2Color = Pal.GREEN, full = listOf(PhoneBtn.MUTE, PhoneBtn.END), compact = listOf(PhoneBtn.END))
+        }
+        is PhoneCardModel.Outgoing -> PhoneView(stringResource(R.string.l_phone_calling), Pal.SEC, name = phone.title.ifEmpty { unknown },
+            line2 = stringResource(R.string.l_phone_calling), full = listOf(PhoneBtn.CANCEL))
     }
 }
 
-/** Экран «Вызовы» (Calls.dc.html): вкладки «Недавние» и «Контакты», 2 колонки x 4 строки, страницы стрелками. */
+/** Экран «Вызовы» (Calls.dc.html): статус, вкладки «Недавние» и «Контакты», 2 колонки x 4 строки, страницы стрелками. */
 @Composable
 fun CallsScreen() {
     val model = LauncherModel
@@ -159,25 +188,23 @@ fun CallsScreen() {
     LaunchedEffect(Unit) { PhoneController.loadAsync(ctx) }
     val permitted = if (tab == 0) PhoneController.logPermitted else PhoneController.contactsPermitted
     val yesterday = stringResource(R.string.l_yesterday)
-    val missedLabel = stringResource(R.string.l_call_missed)
-    val incomingLabel = stringResource(R.string.l_call_incoming)
-    val outgoingLabel = stringResource(R.string.l_call_outgoing)
+    // тип вызова не пишем: пропущенные - имя цветом пропущенного, справа только время
     val rows: List<CallsRow> = if (tab == 0) PhoneController.calls.map {
-        val label = when (it.type) { CallType.MISSED -> missedLabel; CallType.OUTGOING -> outgoingLabel; else -> incomingLabel }
-        CallsRow(it.title, "$label · ${PhoneLogic.whenLabel(System.currentTimeMillis(), it.timeMs, yesterday = yesterday)}",
-            if (it.type == CallType.MISSED) Pal.MISSED else Pal.SEC, it.number)
-    } else PhoneController.contacts.map { CallsRow(it.name.ifEmpty { it.number }, it.number, Pal.SEC, it.number) }
+        CallsRow(it.title, PhoneLogic.whenLabel(System.currentTimeMillis(), it.timeMs, yesterday = yesterday),
+            if (it.type == CallType.MISSED) Pal.MISSED else Pal.TEXT, it.number)
+    } else PhoneController.contacts.map { CallsRow(it.name.ifEmpty { it.number }, "", Pal.TEXT, it.number) }
     val perPage = 8
     val pages = Pager.pageCount(rows.size, perPage)
     val current = Pager.clamp(page, rows.size, perPage)
     val shown = Pager.slice(rows, current, perPage)
     Column(
-        Modifier.fillMaxSize().padding(start = m.dp(s.g), top = m.dp(s.m), end = m.dp(s.m), bottom = m.dp(s.m)),
-        verticalArrangement = Arrangement.spacedBy(m.dp(s.g)),
+        Modifier.fillMaxSize().padding(start = m.dp(s.g), top = m.dp(s.g8), end = m.dp(s.m), bottom = m.dp(s.m)),
+        verticalArrangement = Arrangement.spacedBy(m.dp(s.g8)),
     ) {
+        StatusBar()
         PagerHeader(current, pages, onPage = { page = it }, leading = {
-            PillButton(stringResource(R.string.l_recent), { tab = 0; page = 0 }, filled = tab == 0)
-            PillButton(stringResource(R.string.l_contacts), { tab = 1; page = 0 }, filled = tab == 1)
+            TabPill(stringResource(R.string.l_recent), selected = tab == 0) { tab = 0; page = 0 }
+            TabPill(stringResource(R.string.l_contacts), selected = tab == 1) { tab = 1; page = 0 }
         })
         Box(Modifier.weight(1f).fillMaxWidth()) {
             if (shown.isEmpty()) {
@@ -187,11 +214,11 @@ fun CallsScreen() {
                             !permitted -> R.string.l_calls_no_permission
                             tab == 0 -> R.string.l_calls_empty
                             else -> R.string.l_contacts_empty
-                        }), s.f1, color = Pal.SEC, maxLines = 3, align = androidx.compose.ui.text.style.TextAlign.Center,
+                        }), s.f1, color = Pal.SEC, maxLines = 3, align = TextAlign.Center,
                     )
                 }
             } else {
-                Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(m.dp(s.g))) {
+                Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(m.dp(s.g8))) {
                     for (r in 0 until 4) {
                         Row(Modifier.weight(1f).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(m.dp(s.g))) {
                             for (c in 0 until 2) {
@@ -207,7 +234,27 @@ fun CallsScreen() {
     }
 }
 
-private data class CallsRow(val title: String, val sub: String, val subColor: Color, val number: String)
+/** Вкладка экрана «Вызовы»: выбранная - золото .32 с обводкой 2px, остальные - белый .10. */
+@Composable
+private fun TabPill(text: String, selected: Boolean, onTap: () -> Unit) {
+    val m = LocalMetrics.current
+    val s = m.spec
+    val accent = LocalAccent.current
+    val shape = RoundedCornerShape(m.dp(s.t / 2))
+    Pressable(
+        Modifier.height(m.dp(s.t)).clip(shape)
+            .background(if (selected) accent.copy(alpha = 0.32f) else Color(1f, 1f, 1f, 0.10f))
+            .then(if (selected) Modifier.border(m.dp(2), accent, shape) else Modifier),
+        description = text, onTap = onTap,
+    ) { pressed ->
+        if (pressed) Box(Modifier.matchParentSize().background(Pal.SURFACE_PRESSED))
+        Box(Modifier.fillMaxHeight().padding(horizontal = m.dp((s.t * 0.4f).toInt())), contentAlignment = Alignment.Center) {
+            Txt(text, s.f1, color = if (selected) Pal.WHITE else Pal.TEXT, weight = if (selected) FontWeight.Bold else FontWeight.SemiBold)
+        }
+    }
+}
+
+private data class CallsRow(val title: String, val time: String, val titleColor: Color, val number: String)
 
 @Composable
 private fun CallsRowCell(row: CallsRow) {
@@ -218,10 +265,11 @@ private fun CallsRowCell(row: CallsRow) {
             .padding(start = m.dp(s.g), end = m.dp(s.g8)),
         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(m.dp(s.g)),
     ) {
-        Column(Modifier.weight(1f)) {
-            Txt(row.title, s.f1, weight = FontWeight.Bold)
-            Txt(row.sub, s.fs, color = row.subColor)
+        Row(Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(m.dp(s.g8))) {
+            Txt(row.title, s.f1, Modifier.weight(1f, fill = false).alignByBaseline(), color = row.titleColor, weight = FontWeight.Bold)
+            if (row.time.isNotEmpty()) Txt(row.time, s.f2, Modifier.alignByBaseline(), color = Pal.SEC,
+                weight = FontWeight.SemiBold, mono = true)
         }
-        CallButton(s.t, stringResource(R.string.l_call)) { LauncherActions.callBack(row.number) }
+        PhoneButton(PhoneBtn.CALL, row.number)
     }
 }

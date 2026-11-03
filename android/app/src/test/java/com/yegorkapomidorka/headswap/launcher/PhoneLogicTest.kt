@@ -16,11 +16,11 @@ class PhoneLogicTest {
     ) = PhoneLogic.model(permitted, state, "Сергей", ringed, offhook, calls, seen)
 
     @Test fun noPermissionIsStateV() {
-        assertEquals(PhoneCardModel.Empty(true), model(permitted = false, calls = listOf(rec(CallType.MISSED, 5))))
+        assertEquals(PhoneCardModel.NoAccess, model(permitted = false, calls = listOf(rec(CallType.MISSED, 5))))
     }
 
     @Test fun noCallsIsStateVWithoutPermissionHint() {
-        assertEquals(PhoneCardModel.Empty(false), model())
+        assertEquals(PhoneCardModel.Empty, model())
     }
 
     @Test fun missedCallsAreStateA() {

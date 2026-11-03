@@ -1,13 +1,17 @@
 package com.yegorkapomidorka.headswap.launcher
 
+import android.app.ActivityOptions
+import android.content.Intent
+import android.view.Display
 import com.yegorkapomidorka.headswap.AppLog
+import com.yegorkapomidorka.headswap.MainActivity
 
 /** Действия кнопок лаунчера в одном месте: переходы между экранами, запуск приложений, назад. */
 object LauncherActions {
     private val model get() = LauncherModel
 
-    /** Логотип на рейке: «Все приложения»; повторное нажатие - назад. */
-    fun openAllApps() { if (model.area == Area.AllApps) model.back() else model.go(Area.AllApps) }
+    /** Логотип на рейке: на главном - «Все приложения», на любом другом экране (и в открытом приложении) - домой. */
+    fun logo() { if (model.area == Area.Home) model.go(Area.AllApps) else model.home() }
     fun openPicker() { model.go(Area.Picker) }
     /** Шестерёнка на рейке: настройки; повторное нажатие - назад. */
     fun openSettings() {
@@ -28,6 +32,18 @@ object LauncherActions {
         PhoneController.dial(model.context, number)
     }
     fun cycleCardView() { model.nextCardView() }
+
+    /** Карточка «Телефон» без доступа: окно Headswap на экране телефона с запросом разрешений карточки. */
+    fun openPhoneRequest() {
+        if (!model.launchDebounce.allow(model.now())) return
+        val ctx = model.context
+        val intent = Intent(ctx, MainActivity::class.java).putExtra(MainActivity.EXTRA_CMD, "phone_card_perm")
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        val opts = ActivityOptions.makeBasic().setLaunchDisplayId(Display.DEFAULT_DISPLAY)
+        runCatching { ctx.startActivity(intent, opts.toBundle()) }
+            .onSuccess { AppLog.i("LAUNCHER запрос разрешений карточки «Телефон» открыт на телефоне", false) }
+            .onFailure { AppLog.i("LAUNCHER запрос разрешений на телефоне: ${it.javaClass.simpleName}: ${it.message}", false) }
+    }
 
     /** Выбор в Picker: приложение уходит в нижний ряд главного, туда же и возвращаемся. */
     fun addApp(ref: AppRef) {

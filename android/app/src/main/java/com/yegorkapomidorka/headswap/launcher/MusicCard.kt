@@ -46,8 +46,9 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 
 private val MusicBase = Color(0xFF211C10)
-/** Плашка под чипом плееров и «Нравится»: rgba(14,20,26,.62). */
-private val ChipBg = Color(14, 20, 26, 158)
+/** Стеклянная подложка чипа плееров (и кнопки «Вид карточки» на карте в ленте): rgba(14,20,26,.33), обводка белым .16. */
+val GlassBg = Color(14, 20, 26, 84)
+val GlassBorder = Color(1f, 1f, 1f, 0.16f)
 
 /** Фон без обложки (макет v2): диагональный градиент 150deg, поверх золотое и красно-оранжевое пятна. */
 private fun Modifier.musicBackground(): Modifier = drawBehind {
@@ -76,7 +77,7 @@ private fun Modifier.musicBackground(): Modifier = drawBehind {
 }
 
 /**
- * Карточка музыки (макет v2): фон или обложка, сверху чип плееров и «Нравится», внизу название и исполнитель,
+ * Карточка музыки: фон или обложка, справа сверху чип плееров, внизу название и исполнитель,
  * под ними prev / play-pause / next. Без прогресса.
  */
 @Composable
@@ -93,6 +94,8 @@ fun MusicCard(modifier: Modifier) {
     }
     val st = MusicController.state
     val player = st.pkg ?: model.musicPlayer
+    // играет онлайн-плеер - он и становится вторым слотом чипа
+    LaunchedEffect(st.pkg) { model.noteOnlinePlayer(st.pkg) }
     CardBox(modifier, background = Color.Transparent) {
         Box(Modifier.fillMaxSize().musicBackground())
         if (st.art == null) {
@@ -107,14 +110,7 @@ fun MusicCard(modifier: Modifier) {
             0f to Color(8, 11, 15, 140), 0.38f to Color(8, 11, 15, 64), 1f to Color(8, 11, 15, 209))))
         // тап по телу открывает приложение плеера на весь экран справа от рейки
         Pressable(Modifier.fillMaxSize(), description = stringResource(R.string.l_music_players), onTap = { LauncherActions.openMusicApp() }) {}
-        PlayerChipRow(Modifier.align(Alignment.TopStart).padding(start = m.dp(s.g8), top = m.dp(s.g8)))
-        val like = st.like
-        if (st.hasSession && like != null) {
-            RoundButton(
-                s.pcH, stringResource(R.string.l_like), onTap = { MusicController.like() },
-                modifier = Modifier.align(Alignment.TopEnd).padding(top = m.dp(s.g8), end = m.dp(s.g8)), background = ChipBg,
-            ) { SvgIcon(Ico.HEART, s.pcIc, Pal.WHITE, fill = like.liked, stroke = 2f) }
-        }
+        PlayerChipColumn(Modifier.align(Alignment.TopEnd).padding(end = m.dp(s.g8), top = m.dp(s.g8)))
         Column(
             Modifier.align(Alignment.BottomStart).fillMaxWidth().padding(start = m.dp(s.g), end = m.dp(s.g), bottom = m.dp(s.titleB)),
             verticalArrangement = Arrangement.spacedBy(m.dp(s.g4)),
@@ -136,8 +132,8 @@ fun MusicCard(modifier: Modifier) {
             verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceEvenly,
         ) {
             if (st.hasSession) {
-                RoundButton(s.t, stringResource(R.string.l_prev), onTap = { MusicController.previous() }) {
-                    SvgIcon(Ico.PREV, s.ic, Pal.WHITE, fill = true)
+                RoundButton(s.tp, stringResource(R.string.l_prev), onTap = { MusicController.previous() }) {
+                    SvgIcon(Ico.PREV, s.tpIc, Pal.WHITE, fill = true)
                 }
             }
             if (st.hasSession || (st.access && player != null)) {
@@ -147,33 +143,39 @@ fun MusicCard(modifier: Modifier) {
                 }
             }
             if (st.hasSession) {
-                RoundButton(s.t, stringResource(R.string.l_next), onTap = { MusicController.next() }) {
-                    SvgIcon(Ico.NEXT, s.ic, Pal.WHITE, fill = true)
+                RoundButton(s.tp, stringResource(R.string.l_next), onTap = { MusicController.next() }) {
+                    SvgIcon(Ico.NEXT, s.tpIc, Pal.WHITE, fill = true)
                 }
             }
         }
     }
 }
 
-/** Чип плееров: плеер телефона, Я.Музыка, YouTube Music (установленные). Долгий тап по «ноте» - список всех плееров. */
+/**
+ * Чип плееров вертикально в правом верхнем углу: свой плеер («нота») и последний онлайн-плеер. Выбранный слот -
+ * полупрозрачное золото, остальные - белый на 55%. Долгий тап по «ноте» - список всех плееров.
+ */
 @Composable
-private fun PlayerChipRow(modifier: Modifier) {
+private fun PlayerChipColumn(modifier: Modifier) {
     val model = LauncherModel
     val m = LocalMetrics.current
     val s = m.spec
     val accent = LocalAccent.current
-    val slots = PlayerChip.slots(model.installedPackages, model.musicPlayer)
-    Row(
-        modifier.height(m.dp(s.pcH)).clip(RoundedCornerShape(m.dp(s.pcH))).background(ChipBg).padding(m.dp(s.b4)),
-        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(m.dp(s.b4)),
+    val slots = PlayerChip.slots(model.installedPackages, model.musicPlayer, model.lastOnlinePlayer)
+    val shape = RoundedCornerShape(m.dp(s.pcB))
+    // backdrop-blur макета в Compose не повторить (blur размывает своё содержимое, а не фон) - только стекло и обводка
+    Column(
+        modifier.clip(shape).background(GlassBg).border(m.dp(1), GlassBorder, shape).padding(m.dp(s.b4)),
+        horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(m.dp(s.b4)),
     ) {
         for (slot in slots) {
-            val fg = if (slot.selected) Pal.onAccent(accent) else Pal.WHITE
-            val bg = if (slot.selected) accent else Color.Transparent
+            val fg = Pal.WHITE.copy(alpha = if (slot.selected) 0.9f else 0.55f)
+            val bg = if (slot.selected) accent.copy(alpha = 0.32f) else Color.Transparent
             val desc = stringResource(when (slot.kind) {
-                PlayerChip.Kind.PHONE -> R.string.l_player_phone
+                PlayerChip.Kind.PHONE -> R.string.l_player_mine
                 PlayerChip.Kind.YANDEX -> R.string.l_player_yandex
                 PlayerChip.Kind.YT_MUSIC -> R.string.l_player_ytm
+                PlayerChip.Kind.VK -> R.string.l_player_vk
             })
             RoundButton(
                 s.pcB, desc, background = bg,
@@ -184,6 +186,7 @@ private fun PlayerChipRow(modifier: Modifier) {
                     PlayerChip.Kind.PHONE -> SvgIcon(Ico.MUSIC, s.pcIc, fg, stroke = 2.4f)
                     PlayerChip.Kind.YANDEX -> Txt("Я", s.pcIc, color = fg, weight = FontWeight.Bold)
                     PlayerChip.Kind.YT_MUSIC -> VectorIcon(VIco.YT_MUSIC, 24f, s.pcIc, fg)
+                    PlayerChip.Kind.VK -> Txt("VK", s.pcVk, color = fg, weight = FontWeight.Bold)
                 }
             }
         }

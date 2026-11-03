@@ -5,6 +5,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.content.pm.PackageManager
 import android.hardware.usb.UsbAccessory
 import android.hardware.usb.UsbManager
 import android.os.Build
@@ -255,6 +256,11 @@ class MainActivity : Activity() {
                 // проба локальной сети для беспровода: маяк UDP 7999, ответчик 8999 (--ei seconds N --es to <ip>)
                 "net_probe" -> NetProbe.run(this, intent.getIntExtra("seconds", 20), intent.getStringExtra("to"))
                 "net_perm" -> requestLocalNetwork()
+                // кнопка «Открыть запрос на телефоне» карточки «Телефон» лаунчера Headswap Desktop
+                "phone_card_perm" -> {
+                    val ask = com.yegorkapomidorka.headswap.launcher.PhoneController.PERMISSIONS.filter { checkSelfPermission(it) != PackageManager.PERMISSION_GRANTED }
+                    if (ask.isNotEmpty()) requestPermissions(ask.toTypedArray(), REQ_PHONE_CARD)
+                }
                 "open_aa" -> Actions.openAaSettings(this)
                 // автостарт беспровода без Bluetooth машины: то же, что ACL_CONNECTED / ACL_DISCONNECTED выбранной машины
                 "car_auto" -> startForegroundService(Intent(this, BridgeService::class.java).setAction(BridgeService.ACTION_WIFI_B_AUTO))
@@ -306,6 +312,8 @@ class MainActivity : Activity() {
 
         /** adb shell am start -n com.yegorkapomidorka.headswap/.MainActivity --es cmd aa_selftest */
         const val EXTRA_CMD = "cmd"
+        /** Разрешения карточки «Телефон» лаунчера; тот же код, что SettingsScreen.REQ_PHONE_CARD. */
+        const val REQ_PHONE_CARD = 41
         private const val STATE_SCREENS = "screens"
 
         /** Все поля аксессуара одной строкой. Серийник без разрешения на аксессуар бросает SecurityException. */

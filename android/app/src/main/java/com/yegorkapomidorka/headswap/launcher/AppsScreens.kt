@@ -73,7 +73,7 @@ private fun PageArrow(icon: List<String>, description: String, enabled: Boolean,
     val s = m.spec
     RoundButton(s.t, description, onTap, enabled = enabled,
         background = if (enabled) Color(0x24FFFFFF) else Color(0x0FFFFFFF)) {
-        SvgIcon(icon, s.ic, if (enabled) Pal.WHITE else Color(0xFF6B7590), stroke = 2.6f)
+        SvgIcon(icon, s.ic, if (enabled) Pal.WHITE else Color(0xFF5F6A80), stroke = 2.6f)
     }
 }
 
