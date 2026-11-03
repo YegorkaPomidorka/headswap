@@ -146,6 +146,9 @@ class DevScreen(host: MainActivity) : Screen(host) {
         refreshTouchDecimation()
 
         body.addView(c.sectionTitle(c.getString(R.string.dev_section_video)))
+        body.addView(
+            group(listOf(row(c.getString(R.string.dev_own_idr_title), c.getString(R.string.dev_own_idr_sub), aa.ownIdr) { aa.ownIdr = it })),
+        )
         body.addView(customResCard())
 
         body.addView(c.sectionTitle(c.getString(R.string.dev_section_actions)))
