@@ -114,7 +114,6 @@ CONTROL0, SENSOR1, VIDEO2, INPUT3, SPEECH4, SYSTEM5, MEDIA6, MIC7, BT8, MEDIA_PL
 |---|---|---|
 | `huDesayG6S` | Mazda CX-5 Desay G6S, ch 20622116 | без маршрутного NAVI=1; на PAUSE пустой VIDEO_DATA (USB) / heartbeat (воздух) |
 | `huHonda` | ch 2077xxxx/2083xxxx | roadName под приборку, ждать подписку, перевзвод NAVI |
-| `huHonda20772121` | Civic 11, Vezel 20832125 | IDR по тапу после камеры (h295) |
 | `huVw20082120` | ch 20082120/22/34/14, 21290002 | **по смыслу «heartbeat на PAUSE каждые 100 мс»**, имя историческое (ADR 0007) |
 | `huIdleVideoHeartbeat` | 20082114, 21290002 | heartbeat и без PAUSE после 1 с без кадров |
 | `huVwCns2Delphi` | 20082114 | речь в канал VR, пейсер тача, свои кнопки звонка |
@@ -174,7 +173,7 @@ CONTROL0, SENSOR1, VIDEO2, INPUT3, SPEECH4, SYSTEM5, MEDIA6, MIC7, BT8, MEDIA_PL
 | EIO через секунды после PAUSE | heartbeat на PAUSE: `CarLifeSession.pauseHeartbeat`, флаг `huVw20082120`; ADR 0007 |
 | EIO сразу после крупного IDR | `IdrBitrateCeiling`, потолки по каналу; ADR 0008 |
 | USB встаёт после большого пакета | нарезка `Wire.CHUNK`, `huMazda20622111`; ADR 0009 |
-| Чёрный экран после камеры заднего хода | свой IDR (`IdrSplice`), `huHonda20772121`; ADR 0005 |
+| Чёрный экран после камеры заднего хода | свой IDR (`IdrSplice`); ADR 0005 |
 | Поля, растянуто, не тот размер | `VideoMode`, `SpsCrop`, VIDEO_ENCODER_INIT в логе |
 | AA не подключается, `нет VERSION_RESPONSE` | сервер 5277 заглох: ADR 0003; база кейсов (память `hu/`) |
 | Обрывы по воздуху | `MultiSocketTransport`, `P2pJoin`, `CarNetwork`, строки `WL`; VPN рвёт сокеты |
