@@ -23,7 +23,7 @@ class OnboardingPathTest {
         val q = OnboardingPath.queue(BridgeMode.DESKTOP, true, false, none)
         assertEquals(
             listOf(
-                StepId.MODE, StepId.DEVMODE, StepId.ACTIVATE, StepId.NOTIF, StepId.BACKGROUND,
+                StepId.MODE, StepId.DEVMODE, StepId.NOTIF, StepId.ACTIVATE, StepId.BACKGROUND,
                 StepId.MIC, StepId.BLUETOOTH, StepId.LOCATION, StepId.FIRST, StepId.CAR,
             ),
             q,
@@ -50,9 +50,9 @@ class OnboardingPathTest {
     fun developerModeAlreadyOnIsSkippedOnFirstRun() {
         val q = OnboardingPath.queue(BridgeMode.DESKTOP, true, false, { it == StepId.DEVMODE })
         assertFalse(StepId.DEVMODE in q)
-        assertEquals(StepId.ACTIVATE, q[1])
+        assertEquals(StepId.NOTIF, q[1])
         // номер шага считается по очереди без пропущенного
-        assertEquals(2 to 9, OnboardingPath.progress(q, StepId.ACTIVATE))
+        assertEquals(3 to 9, OnboardingPath.progress(q, StepId.ACTIVATE))
     }
 
     @Test
@@ -64,9 +64,9 @@ class OnboardingPathTest {
     @Test
     fun resumesAfterActivationRestart() {
         // активация перезапускает приложение: режим отмечен, режим разработчика включён, доступ есть - идём дальше
-        val done = setOf(StepId.MODE, StepId.DEVMODE, StepId.ACTIVATE)
+        val done = setOf(StepId.MODE, StepId.DEVMODE, StepId.NOTIF, StepId.ACTIVATE)
         val q = OnboardingPath.queue(BridgeMode.DESKTOP, true, false, { it in done })
-        assertEquals(StepId.NOTIF, q.first())
+        assertEquals(StepId.BACKGROUND, q.first())
     }
 
     @Test
@@ -95,7 +95,7 @@ class OnboardingPathTest {
         assertEquals(1 to 11, OnboardingPath.progress(aa, StepId.MODE))
         assertEquals(2 to 11, OnboardingPath.progress(aa, StepId.AA_DEV))
         assertEquals(1 to 10, OnboardingPath.progress(launcher, StepId.MODE))
-        assertEquals(3 to 10, OnboardingPath.progress(launcher, StepId.ACTIVATE))
+        assertEquals(4 to 10, OnboardingPath.progress(launcher, StepId.ACTIVATE))
         assertEquals(10 to 10, OnboardingPath.progress(launcher, StepId.CAR))
         assertEquals(1 to 10, OnboardingPath.progress(launcher, StepId.AA_DEV))      // нет в пути - первый
     }

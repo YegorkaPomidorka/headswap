@@ -10,9 +10,12 @@ object OnboardingPath {
         StepId.MIC, StepId.BLUETOOTH, StepId.LOCATION, StepId.FIRST, StepId.CAR,
     )
 
-    /** Свой лаунчер: режим разработчика и активация, дальше общие шаги без сервера ГУ Android Auto. */
+    /**
+     * Свой лаунчер: режим разработчика и активация, дальше общие шаги без сервера ГУ Android Auto. Уведомления до
+     * активации: код сопряжения вводится в уведомлении, иначе запрос разрешения всплывает посреди шага активации.
+     */
     val LAUNCHER = listOf(
-        StepId.DEVMODE, StepId.ACTIVATE, StepId.NOTIF, StepId.BACKGROUND,
+        StepId.DEVMODE, StepId.NOTIF, StepId.ACTIVATE, StepId.BACKGROUND,
         StepId.MIC, StepId.BLUETOOTH, StepId.LOCATION, StepId.FIRST, StepId.CAR,
     )
 
