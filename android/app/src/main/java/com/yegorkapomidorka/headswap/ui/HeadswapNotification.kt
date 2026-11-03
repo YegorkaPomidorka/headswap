@@ -15,6 +15,7 @@ import com.yegorkapomidorka.headswap.AppLocale
 import com.yegorkapomidorka.headswap.MainActivity
 import com.yegorkapomidorka.headswap.CarLifeState
 import com.yegorkapomidorka.headswap.R
+import com.yegorkapomidorka.headswap.dex.DexState
 
 /**
  * Уведомление foreground-сервиса по Notification.dc.html: заголовок = состояние, текст = этапы, действие «Стоп».
@@ -34,7 +35,38 @@ object HeadswapNotification {
         return n
     }
 
+    /** Режим Headswap Desktop: статус рабочего стола вместо этапов AA, без действия «Открыть Android Auto». */
+    private fun desktopText(): String = DexState.error ?: "${DexState.status} · ${CarLifeState.status}"
+
+    private fun desktopFrom(ctx: Context, channel: String): Notification {
+        val loc = AppLocale.wrap(ctx)
+        val text = desktopText()
+        val stop = PendingIntent.getBroadcast(
+            ctx, 2, Intent(ctx, StopReceiver::class.java), PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+        )
+        val b = Notification.Builder(ctx, channel)
+            .setSmallIcon(R.drawable.ic_stat_headswap)
+            .setColor(0xFFF2B33D.toInt())
+            .setContentTitle(loc.getString(R.string.desk_notif_title))
+            .setContentText(text)
+            .setStyle(Notification.BigTextStyle().bigText(text))
+            .setOngoing(true)
+            .setOnlyAlertOnce(true)
+            .setCategory(Notification.CATEGORY_SERVICE)
+            .setShowWhen(false)
+            .setContentIntent(
+                PendingIntent.getActivity(
+                    ctx, 0, Intent(ctx, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP),
+                    PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+                ),
+            )
+            .addAction(Notification.Action.Builder(Icon.createWithResource(ctx, R.drawable.ic_stop), loc.getString(R.string.action_stop), stop).build())
+        if (Build.VERSION.SDK_INT >= 31) b.setForegroundServiceBehavior(Notification.FOREGROUND_SERVICE_IMMEDIATE)
+        return b.build()
+    }
+
     private fun from(ctx: Context, channel: String, st: HomeState): Notification {
+        if (DexState.desktopSession) return desktopFrom(ctx, channel)
         val loc = AppLocale.wrap(ctx)       // applicationContext не знает выбранного языка на Android 10-12
         val b = Notification.Builder(ctx, channel)
             .setSmallIcon(R.drawable.ic_stat_headswap)
@@ -82,7 +114,8 @@ object HeadswapNotification {
                     return
                 }
                 val loc = AppLocale.wrap(app)
-                val key = "${st.notifTitle.get(loc)}|${st.notifText.get(loc)}|${st.graceLeftS}|${st.phase}"
+                val key = if (DexState.desktopSession) "desktop|${desktopText()}"
+                else "${st.notifTitle.get(loc)}|${st.notifText.get(loc)}|${st.graceLeftS}|${st.phase}"
                 if (key != lastKey) {
                     lastKey = key
                     nm.notify(notifId, from(app, channel, st))

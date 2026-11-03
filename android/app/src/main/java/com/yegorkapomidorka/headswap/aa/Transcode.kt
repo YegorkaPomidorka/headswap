@@ -2,6 +2,23 @@ package com.yegorkapomidorka.headswap.aa
 
 import com.yegorkapomidorka.headswap.AnnexB
 
+/** A producer may render directly into this surface; its lifetime belongs to the encoder. */
+interface SurfaceVideoInput {
+    val surface: android.view.Surface
+    val width: Int get() = DesktopVideoGeometry.WIDTH
+    val height: Int get() = DesktopVideoGeometry.HEIGHT
+    val density: Int get() = DesktopVideoGeometry.density
+}
+
+/** All callbacks run in order on a worker, never under the bridge monitor. */
+interface DesktopSurfaceListener {
+    fun onSurfaceAvailable(generation: Long, input: SurfaceVideoInput)
+
+    /** Release the matching virtual display before returning, before its consumer is destroyed. */
+    fun onSurfaceClosing(generation: Long)
+    fun onFirstFrame(generation: Long) {}
+}
+
 /** Куда транскодер отдаёт результат (реализует ядро моста). Вызовы идут с нитей MediaCodec. */
 interface TranscodeOutput {
     /** SPS+PPS энкодера (Annex-B, 4-байтные старт-коды). */
@@ -21,6 +38,9 @@ interface TranscodeOutput {
  * (AaTranscoder); ядро моста работает с интерфейсом, чтобы логика проверялась на JVM.
  */
 interface VideoTranscoder {
+    /** Non-null only for an encoder accepting raw surface frames instead of compressed AA video. */
+    val surfaceInput: SurfaceVideoInput? get() = null
+
     /**
      * CODEC_CONFIG AA (SPS+PPS). Новый SPS -> декодер будет пересоздан на следующем IDR.
      * Не блокирует, обрабатывается на нити транскодера; "nofeedthread" в tuning - старый синхронный путь.

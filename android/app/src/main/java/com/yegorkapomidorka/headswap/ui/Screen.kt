@@ -61,6 +61,11 @@ class UiPrefs(ctx: Context) {
         get() = sp.getBoolean("v30NoticeShown", false)
         set(v) = sp.edit().putBoolean("v30NoticeShown", v).apply()
 
+    /** Окно «Свой лаунчер на магнитоле» (4.0) уже показывали или оно не нужно (новичок, Android ниже 13). */
+    var v40NoticeShown: Boolean
+        get() = sp.getBoolean("v40NoticeShown", false)
+        set(v) = sp.edit().putBoolean("v40NoticeShown", v).apply()
+
     /** Тема интерфейса: system / light / medium / dark (см. AppTheme). */
     var theme: String
         get() = sp.getString("theme", "system") ?: "system"

@@ -71,6 +71,9 @@ class UpdatePrefs(ctx: Context) {
  * Состояние для экранов - поля [step], [progress], [error] (экраны опрашивают их в tick).
  */
 object Updater {
+    /** Ветка 4.0: тестовые сборки ставятся руками, публичные релизы 3.x им не предлагаем. */
+    const val ENABLED = false
+
     enum class Step { IDLE, CHECKING, DOWNLOADING, INSTALLING }
 
     @Volatile
@@ -103,7 +106,7 @@ object Updater {
         ).also { installed = it }
 
     /** Сохранённый релиз, если он новее установленной версии. */
-    fun available(ctx: Context): UpdateLogic.Release? =
+    fun available(ctx: Context): UpdateLogic.Release? = if (!ENABLED) null else
         UpdatePrefs(ctx).release()?.takeIf { UpdateLogic.isNewer(it.version, installedVersion(ctx)) }
 
     /** Плашка на главном экране: проверка включена, есть новее и её не закрыли. */
@@ -132,6 +135,7 @@ object Updater {
 
     /** Запросить последний релиз в фоне. manual: ошибку показать тостом. */
     fun check(ctx: Context, manual: Boolean) {
+        if (!ENABLED) return
         synchronized(this) {
             if (step != Step.IDLE) return
             step = Step.CHECKING

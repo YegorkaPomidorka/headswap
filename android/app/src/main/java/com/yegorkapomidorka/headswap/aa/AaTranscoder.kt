@@ -42,6 +42,10 @@ class AaTranscoder(
     private val crop: VideoCrop = VideoCrop.NONE,
     /** Энкодер как у Baidu (MediaFormatUtils :41-60): Baseline, level 256 (AVCLevel3), VBR, I-frame 1 с, повтор кадра 100 мс; fps и битрейт задаёт вызывающий. */
     private val baidu: Boolean = false,
+    /** Virtual display -> GL -> one encoder. No decoder or compressed-input thread is created. */
+    private val directSurface: Boolean = false,
+    /** Validate the requested ceiling even when thermal protection starts the encoder at a lower rate. */
+    private val capabilityFps: Int = fps,
 ) : VideoTranscoder {
     private var encoder: MediaCodec? = null
     private var surface: Surface? = null
@@ -67,7 +71,7 @@ class AaTranscoder(
     private var needIdr = true
 
     // нить кормления: вся работа с декодером уезжает с нити AA сюда
-    private val threaded = !tuning.contains("nofeedthread")
+    private val threaded = !directSurface && !tuning.contains("nofeedthread")
     private val queue = FeedQueue()
     private var feedThread: Thread? = null
 
@@ -96,7 +100,12 @@ class AaTranscoder(
     @Synchronized
     fun start() {
         if (running) return
-        val c = MediaCodec.createEncoderByType(MIME)
+        require(!directSurface || (srcWidth == width && srcHeight == height && crop.isNone)) {
+            "Direct desktop input must use native output geometry without crop"
+        }
+        val c = if (directSurface) MediaCodec.createByCodecName(
+            DesktopEncoderSupport.encoderName(width, height, maxOf(fps, capabilityFps), bitrate))
+            else MediaCodec.createEncoderByType(MIME)
         encoderName = c.name
         var configured = false
         var lastErr: Exception? = null
@@ -151,11 +160,17 @@ class AaTranscoder(
         } catch (_: Exception) {
             -1
         }
-        if (!tuning.contains("nogl")) {
+        if (directSurface || !tuning.contains("nogl")) {
             // декодер -> GL-реле -> Surface энкодера: реле перерисовывает последний кадр на статике (>= 10 fps)
             try {
-                relay = GlRelay(surface!!, width, height, REDRAW_IDLE_MS, log, srcWidth, srcHeight, crop, target).also { it.start() }
+                relay = GlRelay(surface!!, width, height, REDRAW_IDLE_MS, log, srcWidth, srcHeight, crop, target, limitHighFps = directSurface).also { it.start() }
             } catch (e: Exception) {
+                if (directSurface) {
+                    // Direct input depends on GL for pacing and idle redraw. Never silently
+                    // switch to an unpaced surface or leave a configured codec allocated.
+                    stop()
+                    throw IllegalStateException("Desktop GL input could not be created", e)
+                }
                 log("транскодер: GL-реле не поднялось (${e.message}), декодер пишет прямо в энкодер")
                 relay = null
             }
@@ -167,13 +182,22 @@ class AaTranscoder(
             queue.clear()
             feedThread = Thread({ feedLoop() }, "aa-trans-feed").also { it.start() }
         }
-        log("транскодер: энкодер $encoderName ${width}x$height (вход AA ${srcWidth}x$srcHeight${if (crop.isNone) "" else ", кроп $crop"}) ${fps}fps ${bitrate / 1000}kbps ($encoderNote)")
+        log("транскодер: энкодер $encoderName ${width}x$height (вход ${if (directSurface) "Surface DeX, одно кодирование" else "AA"} ${srcWidth}x$srcHeight${if (crop.isNone) "" else ", кроп $crop"}) ${fps}fps ${bitrate / 1000}kbps ($encoderNote)")
     }
+
+    override val surfaceInput: SurfaceVideoInput?
+        @Synchronized get() {
+            if (!directSurface || !running) return null
+            val input = relay?.inputSurface ?: return null
+            return object : SurfaceVideoInput { override val surface: Surface = input }
+        }
 
     override val targetFps: Int get() = target
 
     /** Целевая частота на лету: только гейт GL-реле, кодек не пересоздаётся (KEY_FRAME_RATE остаётся начальным). */
     override fun setTargetFps(fps: Int) {
+        if (directSurface && fps > maxOf(capabilityFps, target)) DesktopEncoderSupport.requireSupported(
+            checkNotNull(encoder) { "Энкодер рабочего стола ещё не создан" }.codecInfo, width, height, fps, curBitrate)
         val old = target
         target = fps
         val r = relay
@@ -240,6 +264,7 @@ class AaTranscoder(
 
     /** Не блокирует: в режиме нити кладёт в очередь, разбор SPS/PPS делает нить кормления. */
     override fun feedConfig(annexB: ByteArray) {
+        if (directSurface) return
         if (threaded) queue.post(FeedItem.Config(annexB)) else processConfig(annexB)
     }
 
@@ -259,6 +284,7 @@ class AaTranscoder(
      * мост получает onNeedAaKeyFrame один раз на эпизод. Колбэк зовётся на нити вызывающего, не под lock.
      */
     override fun feedFrame(annexB: ByteArray, ptsUs: Long) {
+        if (directSurface) return
         if (!running) return
         winIn.incrementAndGet()
         totalIn.incrementAndGet()
@@ -448,6 +474,7 @@ class AaTranscoder(
 
     /** Не блокирует: в режиме нити команда встаёт в очередь после уже принятых кадров, те до сброса и обработаются. */
     override fun resetDecoder() {
+        if (directSurface) return
         if (threaded) queue.post(FeedItem.Reset) else processReset()
     }
 
@@ -549,6 +576,8 @@ class AaTranscoder(
         val gatedWin = gatedNow - lastGated
         lastGated = gatedNow
         val queueNote = if (threaded) ", очередь кормления макс ${queue.resetMaxPending()}" else ""
+        if (directSurface) return "Surface: одно кодирование за %.1f с, выход энкодера %d (%.1f fps), повторов GL %d, задержано гейтом fps %d, потеряно %d; задержка энкодера %.1f мс"
+            .format(sec, outN, outN / sec, repeats, gatedWin, drop, encMs)
         return ("транскод за %.1f с: вход AA %d, декодировано %d, выход энкодера %d (%.1f fps), повторов (перерисовок GL) %d, задержано гейтом fps %d, потеряно %d; задержка декодер %.1f мс + энкодер %.1f мс = %.1f мс"
             .format(sec, inN, dec, outN, outN / sec, repeats, gatedWin, drop, decMs, encMs, decMs + encMs)) + queueNote
     }

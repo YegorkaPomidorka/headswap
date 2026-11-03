@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Home screen in the “Own launcher” mode -->
+<resources>
+    <string name="home_desk_stage_activation">Activation</string>
+    <string name="home_desk_stage_headunit">Head unit</string>
+    <string name="home_desk_stage_desktop">Home screen</string>
+    <string name="home_desk_stage_video">Video</string>
+    <string name="home_desk_stage_audio">Sound</string>
+
+    <string name="home_desk_st_active">active</string>
+    <string name="home_desk_st_needed">needed</string>
+    <string name="home_desk_st_needed_again">needed again</string>
+    <string name="home_desk_st_error">error</string>
+
+    <string name="home_desk_title_activate">Activate Headswap</string>
+    <string name="home_desk_title_error">The home screen did not start</string>
+
+    <string name="home_desk_sub_activate">A one-time activation via “Wireless debugging” is needed.</string>
+    <string name="home_desk_sub_activate_paired">The activation is lost after a phone restart. Repeat it via “Wireless debugging”: half a minute.</string>
+    <string name="home_desk_sub_ok">%1$s on the car screen. You can put the phone away.</string>
+    <string name="home_desk_sub_starting">Starting the home screen.</string>
+
+    <string name="home_desk_btn_activate">Activate</string>
+    <string name="home_desk_btn_stop">Stop</string>
+</resources>

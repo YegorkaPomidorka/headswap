@@ -18,6 +18,7 @@
     <color name="onok_mid">#00391F</color>
     <color name="warn_mid">#D4AC94</color>
     <color name="warnc_mid">#4A3A32</color>
+    <color name="onwarnc_mid">#F0DCCB</color>
     <color name="err_mid">#FFB4A9</color>
     <color name="errc_mid">#6E1912</color>
     <color name="onerr_mid">#690003</color>

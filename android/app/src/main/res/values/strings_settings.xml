@@ -186,6 +186,8 @@
     <string name="fps_15_sub">Lighter for weak head units and the link</string>
     <string name="fps_30_title">30 fps</string>
     <string name="fps_30_sub">Smoother, but heavier</string>
+    <string name="fps_60_title">60 fps</string>
+    <string name="fps_60_sub">Higher frame-rate target; requires capable phone and head unit</string>
 
     <!-- Wireless (branch B) -->
     <string name="wl_title">Wireless</string>
@@ -255,4 +257,26 @@
     <string name="car_auto">Auto</string>
     <string name="car_value_keep">Unchanged</string>
     <string name="car_apply">Apply</string>
+
+    <!-- Bridge mode: Android Auto / Headswap Desktop (SettingsSection.MODE) -->
+    <string name="bm_title">Mode</string>
+    <string name="bm_aa" translatable="false">Android Auto</string>
+    <string name="bm_desktop" translatable="false">Headswap Desktop</string>
+    <string name="bm_aa_note">The head unit shows Android Auto from your phone.</string>
+    <string name="bm_own_launcher">Own launcher</string>
+    <string name="bm_launcher_title">Launcher</string>
+    <string name="bm_launcher_own" translatable="false">Headswap</string>
+    <string name="bm_need_13">Android 13+ required</string>
+    <string name="bm_sum_state">%1$s · %2$s</string>
+    <string name="bm_act_on">Activated</string>
+    <string name="bm_act_off">Not activated</string>
+    <string name="bm_act_lost">Access lost, activate again</string>
+    <string name="about_title">About</string>
+    <string name="about_note">Authors and licenses</string>
+    <string name="about_authors">Authors</string>
+    <string name="about_opensource">Open source</string>
+    <string name="about_author_yegor">Yegor</string>
+    <string name="about_author_ildar">Ildar Sadykov</string>
+    <string name="about_open_project">Project page</string>
+    <string name="about_license_unavailable">License text is not available. See the project page.</string>
 </resources>

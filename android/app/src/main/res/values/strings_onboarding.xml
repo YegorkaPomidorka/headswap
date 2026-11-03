@@ -37,6 +37,7 @@
         <item>Tap “Allow” in the Android window “Allow Headswap to send you notifications?”</item>
     </string-array>
     <string name="step_notif_hint">The notification shade shows how the connection is going, and Android will not unload Headswap while the screen is off.</string>
+    <string name="step_notif_hint_launcher">The Headswap activation code is entered right in the notification. The notification shade also shows how the connection to the head unit is going.</string>
     <string name="step_notif_short">Notifications</string>
 
     <!-- Items 3-4 (autostart) are shown on Xiaomi only -->
@@ -110,4 +111,34 @@
     <string name="step_car_title">Which car do you have?</string>
     <string name="step_car_short">Car</string>
     <string name="step_car_body">We will fill in the settings the community verified on this car. Experienced users can skip this step.</string>
+
+    <!-- Mode choice and the “Own launcher” path (OnboardingMode.dc.html) -->
+    <string name="step_mode_title">Choose a mode</string>
+    <string name="step_mode_subtitle">What to show on the head unit. You can change it in Settings at any time.</string>
+    <string name="step_mode_aa_body">Standard AA: maps, music and calls from Android Auto. Works through its head-unit server.</string>
+    <string name="step_mode_own_body">The head unit shows the Headswap desktop or a car launcher from the phone.</string>
+    <string name="step_mode_warn_title">Attention</string>
+    <string name="step_mode_warn_body">This mode needs Android developer mode and Headswap activation through “Wireless debugging”.</string>
+    <string name="step_mode_warn_risk">These are risky settings. You turn them on at your own risk.</string>
+    <string name="step_mode_primary">Next</string>
+    <string name="step_mode_short">Mode</string>
+
+    <string name="step_devmode_title">Turn on developer mode</string>
+    <string-array name="step_devmode_list">
+        <item>Tap “Open settings”, “About phone” opens</item>
+        <item>Tap “Build number” 7 times until “You are now a developer” appears</item>
+        <item>If the phone asks, enter its PIN</item>
+    </string-array>
+    <string name="step_devmode_hint">Developer mode is needed only for “Wireless debugging”. If it is already on, tap “Already done”.</string>
+    <string name="step_devmode_primary">Open settings</string>
+    <string name="step_devmode_short">Developer mode</string>
+
+    <!-- Items and hint of the activation step; title, buttons and status come from PhoneActivationBlock -->
+    <string-array name="step_activate_list">
+        <item>Tap “Activate”, “Developer options” opens (on Xiaomi: Additional settings → Developer options)</item>
+        <item>Turn on “Wireless debugging” and tap “Pair device with pairing code”</item>
+        <item>Type the code shown into the Headswap notification</item>
+    </string-array>
+    <string name="step_activate_hint">Activation is lost after the phone reboots. Headswap will ask you to repeat it, it takes half a minute.</string>
+    <string name="step_activate_short">Headswap activation</string>
 </resources>

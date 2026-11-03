@@ -2,6 +2,7 @@ package com.yegorkapomidorka.headswap.ui
 
 import android.animation.ObjectAnimator
 import android.graphics.Typeface
+import android.os.Build
 import android.text.SpannableString
 import android.text.Spanned
 import android.text.TextUtils
@@ -20,10 +21,15 @@ import com.yegorkapomidorka.headswap.AppTheme
 import com.yegorkapomidorka.headswap.CarLifeState
 import com.yegorkapomidorka.headswap.MainActivity
 import com.yegorkapomidorka.headswap.R
+import com.yegorkapomidorka.headswap.aa.AaPrefs
 import com.yegorkapomidorka.headswap.aa.AaServerCheck
+import com.yegorkapomidorka.headswap.aa.BridgeMode
 import com.yegorkapomidorka.headswap.update.Updater
 
-/** Главный экран «Готов к поездке» (Main.dc.html): шесть состояний, этапы, кнопки; сверху плашка обновления. */
+/**
+ * Главный экран «Готов к поездке» (Main.dc.html): шесть состояний, этапы, кнопки; сверху плашка обновления.
+ * В режиме «Свой лаунчер» тот же скелет с другими этапами, текстами и кнопками (DesktopHomeLogic).
+ */
 class HomeScreen(host: MainActivity) : Screen(host) {
     private val root = ctx.vbox()
     override val view: View get() = root
@@ -34,6 +40,15 @@ class HomeScreen(host: MainActivity) : Screen(host) {
     private val stagesBox = ctx.vbox()
     private val footer = ctx.vbox(4)
     private var lastState: HomeState? = null
+    private var lastDesk: DesktopHomeState? = null
+    private var desktopMode = false
+    /** Плашка «Свой лаунчер» справа от названия; видна только в режиме DESKTOP. */
+    private val modeChip: TextView = ctx.text(ctx.getString(R.string.bm_own_launcher), 12f, 600, ctx.clr(R.color.on2)).apply {
+        background = ctx.shape(ctx.clr(R.color.surf2), 8)
+        pad(ctx, 8, 3, 8, 3)
+        visibility = View.GONE
+    }
+    private var activation: PhoneActivationBlock? = null
     private var lastWireless: String? = null
     private val rings = ArrayList<ObjectAnimator>()
     private var graceLeftText: TextView? = null
@@ -50,6 +65,7 @@ class HomeScreen(host: MainActivity) : Screen(host) {
             }
             addView(chip, lp(c.dp(32), c.dp(32)))
             addView(c.text("Headswap", 22f, 600).apply { letterSpacing = -0.01f }, lp(WRAP, WRAP).margins(c, 10))
+            addView(modeChip, lp(WRAP, WRAP).margins(c, 8))
             addView(View(c), lp(0, 1, 1f))
             addView(c.iconButton(R.drawable.ic_settings, c.clr(R.color.on2), c.getString(R.string.home_settings)).apply {
                 setOnClickListener { host.showSettings() }
@@ -73,9 +89,22 @@ class HomeScreen(host: MainActivity) : Screen(host) {
 
     override fun onShow() {
         lastState = null
+        lastDesk = null
         updKey = null
-        AaServerCheck.wantAuto()       // открыли экран: проверяем сервер ГУ короткой сессией
+        syncMode()
+        // открыли экран: проверяем сервер ГУ короткой сессией (в режиме «Свой лаунчер» порт 5277 не нужен)
+        if (!desktopMode) AaServerCheck.wantAuto()
         tick()
+    }
+
+    /** Режим, который реально применяется (на Android ниже 13 «Свой лаунчер» - это Android Auto); плашка в шапке по нему. */
+    private fun syncMode() {
+        desktopMode = BridgeMode.effective(AaPrefs(ctx).bridgeMode, Build.VERSION.SDK_INT) == BridgeMode.DESKTOP
+        modeChip.visibility = if (desktopMode) View.VISIBLE else View.GONE
+    }
+
+    override fun onPermissionResult() {
+        activation?.onPermissionResult()
     }
 
     /** Строка беспровода в карточке статуса: только когда режим включён и USB-сессии нет. */
@@ -93,6 +122,13 @@ class HomeScreen(host: MainActivity) : Screen(host) {
 
     override fun tick() {
         refreshUpdate()
+        val wasDesktop = desktopMode
+        syncMode()
+        if (desktopMode != wasDesktop) { lastState = null; lastDesk = null }
+        if (desktopMode) {
+            tickDesktop()
+            return
+        }
         AaServerCheck.autoTick(ctx)
         val st = HeadswapStatus.current(ctx)
         val wl = wirelessLine()
@@ -159,47 +195,11 @@ class HomeScreen(host: MainActivity) : Screen(host) {
     private fun render(st: HomeState) {
         val c = ctx
         onHide()
-        val night = c.isNight
-        val (bgRes, fgRes, onFgRes, textRes) = when (st.tone) {
-            Tone.PRI -> listOf(R.color.pric, R.color.pri, R.color.onpri, if (night) R.color.on else R.color.acc)
-            Tone.OK -> listOf(R.color.okc, R.color.ok, R.color.onok, if (night) R.color.on else R.color.ok)
-            Tone.WARN -> listOf(R.color.warnc, R.color.warn, R.color.warnc, if (night) R.color.on else R.color.warn)
-            Tone.ERR -> listOf(R.color.errc, R.color.err, R.color.onerr, if (night) R.color.on else R.color.err)
-        }
-        heroBox.removeAllViews()
-        heroBox.background = c.shape(c.clr(bgRes), 28)
-        heroBox.pad(c, 20, 20, 20, 20)
-        val iconRes = when (st.icon) {
-            HeroIcon.POWER -> R.drawable.ic_power
-            HeroIcon.PLUG -> R.drawable.ic_plug
-            HeroIcon.CAR -> R.drawable.ic_car
-            HeroIcon.CAR_USB -> R.drawable.ic_car_usb
-            HeroIcon.CAR_WIFI -> R.drawable.ic_car_wifi
-            HeroIcon.REFRESH -> R.drawable.ic_refresh
-            HeroIcon.ALERT -> R.drawable.ic_alert
-        }
-        // слева значок в кружке, справа заголовок в одну строку; подзаголовок ниже на всю ширину
-        heroBox.addView(c.hbox(12).apply {
-            addView(FrameLayout(c).apply {
-                background = c.oval(c.clr(fgRes))
-                addView(c.icon(iconRes, 24, c.clr(onFgRes)), FrameLayout.LayoutParams(c.dp(24), c.dp(24), Gravity.CENTER))
-            }, lp(c.dp(44), c.dp(44)))
-            addView(c.text(st.title.get(c), 20f, 600, c.clr(textRes)).apply {
-                letterSpacing = -0.015f
-                lineHeight = c.dp(26)
-                maxLines = 1
-                ellipsize = TextUtils.TruncateAt.END
-            }, lp(0, WRAP, 1f))
-        }, lp(MATCH, WRAP))
-        heroBox.addView(c.vbox(6).apply {
-            addView(c.text(st.sub.get(c), 16f, 400).apply { lineHeight = c.dp(22) })
-            lastWireless?.let { addView(c.text(it, 14f, 400, c.clr(R.color.on2))) }
-        }, lp(MATCH, WRAP))
+        renderHero(st.tone, st.icon, st.title.get(c), st.sub.get(c), lastWireless)
         if (st.showChain) heroBox.addView(chain(), lp(MATCH, WRAP))
         if (st.phase == Phase.RECONNECTING) heroBox.addView(graceBlock(st), lp(MATCH, WRAP))
 
-        stagesBox.removeAllViews()
-        for ((label, sm) in st.stages) stagesBox.addView(stageRow(label.get(c), sm.first, sm.second.get(c)), c.lpDp(MATCH, 52))
+        renderStages(st.stages)
 
         footer.removeAllViews()
         // сервер ГУ включает пользователь сам: и первый запуск, и после обрыва кнопка ведёт в настройки Android Auto
@@ -218,6 +218,85 @@ class HomeScreen(host: MainActivity) : Screen(host) {
             footer.addView(c.outlineButton(c.getString(R.string.home_btn_open_aa), R.drawable.ic_open).apply { setOnClickListener { Actions.openAaSettings(c) } })
         }
         if (st.phase == Phase.RECONNECTING) updateGrace(st)
+    }
+
+    private fun tickDesktop() {
+        val st = DesktopHomeStatus.current(ctx)
+        if (st == lastDesk) return
+        lastDesk = st
+        renderDesktop(st)
+    }
+
+    /** «Свой лаунчер»: герой-карточка и этапы те же, что у Android Auto, кнопки внизу свои. */
+    private fun renderDesktop(st: DesktopHomeState) {
+        val c = ctx
+        onHide()
+        renderHero(st.tone, st.icon, st.title.get(c), st.sub.get(c), null)
+        renderStages(st.stages)
+        footer.removeAllViews()
+        for (b in st.buttons) {
+            footer.addView(
+                when (b) {
+                    DesktopButton.ACTIVATE -> c.primaryButton(c.getString(R.string.home_desk_btn_activate), R.drawable.ic_key).apply { setOnClickListener { activate() } }
+                    DesktopButton.STOP -> c.outlineButton(c.getString(R.string.home_desk_btn_stop), R.drawable.ic_stop).apply { setOnClickListener { Actions.stopBridge(c) } }
+                    DesktopButton.DIAG -> c.tonalButton(c.getString(R.string.diag_home_btn)).apply { setOnClickListener { host.showDiag() } }
+                },
+            )
+        }
+    }
+
+    /** Тот же поток, что у шага ACTIVATE онбординга и блока в «Режиме»: PhoneActivationBlock без показа (embedded), кнопка здесь. */
+    private fun activate() {
+        val block = activation ?: PhoneActivationBlock(host, embedded = true).also { activation = it }
+        block.activateNow()
+    }
+
+    /** Герой-карточка: тон, значок в кружке, заголовок в одну строку, подзаголовок и необязательная строка [note]. */
+    private fun renderHero(tone: Tone, icon: HeroIcon, title: String, sub: String, note: String?) {
+        val c = ctx
+        val night = c.isNight
+        val (bgRes, fgRes, onFgRes, textRes) = when (tone) {
+            Tone.PRI -> listOf(R.color.pric, R.color.pri, R.color.onpri, if (night) R.color.on else R.color.acc)
+            Tone.OK -> listOf(R.color.okc, R.color.ok, R.color.onok, if (night) R.color.on else R.color.ok)
+            Tone.WARN -> listOf(R.color.warnc, R.color.warn, R.color.warnc, if (night) R.color.on else R.color.warn)
+            Tone.ERR -> listOf(R.color.errc, R.color.err, R.color.onerr, if (night) R.color.on else R.color.err)
+        }
+        heroBox.removeAllViews()
+        heroBox.background = c.shape(c.clr(bgRes), 28)
+        heroBox.pad(c, 20, 20, 20, 20)
+        val iconRes = when (icon) {
+            HeroIcon.POWER -> R.drawable.ic_power
+            HeroIcon.PLUG -> R.drawable.ic_plug
+            HeroIcon.CAR -> R.drawable.ic_car
+            HeroIcon.CAR_USB -> R.drawable.ic_car_usb
+            HeroIcon.CAR_WIFI -> R.drawable.ic_car_wifi
+            HeroIcon.REFRESH -> R.drawable.ic_refresh
+            HeroIcon.ALERT -> R.drawable.ic_alert
+            HeroIcon.KEY -> R.drawable.ic_key
+        }
+        // слева значок в кружке, справа заголовок в одну строку; подзаголовок ниже на всю ширину
+        heroBox.addView(c.hbox(12).apply {
+            addView(FrameLayout(c).apply {
+                background = c.oval(c.clr(fgRes))
+                addView(c.icon(iconRes, 24, c.clr(onFgRes)), FrameLayout.LayoutParams(c.dp(24), c.dp(24), Gravity.CENTER))
+            }, lp(c.dp(44), c.dp(44)))
+            addView(c.text(title, 20f, 600, c.clr(textRes)).apply {
+                letterSpacing = -0.015f
+                lineHeight = c.dp(26)
+                maxLines = 1
+                ellipsize = TextUtils.TruncateAt.END
+            }, lp(0, WRAP, 1f))
+        }, lp(MATCH, WRAP))
+        heroBox.addView(c.vbox(6).apply {
+            addView(c.text(sub, 16f, 400).apply { lineHeight = c.dp(22) })
+            note?.let { addView(c.text(it, 14f, 400, c.clr(R.color.on2))) }
+        }, lp(MATCH, WRAP))
+    }
+
+    private fun renderStages(stages: List<Pair<UiText, Pair<StageState, UiText>>>) {
+        val c = ctx
+        stagesBox.removeAllViews()
+        for ((label, sm) in stages) stagesBox.addView(stageRow(label.get(c), sm.first, sm.second.get(c)), c.lpDp(MATCH, 52))
     }
 
     /** Как запустить сервер ГУ: три пронумерованных пункта на плашке surf (Main.dc.html, isOff). */

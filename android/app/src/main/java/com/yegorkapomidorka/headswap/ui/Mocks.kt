@@ -54,6 +54,10 @@ object Mocks {
         /** Шаг выбора машины рисует свой список (OnboardingScreen.renderCar), схемы нет. */
         StepId.CAR -> ctx.vbox()
         StepId.FIRST -> ctx.vbox(10).apply { addView(ctx.usbDialog(), lp(MATCH, WRAP)) }
+        /** Шаг выбора режима рисует свои карточки (OnboardingScreen.renderMode), схемы нет. */
+        StepId.MODE -> ctx.vbox()
+        StepId.DEVMODE -> aboutPhone(ctx)
+        StepId.ACTIVATE -> developerOptions(ctx)
     }
 
     // --- окна Android Auto ---
@@ -447,6 +451,75 @@ object Mocks {
                 },
             )
         }
+    }
+
+    /**
+     * Экран «Для разработчиков» для шага активации в «Режиме»: заголовок, обведённая строка «Отладка по Wi-Fi»
+     * с включённым переключателем, под ней «Подключить устройство с кодом сопряжения» и размытая строка.
+     */
+    fun developerOptions(ctx: Context): View = ctx.developerRows().let { rows ->
+        ctx.vbox(8).apply { rows.forEach { addView(it, lp(MATCH, WRAP)) } }
+    }
+
+    private fun Context.developerRows(): List<View> {
+        val c = this
+        val title = text(getString(R.string.mock_dev_title), 13f, 600, clr(R.color.on2)).apply { pad(c, 6, 0, 6, 0) }
+        val wifi = hbox().apply {
+            background = shape(clr(R.color.surf), 16, clr(R.color.pri), 3)
+            pad(c, 14, 0, 12, 0)
+            addView(text(getString(R.string.mock_dev_wifi), 15f, 600), lp(0, WRAP, 1f))
+            addView(sysSwitch())
+            minimumHeight = dp(52)
+        }
+        val pair = hbox().apply {
+            background = shape(clr(R.color.surf), 16)
+            pad(c, 14, 8, 14, 8)
+            addView(text(getString(R.string.mock_dev_pair), 14f, 400).apply { lineHeight = dp(19) }, lp(0, WRAP, 1f))
+            minimumHeight = dp(48)
+        }
+        val ghost = hbox(12).apply {
+            background = shape(clr(R.color.surf), 16)
+            pad(c, 14, 0, 14, 0)
+            addView(bar(55), lp(0, WRAP, 1f))
+            minimumHeight = dp(44)
+            blurred(0.5f, 1.2f)
+        }
+        return listOf(title, wifi, pair, ghost)
+    }
+
+    /**
+     * Экран «О телефоне» для шага режима разработчика: обведённая строка «Номер сборки» с подписью для Xiaomi,
+     * рукой и меткой ×7; выше и ниже размытые строки.
+     */
+    fun aboutPhone(ctx: Context): View = ctx.aboutRows().let { rows ->
+        ctx.vbox(8).apply { rows.forEach { addView(it, lp(MATCH, WRAP)) } }
+    }
+
+    private fun Context.aboutRows(): List<View> {
+        val c = this
+        val title = text(getString(R.string.mock_about_title), 13f, 600, clr(R.color.on2)).apply { pad(c, 6, 0, 6, 0) }
+        fun ghost(pct: Int) = hbox(12).apply {
+            background = shape(clr(R.color.surf), 16)
+            pad(c, 14, 0, 14, 0)
+            addView(bar(pct), lp(0, WRAP, 1f))
+            minimumHeight = dp(44)
+            blurred(0.5f, 1.2f)
+        }
+        val build = hbox(8).apply {
+            background = shape(clr(R.color.surf), 16, clr(R.color.pri), 3)
+            pad(c, 14, 8, 12, 8)
+            addView(
+                vbox(2).apply {
+                    addView(text(getString(R.string.mock_about_build), 15f, 600))
+                    addView(text(getString(R.string.mock_about_build_sub), 12f, 400, clr(R.color.on2)).apply { lineHeight = dp(16) })
+                },
+                lp(0, WRAP, 1f),
+            )
+            addView(icon(R.drawable.ic_hand_tap, 30, clr(R.color.acc)))
+            addView(badge("×7", 16f, 5))
+            minimumHeight = dp(60)
+        }
+        return listOf(title, ghost(62), build, ghost(48))
     }
 
     // --- кирпичики ---
