@@ -63,6 +63,13 @@ fun EmbedLayers() {
     LaunchedEffect(appKey, areaRect?.width, areaRect?.height) {
         EmbedHost.want(EmbedHost.app, appKey, areaRect?.width?.roundToInt() ?: 0, areaRect?.height?.roundToInt() ?: 0)
     }
+    // сторонний рабочий стол не открылся (попытки исчерпаны): откат на наш главный вместо экрана «нажмите, чтобы повторить»
+    val appStatus = EmbedHost.app.status
+    LaunchedEffect(appStatus) {
+        if (appStatus == EmbedStatus.FAILED && model.desktopRef != null && model.area == model.homeArea) {
+            LauncherActions.desktopFailed("окно не открылось")
+        }
+    }
     LaunchedEffect(area) {
         when (area) {
             Area.Navigator -> EmbedHost.refresh(EmbedHost.nav)

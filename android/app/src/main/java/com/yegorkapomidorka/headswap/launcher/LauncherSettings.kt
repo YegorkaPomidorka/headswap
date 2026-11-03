@@ -137,7 +137,10 @@ fun LauncherSettingsScreen() {
                                 model.chooseAutoplay(it)
                             }
                         }
-                        SettingsPage.HOME -> MapSideCard(d, cell(0, 3).fillMaxWidth())
+                        SettingsPage.HOME -> {
+                            MapSideCard(d, cell(0, 3).fillMaxWidth())
+                            DesktopCard(d, cell(3).fillMaxWidth())
+                        }
                         SettingsPage.SYSTEM -> {
                             val info = systemInfo()
                             for ((i, row) in info.withIndex()) InfoCard(row.first, row.second, d, cell(i).fillMaxWidth())
@@ -303,6 +306,24 @@ private sealed interface PlayerOpt {
     data class App(val pkg: String) : PlayerOpt
     /** «Последний» второго слота: подменяется тем, что слушали последним. */
     data object Last : PlayerOpt
+    /** «Headswap» в выборе рабочего стола: наш главный экран, иконка - самого приложения. */
+    data object Own : PlayerOpt
+}
+
+/** «Рабочий стол»: наш главный экран или установленный сторонний лаунчер (DriveDeck, CarDash...) в окне справа от рейки. */
+@Composable
+private fun DesktopCard(d: SettingsDims, modifier: Modifier) {
+    val model = LauncherModel
+    val options = model.desktopOptions
+    // откат после сбоя показывает Headswap: он и работает
+    val current = if (model.desktopBroken) null else DesktopPick.selected(model.desktop, options)
+    val own = stringResource(R.string.l_s_desktop_own)
+    PlayersCard(stringResource(R.string.l_s_desktop), listOf(PlayerOpt.Own) + options.map { PlayerOpt.App(it.packageName) },
+        current?.let { PlayerOpt.App(it.packageName) } ?: PlayerOpt.Own, d, modifier,
+        sub = current?.label ?: own, overflow = false) { opt ->
+        model.chooseDesktop((opt as? PlayerOpt.App)?.let { app -> options.firstOrNull { it.packageName == app.pkg }?.key })
+        LauncherActions.home()
+    }
 }
 
 /**
@@ -310,7 +331,10 @@ private sealed interface PlayerOpt {
  * Если не влезают все - последней идёт «…» на экран со всеми плеерами.
  */
 @Composable
-private fun PlayersCard(label: String, opts: List<PlayerOpt>, selected: PlayerOpt?, d: SettingsDims, modifier: Modifier, onPick: (PlayerOpt) -> Unit) {
+private fun PlayersCard(
+    label: String, opts: List<PlayerOpt>, selected: PlayerOpt?, d: SettingsDims, modifier: Modifier,
+    sub: String? = null, overflow: Boolean = true, onPick: (PlayerOpt) -> Unit,
+) {
     val m = LocalMetrics.current
     val s = m.spec
     val measurer = rememberTextMeasurer()
@@ -320,10 +344,16 @@ private fun PlayersCard(label: String, opts: List<PlayerOpt>, selected: PlayerOp
             val box = d.playerIcon + 4 * d.ring
             val step = box + max(0, d.playerGap - 2 * d.ring)
             val fit = max(1, (constraints.maxWidth - labelW - s.g + step - box) / step)
-            val shown: List<PlayerOpt?> = if (opts.size <= fit) opts else opts.take(fit - 1) + null
+            // без экрана «все» (overflow = false) лишние варианты просто не помещаются
+            val shown: List<PlayerOpt?> = if (opts.size <= fit) opts else if (overflow) opts.take(fit - 1) + null else opts.take(fit)
             Row(Modifier.fillMaxSize(), verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(m.dp(max(0, d.playerGap - 2 * d.ring)))) {
-                Txt(label, s.f2, Modifier.weight(1f), ellipsis = false)
+                if (sub == null) Txt(label, s.f2, Modifier.weight(1f), ellipsis = false)
+                else {
+                    // название выбранного рядом с заголовком; ему отдаётся остаток ширины
+                    Txt(label, s.f2, ellipsis = false)
+                    Txt(sub, s.f2, Modifier.weight(1f), color = Pal.SEC)
+                }
                 for (o in shown) PlayerIcon(o, o != null && o == selected, d) { if (o == null) LauncherActions.openPlayers() else onPick(o) }
             }
         }
@@ -338,6 +368,7 @@ private fun PlayerIcon(opt: PlayerOpt?, selected: Boolean, d: SettingsDims, onTa
     val desc = when (opt) {
         is PlayerOpt.App -> LauncherModel.packageLabel(opt.pkg)
         PlayerOpt.Last -> stringResource(R.string.l_s_last)
+        PlayerOpt.Own -> stringResource(R.string.l_s_desktop_own)
         null -> stringResource(R.string.l_s_more)
     }
     // кольца снаружи круга: 3px цвета фона, затем 3px золота
@@ -349,6 +380,7 @@ private fun PlayerIcon(opt: PlayerOpt?, selected: Boolean, d: SettingsDims, onTa
                 when (opt) {
                     is PlayerOpt.App -> rememberPackageIcon(opt.pkg)?.let { Image(it, null, Modifier.fillMaxSize()) }
                     PlayerOpt.Last -> SvgIcon(Ico.REPEAT, d.playerIcon / 2, Pal.TEXT, stroke = 2.6f)
+                    PlayerOpt.Own -> rememberPackageIcon(LauncherModel.context.packageName)?.let { Image(it, null, Modifier.fillMaxSize()) }
                     null -> Txt("…", m.spec.f2, color = Pal.TEXT, weight = FontWeight.Bold)
                 }
             }

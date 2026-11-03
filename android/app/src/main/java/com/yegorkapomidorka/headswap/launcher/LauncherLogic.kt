@@ -1,5 +1,6 @@
 package com.yegorkapomidorka.headswap.launcher
 
+import com.yegorkapomidorka.headswap.desktop.DesktopAppCatalog
 import kotlin.math.max
 
 /** Страницы вместо скролла: ни свайпов, ни прокрутки (тач по ГУ идёт с задержкой). */
@@ -109,6 +110,31 @@ object NavigatorPick {
         saved?.takeIf { it in installed } ?: defaultFor(installed)
 }
 
+/** Сторонний рабочий стол вместо главного экрана: что предложить в настройках и когда не перезапускать. */
+internal object DesktopPick {
+    /** Рабочий стол, умерший сам два раза за это время, больше не перезапускаем: откат на наш главный. */
+    const val RESTART_WINDOW_MS = 15_000L
+
+    /**
+     * Лаунчеры для выбора: пакеты с входом под HOME ([homeKeys] - «пакет/класс») и exported входом под LAUNCHER (каталог,
+     * наш пакет там уже отфильтрован). Компонент запуска - LAUNCHER-вход, который есть и под HOME, иначе первый LAUNCHER.
+     */
+    fun options(catalog: List<DesktopAppCatalog.Entry>, homeKeys: Set<String>): List<DesktopAppCatalog.Entry> {
+        val homePackages = homeKeys.mapTo(HashSet()) { it.substringBefore('/') }
+        return catalog.filter { it.packageName in homePackages }.groupBy { it.packageName }.values
+            .map { list -> list.firstOrNull { it.key in homeKeys } ?: list.first() }
+    }
+
+    /** Выбранный компонент, пока он есть среди вариантов (по пакету: активность могла смениться); иначе null - Headswap. */
+    fun selected(desktop: String?, options: List<DesktopAppCatalog.Entry>): DesktopAppCatalog.Entry? {
+        val pkg = AppRef.parse(desktop ?: return null)?.pkg ?: return null
+        return options.firstOrNull { it.packageName == pkg }
+    }
+
+    /** Рабочий стол пропал с дисплея сам, не по «Назад»: [lastGoneAt] - прошлый такой случай (0 - не было). */
+    fun crashLoop(lastGoneAt: Long, now: Long): Boolean = lastGoneAt != 0L && now - lastGoneAt in 0 until RESTART_WINDOW_MS
+}
+
 /** Ответы taskState дочернего дисплея и решения по ним (EmbedHost): что делать после Back и при повторном показе. */
 object TaskCheck {
     const val UNKNOWN = -1
@@ -148,6 +174,7 @@ object TaskCheck {
 /**
  * «Назад» на экранах лаунчера (без кнопки «Главный»): на предыдущий экран лаунчера, если он был не главным, иначе на главный.
  * Та же кнопка рейки, что открыла экран (логотип, шестерёнка), при повторном нажатии тоже ведёт назад.
+ * «Назад» остаётся доступным и в стороннем рабочем столе: открытые из него приложения живут в том же окне.
  */
 object BackNav {
     /** Экраны лаунчера, куда можно вернуться Назад; встроенные приложения и главный не запоминаются. */
@@ -158,7 +185,7 @@ object BackNav {
     fun remembered(from: Area): Area? = from.takeIf(::isScreen)
 
     /** Куда ведёт Назад с экрана [current]; [previous] - запомненный предыдущий экран. */
-    fun target(current: Area, previous: Area?): Area = previous?.takeIf { isScreen(it) && it != current } ?: Area.Home
+    fun target(current: Area, previous: Area?, home: Area = Area.Home): Area = previous?.takeIf { isScreen(it) && it != current } ?: home
 
     /** Серый «Назад» - только на главном: идти некуда. */
     fun enabled(current: Area): Boolean = current != Area.Home

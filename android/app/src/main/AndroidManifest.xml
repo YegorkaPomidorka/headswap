@@ -81,6 +81,11 @@
             <action android:name="android.intent.action.MAIN" />
             <category android:name="android.intent.category.LAUNCHER" />
         </intent>
+        <!-- лаунчер Headswap Desktop: выбор стороннего рабочего стола (DriveDeck, CarDash) - входы под HOME; LAUNCHER выше -->
+        <intent>
+            <action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.HOME" />
+        </intent>
         <!-- лаунчер Headswap Desktop: список музыкальных плееров (MediaBrowserService) для переключателя на карточке музыки -->
         <intent>
             <action android:name="android.media.browse.MediaBrowserService" />

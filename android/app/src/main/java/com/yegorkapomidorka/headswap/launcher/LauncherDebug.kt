@@ -16,7 +16,7 @@ internal object LauncherDebug {
             intent.getStringExtra("map")?.let { model.chooseMapLeft(it == "left") }
             intent.getStringExtra("page")?.let { p -> SettingsPage.entries.firstOrNull { it.name.equals(p, true) }?.let { model.settingsPage = it } }
             when (intent.getStringExtra("area")) {
-                "home" -> model.home()
+                "home" -> LauncherActions.home()
                 "settings" -> model.go(Area.Settings)
             }
             AppLog.i("LAUNCHER debug: экран=${model.area} раздел=${model.settingsPage} тема=${model.theme} карта слева=${model.mapLeft}", false)

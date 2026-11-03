@@ -102,6 +102,8 @@
     <string name="l_s_more">Все плееры</string>
     <string name="l_s_autoplay">Включать музыку автоматически</string>
     <string name="l_s_map">Карта на главном</string>
+    <string name="l_s_desktop">Рабочий стол</string>
+    <string name="l_s_desktop_own">Headswap</string>
     <string name="l_s_right">Справа</string>
     <string name="l_s_left">Слева</string>
     <string name="l_s_hu">Головное устройство</string>

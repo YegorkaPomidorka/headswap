@@ -68,6 +68,11 @@ class LauncherPrefs(context: Context) {
         get() = prefs.getString("navigator", null)
         set(value) { prefs.edit().putString("navigator", value).apply() }
 
+    /** Сторонний рабочий стол «пакет/класс» вместо нашего главного экрана; null - Headswap. */
+    var desktop: String?
+        get() = prefs.getString("desktop", null)
+        set(value) { prefs.edit().putString("desktop", value).apply() }
+
     /** Пакет текущего музыкального плеера. */
     var musicPlayer: String?
         get() = prefs.getString("music_player", null)
