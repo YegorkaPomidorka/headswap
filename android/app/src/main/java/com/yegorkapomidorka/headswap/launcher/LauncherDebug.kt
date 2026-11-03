@@ -15,6 +15,8 @@ internal object LauncherDebug {
             intent.getStringExtra("theme")?.let { t -> ThemeChoice.entries.firstOrNull { it.name.equals(t, true) }?.let(model::chooseTheme) }
             intent.getStringExtra("map")?.let { model.chooseMapLeft(it == "left") }
             intent.getStringExtra("page")?.let { p -> SettingsPage.entries.firstOrNull { it.name.equals(p, true) }?.let { model.settingsPage = it } }
+            // рабочий стол «пакет/класс»; "own" - наш главный
+            intent.getStringExtra("desktop")?.let { d -> model.chooseDesktop(d.takeUnless { it == "own" }); LauncherActions.home() }
             when (intent.getStringExtra("area")) {
                 "home" -> LauncherActions.home()
                 "settings" -> model.go(Area.Settings)
