@@ -207,6 +207,10 @@ class AaBridgeCore(
         private set
     @Volatile var huVw20082138 = false         // VW ID (channel 20082138 кроме "VW BT 1420"; ID.6 Crozz: 20082128 + "VW BT 9491"; пресет ID. UNYX): IDR > ~600 КиБ рвёт USB EIO
         private set
+    @Volatile var huKia20032131 = false        // Kia Seltos sm6150 (channel 20032131, h672): кнопка трубки на руле = LAUNCH_MODE_PHONE
+        private set
+    private var lastLaunchPhoneMs = NEVER       // h672: ГУ шлёт LAUNCH_MODE_PHONE парой за ~200 мс на одно нажатие
+    private var huGear = -1                     // h672: последняя передача из HU_GEAR_INFO, -1 = не приходила
     @Volatile var huHyundaiCn7 = false         // ГУ Hyundai CN7 (product wp_cn7cpe_cn, h218): в режиме «Авто» музыка 32 кГц с ресэмплом 48→32
         private set
     @Volatile var huPioneerRm56 = false        // ГУ Pioneer RM56E8B (Dongfeng DF6, h277): 4-5 Мбит/с рвут USB EIO за 25-30 с, живёт на ~1 Мбит/с и fps ≤ 15
@@ -422,6 +426,9 @@ class AaBridgeCore(
         huHonda = false                        // STATISTIC_INFO придёт заново в этой сессии
         huVwBt1420 = false                     // HU_INFO придёт заново в этой сессии
         huVw20082138 = false                   // HU_INFO / STATISTIC_INFO придут заново в этой сессии
+        huKia20032131 = false                  // STATISTIC_INFO придёт заново в этой сессии
+        lastLaunchPhoneMs = NEVER
+        huGear = -1
         vwIdName = null
         vwIdChannel = null
         huHyundaiCn7 = false                   // HU_INFO придёт заново в этой сессии
@@ -740,6 +747,10 @@ class AaBridgeCore(
         if (channel == HONDA_20772121_CHANNEL || channel == HONDA_20832125_CHANNEL) huHonda20772121 = true
         if (channel == HONDA_20832125_CHANNEL) huHondaVezel = true
         if (channel == HONDA_20772104_CHANNEL) huHonda20772104 = true
+        if (channel == KIA_20032131_CHANNEL && !huKia20032131) {
+            huKia20032131 = true
+            log("BRIDGE ГУ Kia 20032131: LAUNCH_MODE_PHONE (кнопка трубки на руле) -> AA KEYCODE_CALL", true)
+        }
         if (channel == MAZDA_20622111_CHANNEL && !huMazda20622111) {
             huMazda20622111 = true
             log("BRIDGE ГУ Mazda 20622111: VIDEO_DATA режу на куски ≤ $MAZDA_20622111_MAX_VIDEO_PACKET Б, потолок ${MAZDA_20622111_CEILING_BPS / 1000} кбит/с", true)
@@ -1058,6 +1069,39 @@ class AaBridgeCore(
             log("BRIDGE тач $name[$index] пальцев ${points.size}: ГУ $gu -> AA $aa (${mode.label})", ui)
         }
         p.sendTouch(act, index, points)
+    }
+
+    /**
+     * CMD LAUNCH_MODE_PHONE от ГУ. Kia 20032131 (h672) шлёт его кнопкой трубки на руле вместо hard key PHONE_CALL,
+     * по два раза за ~200 мс: второй CALL в AA набрал бы номер, поэтому повтор в [LAUNCH_PHONE_DEBOUNCE_MS] глотаем.
+     * На остальных ГУ смысл команды не проверен - только лог.
+     */
+    fun onCarlifeLaunchPhone() {
+        if (!huKia20032131) {
+            log("BRIDGE LAUNCH_MODE_PHONE: не Kia 20032131, игнор", false)
+            return
+        }
+        val now = clockMs()
+        val since = now - lastLaunchPhoneMs
+        lastLaunchPhoneMs = now
+        if (since < LAUNCH_PHONE_DEBOUNCE_MS) {
+            log("BRIDGE LAUNCH_MODE_PHONE повтор через $since мс, игнор", true)
+            return
+        }
+        onCarlifeHardKey(HARD_KEY_PHONE_CALL)
+    }
+
+    /**
+     * HU_GEAR_INFO от ГУ. Kia 20032131 (h672) на камере заднего хода гасит CarLife и после R ~3 с держит заставку
+     * Baidu, пока не придёт IDR (свои IDR на пробросе раз в ~2,3 с). true = вышли из R, вызывающий просит ключевой кадр.
+     */
+    @Synchronized
+    fun onHuGear(gear: Int?): Boolean {
+        val prev = huGear
+        huGear = gear ?: -1
+        if (!huKia20032131 || prev != GEAR_REVERSE || gear == GEAR_REVERSE) return false
+        log("BRIDGE передача R -> $gear: ГУ вернётся с камеры, прошу ключевой кадр", true)
+        return true
     }
 
     /** TOUCH_CAR_HARD_KEY_CODE ГУ (кнопки руля) -> AA: нажатие Android KeyEvent по [HARD_KEY_TO_ANDROID]. */
@@ -2646,6 +2690,11 @@ class AaBridgeCore(
         const val HARD_KEY_SEEK_HOLD = 0
         /** MEDIA_STOP с ГУ; Delphi шлёт его сам, когда уходит на свой звонок. */
         const val HARD_KEY_MEDIA_STOP = 0x20
+        const val HARD_KEY_PHONE_CALL = 0x02
+        const val LAUNCH_PHONE_DEBOUNCE_MS = 1000L
+        const val GEAR_REVERSE = 5
+        /** h672: после выхода из R ключевой кадр сразу и повторно - когда ГУ поднимет CarLife, неизвестно. */
+        val GEAR_IDR_DELAYS_MS = longArrayOf(0, 500, 1200)
 
         /**
          * CarLife hard key (HUJ/CommonParams) -> Android KeyEvent; все значения есть в AapMessages.KEYCODES_SUPPORTED.
@@ -2698,6 +2747,7 @@ class AaBridgeCore(
         const val MAZDA_20622111_MAX_VIDEO_PACKET = 15_000
         const val MAZDA_20622111_ART_BYTES = 12_000          // обложка в MEDIA_INFO: весь пакет должен остаться < 15000 Б
         const val MAZDA_20622111_CEILING_BPS = 1_500_000  // IDR поменьше на случай, если ГУ не склеивает куски
+        const val KIA_20032131_CHANNEL = "20032131"       // Kia Seltos 2026 Китай, QTI sm6150_au madison (h672)
         const val VW_20082120_CHANNEL = "20082120"        // VW, protocol 1.0, versionName="RADIO" (h93)
         const val VW_CNS3_20082122_CHANNEL = "20082122"   // VW CNS3 (Tharu и др.): рвёт USB через ~5,6 с PAUSE без heartbeat (h222)
         const val VW_CNS3_20082134_CHANNEL = "20082134"   // VW CNS3 Tiguan L Pro: рвёт CarLife по Wi-Fi через ~5,1-5,7 с PAUSE (h224)

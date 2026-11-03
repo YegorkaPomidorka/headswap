@@ -510,6 +510,16 @@ class CarLifeSession(
                 val state = PbReader.parse(m.body)?.let { PbReader.int(it, 1) }
                 bridge.onHuBtHfpConnection(state)
             }
+            Msg.LAUNCH_MODE_PHONE -> bridge.onCarlifeLaunchPhone()
+            Msg.HU_GEAR_INFO -> {
+                val gear = PbReader.parse(m.body)?.let { PbReader.int(it, 1) }
+                if (bridge.onHuGear(gear)) {
+                    for (d in AaBridgeCore.GEAR_IDR_DELAYS_MS) sched.schedule({
+                        source?.requestKeyFrame()
+                        bridge.onCarlifeKeyFrameRequest()
+                    }, d, TimeUnit.MILLISECONDS)
+                }
+            }
             Msg.MD_EXIT -> close("ГУ прислало MD_EXIT")
             else -> Unit // всё остальное только в логе
         }
