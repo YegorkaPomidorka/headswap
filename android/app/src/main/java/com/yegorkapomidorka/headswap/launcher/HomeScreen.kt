@@ -105,8 +105,9 @@ private fun QuickAppsRow() {
         for (slot in slots) {
             Box(Modifier.weight(1f).fillMaxHeight(), contentAlignment = Alignment.Center) {
                 when (slot) {
-                    is QuickSlot.App -> AppTile(slot.ref, labelled = true, onLong = { LauncherModel.confirmRemove = slot.ref })
-                    QuickSlot.Plus -> PlusTile(labelled = true)
+                    // без подписей: в быстром ряду иконок достаточно, подписи только обрезались («Доба…»)
+                    is QuickSlot.App -> AppTile(slot.ref, labelled = false, onLong = { LauncherModel.confirmRemove = slot.ref })
+                    QuickSlot.Plus -> PlusTile(labelled = false)
                     QuickSlot.Empty -> Unit
                 }
             }
