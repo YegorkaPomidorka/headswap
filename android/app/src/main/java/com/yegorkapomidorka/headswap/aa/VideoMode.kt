@@ -167,7 +167,7 @@ enum class VideoMode(
 }
 
 /** Причина, по которой размер для [CustomVideoMode] не принимается. */
-enum class CustomResError { WIDTH_RANGE, HEIGHT_RANGE, ODD, PORTRAIT }
+enum class CustomResError { WIDTH_RANGE, HEIGHT_RANGE, ODD }
 
 /**
  * Своё разрешение (раздел для разработчиков): кадр outW×outH для ГУ, который строится как в WIDE-режимах:
@@ -220,15 +220,22 @@ data class CustomVideoMode(override val outW: Int, override val outH: Int) : Vid
         const val MIN_BITRATE = 2_000_000
         const val MAX_BITRATE = 8_000_000
         private val PLATES = listOf(800 to 480, 1280 to 720, 1920 to 1080)
-        private val MAX_PLATE = PLATES.last()
+        /** Вертикальные подложки AA (коды 6 и 7 в SDR); 480x800 у AA нет. */
+        private val PORTRAIT_PLATES = listOf(720 to 1280, 1080 to 1920)
 
-        /** Почему размер не годится; null = годится. */
-        fun check(w: Int, h: Int): CustomResError? = when {
-            w !in MIN_W..MAX_W -> CustomResError.WIDTH_RANGE
-            h !in MIN_H..MAX_H -> CustomResError.HEIGHT_RANGE
-            w % 2 != 0 || h % 2 != 0 -> CustomResError.ODD
-            w < h -> CustomResError.PORTRAIT
-            else -> null
+        private fun platesFor(w: Int, h: Int) = if (w < h) PORTRAIT_PLATES else PLATES
+
+        /** Почему размер не годится; null = годится. Вертикальный кадр - те же диапазоны с осями наоборот. */
+        fun check(w: Int, h: Int): CustomResError? {
+            val portrait = w < h
+            val wRange = if (portrait) MIN_H..MAX_H else MIN_W..MAX_W
+            val hRange = if (portrait) MIN_W..MAX_W else MIN_H..MAX_H
+            return when {
+                w !in wRange -> CustomResError.WIDTH_RANGE
+                h !in hRange -> CustomResError.HEIGHT_RANGE
+                w % 2 != 0 || h % 2 != 0 -> CustomResError.ODD
+                else -> null
+            }
         }
 
         /** Валидный размер -> режим, иначе null. */
@@ -239,14 +246,14 @@ data class CustomVideoMode(override val outW: Int, override val outH: Int) : Vid
             (if (enabled) from(w, h) else null) ?: preset
 
         private fun plateFor(w: Int, h: Int): Pair<Int, Int> =
-            PLATES.firstOrNull { w <= it.first && h <= it.second } ?: MAX_PLATE
+            platesFor(w, h).let { p -> p.firstOrNull { w <= it.first && h <= it.second } ?: p.last() }
 
         private fun even(v: Double): Int = (Math.round(v / 2.0) * 2).toInt()
 
         private fun areaFor(w: Int, h: Int, plate: Pair<Int, Int>): Pair<Int, Int> {
             if (w <= plate.first && h <= plate.second) return w to h
-            // не влезает ни в одну подложку: аспект вписывается в 1920x1080
-            val (pw, ph) = MAX_PLATE
+            // не влезает ни в одну подложку: аспект вписывается в наибольшую (1920x1080 или 1080x1920)
+            val (pw, ph) = plate
             return if (w.toDouble() / h >= pw.toDouble() / ph) pw to even(pw.toDouble() * h / w)
             else even(ph.toDouble() * w / h) to ph
         }
