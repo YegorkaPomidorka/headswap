@@ -256,8 +256,6 @@ class MainActivity : Activity() {
                 // проба локальной сети для беспровода: маяк UDP 7999, ответчик 8999 (--ei seconds N --es to <ip>)
                 "net_probe" -> NetProbe.run(this, intent.getIntExtra("seconds", 20), intent.getStringExtra("to"))
                 "net_perm" -> requestLocalNetwork()
-                // стенд лаунчера без тапов: --es area home|settings --es page look|navigator|music|home|system --es theme dark|light|auto --es map left|right
-                "launcher" -> com.yegorkapomidorka.headswap.launcher.LauncherDebug.apply(this, intent)
                 // кнопка «Открыть запрос на телефоне» карточки «Телефон» лаунчера Headswap Desktop
                 "phone_card_perm" -> {
                     val ask = com.yegorkapomidorka.headswap.launcher.PhoneController.PERMISSIONS.filter { checkSelfPermission(it) != PackageManager.PERMISSION_GRANTED }

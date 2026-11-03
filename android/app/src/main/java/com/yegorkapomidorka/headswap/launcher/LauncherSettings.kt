@@ -435,8 +435,10 @@ private fun InfoCard(label: String, value: String, d: SettingsDims, modifier: Mo
     Card(modifier) {
         Row(Modifier.fillMaxSize().padding(horizontal = m.dp(d.padStart)), verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(m.dp(s.g))) {
-            Txt(label, s.f2, Modifier.weight(1f), ellipsis = false)
-            Txt(value, s.f2, color = Pal.SEC, weight = FontWeight.SemiBold, mono = true, ellipsis = false)
+            // название целиком, значение занимает остаток и прижато вправо
+            Txt(label, s.f2, ellipsis = false)
+            Txt(value, s.f2, Modifier.weight(1f), color = Pal.SEC, weight = FontWeight.SemiBold, mono = true,
+                align = androidx.compose.ui.text.style.TextAlign.End, ellipsis = false)
         }
     }
 }

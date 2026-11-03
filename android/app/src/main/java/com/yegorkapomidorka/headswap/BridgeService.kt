@@ -240,6 +240,12 @@ class BridgeService : Service() {
             if (session == null && host == null && !linkWaiting) stopSelfResult(startId)
             return stickiness()
         }
+        if (intent?.action == ACTION_LAUNCHER_DEBUG) {
+            // стенд лаунчера: экран, раздел, тема и карта без тапов и без окна MainActivity поверх рабочего стола
+            com.yegorkapomidorka.headswap.launcher.LauncherDebug.apply(this, intent)
+            if (session == null && host == null && !linkWaiting) stopSelfResult(startId)
+            return stickiness()
+        }
         DexState.desktopSession = foregroundMode() == BridgeMode.DESKTOP
         // startForegroundService требует startForeground в течение 5 с, делаем сразу
         val n = HeadswapNotification.build(this, CHANNEL, NOTIF_ID)
@@ -1396,6 +1402,8 @@ class BridgeService : Service() {
         const val ACTION_STOP = "com.yegorkapomidorka.headswap.STOP"
         /** Режим DESKTOP: показать рабочий стол (кнопка HOME для идущей сессии). Только к живой сессии, сервис сам не поднимает. */
         const val ACTION_DESKTOP_HOME = "com.yegorkapomidorka.headswap.DESKTOP_HOME"
+        /** adb shell am startservice -a com.yegorkapomidorka.headswap.LAUNCHER_DEBUG --es area settings --es page music --es theme light --es map left */
+        const val ACTION_LAUNCHER_DEBUG = "com.yegorkapomidorka.headswap.LAUNCHER_DEBUG"
         /** Беспровод (бета): ждать машину по Wi-Fi, ветка B (хотспот телефона + маяк). */
         const val ACTION_WIFI_B = "com.yegorkapomidorka.headswap.WIFI_B"
         /** Выбранная машина подключилась по Bluetooth (ACL_CONNECTED): ждать по Wi-Fi, пока она рядом. */
