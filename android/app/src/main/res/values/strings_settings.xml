@@ -147,10 +147,10 @@
     <string name="video_wide_976_sub">Wide crop scaled to the CarLife window of the VW CNS3 head unit</string>
     <string name="video_wide_836_title">Wide 1920×836 (VW Tiguan L Pro, passthrough)</string>
     <string name="video_wide_836_sub">Aspect of the 2240×976 window without scaling on the phone: the head unit scales. For crop without transcoding</string>
-    <string name="video_portrait_960_title">Portrait 3:4 (Hyundai Tucson NX4c)</string>
-    <string name="video_portrait_960_sub">960×1280: full screen, the head unit cuts off the climate bar itself</string>
-    <string name="video_portrait_1150_title">Portrait 960×1150</string>
-    <string name="video_portrait_1150_sub">960×1280 without the 130 px climate bar at the bottom</string>
+    <string name="video_portrait_960_title">Portrait 3:4</string>
+    <string name="video_portrait_960_sub">960×1280: the whole portrait screen</string>
+    <string name="video_portrait_1152_title">Portrait 5:6 (Hyundai Tucson NX4c)</string>
+    <string name="video_portrait_1152_sub">960×1152: a 960×1280 screen without the climate bar at the bottom, no stretching</string>
 
     <!-- Music sample rate (MusicRate) -->
     <string name="mrate_auto">Auto</string>

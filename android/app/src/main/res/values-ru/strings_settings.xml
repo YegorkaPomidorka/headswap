@@ -147,10 +147,10 @@
     <string name="video_wide_976_sub">Широкая обрезка под окно CarLife на ГУ VW CNS3</string>
     <string name="video_wide_836_title">Широкий 1920×836 (VW Tiguan L Pro, проброс)</string>
     <string name="video_wide_836_sub">Пропорция окна 2240×976 без растяжения на телефоне: растягивает ГУ. Для кропа без перекодирования</string>
-    <string name="video_portrait_960_title">Вертикальный 3:4 (Hyundai Tucson NX4c)</string>
-    <string name="video_portrait_960_sub">960×1280: весь экран, полосу климата ГУ вычитает сама</string>
-    <string name="video_portrait_1150_title">Вертикальный 960×1150</string>
-    <string name="video_portrait_1150_sub">960×1280 без полосы климата 130 px внизу</string>
+    <string name="video_portrait_960_title">Вертикальный 3:4</string>
+    <string name="video_portrait_960_sub">960×1280: вертикальный экран целиком</string>
+    <string name="video_portrait_1152_title">Вертикальный 5:6 (Hyundai Tucson NX4c)</string>
+    <string name="video_portrait_1152_sub">960×1152: экран 960×1280 без полосы климата внизу, без растяжения</string>
 
     <!-- Частота музыки (MusicRate) -->
     <string name="mrate_auto">Авто</string>

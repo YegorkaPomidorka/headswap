@@ -25,7 +25,7 @@ class VideoModeTest {
             VideoMode.WIDE_976 to Row("1920x1080", 0, 244, 160, 2240, 976, 8_000_000),
             VideoMode.WIDE_836 to Row("1920x1080", 0, 244, 160, 1920, 836, 6_000_000),
             VideoMode.PORTRAIT_960 to Row("1080x1920", 120, 640, 160, 960, 1280, 6_000_000),
-            VideoMode.PORTRAIT_1150 to Row("1080x1920", 120, 770, 160, 960, 1150, 6_000_000),
+            VideoMode.PORTRAIT_1152 to Row("1080x1920", 120, 768, 160, 960, 1152, 6_000_000),
         )
         assertEquals(expected.keys, VideoMode.values().toSet())
         for ((m, r) in expected) {
@@ -150,7 +150,7 @@ class VideoModeTest {
     @Test
     fun portrait() {
         // те же поля, что считает своё разрешение: пресет и CustomVideoMode дают одну геометрию
-        for (m in listOf(VideoMode.PORTRAIT_960, VideoMode.PORTRAIT_1150)) {
+        for (m in listOf(VideoMode.PORTRAIT_960, VideoMode.PORTRAIT_1152)) {
             val c = CustomVideoMode(m.outW, m.outH)
             assertEquals(m.name, c.aaResolution, m.aaResolution)
             assertEquals(m.name, c.marginW to c.marginH, m.marginW to m.marginH)
@@ -165,7 +165,8 @@ class VideoModeTest {
         // SDR: res=7 (1080x1920), margin_w 120 (78), margin_h 640 (80 05)
         val sdr = hex(M.serviceDiscoveryResponse(p.sdOptions(false)).payload)
         assertTrue(sdr, sdr.contains("0807100218782080052" + "8a001"))
-        assertEquals(VideoMode.PORTRAIT_1150, VideoMode.parse("PORTRAIT_1150"))
+        assertEquals(VideoMode.PORTRAIT_1152, VideoMode.parse("PORTRAIT_1152"))
+        assertEquals("960×1152", VideoMode.PORTRAIT_1152.outLabel)
     }
 
     @Test

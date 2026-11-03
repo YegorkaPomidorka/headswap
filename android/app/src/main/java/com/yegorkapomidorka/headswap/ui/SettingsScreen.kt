@@ -657,7 +657,7 @@ class SettingsSectionScreen(host: MainActivity, val section: SettingsSection) : 
         /** Группы выпадающего списка разрешений; WIDE_836 отдельной строкой нет (это WIDE_976 в passthrough). */
         val RES_STANDARD = listOf(VideoMode.R800, VideoMode.R1024, VideoMode.R720, VideoMode.R1080)
         val RES_WIDE = listOf(VideoMode.WIDE, VideoMode.WIDE_MID, VideoMode.WIDE_HD, VideoMode.WIDE_640, VideoMode.WIDE_2_1, VideoMode.WIDE_976)
-        val RES_PORTRAIT = listOf(VideoMode.PORTRAIT_960, VideoMode.PORTRAIT_1150)
+        val RES_PORTRAIT = listOf(VideoMode.PORTRAIT_960, VideoMode.PORTRAIT_1152)
         /** Слова названия машины, которые в списке разрешений не нужны: годы, двигатель, гибрид, рестайлинг. */
         val CAR_NAME_NOISE = Regex("""(?i)(19|20)\d\d([–-](19|20)?\d\d)?|\d\.\dT|гибрид|hybrid|дорестайл|рестайлинг|restyling|facelift|pre-facelift""")
     }
@@ -795,7 +795,7 @@ class SettingsSectionScreen(host: MainActivity, val section: SettingsSection) : 
         VideoMode.WIDE_2_1 -> "2:1"
         VideoMode.WIDE_976, VideoMode.WIDE_836 -> ctx.getString(R.string.set_res_ratio_wide_976)
         VideoMode.PORTRAIT_960 -> "3:4"
-        VideoMode.PORTRAIT_1150 -> "5:6"
+        VideoMode.PORTRAIT_1152 -> "5:6"
     }
 
     /**

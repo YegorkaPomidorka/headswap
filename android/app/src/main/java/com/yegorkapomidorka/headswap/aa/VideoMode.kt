@@ -127,10 +127,10 @@ enum class VideoMode(
      * не показывается: это WIDE_976 в passthrough ([effective]).
      */
     WIDE_836(R.string.video_wide_836_title, R.string.video_wide_836_sub, "1920x1080", 0, 244, 160, 1920, 836, 6_000_000),
-    /** 960×1280 - вертикальный экран Hyundai Tucson NX4c (h670): из вертикального кадра AA 1080×1920 вырезается центр 960×1280, 1:1. */
+    /** 960×1280 - вертикальный экран 3:4 целиком (Hyundai Tucson NX4c с климатом поверх, h670): из вертикального кадра AA 1080×1920 вырезается центр 960×1280, 1:1. */
     PORTRAIT_960(R.string.video_portrait_960_title, R.string.video_portrait_960_sub, "1080x1920", 120, 640, 160, 960, 1280, 6_000_000),
-    /** 960×1150 - тот же экран без полосы климата 130 px (так выставляют в WizCar, h670): центр 960×1150 из 1080×1920, 1:1. */
-    PORTRAIT_1150(R.string.video_portrait_1150_title, R.string.video_portrait_1150_sub, "1080x1920", 120, 770, 160, 960, 1150, 6_000_000);
+    /** 960×1152 - экран Tucson NX4c без полосы климата (1280 - 130, округлено до кратного 16; h670 - без растяжения): центр 960×1152 из 1080×1920, 1:1. */
+    PORTRAIT_1152(R.string.video_portrait_1152_title, R.string.video_portrait_1152_sub, "1080x1920", 120, 768, 160, 960, 1152, 6_000_000);
 
     override val aaW: Int = aaResolution.substringBefore('x').toInt()
     override val aaH: Int = aaResolution.substringAfter('x').toInt()
