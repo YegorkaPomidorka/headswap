@@ -657,6 +657,7 @@ class SettingsSectionScreen(host: MainActivity, val section: SettingsSection) : 
         /** Группы выпадающего списка разрешений; WIDE_836 отдельной строкой нет (это WIDE_976 в passthrough). */
         val RES_STANDARD = listOf(VideoMode.R800, VideoMode.R1024, VideoMode.R720, VideoMode.R1080)
         val RES_WIDE = listOf(VideoMode.WIDE, VideoMode.WIDE_MID, VideoMode.WIDE_HD, VideoMode.WIDE_640, VideoMode.WIDE_2_1, VideoMode.WIDE_976)
+        val RES_PORTRAIT = listOf(VideoMode.PORTRAIT_960, VideoMode.PORTRAIT_1150)
         /** Слова названия машины, которые в списке разрешений не нужны: годы, двигатель, гибрид, рестайлинг. */
         val CAR_NAME_NOISE = Regex("""(?i)(19|20)\d\d([–-](19|20)?\d\d)?|\d\.\dT|гибрид|hybrid|дорестайл|рестайлинг|restyling|facelift|pre-facelift""")
     }
@@ -793,6 +794,8 @@ class SettingsSectionScreen(host: MainActivity, val section: SettingsSection) : 
         VideoMode.WIDE_640 -> "3:1"
         VideoMode.WIDE_2_1 -> "2:1"
         VideoMode.WIDE_976, VideoMode.WIDE_836 -> ctx.getString(R.string.set_res_ratio_wide_976)
+        VideoMode.PORTRAIT_960 -> "3:4"
+        VideoMode.PORTRAIT_1150 -> "5:6"
     }
 
     /**
@@ -868,7 +871,9 @@ class SettingsSectionScreen(host: MainActivity, val section: SettingsSection) : 
         val c = ctx
         val selected = rowOf(aa.videoMode.effective(aa.transcode))
         val list = c.vbox().apply { pad(c, 0, 4, 0, 8) }
-        for ((titleRes, modes) in listOf(R.string.set_res_group_standard to RES_STANDARD, R.string.set_res_group_wide to RES_WIDE)) {
+        for ((titleRes, modes) in listOf(
+            R.string.set_res_group_standard to RES_STANDARD, R.string.set_res_group_wide to RES_WIDE, R.string.set_res_group_portrait to RES_PORTRAIT,
+        )) {
             list.addView(c.text(c.getString(titleRes).uppercase(), 12f, 600, c.clr(R.color.acc)).apply {
                 letterSpacing = 0.06f
                 pad(c, 16, 12, 16, 6)

@@ -126,7 +126,11 @@ enum class VideoMode(
      * полоса 1920×836 один к одному, годится для SPS-кропа; до окна 2240×976 растягивает сама ГУ. В UI отдельной строкой
      * не показывается: это WIDE_976 в passthrough ([effective]).
      */
-    WIDE_836(R.string.video_wide_836_title, R.string.video_wide_836_sub, "1920x1080", 0, 244, 160, 1920, 836, 6_000_000);
+    WIDE_836(R.string.video_wide_836_title, R.string.video_wide_836_sub, "1920x1080", 0, 244, 160, 1920, 836, 6_000_000),
+    /** 960×1280 - вертикальный экран Hyundai Tucson NX4c (h670): из вертикального кадра AA 1080×1920 вырезается центр 960×1280, 1:1. */
+    PORTRAIT_960(R.string.video_portrait_960_title, R.string.video_portrait_960_sub, "1080x1920", 120, 640, 160, 960, 1280, 6_000_000),
+    /** 960×1150 - тот же экран без полосы климата 130 px (так выставляют в WizCar, h670): центр 960×1150 из 1080×1920, 1:1. */
+    PORTRAIT_1150(R.string.video_portrait_1150_title, R.string.video_portrait_1150_sub, "1080x1920", 120, 770, 160, 960, 1150, 6_000_000);
 
     override val aaW: Int = aaResolution.substringBefore('x').toInt()
     override val aaH: Int = aaResolution.substringAfter('x').toInt()

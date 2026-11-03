@@ -49,6 +49,7 @@
     <string name="set_res_pick">Choose resolution</string>
     <string name="set_res_group_standard">Regular screens</string>
     <string name="set_res_group_wide">Wide screens</string>
+    <string name="set_res_group_portrait">Portrait screens</string>
     <string name="set_res_ratio_wide_976">2.3:1</string>
     <string name="set_apply_next">Applies on the next connection.</string>
     <string name="set_needs_transcode">Needs re-encoding</string>
@@ -146,6 +147,10 @@
     <string name="video_wide_976_sub">Wide crop scaled to the CarLife window of the VW CNS3 head unit</string>
     <string name="video_wide_836_title">Wide 1920×836 (VW Tiguan L Pro, passthrough)</string>
     <string name="video_wide_836_sub">Aspect of the 2240×976 window without scaling on the phone: the head unit scales. For crop without transcoding</string>
+    <string name="video_portrait_960_title">Portrait 3:4 (Hyundai Tucson NX4c)</string>
+    <string name="video_portrait_960_sub">960×1280: full screen, the head unit cuts off the climate bar itself</string>
+    <string name="video_portrait_1150_title">Portrait 960×1150</string>
+    <string name="video_portrait_1150_sub">960×1280 without the 130 px climate bar at the bottom</string>
 
     <!-- Music sample rate (MusicRate) -->
     <string name="mrate_auto">Auto</string>
@@ -228,6 +233,7 @@
     <string name="car_honda_vezel_2022">Honda Vezel 2022–2024 (GAC Honda)</string>
     <string name="car_hyundai_elantra_7">Hyundai Elantra, 7th generation, pre-facelift</string>
     <string name="car_hyundai_ix35_2021">Hyundai ix35 2021</string>
+    <string name="car_hyundai_tucson_nx4c">Hyundai Tucson NX4c</string>
     <string name="car_jetta_vs">Jetta VS5/VS7 (Baidu CarLife only, not J-Link)</string>
     <string name="car_kia_k3_2023">Kia K3 2023</string>
     <string name="car_kia_sportage_ace">Kia Sportage Ace</string>
