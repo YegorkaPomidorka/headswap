@@ -140,7 +140,10 @@ private fun AppsGrid(columns: Int, rows: Int) {
 
 @Composable
 fun rememberAppIcon(ref: AppRef): ImageBitmap? {
+    // initialValue produceState берёт только при первой композиции: при смене ref (листание страниц,
+    // слот переиспользуется) value осталась бы иконкой прошлого приложения - сбрасываем сами.
     val icon by produceState(LauncherModel.cachedIcon(ref), ref) {
+        value = LauncherModel.cachedIcon(ref)
         if (value == null) value = withContext(Dispatchers.IO) { LauncherModel.loadIcon(ref) }
     }
     return icon
