@@ -37,6 +37,7 @@
         <item>Нажмите «Разрешить» в окне Android «Разрешить приложению Headswap отправлять уведомления?»</item>
     </string-array>
     <string name="step_notif_hint">В шторке будет видно, как идёт подключение, а Android не выгрузит Headswap, пока экран погашен.</string>
+    <string name="step_notif_hint_launcher">Код для активации Headswap вводится прямо в уведомлении. Ещё в шторке видно, как идёт подключение к магнитоле.</string>
     <string name="step_notif_short">Уведомления</string>
 
     <!-- Пункты 3-4 (автозапуск) показываются только на Xiaomi -->
