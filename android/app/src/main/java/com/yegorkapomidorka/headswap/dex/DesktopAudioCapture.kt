@@ -140,11 +140,21 @@ class DesktopAudioCapture(context: Context) {
 
     private fun runCapture(capture: Capture) {
         var record: AudioRecord? = null
+        var loopback: DesktopAudioLoopback? = null
         var started = false
         var failure: Throwable? = null
         try {
+            if (context.checkSelfPermission(DesktopAudioPolicy.ROUTING_PERMISSION) == PackageManager.PERMISSION_GRANTED) {
+                try {
+                    loopback = DesktopAudioLoopback.open(context, DesktopAudioPolicy.SAMPLE_RATE)
+                    record = loopback.record
+                } catch (error: Throwable) {
+                    AppLog.i("DESKTOP AUDIO: AudioMix loopback недоступен (${error.javaClass.simpleName}: ${error.message}), беру REMOTE_SUBMIX", false)
+                }
+            } else AppLog.i("DESKTOP AUDIO: нет MODIFY_AUDIO_ROUTING (активация без нового --audio), беру REMOTE_SUBMIX", false)
             // AudioService propagates new delegated grants to its native permission cache asynchronously.
             for (attempt in 0..2) {
+                if (record != null) break
                 if (capture.cancelled.get()) return
                 try { record = openRecord(); break }
                 catch (error: Exception) { if (attempt == 2) throw error; Thread.sleep(150) }
@@ -161,10 +171,16 @@ class DesktopAudioCapture(context: Context) {
                 DesktopAudioState.running = true
                 DesktopAudioState.status = "Звук передаётся по USB"
             } }
-            AppLog.i("DESKTOP AUDIO: REMOTE_SUBMIX PCM 48000 Hz stereo16 started (memory only)")
+            AppLog.i("DESKTOP AUDIO: ${if (loopback != null) "AudioMix loopback (media/game/unknown)" else "REMOTE_SUBMIX"} PCM 48000 Hz stereo16 started (memory only)")
             val input = ByteArray(DesktopAudioPolicy.READ_BYTES)
             val frames = DesktopPcmFrames()
+            var statsAt = SystemClock.elapsedRealtime()
             while (!capture.cancelled.get()) {
+                val now = SystemClock.elapsedRealtime()
+                if (now - statsAt >= STATS_MS) {
+                    statsAt = now
+                    AppLog.i("DESKTOP AUDIO: PCM bytes=${DesktopAudioState.pcmBytes}, non-silent buffers=${DesktopAudioState.nonSilentBuffers}", false)
+                }
                 val count = audio.read(input, 0, input.size, AudioRecord.READ_NON_BLOCKING)
                 check(count >= 0) { "Ошибка чтения звука Android: $count" }
                 if (count == 0) { Thread.sleep(5); continue }
@@ -185,7 +201,7 @@ class DesktopAudioCapture(context: Context) {
         } finally {
             // Stop rerouting output before notifying CarLife; never retain capture during USB grace.
             if (started) runCatching { record?.stop() }
-            runCatching { record?.release() }
+            if (loopback != null) loopback.release() else runCatching { record?.release() }
             if (started) runCatching { sessions.runIfCurrent(capture.generation) {
                 capture.core.onAudioStop(DesktopAudioPolicy.MEDIA_CHANNEL)
             } }
@@ -204,4 +220,6 @@ class DesktopAudioCapture(context: Context) {
             AppLog.i("DESKTOP AUDIO: stopped; PCM bytes=${DesktopAudioState.pcmBytes}, non-silent buffers=${DesktopAudioState.nonSilentBuffers}", false)
         }
     }
+
+    private companion object { const val STATS_MS = 5_000L }
 }

@@ -1072,10 +1072,12 @@ class BridgeService : Service() {
         val s = CarLifeSession(transport, cfg, owner.core, PhoneThermal(this), CallStateSource.NONE, onHuSize = { w, hh -> aaPrefs.saveHuSize(w, hh) }) { reason -> main.post { onSessionClosed(sref[0]!!, reason) } }
         sref[0] = s
         session = s
-        DesktopMusicPlayback.attach(applicationContext, this, s, isUsb,
+        // tcp-debug есть только в debug/smoke (эмулятор ГУ): для звука считаем его USB, чтобы проверять захват на стенде
+        val audioUsb = isUsb || transport.caps === TransportCaps.TCP_DEBUG
+        DesktopMusicPlayback.attach(applicationContext, this, s, audioUsb,
             ready = { session === s && DexState.running && s.hasFreshDesktopVideo() },
             audioReady = { !DexPrefs(this).usbPlaybackAudio || !owner.core.audioViaUsb || DesktopAudioState.running })
-        desktopAudio.attach(owner.core, isUsb) { session === s && s.canCaptureDesktopAudio() }
+        desktopAudio.attach(owner.core, audioUsb) { session === s && s.canCaptureDesktopAudio() }
         s.start()
         owner.onUsbSessionStarted()
     }

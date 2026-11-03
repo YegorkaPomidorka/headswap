@@ -4,6 +4,8 @@ package com.yegorkapomidorka.headswap.dex
 /** Playback only. The microphone and call recording sources are never selectable. */
 object DesktopAudioPolicy {
     const val PERMISSION = "android.permission.CAPTURE_AUDIO_OUTPUT"
+    /** Optional: loopback AudioMix for media (wins over A2DP). Without it capture falls back to bare REMOTE_SUBMIX. */
+    const val ROUTING_PERMISSION = "android.permission.MODIFY_AUDIO_ROUTING"
     const val ACTIVATION_ARGUMENT = "headswap_audio"
     const val SAMPLE_RATE = 48000
     const val CHANNELS = 2

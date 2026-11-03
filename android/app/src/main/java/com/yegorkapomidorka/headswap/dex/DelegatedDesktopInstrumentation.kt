@@ -80,6 +80,7 @@ class DelegatedDesktopInstrumentation : Instrumentation() {
             if (requestAudio) permissions.add(DesktopAudioPolicy.PERMISSION)
             // Optional (not part of hasPermissions): shells that lack it simply do not pass it on.
             permissions.add(DelegatedDesktopAccess.ADD_ALWAYS_UNLOCKED_DISPLAY)
+            if (requestAudio) permissions.add(DesktopAudioPolicy.ROUTING_PERMISSION)
             automation.adoptShellPermissionIdentity(*permissions.toTypedArray())
             adoptedHere = true
             check(DelegatedDesktopAccess.hasPermissions(context)) { "Android не предоставил все права рабочего стола и управления музыкой. Повторите явную активацию HeadSwap." }
