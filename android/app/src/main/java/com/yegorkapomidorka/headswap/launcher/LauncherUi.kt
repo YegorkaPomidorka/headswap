@@ -36,6 +36,7 @@ import androidx.compose.ui.graphics.vector.PathParser
 import androidx.compose.ui.graphics.vector.toPath
 import androidx.compose.ui.input.pointer.PointerInputChange
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -51,6 +52,7 @@ import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.TextUnit
+import com.yegorkapomidorka.headswap.R
 import kotlin.math.abs
 import kotlin.math.cos
 import kotlin.math.sin
@@ -63,6 +65,25 @@ class LauncherMetrics(val spec: LauncherSpec, private val density: Density) {
 
 val LocalMetrics = staticCompositionLocalOf<LauncherMetrics> { error("LauncherMetrics not provided") }
 val LocalAccent = staticCompositionLocalOf { Pal.GOLD }
+
+/** Шрифты макета: Golos Text и JetBrains Mono (OFL, вариативные, уже лежат в res/font для интерфейса телефона). */
+object LauncherFonts {
+    private val cache = java.util.concurrent.ConcurrentHashMap<Int, FontFamily>()
+
+    /**
+     * Семейство под один вес: Compose у вариативного шрифта из ресурсов не выставляет wght (всё рисовалось 400),
+     * поэтому берём font-family XML (golos.xml / jetbrains_mono.xml с fontVariationSettings) и выбираем вес системой.
+     */
+    fun family(ctx: android.content.Context, mono: Boolean, weight: FontWeight): FontFamily {
+        val key = (if (mono) 10_000 else 0) + weight.weight
+        return cache.getOrPut(key) {
+            runCatching {
+                val base = ctx.resources.getFont(if (mono) R.font.jetbrains_mono else R.font.golos)
+                FontFamily(androidx.compose.ui.text.font.Typeface(android.graphics.Typeface.create(base, weight.weight, false)))
+            }.getOrElse { if (mono) FontFamily.Monospace else FontFamily.SansSerif }
+        }
+    }
+}
 
 /** Палитра темы лаунчера: THEMES из Teyes.dc.html и Settings.dc.html. Обложка музыки и чип плееров тёмные в обеих. */
 class LauncherPalette(
@@ -353,7 +374,7 @@ fun Txt(
         text, modifier,
         style = TextStyle(
             color = color, fontSize = m.sp(sizePx), fontWeight = weight,
-            fontFamily = if (mono) FontFamily.Monospace else FontFamily.SansSerif,
+            fontFamily = LauncherFonts.family(LocalContext.current, mono, weight),
             lineHeight = m.sp((sizePx * 1.15f).toInt()), textAlign = align,
         ),
         maxLines = maxLines, softWrap = maxLines > 1, overflow = if (ellipsis) TextOverflow.Ellipsis else TextOverflow.Clip,

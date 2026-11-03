@@ -27,6 +27,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
@@ -315,7 +316,7 @@ private fun PlayersCard(label: String, opts: List<PlayerOpt>, selected: PlayerOp
     val measurer = rememberTextMeasurer()
     Card(modifier) {
         BoxWithConstraints(Modifier.fillMaxSize().padding(start = m.dp(d.padStart), end = m.dp(d.padEnd))) {
-            val labelW = measurer.measure(label, TextStyle(fontSize = m.sp(s.f2), fontFamily = FontFamily.SansSerif)).size.width
+            val labelW = measurer.measure(label, TextStyle(fontSize = m.sp(s.f2), fontFamily = LauncherFonts.family(LocalContext.current, false, FontWeight.Normal))).size.width
             val box = d.playerIcon + 4 * d.ring
             val step = box + max(0, d.playerGap - 2 * d.ring)
             val fit = max(1, (constraints.maxWidth - labelW - s.g + step - box) / step)

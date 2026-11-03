@@ -11,4 +11,14 @@
         android:fontStyle="normal"
         android:fontVariationSettings="'wght' 500"
         android:fontWeight="500" />
+    <font
+        android:font="@font/jetbrains_mono_vf"
+        android:fontStyle="normal"
+        android:fontVariationSettings="'wght' 600"
+        android:fontWeight="600" />
+    <font
+        android:font="@font/jetbrains_mono_vf"
+        android:fontStyle="normal"
+        android:fontVariationSettings="'wght' 700"
+        android:fontWeight="700" />
 </font-family>
