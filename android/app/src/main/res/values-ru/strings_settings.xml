@@ -49,6 +49,7 @@
     <string name="set_res_pick">Выбрать разрешение</string>
     <string name="set_res_group_standard">Обычные экраны</string>
     <string name="set_res_group_wide">Широкие экраны</string>
+    <string name="set_res_group_portrait">Вертикальные экраны</string>
     <string name="set_res_ratio_wide_976">2,3:1</string>
     <string name="set_apply_next">Применится при следующем подключении.</string>
     <string name="set_needs_transcode">Нужно перекодирование</string>
@@ -146,6 +147,10 @@
     <string name="video_wide_976_sub">Широкая обрезка под окно CarLife на ГУ VW CNS3</string>
     <string name="video_wide_836_title">Широкий 1920×836 (VW Tiguan L Pro, проброс)</string>
     <string name="video_wide_836_sub">Пропорция окна 2240×976 без растяжения на телефоне: растягивает ГУ. Для кропа без перекодирования</string>
+    <string name="video_portrait_960_title">Вертикальный 3:4</string>
+    <string name="video_portrait_960_sub">960×1280: вертикальный экран целиком</string>
+    <string name="video_portrait_1152_title">Вертикальный 5:6 (Hyundai Tucson NX4c)</string>
+    <string name="video_portrait_1152_sub">960×1152: экран 960×1280 без полосы климата внизу, без растяжения</string>
 
     <!-- Частота музыки (MusicRate) -->
     <string name="mrate_auto">Авто</string>
@@ -228,6 +233,7 @@
     <string name="car_honda_vezel_2022">Honda Vezel 2022–2024 (GAC Honda)</string>
     <string name="car_hyundai_elantra_7">Hyundai Elantra, 7 поколение, дорестайл</string>
     <string name="car_hyundai_ix35_2021">Hyundai ix35 2021</string>
+    <string name="car_hyundai_tucson_nx4c">Hyundai Tucson NX4c</string>
     <string name="car_jetta_vs">Jetta VS5/VS7 (только с Baidu CarLife, не J-Link)</string>
     <string name="car_kia_k3_2023">Kia K3 2023</string>
     <string name="car_kia_sportage_ace">Kia Sportage Ace</string>

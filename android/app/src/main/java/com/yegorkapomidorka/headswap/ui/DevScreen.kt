@@ -403,7 +403,6 @@ class DevScreen(host: MainActivity) : Screen(host) {
             CustomResError.WIDTH_RANGE -> R.string.dev_custom_err_width
             CustomResError.HEIGHT_RANGE -> R.string.dev_custom_err_height
             CustomResError.ODD -> R.string.dev_custom_err_odd
-            CustomResError.PORTRAIT -> R.string.dev_custom_err_portrait
             null -> if (encoderSupports(w, h)) 0 else R.string.dev_custom_err_encoder
         }
         if (problem != 0) {

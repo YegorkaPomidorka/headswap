@@ -60,15 +60,30 @@ class CustomVideoModeTest {
         assertNull(CustomVideoMode.from(1281, 720))        // нечётная ширина
         assertNull(CustomVideoMode.from(1280, 721))        // нечётная высота
         assertNull(CustomVideoMode.from(1920, 1082))       // высота > 1080
-        assertNull(CustomVideoMode.from(700, 1000))        // вертикальный
+        assertNull(CustomVideoMode.from(1082, 1920))       // вертикальный шире 1080
         assertNull(CustomVideoMode.from(0, 0))
         assertEquals(CustomResError.WIDTH_RANGE, CustomVideoMode.check(2242, 800))
         assertEquals(CustomResError.HEIGHT_RANGE, CustomVideoMode.check(1920, 1082))
         assertEquals(CustomResError.ODD, CustomVideoMode.check(1281, 720))
-        assertEquals(CustomResError.PORTRAIT, CustomVideoMode.check(700, 1000))
+        assertEquals(CustomResError.WIDTH_RANGE, CustomVideoMode.check(1082, 1920))
+        assertEquals(CustomResError.HEIGHT_RANGE, CustomVideoMode.check(1000, 2242))
+        assertNull(CustomVideoMode.check(700, 1000))
+        assertNull(CustomVideoMode.check(1080, 2240))
         assertNull(CustomVideoMode.check(640, 640))
         assertNull(CustomVideoMode.check(2240, 1080))
         assertEquals(CustomVideoMode(2240, 976), CustomVideoMode.from(2240, 976))
+    }
+
+    @Test
+    fun portraitUsesPortraitPlates() {
+        assertLayout(960, 1280, "1080x1920", 120, 640)     // 1:1 из 1080x1920
+        assertLayout(720, 1280, "720x1280", 0, 0)
+        assertLayout(640, 960, "720x1280", 80, 320)
+        val tall = CustomVideoMode(1080, 2240)             // выше 1920: аспект вписывается в 1080x1920
+        assertEquals("1080x1920", tall.aaResolution)
+        assertEquals(1920, tall.areaH)
+        assertEquals(926, tall.areaW)
+        AapMessages.serviceDiscoveryResponse(CustomVideoMode(960, 1280).sdOptions(false))   // код 7 есть, не бросает
     }
 
     @Test
@@ -147,7 +162,7 @@ class CustomVideoModeTest {
         // невалидные сохранённые значения = пресет
         assertSame(VideoMode.WIDE, CustomVideoMode.resolve(true, 639, 976, VideoMode.WIDE))
         assertSame(VideoMode.WIDE, CustomVideoMode.resolve(true, 1281, 720, VideoMode.WIDE))
-        assertSame(VideoMode.WIDE, CustomVideoMode.resolve(true, 700, 1000, VideoMode.WIDE))
+        assertSame(VideoMode.WIDE, CustomVideoMode.resolve(true, 1082, 1920, VideoMode.WIDE))
         assertSame(VideoMode.WIDE, CustomVideoMode.resolve(true, 0, 0, VideoMode.WIDE))
     }
 

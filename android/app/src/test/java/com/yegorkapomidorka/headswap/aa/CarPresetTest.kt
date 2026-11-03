@@ -33,7 +33,8 @@ class CarPresetTest {
     fun allPresetsDirectPassthroughAutoFps() {
         for (p in CarPreset.values()) {
             if (p == CarPreset.HYUNDAI_ELANTRA_7) continue      // CN7: проброс моргает (h638), перекодирование 1280×480 / 15
-            assertEquals(p.name, false, p.settings.transcode)
+            // Tucson NX4c: вертикальный кадр проверен только с перекодированием (h670)
+            assertEquals(p.name, p == CarPreset.HYUNDAI_TUCSON_NX4C, p.settings.transcode)
             assertEquals(p.name, FpsSetting.AUTO, p.settings.fps)
         }
         with(CarPreset.HYUNDAI_ELANTRA_7.settings) {
