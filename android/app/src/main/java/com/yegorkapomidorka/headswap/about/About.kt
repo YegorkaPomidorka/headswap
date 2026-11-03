@@ -4,7 +4,7 @@ import android.content.Context
 import com.yegorkapomidorka.headswap.R
 
 /** Автор для экрана «О приложении»: имя по языку, ник и страница в Telegram. */
-data class Author(val nameRes: Int, val handle: String, val url: String)
+data class Author(val nameRes: Int, val handle: String)
 
 /** Проект с открытой лицензией: правообладатель, лицензия, страница проекта и файл с полным текстом в assets/licenses. */
 data class OpenSource(
@@ -22,8 +22,8 @@ data class OpenSource(
 /** Авторы и сторонние лицензии: один источник для экрана ГУ (лаунчер) и экрана телефона. */
 object About {
     val authors = listOf(
-        Author(R.string.about_author_yegor, "@YegorkaPomidorka", "https://t.me/YegorkaPomidorka"),
-        Author(R.string.about_author_ildar, "@sadykovildar", "https://t.me/sadykovildar"),
+        Author(R.string.about_author_yegor, "@YegorkaPomidorka"),
+        Author(R.string.about_author_ildar, "@sadykovildar"),
     )
 
     private const val GPL = "GPL-3.0.txt"
