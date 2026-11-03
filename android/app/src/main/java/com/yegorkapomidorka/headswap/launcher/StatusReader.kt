@@ -5,8 +5,6 @@ import android.bluetooth.BluetoothManager
 import android.content.Context
 import android.content.pm.PackageManager
 import android.media.AudioManager
-import android.net.ConnectivityManager
-import android.net.NetworkCapabilities
 import android.net.wifi.WifiManager
 import android.telephony.TelephonyManager
 import java.time.DayOfWeek
@@ -42,21 +40,11 @@ internal object StatusReader {
     private fun weekday(d: DayOfWeek): String =
         d.getDisplayName(TextStyle.SHORT, Locale.getDefault()).replaceFirstChar { it.uppercase() }
 
-    private fun network(ctx: Context): String {
-        val cm = ctx.getSystemService(ConnectivityManager::class.java) ?: return NetLabel.NONE
-        val caps = runCatching { cm.getNetworkCapabilities(cm.activeNetwork) }.getOrNull() ?: return NetLabel.NONE
-        return when {
-            caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) -> "Wi-Fi"
-            caps.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) -> NetLabel.cellular(cellularType(ctx))
-            caps.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET) -> "LAN"
-            else -> NetLabel.NONE
-        }
-    }
+    /** Мобильная сеть в статусе (у Wi-Fi свой значок): тип сети даже при активном Wi-Fi, как на магнитолах. */
+    private fun network(ctx: Context): String = NetLabel.cellular(cellularType(ctx))
 
+    /** Уровень сигнала мобильной сети 0..4; -1 - сети нет (нет SIM, авиарежим): тогда значок не рисуем. */
     private fun signal(ctx: Context): Int {
-        val cm = ctx.getSystemService(ConnectivityManager::class.java) ?: return -1
-        val caps = runCatching { cm.getNetworkCapabilities(cm.activeNetwork) }.getOrNull() ?: return -1
-        if (!caps.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) || caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)) return -1
         val level = runCatching { ctx.getSystemService(TelephonyManager::class.java)?.signalStrength?.level }.getOrNull()
         return level?.coerceIn(0, 4) ?: -1
     }

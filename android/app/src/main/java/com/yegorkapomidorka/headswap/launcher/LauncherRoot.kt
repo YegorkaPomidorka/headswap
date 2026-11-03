@@ -193,8 +193,8 @@ fun StatusBar() {
             SvgIcon(Ico.BT, s.fs, if (st.bluetooth) Pal.SEC2 else Pal.SEC2.copy(alpha = 0.3f))
             SvgIcon(Ico.WIFI, s.fs, if (st.wifi) Pal.SEC2 else Pal.SEC2.copy(alpha = 0.3f))
             // сеть с уровнем сигнала - здесь, рядом с Wi-Fi, а не в рейке
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(m.dp(s.g4))) {
-                if (st.signal >= 0) VectorIcon(VIco.signal(st.signal), 24f, s.fs, Pal.SEC2)
+            if (st.signal >= 0) Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(m.dp(s.g4))) {
+                VectorIcon(VIco.signal(st.signal), 24f, s.fs, Pal.SEC2)
                 Txt(st.net, s.fs, color = Pal.SEC2)
             }
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(m.dp(s.g4))) {
