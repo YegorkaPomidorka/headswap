@@ -162,7 +162,7 @@ class CustomVideoModeTest {
         // невалидные сохранённые значения = пресет
         assertSame(VideoMode.WIDE, CustomVideoMode.resolve(true, 639, 976, VideoMode.WIDE))
         assertSame(VideoMode.WIDE, CustomVideoMode.resolve(true, 1281, 720, VideoMode.WIDE))
-        assertSame(VideoMode.WIDE, CustomVideoMode.resolve(true, 700, 1000, VideoMode.WIDE))
+        assertSame(VideoMode.WIDE, CustomVideoMode.resolve(true, 1082, 1920, VideoMode.WIDE))
         assertSame(VideoMode.WIDE, CustomVideoMode.resolve(true, 0, 0, VideoMode.WIDE))
     }
 
