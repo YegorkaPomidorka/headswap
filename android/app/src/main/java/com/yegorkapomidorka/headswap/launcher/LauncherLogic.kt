@@ -75,6 +75,16 @@ data class AppRef(val pkg: String, val cls: String) {
     }
 }
 
+/**
+ * Двойное «Назад» в окне приложения - на главный. Teams и другие на своём первом экране глотают Back: задача остаётся
+ * сверху, а «Домой» на рейке нет (Егор 04.11). Отличить первый экран от внутреннего мы не можем, поэтому второе
+ * нажатие в пределах [WINDOW_MS] уводит на главный всегда; приложение остаётся в фоне.
+ */
+object DoubleBack {
+    const val WINDOW_MS = 1500L
+    fun isDouble(prevAt: Long, now: Long): Boolean = prevAt > 0 && now - prevAt in 0..WINDOW_MS
+}
+
 /** Персистентный список приложений: порядок важен, дублей нет. */
 object AppList {
     fun encode(list: List<AppRef>): String = list.joinToString("\n") { it.key }
