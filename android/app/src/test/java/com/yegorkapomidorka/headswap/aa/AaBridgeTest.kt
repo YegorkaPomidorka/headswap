@@ -648,7 +648,7 @@ class AaBridgeCoreTest {
         core.onCarlifeHardKey(0x14)                           // OK: нажатие шайбы
         assertEquals(listOf(1, -1), peer.rotary.toList())
         assertEquals(listOf(23), peer.keys.toList())
-        assertTrue(logs.any { it.contains("шайба keycode=6 -> AA rotary 1") })
+        assertTrue(logs.any { it.contains("шайба keycode=6 -> rotary 1") })
         assertTrue(AapMessages.KEYCODE_ROTARY_CONTROLLER in AapMessages.KEYCODES_SUPPORTED)
         core.peer = null
         core.onCarlifeHardKey(6)                              // AA не подключён: игнор без исключений

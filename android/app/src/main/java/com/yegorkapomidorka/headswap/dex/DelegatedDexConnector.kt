@@ -11,6 +11,7 @@ import android.os.DeadObjectException
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
+import android.view.KeyEvent
 import android.view.MotionEvent
 import com.yegorkapomidorka.headswap.AppLog
 import com.yegorkapomidorka.headswap.embed.EmbeddedSessionRegistry
@@ -254,8 +255,24 @@ class DelegatedDexConnector(context: Context, private val core: AaBridgeCore,
         }
     }
 
+    /** Кнопка ГУ: сначала свой лаунчер (DesktopKeys), иначе нажатие в дисплей рабочего стола. */
     override fun sendKey(keycode: Int) {
-        if (keycode !in 0..1000) return
+        if (DesktopKeys.sink?.key(keycode) == true) return
+        if (keycode !in 0..1000) {
+            AppLog.i("DESKTOP кнопка $keycode: лаунчер не взял, в Android аналога нет", false)
+            return
+        }
+        inject(keycode)
+    }
+
+    /** Шайба: свой лаунчер двигает фокус сам; без него - стрелки вниз/вверх в окно (чужой лаунчер, списки). */
+    override fun sendRotary(delta: Int) {
+        if (DesktopKeys.sink?.rotate(delta) == true) return
+        val key = if (delta > 0) KeyEvent.KEYCODE_DPAD_DOWN else KeyEvent.KEYCODE_DPAD_UP
+        repeat(kotlin.math.abs(delta).coerceAtMost(8)) { inject(key) }
+    }
+
+    private fun inject(keycode: Int) {
         enqueue { it.injectKey(0, keycode); it.injectKey(1, keycode) }
     }
 

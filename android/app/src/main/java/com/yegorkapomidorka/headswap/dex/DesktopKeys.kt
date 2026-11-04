@@ -1,0 +1,17 @@
+package com.yegorkapomidorka.headswap.dex
+
+/**
+ * Шайба и кнопки ГУ в режиме рабочего стола. Свой лаунчер живёт в процессе приложения и забирает их напрямую,
+ * без инжекта в дисплей (ADR 0024): поворот шайбы в Android аналога без мета-клавиш не имеет, а NAVI/MUSIC/HOME
+ * означают действия лаунчера, а не клавиши. Нет приёмника (чужой лаунчер, активность не на экране) - старый путь.
+ */
+object DesktopKeys {
+    interface Sink {
+        /** Поворот шайбы: delta > 0 по часовой. false - не взял, вызывающий решает сам. Любой поток. */
+        fun rotate(delta: Int): Boolean
+        /** Android keycode от моста (AaBridge.HARD_KEY_TO_ANDROID). false - не взял. Любой поток. */
+        fun key(keycode: Int): Boolean
+    }
+
+    @Volatile var sink: Sink? = null
+}
