@@ -216,6 +216,7 @@ object CarHostProbe {
                 override fun onSuccess(r: Bundleable?) {
                     val w = runCatching { r?.get() as? TemplateWrapper }.getOrNull()
                     log("шаблон: ${describe(w)}")
+                    h.post { dumpTemplate(w) }
                 }
                 override fun onFailure(r: Bundleable?) { log("getTemplate: отказ ${failText(r)}") }
             })
@@ -232,6 +233,112 @@ object CarHostProbe {
                 "${ri?.currentDistance?.let { meters(it) }} м, loading=${ri?.isLoading}"
         }
         return base
+    }
+
+    // --- дамп шаблона целиком (поля моделей рефлексией) и клики по нему; только поток h ---
+
+    private val clicks = mutableListOf<androidx.car.app.model.OnClickDelegate>()
+    private var lastDump = ""
+
+    private fun dumpTemplate(w: TemplateWrapper?) {
+        val t = w?.template ?: return
+        val found = mutableListOf<androidx.car.app.model.OnClickDelegate>()
+        val sb = StringBuilder()
+        dumpObj(t, 0, sb, found, java.util.IdentityHashMap())
+        val s = sb.toString()
+        clicks.clear(); clicks.addAll(found)
+        // NavigationTemplate перерисовывается каждые секунды: пишем только изменения без метров/секунд
+        val key = s.replace(Regex("\\d+"), "#")
+        if (key == lastDump) return
+        lastDump = key
+        log("дамп ${t.javaClass.simpleName} (кликов ${found.size}):")
+        s.lineSequence().filter { it.isNotBlank() }.forEach { log("  $it") }
+    }
+
+    private fun dumpObj(o: Any?, depth: Int, sb: StringBuilder, found: MutableList<androidx.car.app.model.OnClickDelegate>,
+                        seen: java.util.IdentityHashMap<Any, Boolean>) {
+        val pad = "  ".repeat(depth)
+        if (o == null || depth > 9 || seen.put(o, true) != null) return
+        for (c in generateSequence<Class<*>>(o.javaClass) { it.superclass }.takeWhile { it != Any::class.java }) {
+            for (f in c.declaredFields) {
+                if (java.lang.reflect.Modifier.isStatic(f.modifiers)) continue
+                val v = runCatching { f.isAccessible = true; f.get(o) }.getOrNull() ?: continue
+                val name = f.name.removePrefix("m").replaceFirstChar { it.lowercase() }
+                val leaf = leafText(v, found)
+                when {
+                    leaf != null -> if (leaf.isNotEmpty()) sb.append(pad).append(name).append(" = ").append(leaf).append('\n')
+                    v is Collection<*> -> {
+                        if (v.isEmpty()) continue
+                        sb.append(pad).append(name).append(" [").append(v.size).append("]\n")
+                        v.forEachIndexed { i, e ->
+                            val l = leafText(e, found)
+                            if (l != null) sb.append(pad).append("  #").append(i).append(' ').append(l).append('\n')
+                            else {
+                                sb.append(pad).append("  #").append(i).append(' ').append(e?.javaClass?.simpleName).append('\n')
+                                dumpObj(e, depth + 2, sb, found, seen)
+                            }
+                        }
+                    }
+                    v.javaClass.name.startsWith("androidx.car.app.") -> {
+                        sb.append(pad).append(name).append(": ").append(v.javaClass.simpleName).append('\n')
+                        dumpObj(v, depth + 1, sb, found, seen)
+                    }
+                }
+            }
+        }
+    }
+
+    /** Значение-лист одной строкой; "" - пропустить; null - не лист, раскрывать дальше. */
+    private fun leafText(v: Any?, found: MutableList<androidx.car.app.model.OnClickDelegate>): String? = when (v) {
+        null -> ""
+        is String -> "\"$v\""
+        is Number, is Boolean, is Enum<*> -> v.toString()
+        is CarText -> "\"${text(v)}\""
+        is CharSequence -> "\"$v\""
+        is Distance -> "${v.displayDistance} unit${v.displayUnit}"
+        is androidx.car.app.model.CarColor -> "color${v.type}"
+        is androidx.car.app.model.CarIcon -> "icon(type ${v.type}${saveIcon(v)})"
+        is androidx.car.app.model.OnClickDelegate -> { found.add(v); "КЛИК #${found.size - 1}" }
+        is IBinder, is android.os.IInterface -> ""
+        else -> if (v.javaClass.simpleName.contains("Delegate")) "делегат ${v.javaClass.simpleName}" else null
+    }
+
+    /** Своя иконка приложения -> files/carhost/icon_<хеш>.png (для разбора кнопок); в дамп - имя файла. */
+    private fun saveIcon(ic: androidx.car.app.model.CarIcon): String = runCatching {
+        val d = ic.icon?.loadDrawable(app) ?: return ""
+        val w = d.intrinsicWidth.takeIf { it > 0 } ?: 96
+        val hh = d.intrinsicHeight.takeIf { it > 0 } ?: 96
+        val bmp = android.graphics.Bitmap.createBitmap(w, hh, android.graphics.Bitmap.Config.ARGB_8888)
+        d.setBounds(0, 0, w, hh); d.draw(android.graphics.Canvas(bmp))
+        val px = IntArray(w * hh).also { bmp.getPixels(it, 0, w, 0, 0, w, hh) }
+        val name = "icon_%08x.png".format(px.contentHashCode())
+        val dir = java.io.File(app.filesDir, "carhost").apply { mkdirs() }
+        val f = java.io.File(dir, name)
+        if (!f.exists()) f.outputStream().use { bmp.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it) }
+        " $name ${w}x$hh"
+    }.getOrElse { " иконка не сохранена: ${it.javaClass.simpleName}" }
+
+    /** cmd car_click --ei i N: нажать N-й кликабельный элемент последнего дампа. */
+    fun click(i: Int) {
+        h.post {
+            val d = clicks.getOrNull(i)
+            if (d == null) { log("клик #$i: нет такого (всего ${clicks.size})"); return@post }
+            log("клик #$i")
+            runCatching {
+                d.sendClick(object : androidx.car.app.OnDoneCallback {
+                    override fun onSuccess(response: Bundleable?) { log("клик #$i: ок") }
+                    override fun onFailure(response: Bundleable) { log("клик #$i: отказ ${failText(response)}") }
+                })
+            }.onFailure { log("клик #$i упал: ${it.javaClass.simpleName}: ${it.message}") }
+        }
+    }
+
+    /** cmd car_back: кнопка «Назад» хоста. */
+    fun back() {
+        h.post {
+            val m = appManager ?: return@post
+            runCatching { m.onBackPressed(done("onBackPressed")) }.onFailure { log("назад упал: ${it.javaClass.simpleName}") }
+        }
     }
 
     private val host = object : ICarHost.Stub() {
