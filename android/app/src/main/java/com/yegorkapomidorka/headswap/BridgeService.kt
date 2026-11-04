@@ -25,6 +25,7 @@ import android.provider.Settings
 import com.yegorkapomidorka.headswap.aa.AaBridgeCore
 import com.yegorkapomidorka.headswap.aa.AaShadowNav
 import com.yegorkapomidorka.headswap.aa.DesktopNavHints
+import com.yegorkapomidorka.headswap.carapp.CarAppHost
 import com.yegorkapomidorka.headswap.aa.AaConnector
 import com.yegorkapomidorka.headswap.aa.AaCertsMissingException
 import com.yegorkapomidorka.headswap.aa.AaCreds
@@ -1175,6 +1176,7 @@ class BridgeService : Service() {
         if (host === owner) host = null
         AppLog.i("DEX: источник закрыт")
         AaShadowNav.stop()
+        CarAppHost.stop()
         DesktopNavHints.target = null
         val recovery = pendingDesktopRecovery
         if (recovery != null && recovery.owner === owner && desktopRecovery.isCurrent(recovery.attempt)) {

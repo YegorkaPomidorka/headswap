@@ -1,5 +1,6 @@
 package com.yegorkapomidorka.headswap.launcher
 
+import android.content.Context
 import android.graphics.SurfaceTexture
 import android.os.Binder
 import android.os.Handler
@@ -13,8 +14,10 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import com.yegorkapomidorka.headswap.AppLog
 import com.yegorkapomidorka.headswap.aa.AaShadowNav
-import com.yegorkapomidorka.headswap.aa.CarHostProbe
 import com.yegorkapomidorka.headswap.aa.TouchPoint
+import com.yegorkapomidorka.headswap.carapp.CarAppCatalog
+import com.yegorkapomidorka.headswap.carapp.CarAppHost
+import com.yegorkapomidorka.headswap.carapp.CarAppTarget
 import com.yegorkapomidorka.headswap.dex.DexState
 import com.yegorkapomidorka.headswap.embed.EmbeddedSessionRegistry
 
@@ -174,15 +177,39 @@ internal object EmbedHost {
 
     /** Поверхность, отданная декодеру AA или своему хосту Car App (только рабочий поток). */
     private var projSurface: Surface? = null
-    private var projCar = false
+    /** Окно навигатора рисует свой хост Car App: касания идут ему, а не в реестр. */
+    @Volatile private var projCar = false
     @Volatile private var projW = 0
     @Volatile private var projH = 0
 
+    @Volatile var appContext: Context? = null
+
+    /** Навигатор слота nav на Car App Library, последний ответ каталога (только рабочий поток). */
+    private var carPkg: String? = null
+    private var carTarget: CarAppTarget? = null
+
+    init {
+        // навигатор отказал хосту: следующий проход откроет его обычным окном
+        CarAppHost.onRefused = { pkg -> worker.post { if (carPkg == pkg) carPkg = null; reconcile(nav) } }
+    }
+
     private fun unproject() {
         if (projSurface == null) return
-        if (projCar) CarHostProbe.setSurface(null, 0, 0, densityDpi) else AaShadowNav.setSurface(null)
+        if (projCar) CarAppHost.setSurface(null, 0, 0, densityDpi) else AaShadowNav.setSurface(null)
         projSurface = null
         projCar = false
+    }
+
+    /** Навигатор [pkg] на Car App Library, которому хост ещё не отказал; null - показывать окном. Только рабочий поток. */
+    private fun carTargetFor(pkg: String?): CarAppTarget? {
+        val ctx = appContext
+        if (pkg == null || ctx == null || !CarAppHost.enabled) return null
+        if (pkg != carPkg) {
+            carPkg = pkg
+            carTarget = CarAppCatalog.usable(ctx, pkg)
+            AppLog.i("EMBED nav: $pkg ${if (carTarget != null) "на Car App Library - свой хост" else "- окном"}", false)
+        }
+        return carTarget
     }
 
     fun textureAvailable(slot: EmbedSlot, texture: SurfaceTexture) {
@@ -216,10 +243,10 @@ internal object EmbedHost {
         if (action !in intArrayOf(0, 1, 2, 3, 5, 6)) return
         val count = ev.pointerCount
         if (count > 2 || viewW <= 0 || viewH <= 0) return
-        if (slot === nav && CarHostProbe.active) {
+        if (slot === nav && projCar) {
             val w = projW
             val h = projH
-            if (w > 0 && h > 0) CarHostProbe.touch(action, ev.x * w / viewW, ev.y * h / viewH)
+            if (w > 0 && h > 0 && slot.interactive) CarAppHost.touch(action, ev.x * w / viewW, ev.y * h / viewH)
             return
         }
         if (slot === nav && AaShadowNav.projection) {
@@ -255,6 +282,11 @@ internal object EmbedHost {
      * недоступен) раньше навсегда оставлял слой поверх пустого дисплея.
      */
     fun back(slot: EmbedSlot, onClosed: () -> Unit) {
+        if (slot === nav && projCar) {
+            // свой хост: на карте с маршрутом «Назад» - на главный, на остальных экранах навигатор возвращается сам
+            if (CarAppHost.template?.template is androidx.car.app.navigation.model.NavigationTemplate) onClosed() else CarAppHost.back()
+            return
+        }
         worker.post {
             AppLog.i("EMBED ${slot.name}: Back handle=${slot.handle} pkg=${slot.pkg} статус=${slot.status} " +
                 "state=${slot.lastState} касаний отброшено=${slot.dropped}", false)
@@ -442,23 +474,27 @@ internal object EmbedHost {
         val texture = synchronized(slot.lock) { slot.texture }
         if (texture == null || texture.isReleased) { slot.status = EmbedStatus.CONNECTING; return }
         if (slot === nav) {
-            if (CarHostProbe.active) {
-                // ПРОБНИК: свой хост Car App - карта навигатора прямо в эту поверхность, в размер окна
+            val car = carTargetFor(slot.pkg)
+            if (car != null) {
+                // Свой хост Car App: карта навигатора прямо в эту поверхность, в размер окна; телефонную часть
+                // навигатора не запускаем - иначе она держит его движок и машинная часть висит на заставке.
                 val w = slot.wantW
                 val h = slot.wantH
                 if (w < 128 || h < 128) return
                 if (projSurface != null && !projCar) unproject()
                 if (slot.handle > 0) { releaseLease(slot); AppLog.i("EMBED nav: окно отдано своему хосту Car App", false) }
+                CarAppHost.start(appContext ?: return, car)
                 val surface = slot.surface ?: Surface(texture).also { slot.surface = it }
                 texture.setDefaultBufferSize(w, h)
                 if (projSurface !== surface || projW != w || projH != h) {
                     projSurface = surface; projCar = true; projW = w; projH = h
-                    CarHostProbe.setSurface(surface, w, h, densityDpi)
+                    CarAppHost.setSurface(surface, w, h, densityDpi)
                 }
                 slot.status = EmbedStatus.READY
                 return
             }
             if (projCar) { unproject(); dropSurface(slot) }
+            if (CarAppHost.pkg != null) CarAppHost.stop() // навигатор сменили на оконный или хосту отказали
             if (AaShadowNav.projection) {
                 // ПРОБНИК: вместо навигатора телефона - экран теневой AA (там тот же навигатор в машинном виде)
                 if (slot.handle > 0) { releaseLease(slot); AppLog.i("EMBED nav: окно отдано проекции AA", false) }

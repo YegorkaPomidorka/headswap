@@ -63,7 +63,7 @@
     <!-- без queries на API 30+ пакет Android Auto не виден (проверка установки, запуск настроек) -->
     <queries>
         <package android:name="com.google.android.projection.gearhead" />
-        <!-- ПРОБНИК: свой хост Car App Library (aa/CarHostProbe.kt) -->
+        <!-- свой хост Car App Library: навигаторы рабочего стола (carapp/CarAppCatalog.kt) -->
         <intent>
             <action android:name="androidx.car.app.CarAppService" />
         </intent>

@@ -33,6 +33,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.LayoutDirection
 import com.yegorkapomidorka.headswap.CarLifeState
 import com.yegorkapomidorka.headswap.R
+import com.yegorkapomidorka.headswap.carapp.CarAppHost
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
@@ -50,6 +51,8 @@ fun LauncherRoot(connected: Boolean) {
             delay(1000)
         }
     }
+    // день/ночь карты навигатора на своём хосте Car App - по теме лаунчера (2ГИС берёт его только у хоста)
+    LaunchedEffect(model.lightTheme) { CarAppHost.setNight(!model.lightTheme) }
     // состояние звонка и журнал: на главном потоке (PhoneStateListener берёт Looper потока создания)
     LaunchedEffect(Unit) {
         while (true) {

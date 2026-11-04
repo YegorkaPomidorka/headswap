@@ -310,14 +310,8 @@ class MainActivity : Activity() {
                     com.yegorkapomidorka.headswap.aa.AaShadowNav.projection = false
                     com.yegorkapomidorka.headswap.launcher.EmbedHost.reproject()
                 }
-                "car_host" -> {                                // ПРОБНИК: свой хост Car App для 2ГИС в окне навигатора
-                    com.yegorkapomidorka.headswap.aa.AaShadowNav.projection = false
-                    com.yegorkapomidorka.headswap.aa.AaShadowNav.start(this, withVideo = false)
-                    com.yegorkapomidorka.headswap.aa.CarHostProbe.start(this)
-                    com.yegorkapomidorka.headswap.launcher.EmbedHost.reproject()
-                }
-                "car_host_off" -> {
-                    com.yegorkapomidorka.headswap.aa.CarHostProbe.stop()
+                "car_host", "car_host_off" -> {                // свой хост Car App для навигатора: вкл (по умолчанию) / окном
+                    com.yegorkapomidorka.headswap.carapp.CarAppHost.enabled = cmd == "car_host"
                     com.yegorkapomidorka.headswap.launcher.EmbedHost.reproject()
                 }
                 "car_click" -> com.yegorkapomidorka.headswap.carapp.CarAppHost.click(intent.getIntExtra("i", -1))

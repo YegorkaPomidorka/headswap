@@ -122,7 +122,7 @@ dependencies {
     implementation("androidx.compose.foundation:foundation")
     implementation("androidx.compose.runtime:runtime")
     implementation("androidx.activity:activity-compose:1.11.0")
-    // ПРОБНИК: свой хост Car App Library (AIDL ICarApp/ICarHost и модель Trip/Template), см. aa/CarHostProbe.kt
+    // свой хост Car App Library для навигаторов рабочего стола (AIDL ICarApp/ICarHost, модели Trip/Template), см. carapp/
     implementation("androidx.car.app:app:1.7.0")
     testImplementation("junit:junit:4.13.2")
     // В unit-тестах android.jar — заглушки (isReturnDefaultValues), настоящий org.json нужен LogDiag
