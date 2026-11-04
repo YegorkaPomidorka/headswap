@@ -25,6 +25,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
@@ -182,7 +183,13 @@ private fun PlayerChipColumn(modifier: Modifier) {
                 onTap = { if (slot.pkg == null) LauncherActions.choosePhonePlayer() else LauncherActions.choosePlayer(slot.pkg) },
                 onLong = if (slot.kind == PlayerChip.Kind.PHONE) ({ LauncherActions.openPlayers() }) else null,
             ) {
-                when (slot.kind) {
+                // иконка выбранного приложения; «любой плеер» без закрепления - тот, что выбран или играет сейчас
+                val iconPkg = slot.pkg ?: model.musicPlayer?.takeIf { it !in PlayerChip.ONLINE }
+                    ?: MusicController.state.pkg?.takeIf { it !in PlayerChip.ONLINE }
+                val icon = iconPkg?.let { rememberPackageIcon(it) }
+                if (icon != null) {
+                    Image(icon, null, Modifier.size(m.dp(s.pcApp)).clip(CircleShape).alpha(if (slot.selected) 1f else 0.55f))
+                } else when (slot.kind) {
                     PlayerChip.Kind.PHONE -> SvgIcon(Ico.MUSIC, s.pcIc, fg, stroke = 2.4f)
                     PlayerChip.Kind.YANDEX -> Txt("Я", s.pcIc, color = fg, weight = FontWeight.Bold)
                     PlayerChip.Kind.YT_MUSIC -> VectorIcon(VIco.YT_MUSIC, 24f, s.pcIc, fg)
