@@ -64,6 +64,8 @@ enum class CarPreset(val titleRes: Int, val settings: CarSettings = CarSettings(
     TOYOTA_RAV4_2025(R.string.car_toyota_rav4_2025, CarSettings(videoMode = VideoMode.WIDE)),
     /** Китай: 1920×1080, 30 кадров (Егор, 18.10). */
     VW_BORA_2021(R.string.car_vw_bora_2021, CarSettings(videoMode = VideoMode.R1080)),
+    /** Мультимедиа Discover Pro 9.2 во всех моделях VW: экран 1280×640, как у Octavia Pro (запрос юзера 04.11). */
+    VW_DISCOVER_PRO_9_2(R.string.car_vw_discover_pro_9_2, CarSettings(videoMode = VideoMode.WIDE_2_1)),
     /** 1920×1080, остальное «Авто» (Александр). */
     VW_GOLF_8_PRO(R.string.car_vw_golf_8_pro, CarSettings(videoMode = VideoMode.R1080)),
     VW_ID_UNYX(R.string.car_vw_id_unyx),
