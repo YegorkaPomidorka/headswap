@@ -82,6 +82,15 @@ object CarConfigMath {
     fun step(i: Int): Float = STEPS[i.coerceIn(0, STEPS.size - 1)]
 }
 
+/**
+ * Навигаторы, которые читают dpi («Масштаб карты») только при старте сессии: при смене ступени сессию перезапускаем.
+ * Яндекс Навигатор: стенд 04.11, dpi 107 -> 160 -> 80 на одной сессии карту не меняли, после перезапуска - меняли.
+ */
+object CarScaleRestart {
+    val PACKAGES = setOf("ru.yandex.yandexnavi", "ru.yandex.yandexmaps")
+    fun needed(pkg: String?): Boolean = pkg != null && pkg in PACKAGES
+}
+
 /** Отказ хоста или приложения: навигатор показываем обычным окном. */
 enum class CarAppRefusal { BIND, PERMISSION, NO_APP_INFO, API_LEVEL, HANDSHAKE, CREATE, FINISHED, DIED }
 

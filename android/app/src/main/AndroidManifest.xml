@@ -60,6 +60,13 @@
     <!-- обновление из приложения: установка скачанного с GitHub APK через PackageInstaller -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
 
+    <!-- свой хост Car App (ADR 0022): HostValidator из Car App Library пускает хост с выданным TEMPLATE_RENDERER.
+         На телефоне его никто не объявляет, объявляем сами (normal, выдаётся при установке) - так нас пускает
+         Яндекс Навигатор, у которого в списке хостов только Android Auto. -->
+
+    <permission android:name="android.car.permission.TEMPLATE_RENDERER" android:protectionLevel="normal" />
+    <uses-permission android:name="android.car.permission.TEMPLATE_RENDERER" />
+
     <!-- без queries на API 30+ пакет Android Auto не виден (проверка установки, запуск настроек) -->
     <queries>
         <package android:name="com.google.android.projection.gearhead" />

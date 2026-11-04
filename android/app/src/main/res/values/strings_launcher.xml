@@ -22,6 +22,7 @@
     <string name="l_nav_starting">Starting the navigator…</string>
     <string name="l_nav_failed">The window did not open. Tap to retry.</string>
     <string name="l_nav_restart">Restart navigator</string>
+    <string name="l_nav_yandex_plus">Works only with an active Plus subscription!</string>
     <string name="l_view_navigator">Navigator</string>
     <string name="l_view_clock">Clock</string>
 

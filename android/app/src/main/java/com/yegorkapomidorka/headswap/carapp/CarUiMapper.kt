@@ -15,12 +15,15 @@ import androidx.car.app.model.GridItem
 import androidx.car.app.model.GridTemplate
 import androidx.car.app.model.Header
 import androidx.car.app.model.ItemList
+import androidx.car.app.model.ListTemplate
+import androidx.car.app.model.MessageTemplate
 import androidx.car.app.model.OnClickDelegate
 import androidx.car.app.model.Pane
 import androidx.car.app.model.Row
 import androidx.car.app.model.SearchTemplate
 import androidx.car.app.model.Template
 import androidx.car.app.navigation.model.MapTemplate
+import androidx.car.app.navigation.model.MapWithContentTemplate
 import androidx.car.app.navigation.model.NavigationTemplate
 import androidx.car.app.navigation.model.PlaceListNavigationTemplate
 import androidx.car.app.navigation.model.RoutePreviewNavigationTemplate
@@ -45,9 +48,15 @@ internal class CarUiMapper(private val app: Context, private val units: CarUnits
         is RoutePreviewNavigationTemplate -> panel(title(t.header, t.title), back(t.header, t.headerAction), t.itemList,
             listOfNotNull(t.navigateAction), t.actionStrip?.actions, t.mapActionStrip?.actions, t.isLoading, primaryButtons = true)
         is MapTemplate -> mapTemplate(t)
+        // кнопки шапки: вход в поле поиска (значок) и «История». Яндекс шлёт их дважды - в шапке (новые хосты) и в
+        // actionStrip (старые), берём шапку, actionStrip - только без неё
         is GridTemplate -> CarUi.Grid(title(t.header, t.title), back(t.header, t.headerAction),
-            t.singleList?.items.orEmpty().filterIsInstance<GridItem>().map(::gridItem), t.isLoading)
+            t.singleList?.items.orEmpty().filterIsInstance<GridItem>().map(::gridItem), t.isLoading,
+            (t.header?.endHeaderActions?.takeIf { it.isNotEmpty() } ?: t.actionStrip?.actions.orEmpty()).map(::action))
         is SearchTemplate -> search(t)
+        is ListTemplate -> listTemplate(t, null, null)
+        is MessageTemplate -> message(t, null, null)
+        is MapWithContentTemplate -> mapWithContent(t)
         else -> CarUi.Unknown(t.javaClass.simpleName)
     }
 
@@ -81,11 +90,46 @@ internal class CarUiMapper(private val app: Context, private val units: CarUnits
     ): CarUi.Panel {
         val sel = list?.onSelectedDelegate
         return CarUi.Panel(
-            title, back, list?.items.orEmpty().filterIsInstance<Row>().map(::row), list?.selectedIndex ?: -1,
+            // selectedIndex без делегата выбора - просто 0 по умолчанию (Яндекс: подсвечивались «Мои места»)
+            title, back, list?.items.orEmpty().filterIsInstance<Row>().map(::row), if (sel != null) list.selectedIndex else -1,
             sel?.let { d -> { i: Int -> post { log("выбор $i"); runCatching { d.sendSelected(i, done("выбор $i")) } } } },
             buttons.map { action(it, primaryButtons) }, actions.orEmpty().map(::action),
             CarActions.visibleMapActions(mapActions.orEmpty()) { it.type }.map(::action), loading, text(list?.noItemsMessage),
         )
+    }
+
+    /**
+     * Карта приложения + контент поверх (Car App API 7). Яндекс Навигатор строит на нём главный экран («Мои места»,
+     * «История поездок»), списки мест и выдачу категорий; кнопки (поиск, настройки) - в actionStrip, зум - в mapController.
+     * Без него оверлей пустой и кнопок нет (стенд 04.11).
+     */
+    private fun mapWithContent(t: MapWithContentTemplate): CarUi? {
+        val actions = t.actionStrip?.actions
+        val mapActions = t.mapController?.mapActionStrip?.actions
+        return when (val c = t.contentTemplate) {
+            is ListTemplate -> listTemplate(c, actions, mapActions)
+            is MessageTemplate -> message(c, actions, mapActions)
+            else -> map(c)
+        }
+    }
+
+    private fun listTemplate(t: ListTemplate, actions: List<Action>?, mapActions: List<Action>?): CarUi.Panel {
+        val strip = actions ?: t.actionStrip?.actions
+        val sections = t.sectionedLists
+        if (t.singleList != null || sections.isEmpty()) {
+            return panel(title(t.header, t.title), back(t.header, t.headerAction), t.singleList, emptyList(), strip, mapActions, t.isLoading)
+        }
+        val rows = sections.flatMap { it.itemList.items.filterIsInstance<Row>() }.map(::row)
+        return CarUi.Panel(title(t.header, t.title), back(t.header, t.headerAction), rows, -1, null, emptyList(),
+            strip.orEmpty().map(::action), CarActions.visibleMapActions(mapActions.orEmpty()) { it.type }.map(::action), t.isLoading, "")
+    }
+
+    /** Сообщение с кнопками (Яндекс без геолокации: «Доступ к местоположению», «В телефон»). */
+    private fun message(t: MessageTemplate, actions: List<Action>?, mapActions: List<Action>?): CarUi.Panel {
+        val msg = CarRow(text(t.message), emptyList(), image(t.icon), null, false, 0, null)
+        return CarUi.Panel(title(t.header, t.title), back(t.header, t.headerAction), listOf(msg), -1, null,
+            t.actions.map(::action), (actions ?: t.actionStrip?.actions).orEmpty().map(::action),
+            CarActions.visibleMapActions(mapActions.orEmpty()) { it.type }.map(::action), t.isLoading, "")
     }
 
     private fun search(t: SearchTemplate): CarUi.Search {

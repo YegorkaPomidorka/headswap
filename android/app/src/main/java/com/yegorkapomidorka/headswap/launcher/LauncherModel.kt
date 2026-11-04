@@ -197,7 +197,10 @@ internal object LauncherModel {
     fun mapScale(pkg: String): Int { mapScaleRev; return prefs.mapScale(pkg) }
     fun chooseMapScale(pkg: String, step: Int) {
         prefs.setMapScale(pkg, step); mapScaleRev++
-        if (CarAppHost.pkg == pkg) CarAppHost.setScale(CarConfigMath.step(step)) // меняется сразу
+        if (CarAppHost.pkg != pkg) return
+        CarAppHost.setScale(CarConfigMath.step(step)) // 2ГИС меняет сразу
+        // Яндекс берёт dpi только при старте сессии (стенд 04.11: новые dpi на той же сессии не меняют карту)
+        if (com.yegorkapomidorka.headswap.carapp.CarScaleRestart.needed(pkg)) EmbedHost.restartCar()
     }
     fun chooseMusicPlayer(pkg: String?) { musicPlayer = pkg; prefs.musicPlayer = pkg; noteOnlinePlayer(pkg) }
     /** Выбрали или услышали [pkg]: если это онлайн-плеер, он становится вторым слотом чипа. */

@@ -136,7 +136,13 @@ fun LauncherSettingsScreen() {
                             val navPkg = model.navigatorPkg
                             if (EmbedHost.nav.carHost && navPkg != null) {
                                 MapScaleCard(navPkg, d, cell(2, 2).fillMaxWidth())
-                                RestartNavCard(d, cell(4).fillMaxWidth())
+                                // машинная часть Яндекс Навигатора работает только с Плюсом (Егор 04.11) - предупреждаем при выборе
+                                if (navPkg == NavigatorPick.YANDEX_NAVI) {
+                                    Row(cell(4).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(m.dp(d.gap))) {
+                                        RestartNavCard(d, Modifier.weight(1f).fillMaxHeight())
+                                        NoteCard(stringResource(R.string.l_nav_yandex_plus), d, Modifier.weight(1f).fillMaxHeight())
+                                    }
+                                } else RestartNavCard(d, cell(4).fillMaxWidth())
                             }
                         }
                         SettingsPage.MUSIC -> {
@@ -528,6 +534,17 @@ private fun RestartNavCard(d: SettingsDims, modifier: Modifier) {
         if (pressed) Box(Modifier.matchParentSize().background(Pal.SURFACE_PRESSED))
         Row(Modifier.fillMaxSize().padding(start = m.dp(d.padStart), end = m.dp(d.padEnd)), verticalAlignment = Alignment.CenterVertically) {
             Txt(label, s.f2, ellipsis = false)
+        }
+    }
+}
+
+/** Карточка-пояснение без нажатия (Яндекс: «только с Плюсом»). */
+@Composable
+private fun NoteCard(text: String, d: SettingsDims, modifier: Modifier) {
+    val m = LocalMetrics.current
+    Card(modifier) {
+        Box(Modifier.fillMaxSize().padding(start = m.dp(d.padStart), end = m.dp(d.padEnd)), contentAlignment = Alignment.CenterStart) {
+            Txt(text, d.sub, color = Pal.SEC, maxLines = 3, ellipsis = false)
         }
     }
 }

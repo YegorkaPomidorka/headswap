@@ -52,3 +52,4 @@
 | 0019 | [Полноэкранный YouTube в лаунчере прячет рейку; признак — requestedVisibleTypes задачи](0019-launcher-youtube-fullscreen.md) | принято |
 | 0020 | [В режиме рабочего стола звук идёт по Bluetooth, музыку по USB не передаём](0020-desktop-audio-bluetooth.md) | принято |
 | 0021 | [Навигатор на рабочем столе — через свой хост Car App Library](0021-own-car-app-host.md) | принято |
+| 0022 | [Хост Car App объявляет и берёт себе TEMPLATE_RENDERER (Яндекс Навигатор)](0022-car-host-template-renderer.md) | принято |
