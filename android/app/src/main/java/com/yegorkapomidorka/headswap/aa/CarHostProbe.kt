@@ -78,6 +78,10 @@ object CarHostProbe {
         active = false
         h.post {
             val a = carApp
+            // Сначала забрать поверхность: иначе процесс 2ГИС переживает отключение и рисует в мёртвую поверхность
+            // (drawSurface IllegalArgumentException), а новая сессия хоста висит на заставке.
+            val old = delivered
+            if (old != null) runCatching { surfaceCb?.onSurfaceDestroyed(Bundleable.create(SurfaceContainer(old, sw, shh, sdpi)), done("onSurfaceDestroyed")) }
             if (a != null) {
                 runCatching { a.onAppPause(done("onAppPause")) }
                 runCatching { a.onAppStop(done("onAppStop")) }
@@ -184,7 +188,10 @@ object CarHostProbe {
             smallestScreenWidthDp = minOf(screenWidthDp, screenHeightDp)
         }
         densityDpi = dpi
-        uiMode = (uiMode and Configuration.UI_MODE_TYPE_MASK.inv()) or Configuration.UI_MODE_TYPE_CAR
+        // День/ночь навигатору - явно, не от темы Headswap (иначе 2ГИС днём тёмный). Пробник: всегда день;
+        // в фиче - по теме лаунчера / фарам машины.
+        uiMode = (uiMode and (Configuration.UI_MODE_TYPE_MASK or Configuration.UI_MODE_NIGHT_MASK).inv()) or
+            Configuration.UI_MODE_TYPE_CAR or Configuration.UI_MODE_NIGHT_NO
     }
 
     private fun deliverSurface() {
