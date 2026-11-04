@@ -142,8 +142,8 @@
     <string name="video_wide_hd_sub">1920×720: sharper and smaller, more fits on the screen</string>
     <string name="video_wide_640_title">Wide 3:1 (Citroen C5 X)</string>
     <string name="video_wide_640_sub">1920×640: native resolution of the Citroen C5 X screen, no side bars</string>
-    <string name="video_wide_2_1_title">Wide 2:1 (Skoda Octavia Pro)</string>
-    <string name="video_wide_2_1_sub">1280×640: native resolution of the Octavia screen, no stretching</string>
+    <string name="video_wide_2_1_title">Wide 2:1 (Octavia Pro, VW Discover Pro 9.2)</string>
+    <string name="video_wide_2_1_sub">1280×640: native resolution of the Octavia Pro and VW Discover Pro 9.2 screens, no stretching</string>
     <string name="video_wide_976_title">Wide 2240×976 (VW Tiguan L Pro)</string>
     <string name="video_wide_976_sub">Wide crop scaled to the CarLife window of the VW CNS3 head unit</string>
     <string name="video_wide_836_title">Wide 1920×836 (VW Tiguan L Pro, passthrough)</string>
@@ -250,6 +250,7 @@
     <string name="car_toyota_levin">Toyota Levin</string>
     <string name="car_toyota_rav4_2025">Toyota RAV4 2025</string>
     <string name="car_vw_bora_2021">Volkswagen Bora 2021</string>
+    <string name="car_vw_discover_pro_9_2">Volkswagen Discover Pro 9.2 (1280×640)</string>
     <string name="car_vw_golf_8_pro">Volkswagen Golf 8 Pro 2021</string>
     <string name="car_vw_id_unyx">Volkswagen ID.Unyx</string>
     <string name="car_vw_lamando_l">Volkswagen Lamando L</string>
