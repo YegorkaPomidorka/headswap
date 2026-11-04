@@ -31,4 +31,13 @@ internal object FrameworkTaskIdentityPolicy {
         if (taskId != expectedTaskId) return null
         return fromFields(displayId, userId, taskId)
     }
+
+    private val visibleTypes = Regex(" requestedVisibleTypes=(-?[0-9]{1,10})(?=[ }]|$)")
+
+    /**
+     * TaskInfo.requestedVisibleTypes (Android 15+, скрытое поле): какие системные панели просит видимыми верхнее окно задачи.
+     * Берётся последнее вхождение: поле пишет система после текста интента. Нет поля (Android 14 и ниже, OEM) - null.
+     */
+    fun requestedVisibleTypes(text: String): Int? =
+        visibleTypes.findAll(text).lastOrNull()?.groupValues?.get(1)?.toIntOrNull()
 }

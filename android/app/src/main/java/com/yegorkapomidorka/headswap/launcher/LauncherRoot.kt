@@ -37,7 +37,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 
-/** Корень лаунчера: фон по теме, рейка слева (всегда) и область содержимого. */
+/** Корень лаунчера: фон по теме, рейка слева (кроме полноэкранного YouTube) и область содержимого. */
 @Composable
 fun LauncherRoot(connected: Boolean) {
     val density = LocalDensity.current
@@ -80,9 +80,11 @@ fun LauncherRoot(connected: Boolean) {
                     // чужой лаунчер: только его окно и наша панель навигации, без рейки и оверлеев звонка
                     ForeignRoot()
                 } else {
-                    // рейка всегда слева; «Карта слева» переставляет только ряды главного (HomeScreen)
+                    // рейка всегда слева; «Карта слева» переставляет только ряды главного (HomeScreen).
+                    // Полноэкранный YouTube забирает и её место: выход - кнопкой самого YouTube (FullscreenApp)
+                    val fullscreen = model.area is Area.App && EmbedHost.app.fullscreen
                     Row(Modifier.fillMaxSize()) {
-                        Rail()
+                        if (!fullscreen) Rail()
                         Box(Modifier.weight(1f).fillMaxHeight().onGloballyPositioned { model.areaRect = it.boundsInRoot() }) {
                             AreaContent()
                         }

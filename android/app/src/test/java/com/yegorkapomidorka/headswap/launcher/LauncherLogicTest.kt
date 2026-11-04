@@ -295,6 +295,24 @@ class LauncherLogicTest {
         assertTrue(ThemeChoice.light(ThemeChoice.LIGHT, 1))
     }
 
+    @Test fun fullscreenRailHidesAfterTwoReadsAndShowsOnDoubt() {
+        val t = FullscreenApp.Tracker()
+        assertFalse(t.update(1, 10_000))
+        assertTrue(t.update(1, 10_500))
+        // смена размера окна из-за спрятанной рейки: короткое «нет» не возвращает рейку
+        t.resized(10_600)
+        assertTrue(t.update(0, 11_000))
+        assertTrue(t.update(-1, 11_500))
+        assertTrue(t.update(1, 12_000))
+        // выход кнопкой YouTube после успокоения - рейка сразу видна; неизвестно - тоже видна
+        assertFalse(t.update(0, 12_500))
+        assertTrue(FullscreenApp.watched(FullscreenApp.YOUTUBE))
+        assertFalse(FullscreenApp.watched(PlayerChip.YT_MUSIC))
+        val u = FullscreenApp.Tracker()
+        u.update(1, 0); u.update(1, 500)
+        assertFalse(u.update(-1, 5_000))
+    }
+
     @Test fun navArrowStopsInAnotherDirection() {
         for (k in 1..7) {
             val next = NavSpinLogic.next(90f, k)

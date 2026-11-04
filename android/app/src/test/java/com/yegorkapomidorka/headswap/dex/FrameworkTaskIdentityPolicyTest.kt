@@ -22,6 +22,16 @@ class FrameworkTaskIdentityPolicyTest {
         ))
     }
 
+    @Test fun requestedVisibleTypesIsReadFromLastSystemWrittenField() {
+        assertEquals(8, FrameworkTaskIdentityPolicy.requestedVisibleTypes(
+            "TaskInfo{userId=0 taskId=42 displayId=7 isRunning=true baseIntent=Intent { cmp=x/.A } requestedVisibleTypes=8 " +
+                "topActivityRequestOpenInBrowserEducationTimestamp=0}"))
+        // текст приложения раньше поля не перебивает системное значение
+        assertEquals(-9, FrameworkTaskIdentityPolicy.requestedVisibleTypes(
+            "TaskInfo{taskDescription=TaskDescription Label: x requestedVisibleTypes=0 requestedVisibleTypes=-9}"))
+        assertNull(FrameworkTaskIdentityPolicy.requestedVisibleTypes("TaskInfo{userId=0 taskId=42 displayId=7 isRunning=true}"))
+    }
+
     @Test fun newerFrameworkPrefixWithEffectiveUidIsAccepted() {
         assertEquals(FrameworkTaskIdentityPolicy.Identity(7, 0, 42),
             parse("TaskInfo{userId=0 taskId=42 effectiveUid=10234 displayId=7 isRunning=true baseIntent=Intent { }}"))

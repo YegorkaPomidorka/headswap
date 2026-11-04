@@ -12,4 +12,5 @@ interface IDelegatedInputGateway {
     void injectInput(int displayId, IBinder token, in InputEvent event, int actionButton);
     int childTaskState(int displayId, IBinder token, String packageName);
     String[] childTaskPackages(int displayId, IBinder token);
+    int childFullscreen(int displayId, IBinder token, String packageName);
 }

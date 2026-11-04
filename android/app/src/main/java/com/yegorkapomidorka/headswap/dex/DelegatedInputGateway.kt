@@ -135,6 +135,24 @@ internal class DelegatedInputGateway(context: Context) : IDelegatedInputGateway.
             ?.toTypedArray()
     }
 
+    /** Приложение этого дочернего экрана в полноэкранном режиме: 1 да, 0 нет, -1 не удалось узнать. */
+    @Synchronized override fun childFullscreen(displayId: Int, token: IBinder, packageName: String): Int {
+        requireActive()
+        check(registry.requireDisplay(displayId, token).parent != null) { "Ожидался экран виджета" }
+        requireTrustedDisplay(displayId)
+        EmbeddedDisplayPolicy.requirePackage(packageName)
+        val permitted = DelegatedDesktopAccess.hasPermissions(context)
+        val tasks = readTasks(permitted)
+        // сырое значение в лог при смене: по первому прогону на ГУ видно, отдаёт ли Android поле
+        val raw = tasks?.firstOrNull { it.displayId == displayId }?.let { "${it.topPackage}:${it.visibleTypes}" }
+        if (raw != lastVisibleTypes) {
+            lastVisibleTypes = raw
+            AppLog.i("TASKS экран $displayId: requestedVisibleTypes $raw", false)
+        }
+        return DelegatedDesktopPolicy.fullscreen(displayId, context.applicationInfo.uid / 100000, packageName, permitted, tasks)
+    }
+    private var lastVisibleTypes: String? = null
+
     @Suppress("DEPRECATION")
     private fun readTasks(permitted: Boolean): List<DelegatedDesktopPolicy.Task>? {
         var tasks: List<DelegatedDesktopPolicy.Task>? = null
@@ -149,7 +167,8 @@ internal class DelegatedInputGateway(context: Context) : IDelegatedInputGateway.
                 DelegatedDesktopPolicy.Task(identity?.displayId ?: DelegatedDesktopPolicy.UNKNOWN,
                     identity?.userId ?: DelegatedDesktopPolicy.UNKNOWN,
                     it.baseActivity?.packageName, it.topActivity?.packageName,
-                    visible = Build.VERSION.SDK_INT < 32 || it.isVisible)
+                    visible = Build.VERSION.SDK_INT < 32 || it.isVisible,
+                    visibleTypes = FrameworkTaskIdentityReader.requestedVisibleTypes(it))
             }
             if (unreadable == 0) diag("ok", "задачи читаются: ${running.size}, displayId/userId доступны")
         } catch (e: Exception) {

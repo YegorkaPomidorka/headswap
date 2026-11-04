@@ -121,4 +121,10 @@ internal class DelegatedDesktopRuntime(private val context: Context, private val
         val token = inputLeases[id] ?: return null
         return inputGateway.childTaskPackages(id, token)?.toList()
     }
+
+    override fun childFullscreen(id: Int, packageName: String): Int {
+        check(id > 0) { "Проверка основного экрана запрещена" }
+        val token = inputLeases[id] ?: return -1
+        return inputGateway.childFullscreen(id, token, packageName)
+    }
 }

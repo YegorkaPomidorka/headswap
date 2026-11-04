@@ -35,9 +35,27 @@ internal object DelegatedDesktopPolicy {
      * [visible]: задача на экране (TaskInfo.isVisible, API 32+); после moveTaskToBack она остаётся первой в списке, но не видна.
      * [displayId]/[userId] = [UNKNOWN], если Android не отдал их приложению (скрытые поля TaskInfo).
      */
-    data class Task(val displayId: Int, val userId: Int, val basePackage: String?, val topPackage: String?, val visible: Boolean = true)
+    data class Task(val displayId: Int, val userId: Int, val basePackage: String?, val topPackage: String?, val visible: Boolean = true,
+        val visibleTypes: Int? = null)
 
     const val UNKNOWN = -1
+    /** WindowInsets.Type.statusBars(): бит строки состояния в requestedVisibleTypes. */
+    const val STATUS_BARS = 1
+
+    /**
+     * Верхнее окно экрана [id] - видимая задача [packageName], и она прячет строку состояния (полноэкранное видео):
+     * 1 да, 0 нет, -1 не удалось узнать. Только по своему экрану: задача с неизвестным экраном могла бы быть на телефоне.
+     */
+    fun fullscreen(id: Int, userId: Int, packageName: String, permitted: Boolean, tasks: List<Task>?): Int {
+        require(id > 0) { "Проверка основного экрана запрещена" }
+        EmbeddedDisplayPolicy.requirePackage(packageName)
+        if (!permitted || tasks == null) return -1
+        val top = tasks.firstOrNull { it.displayId == id && it.userId == userId }
+            ?: return if (tasks.any { it.displayId == UNKNOWN || it.userId == UNKNOWN }) -1 else 0
+        if (top.topPackage != packageName || !top.visible) return 0
+        val types = top.visibleTypes ?: return -1
+        return if (types and STATUS_BARS == 0) 1 else 0
+    }
 
     /**
      * null means unavailable/filtered, not an empty display. Never examine another display or user.
