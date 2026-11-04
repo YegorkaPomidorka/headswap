@@ -9,9 +9,12 @@ import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import com.yegorkapomidorka.headswap.carapp.CarAppHost
+import com.yegorkapomidorka.headswap.carapp.CarConfigMath
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
@@ -131,6 +134,7 @@ internal object LauncherModel {
         lastOnlinePlayer = prefs.lastOnlinePlayer
         missedSeenMs = prefs.missedSeenMs
         EmbedHost.onGone = { LauncherActions.embedGone(it) }
+        CarAppHost.scaleFor = { pkg -> CarConfigMath.step(prefs.mapScale(pkg)) }
         ready = true
         reloadCatalog()
     }
@@ -187,6 +191,14 @@ internal object LauncherModel {
     fun chooseOnlinePlayer(pkg: String?) { onlinePlayer = pkg; prefs.onlinePlayer = pkg }
     fun nextCardView() { cardView = cardView.next().also { prefs.cardView = it } }
     fun setNavigator(pkg: String?) { savedNavigator = pkg; prefs.navigator = pkg }
+
+    /** Смена «Масштаба карты» - перерисовать карточку (сами ступени в prefs, по пакету). */
+    private var mapScaleRev by mutableIntStateOf(0)
+    fun mapScale(pkg: String): Int { mapScaleRev; return prefs.mapScale(pkg) }
+    fun chooseMapScale(pkg: String, step: Int) {
+        prefs.setMapScale(pkg, step); mapScaleRev++
+        if (CarAppHost.pkg == pkg) CarAppHost.setScale(CarConfigMath.step(step)) // меняется сразу
+    }
     fun chooseMusicPlayer(pkg: String?) { musicPlayer = pkg; prefs.musicPlayer = pkg; noteOnlinePlayer(pkg) }
     /** Выбрали или услышали [pkg]: если это онлайн-плеер, он становится вторым слотом чипа. */
     fun noteOnlinePlayer(pkg: String?) {

@@ -99,6 +99,11 @@
     <string name="l_s_theme_auto">Auto</string>
     <string name="l_s_theme_sub">Auto follows the car headlights</string>
     <string name="l_s_anim">Button animations</string>
+    <string name="l_s_map_scale">Map scale</string>
+    <string name="l_s_map_scale_sub">Only for %1$s · applies immediately</string>
+    <string name="l_s_scale_smaller">Smaller</string>
+    <string name="l_s_scale_larger">Larger</string>
+    <string name="l_s_scale_largest">Largest</string>
     <string name="l_s_slot1">First slot</string>
     <string name="l_s_slot2">Second slot</string>
     <string name="l_s_last">Last played</string>

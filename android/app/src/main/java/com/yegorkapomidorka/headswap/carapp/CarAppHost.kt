@@ -73,6 +73,7 @@ object CarAppHost {
             cur?.stop()
             log("старт ${target.pkg}/${target.service}")
             pkg = target.pkg
+            scaleFor?.let { scale = it(target.pkg) }
             template = null; toast = null; ui = null
             if (mapper == null) mapper = CarUiMapper(app, units(app)) { r -> h.post(r) }
             setStatus(Status.CONNECTING)
@@ -116,8 +117,10 @@ object CarAppHost {
     /** cmd car_night: true/false - ночь/день от хоста, null - как в настройках навигатора. */
     fun setNight(value: Boolean?) { h.post { if (night != value) { night = value; push() } } }
 
-    /** Ступень «Масштаба карты» (1 = «Авто»). */
+    /** Множитель «Масштаба карты» (1 = «Авто»). */
     fun setScale(value: Float) { h.post { if (scale != value) { scale = value; push() } } }
+    /** Сохранённый «Масштаб карты» навигатора (пакет -> множитель); берётся при старте сессии. */
+    @Volatile var scaleFor: ((String) -> Float)? = null
 
     /** Касание окна навигатора, координаты уже в поверхности. */
     fun touch(action: Int, x: Float, y: Float) { h.post { session?.touch(action, x, y) } }

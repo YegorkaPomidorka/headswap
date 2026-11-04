@@ -99,6 +99,11 @@
     <string name="l_s_theme_auto">Авто</string>
     <string name="l_s_theme_sub">Авто — по режиму фар машины</string>
     <string name="l_s_anim">Анимации кнопок</string>
+    <string name="l_s_map_scale">Масштаб карты</string>
+    <string name="l_s_map_scale_sub">Только для %1$s · меняется сразу</string>
+    <string name="l_s_scale_smaller">Мельче</string>
+    <string name="l_s_scale_larger">Крупнее</string>
+    <string name="l_s_scale_largest">Ещё крупнее</string>
     <string name="l_s_slot1">Первый слот</string>
     <string name="l_s_slot2">Второй слот</string>
     <string name="l_s_last">Последний</string>
