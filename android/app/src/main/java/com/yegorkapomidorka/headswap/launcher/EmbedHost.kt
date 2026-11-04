@@ -74,6 +74,17 @@ internal class EmbedSlot(val name: String) {
     var stale = false
     var dropped = 0
     val watchToken = Any()
+    val fullscreenToken = Any()
+    val fullscreenTracker = FullscreenApp.Tracker()
+    private var fullscreenValue by mutableStateOf(false)
+    /** Приложение в окне в полноэкранном режиме ([FullscreenApp]): рейка спрятана. Пишется с рабочего потока. */
+    var fullscreen: Boolean
+        get() = fullscreenValue
+        set(value) {
+            if (value == fullscreenValue) return
+            AppLog.i("EMBED $name: полноэкранный режим ${if (value) "включён" else "выключен"} pkg=$pkg", false)
+            fullscreenValue = value
+        }
 
     val touchQueue = ArrayDeque<TouchPacket>()
 
@@ -121,7 +132,10 @@ internal object EmbedHost {
     /** Нужное содержимое и размер слота. Тот же ключ и размер - ничего не происходит. */
     fun want(slot: EmbedSlot, key: String?, w: Int, h: Int) {
         // другое приложение в то же окно: сразу «запускаем», не показывая на миг прежнее
-        if (key != slot.wantKey) slot.status = if (key == null) EmbedStatus.IDLE else EmbedStatus.STARTING
+        if (key != slot.wantKey) {
+            slot.status = if (key == null) EmbedStatus.IDLE else EmbedStatus.STARTING
+            slot.fullscreen = false // трекер сбросит рабочий поток: следующий тик увидит STARTING
+        }
         slot.wantKey = key
         if (w > 0 && h > 0) { slot.wantW = w; slot.wantH = h }
         schedule(slot, 0)
@@ -335,6 +349,7 @@ internal object EmbedHost {
         slot.launchedKey = null
         slot.seenTop = false
         slot.touchBlocked = true
+        resetFullscreen(slot)
         main.post { onGone?.invoke(slot) }
     }
 
@@ -351,6 +366,35 @@ internal object EmbedHost {
     private fun startWatch(slot: EmbedSlot) {
         worker.removeCallbacksAndMessages(slot.watchToken)
         worker.postAtTime({ watchTick(slot) }, slot.watchToken, SystemClock.uptimeMillis() + WATCH_MS)
+        if (slot === app && FullscreenApp.watched(slot.pkg)) {
+            worker.removeCallbacksAndMessages(slot.fullscreenToken)
+            worker.postAtTime({ fullscreenTick(slot) }, slot.fullscreenToken, SystemClock.uptimeMillis() + FullscreenApp.POLL_MS)
+        }
+    }
+
+    /** Пока в окне приложения YouTube, раз в 0,5 с: не перешёл ли он в полноэкранный режим. Любое сомнение - рейка видна. */
+    private fun fullscreenTick(slot: EmbedSlot) {
+        val pkg = slot.pkg
+        if (pkg == null || !FullscreenApp.watched(pkg) || slot.handle <= 0 || slot.status != EmbedStatus.READY) {
+            resetFullscreen(slot)
+            return
+        }
+        if (slot.interactive && !slot.touchBlocked && slot.backAt == 0L) {
+            val state = try {
+                timed(slot, "fullscreen") { EmbeddedSessionRegistry.fullscreen(uid, slot.handle, pkg) }
+            } catch (e: Exception) {
+                AppLog.i("EMBED ${slot.name}: fullscreen не удался: ${e.javaClass.simpleName}: ${e.message}", false)
+                if (leaseGone(e)) { lostLease(slot); return }
+                -1
+            }
+            slot.fullscreen = slot.fullscreenTracker.update(state, SystemClock.uptimeMillis())
+        } else resetFullscreen(slot)
+        worker.postAtTime({ fullscreenTick(slot) }, slot.fullscreenToken, SystemClock.uptimeMillis() + FullscreenApp.POLL_MS)
+    }
+
+    private fun resetFullscreen(slot: EmbedSlot) {
+        slot.fullscreenTracker.reset()
+        slot.fullscreen = false
     }
 
     // --- рабочий поток ---
@@ -444,6 +488,7 @@ internal object EmbedHost {
         } else if (slot.geomW != w || slot.geomH != h) {
             cancelTouch(slot)
             AppLog.i("EMBED ${slot.name}: размер ${slot.geomW}x${slot.geomH} -> ${w}x$h", false)
+            slot.fullscreenTracker.resized(SystemClock.uptimeMillis())
             timed(slot, "resize") { EmbeddedSessionRegistry.resize(uid, slot.handle, w, h, densityDpi) }
             texture.setDefaultBufferSize(w, h)
             slot.geomW = w
@@ -550,6 +595,7 @@ internal object EmbedHost {
         slot.lastPacket = null
         slot.geomW = 0
         slot.geomH = 0
+        resetFullscreen(slot)
     }
 
     private fun releaseLease(slot: EmbedSlot) {

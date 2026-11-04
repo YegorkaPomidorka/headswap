@@ -25,6 +25,15 @@ internal object FrameworkTaskIdentityReader {
         }.getOrNull()
     }
 
+    private val visibleTypesField = runCatching { android.app.TaskInfo::class.java.getField("requestedVisibleTypes") }.getOrNull()
+
+    /** Запрошенные видимыми системные панели верхнего окна задачи; null - Android их не отдал. */
+    fun requestedVisibleTypes(task: ActivityManager.RunningTaskInfo): Int? {
+        if (task.javaClass != taskClass) return null
+        return runCatching { visibleTypesField?.getInt(task) }.getOrNull()
+            ?: runCatching { FrameworkTaskIdentityPolicy.requestedVisibleTypes(task.toString()) }.getOrNull()
+    }
+
     /** One line for the log: why [read] returned null (class, reflection results, start of toString without app text). */
     fun diagnose(task: ActivityManager.RunningTaskInfo): String {
         if (task.javaClass != taskClass) return "класс ${task.javaClass.name}"

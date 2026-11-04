@@ -66,6 +66,26 @@ class DelegatedDesktopPolicyTest {
             listOf(task(42, base = "com.example.music", visible = false), task(42))))
     }
 
+    @Test fun fullscreenOnlyForVisibleTopTaskOfOwnDisplayWithoutStatusBar() {
+        val yt = "com.google.android.youtube"
+        fun t(display: Int, types: Int?, top: String = yt, visible: Boolean = true, user: Int = 0) =
+            DelegatedDesktopPolicy.Task(display, user, top, top, visible, types)
+        val full = 0b1000 // статус- и навигационные панели скрыты, остальное видно
+        val normal = 0b1011
+        assertEquals(1, DelegatedDesktopPolicy.fullscreen(42, 0, yt, true, listOf(t(42, full))))
+        assertEquals(0, DelegatedDesktopPolicy.fullscreen(42, 0, yt, true, listOf(t(42, normal))))
+        // поле не отдали, нет прав, список недоступен - неизвестно
+        assertEquals(-1, DelegatedDesktopPolicy.fullscreen(42, 0, yt, true, listOf(t(42, null))))
+        assertEquals(-1, DelegatedDesktopPolicy.fullscreen(42, 0, yt, false, listOf(t(42, full))))
+        assertEquals(-1, DelegatedDesktopPolicy.fullscreen(42, 0, yt, true, null))
+        // полноэкранный YouTube на телефоне, другом пользователе или под другим приложением не считается
+        assertEquals(0, DelegatedDesktopPolicy.fullscreen(42, 0, yt, true, listOf(t(0, full), t(42, full, user = 10))))
+        assertEquals(0, DelegatedDesktopPolicy.fullscreen(42, 0, yt, true, listOf(t(42, normal, top = "com.example.map"), t(42, full))))
+        assertEquals(0, DelegatedDesktopPolicy.fullscreen(42, 0, yt, true, listOf(t(42, full, visible = false))))
+        // экран задачи не опознан: по пакету не угадываем
+        assertEquals(-1, DelegatedDesktopPolicy.fullscreen(42, 0, yt, true, listOf(t(DelegatedDesktopPolicy.UNKNOWN, full))))
+    }
+
     @Test fun taskObserverNeverTurnsMissingPermissionOrFailedQueryIntoAbsent() {
         assertEquals(-1, DelegatedDesktopPolicy.taskState(42, 0, "com.example.map", false, emptyList()))
         assertEquals(-1, DelegatedDesktopPolicy.taskState(42, 0, "com.example.map", false, listOf(task(42))))

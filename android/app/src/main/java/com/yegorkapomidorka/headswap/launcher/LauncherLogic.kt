@@ -175,6 +175,45 @@ object BackNav {
 }
 
 /**
+ * Полноэкранный YouTube в окне приложения занимает весь экран, рейка прячется; выход - кнопкой самого YouTube.
+ * Только YouTube: приложение, которое прячет строку состояния всегда (игры), осталось бы без «Назад» и «Домой».
+ * Сомнение (ошибка запроса, не тот экран, не готово) - рейка видна.
+ */
+object FullscreenApp {
+    const val YOUTUBE = "com.google.android.youtube"
+    private val PACKAGES = setOf(YOUTUBE)
+    /** Опрос, пока в окне YouTube. */
+    const val POLL_MS = 500L
+    /** Подряд ответов «полноэкранный», чтобы спрятать рейку. */
+    const val HIDE_AFTER = 2
+    /** После смены размера окна YouTube перестраивается и может на миг показать панели: «нет» столько не верим. */
+    const val SETTLE_MS = 1500L
+
+    fun watched(pkg: String?): Boolean = pkg in PACKAGES
+
+    /** Решение «рейка спрятана» по ответам childFullscreen (1 да, 0 нет, -1 неизвестно). */
+    class Tracker {
+        var hidden = false
+            private set
+        private var yes = 0
+        private var resizedAt = Long.MIN_VALUE / 2
+
+        fun reset() { hidden = false; yes = 0 }
+        fun resized(now: Long) { resizedAt = now }
+
+        fun update(state: Int, now: Long): Boolean {
+            if (state == 1) {
+                if (++yes >= HIDE_AFTER) hidden = true
+            } else {
+                yes = 0
+                if (now - resizedAt >= SETTLE_MS) hidden = false
+            }
+            return hidden
+        }
+    }
+}
+
+/**
  * Чип плееров на карточке музыки: два слота - свой плеер телефона (любая активная сессия) и последний онлайн-плеер
  * (Я.Музыка, YouTube Music, VK Музыка - что слушали последним, иначе первый установленный). Остальные медиаприложения -
  * долгий тап по «ноте» (список плееров).
