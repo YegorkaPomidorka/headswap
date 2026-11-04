@@ -9,6 +9,7 @@ import android.os.Binder
 import android.os.Build
 import android.os.IBinder
 import android.os.Process
+import android.os.SystemClock
 import android.view.InputDevice
 import android.view.InputEvent
 import android.view.KeyEvent
@@ -25,6 +26,7 @@ internal class DelegatedInputGateway(context: Context) : IDelegatedInputGateway.
     private val inject by lazy { InputManager::class.java.getMethod("injectInputEvent", InputEvent::class.java, Int::class.javaPrimitiveType) }
     private val displayEvents = DisplayEventAccess()
     private val wakeLocks = DisplayWakeLocks(context)
+    private val imeRoutes = DelegatedImeRoutes()
     private val setActionButton by lazy { MotionEvent::class.java.getMethod("setActionButton", Int::class.javaPrimitiveType) }
 
     fun preflight() {
@@ -36,11 +38,13 @@ internal class DelegatedInputGateway(context: Context) : IDelegatedInputGateway.
 
     @Synchronized fun beginGeneration(generation: Long, token: IBinder) {
         registry.begin(generation, token)
+        imeRoutes.clear()
         liveDisplayIds = emptySet()
         activeGateway.set(this)
     }
     @Synchronized fun deactivate() {
         wakeLocks.releaseAll()
+        imeRoutes.clear()
         liveDisplayIds = emptySet()
         activeGateway.compareAndSet(this, null)
         registry.deactivate()
@@ -51,6 +55,7 @@ internal class DelegatedInputGateway(context: Context) : IDelegatedInputGateway.
         registry.registerParent(displayId, token, width, height)
         liveDisplayIds = registry.registeredDisplayIds()
         holdAwake(displayId)
+        localIme(registry.requireDisplay(displayId, token))
     }
 
     @Synchronized override fun registerChild(parentId: Int, displayId: Int, token: IBinder, width: Int, height: Int) {
@@ -58,6 +63,35 @@ internal class DelegatedInputGateway(context: Context) : IDelegatedInputGateway.
         registry.registerChild(parentId, displayId, token, width, height)
         liveDisplayIds = registry.registeredDisplayIds()
         holdAwake(displayId)
+        localIme(registry.requireDisplay(displayId, token))
+    }
+
+    /** Клавиатура на этом же экране ГУ, а не на телефоне. Сразу после регистрации, до запуска приложений. */
+    private fun localIme(entry: DelegatedInputRegistry.Entry) {
+        if (!applyIme(entry)) imeRoutes.add(entry)
+    }
+
+    private fun applyIme(entry: DelegatedInputRegistry.Entry): Boolean {
+        val ok = try {
+            check(runCatching { registry.requireDisplay(entry.id, entry.token) }.getOrNull() === entry) { "Экран уже закрыт" }
+            requireTrustedDisplay(entry.id)
+            check(DisplayIme.available(context)) { "нет ${DisplayIme.PERMISSION}" }
+            DisplayIme.enable(entry.id)
+            true
+        } catch (e: Exception) {
+            AppLog.i("DESKTOP IME: дисплей ${entry.id} — LOCAL не применён (${e.javaClass.simpleName}: ${e.message}), повтор", false)
+            false
+        } catch (e: LinkageError) {
+            AppLog.i("DESKTOP IME: дисплей ${entry.id} — скрытый API недоступен: ${e.message}", false)
+            false
+        }
+        if (ok) AppLog.i("DESKTOP IME: дисплей ${entry.id} — LOCAL подтверждён", false)
+        return ok
+    }
+
+    @Synchronized private fun refreshIme() {
+        if (activeGateway.get() !== this || !DelegatedDesktopAccess.isReady(context)) return
+        imeRoutes.refresh(SystemClock.elapsedRealtime(), ::applyIme)
     }
 
     @Synchronized override fun resizeDisplay(displayId: Int, token: IBinder, width: Int, height: Int) {
@@ -69,6 +103,7 @@ internal class DelegatedInputGateway(context: Context) : IDelegatedInputGateway.
         requireCaller() // Cleanup remains possible after activation has ended.
         registry.unregister(displayId, token)
         liveDisplayIds = registry.registeredDisplayIds()
+        imeRoutes.retain(liveDisplayIds)
         wakeLocks.retain(liveDisplayIds)
     }
 
@@ -179,6 +214,8 @@ internal class DelegatedInputGateway(context: Context) : IDelegatedInputGateway.
     companion object {
         const val EXTRA_BINDER = "headswap_delegated_input_gateway"
         private val activeGateway = java.util.concurrent.atomic.AtomicReference<DelegatedInputGateway?>()
+        /** Пульс активации: повторить LOCAL для дисплеев, где Android не применил его сразу. */
+        fun refreshImeRoutes() { activeGateway.get()?.refreshIme() }
         fun ownsFocusedDisplay(id: Int): Boolean = id > 0 && activeGateway.get()?.liveDisplayIds?.contains(id) == true
     }
 }
