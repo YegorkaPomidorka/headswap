@@ -320,8 +320,9 @@ class MainActivity : Activity() {
                     com.yegorkapomidorka.headswap.aa.CarHostProbe.stop()
                     com.yegorkapomidorka.headswap.launcher.EmbedHost.reproject()
                 }
-                "car_click" -> com.yegorkapomidorka.headswap.aa.CarHostProbe.click(intent.getIntExtra("i", -1))
-                "car_back" -> com.yegorkapomidorka.headswap.aa.CarHostProbe.back()
+                "car_click" -> com.yegorkapomidorka.headswap.carapp.CarAppHost.click(intent.getIntExtra("i", -1))
+                "car_back" -> com.yegorkapomidorka.headswap.carapp.CarAppHost.back()
+                "car_dump" -> com.yegorkapomidorka.headswap.carapp.CarAppHost.dumpTemplates = intent.getBooleanExtra("on", true)
                 "shadow_dump" -> com.yegorkapomidorka.headswap.aa.AaShadowNav.dump()
                 "shadow_tap" -> com.yegorkapomidorka.headswap.aa.AaShadowNav.tap(intent.getIntExtra("x", 0), intent.getIntExtra("y", 0))
                 "theme" -> {                                   // --es mode system|light|medium|dark

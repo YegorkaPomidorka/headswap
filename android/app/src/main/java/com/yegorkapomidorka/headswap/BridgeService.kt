@@ -24,6 +24,7 @@ import android.os.SystemClock
 import android.provider.Settings
 import com.yegorkapomidorka.headswap.aa.AaBridgeCore
 import com.yegorkapomidorka.headswap.aa.AaShadowNav
+import com.yegorkapomidorka.headswap.aa.DesktopNavHints
 import com.yegorkapomidorka.headswap.aa.AaConnector
 import com.yegorkapomidorka.headswap.aa.AaCertsMissingException
 import com.yegorkapomidorka.headswap.aa.AaCreds
@@ -1114,7 +1115,7 @@ class BridgeService : Service() {
             core.usbAudioEnabled = false
             core.mapHomeKey = true
             core.desktopInputEnabled = true
-            AaShadowNav.target = core       // ПРОБНИК: подсказки теневой AA-сессии в штатный MetaRelay
+            DesktopNavHints.target = core   // подсказки навигатора рабочего стола (свой хост Car App, теневая AA) в MetaRelay
             if (aaPrefs.metaNavi) AaShadowNav.start(this)   // в машине adb нет: стартуем вместе с рабочим столом
             core.touchDecimationProvider = { aaPrefs.touchDecimation }
             core.transcodeEnabled = true
@@ -1174,7 +1175,7 @@ class BridgeService : Service() {
         if (host === owner) host = null
         AppLog.i("DEX: источник закрыт")
         AaShadowNav.stop()
-        AaShadowNav.target = null
+        DesktopNavHints.target = null
         val recovery = pendingDesktopRecovery
         if (recovery != null && recovery.owner === owner && desktopRecovery.isCurrent(recovery.attempt)) {
             // колбэк подтверждает закрытие и привилегированного производителя, и энкодера с Surface

@@ -76,13 +76,10 @@ object AaShadowNav {
         override fun onNavDistance(d: AaNavDistance) { log("дистанция $d legacy=${d.legacy}"); forward { it.onNavDistance(d) } }
 
         private inline fun forward(block: (AaMetaSink) -> Unit) {
-            val t = target ?: return
+            val t = DesktopNavHints.target ?: return
             try { block(t) } catch (e: Throwable) { log("в мост не ушло: ${e.javaClass.simpleName}: ${e.message}") }
         }
     }
-
-    /** Мост рабочего стола (AaBridgeCore): туда уходят подсказки, как из обычной AA-сессии. */
-    @Volatile var target: AaMetaSink? = null
 
     private fun log(line: String) = AppLog.i("SHADOWNAV $line", false)
 

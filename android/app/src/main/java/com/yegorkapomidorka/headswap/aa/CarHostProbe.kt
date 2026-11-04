@@ -412,7 +412,7 @@ object CarHostProbe {
     }
 
     private inline fun sink(block: (AaMetaSink) -> Unit) {
-        val t = AaShadowNav.target ?: return
+        val t = DesktopNavHints.target ?: return
         try { block(t) } catch (e: Throwable) { log("в мост не ушло: ${e.javaClass.simpleName}: ${e.message}") }
     }
 
