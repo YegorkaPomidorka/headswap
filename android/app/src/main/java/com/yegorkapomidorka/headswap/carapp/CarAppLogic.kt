@@ -40,10 +40,11 @@ object CarAreas {
         val left = leftPx.coerceIn(0, w - 1)
         val right = (w - rightPx.coerceAtLeast(0)).coerceIn(left + 1, w)
         var top = topPx.coerceIn(0, h - 1)
-        if (right == w && top == 0) top = (h * MIN_TOP_SHARE).roundToInt().coerceIn(1, h - 1)
+        if (top == 0) top = (h * MIN_TOP_SHARE).roundToInt().coerceIn(1, h - 1)
         val x = frame.left
         val y = frame.top
-        return Box(x + left, y, x + w, y + h) to Box(x + left, y + top, x + right, y + h)
+        // кнопки справа - всегда на экране: вне и visible (иначе лимит и мини-карта 2ГИС уходят под них, стенд 04.11)
+        return Box(x + left, y, x + right, y + h) to Box(x + left, y + top, x + right, y + h)
     }
 
     /** Вырезка размера карточки [cw]x[ch] из центра поверхности [w]x[h]; карточка больше - вся поверхность. */

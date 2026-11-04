@@ -8,8 +8,8 @@ import org.junit.Test
 class CarAppLogicTest {
     @Test fun areasKeepCardsOutOfVisibleAndButtonsOutOfStable() {
         val (visible, stable) = CarAreas.of(1136, 720, leftPx = 440, rightPx = 120, topPx = 0)
-        assertEquals(Box(440, 0, 1136, 720), visible)
-        assertEquals(Box(440, 0, 1016, 720), stable)
+        assertEquals(Box(440, 0, 1016, 720), visible)
+        assertEquals(Box(440, 108, 1016, 720), stable)
     }
 
     @Test fun visibleNeverEqualsStableEvenWithoutButtons() {
@@ -25,7 +25,7 @@ class CarAppLogicTest {
 
     @Test fun defaultAreasMatchTheProbe() {
         val (visible, stable) = CarAreas.default(712, 501)
-        assertEquals(Box(256, 0, 712, 501), visible)
+        assertEquals(Box(256, 0, 641, 501), visible)
         assertEquals(Box(256, 75, 641, 501), stable)
     }
 

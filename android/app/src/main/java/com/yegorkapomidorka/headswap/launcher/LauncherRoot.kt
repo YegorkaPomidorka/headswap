@@ -91,6 +91,7 @@ fun LauncherRoot(connected: Boolean) {
                     }
                     run {
                         EmbedLayers()
+                        NavHostOverlay() // шаблоны навигатора на своём хосте Car App - над его картой, в границах области
                         // входящий звонок поверх чужого приложения или экрана без карточки «Телефон»
                         if (PhoneController.callState == CallState.RINGING && (model.area != Area.Home || spec.strip)) {
                             // как нижняя полоса главного: прибита к низу, скругления только сверху

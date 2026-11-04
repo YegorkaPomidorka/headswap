@@ -6,6 +6,7 @@ import android.os.HandlerThread
 import android.view.Surface
 import androidx.car.app.model.TemplateWrapper
 import com.yegorkapomidorka.headswap.AppLog
+import com.yegorkapomidorka.headswap.R
 
 /**
  * Headswap - хост Car App Library для навигатора рабочего стола: карта приложения рисуется прямо в поверхность окна
@@ -32,6 +33,10 @@ object CarAppHost {
         private set
     @Volatile var toast: CharSequence? = null
         private set
+    /** Последний шаблон для отрисовки лаунчером; null - шаблона нет. */
+    @Volatile var ui: CarUi? = null
+        private set
+    private var mapper: CarUiMapper? = null
 
     /** Изменились status / template / toast. Зовётся на потоке хоста. */
     @Volatile var onChange: (() -> Unit)? = null
@@ -68,7 +73,8 @@ object CarAppHost {
             cur?.stop()
             log("старт ${target.pkg}/${target.service}")
             pkg = target.pkg
-            template = null; toast = null
+            template = null; toast = null; ui = null
+            if (mapper == null) mapper = CarUiMapper(app, units(app)) { r -> h.post(r) }
             setStatus(Status.CONNECTING)
             val s = CarAppSession(app, target, h, events)
             session = s
@@ -82,7 +88,7 @@ object CarAppHost {
             // после отказа сессии уже нет, но pkg и REFUSED надо снять
             session?.stop()
             session = null
-            pkg = null; template = null; toast = null
+            pkg = null; template = null; toast = null; ui = null
             setStatus(Status.IDLE)
         }
     }
@@ -124,6 +130,11 @@ object CarAppHost {
 
     private fun push() { session?.update(view()) }
 
+    private fun units(c: Context) = CarUnits(
+        c.getString(R.string.l_u_m), c.getString(R.string.l_u_km), c.getString(R.string.l_u_ft), c.getString(R.string.l_u_mi),
+        c.getString(R.string.l_u_yd), c.getString(R.string.l_u_min), c.getString(R.string.l_u_h),
+    )
+
     private fun view(): CarAppSession.View {
         val c = crop
         val (visible, stable) = when {
@@ -147,7 +158,7 @@ object CarAppHost {
             CarAppCatalog.verdicts.refuse(s.target, why)
             session = null
             s.stop()
-            template = null
+            template = null; ui = null
             setStatus(Status.REFUSED)
             onRefused?.invoke(s.target.pkg)
         }
@@ -155,6 +166,7 @@ object CarAppHost {
         override fun onTemplate(s: CarAppSession, t: TemplateWrapper?) {
             if (s !== session) return
             template = t
+            ui = runCatching { mapper?.map(t?.template) }.onFailure { log("шаблон не разобран: ${it.javaClass.simpleName}: ${it.message}") }.getOrNull()
             // рефлексия по всему дереву - только для разбора на стенде, NavigationTemplate приходит каждую секунду
             if (dumpTemplates) CarTemplateDump.collect(t, ::log)
             onChange?.invoke()

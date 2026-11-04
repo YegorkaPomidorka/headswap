@@ -117,4 +117,16 @@
     <string name="l_nav_2gis">2ГИС</string>
     <string name="l_nav_yandex_maps">Яндекс Карты</string>
     <string name="l_nav_google_maps">Google Карты</string>
+    <!-- навигатор на своём хосте Car App -->
+    <string name="l_u_m">м</string>
+    <string name="l_u_km">км</string>
+    <string name="l_u_ft">фт</string>
+    <string name="l_u_mi">ми</string>
+    <string name="l_u_yd">ярд</string>
+    <string name="l_u_min">мин</string>
+    <string name="l_u_h">ч</string>
+    <string name="l_nh_arrival">прибытие</string>
+    <string name="l_nh_end">Завершить маршрут</string>
+    <string name="l_nh_search">Поиск</string>
+    <string name="l_nh_loading">Загрузка…</string>
 </resources>
