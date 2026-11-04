@@ -23,6 +23,7 @@ import android.os.PowerManager
 import android.os.SystemClock
 import android.provider.Settings
 import com.yegorkapomidorka.headswap.aa.AaBridgeCore
+import com.yegorkapomidorka.headswap.aa.AaShadowNav
 import com.yegorkapomidorka.headswap.aa.AaConnector
 import com.yegorkapomidorka.headswap.aa.AaCertsMissingException
 import com.yegorkapomidorka.headswap.aa.AaCreds
@@ -1039,7 +1040,8 @@ class BridgeService : Service() {
         val screenOn = getSystemService(PowerManager::class.java).isInteractive
         val cfg = SessionConfig(
             screenOn, false, dexPrefs.desktopFps,
-            metaMusic = false, metaNavi = false, naviField6 = aaPrefs.naviField6, desktopVideo = desktopVideo,
+            // ПРОБНИК: навигация из теневой AA-сессии (AaShadowNav), без неё подписку ГУ просто никто не кормит
+            metaMusic = false, metaNavi = aaPrefs.metaNavi, naviField6 = aaPrefs.naviField6, desktopVideo = desktopVideo,
         )
         MetaRelay.PROGRESS_UNIT = if (aaPrefs.progressSeconds) 1 else 1000
 
@@ -1112,6 +1114,8 @@ class BridgeService : Service() {
             core.usbAudioEnabled = false
             core.mapHomeKey = true
             core.desktopInputEnabled = true
+            AaShadowNav.target = core       // ПРОБНИК: подсказки теневой AA-сессии в штатный MetaRelay
+            if (aaPrefs.metaNavi) AaShadowNav.start(this)   // в машине adb нет: стартуем вместе с рабочим столом
             core.touchDecimationProvider = { aaPrefs.touchDecimation }
             core.transcodeEnabled = true
             core.refDecoderFactory = { sink -> RefDecoder(sink) { AppLog.i(it, false) } }
@@ -1169,6 +1173,8 @@ class BridgeService : Service() {
     private fun onDesktopHostTornDown(owner: BridgeHost) {
         if (host === owner) host = null
         AppLog.i("DEX: источник закрыт")
+        AaShadowNav.stop()
+        AaShadowNav.target = null
         val recovery = pendingDesktopRecovery
         if (recovery != null && recovery.owner === owner && desktopRecovery.isCurrent(recovery.attempt)) {
             // колбэк подтверждает закрытие и привилегированного производителя, и энкодера с Surface
@@ -1219,6 +1225,7 @@ class BridgeService : Service() {
     /** Новый AA-хост: ядро, коннектор, сертификаты. null = мост не поднялся (причина в AaState.setupError). */
     private fun createHost(aaPrefs: AaPrefs, chosen: VideoGeometry, mode: VideoGeometry, densityOverride: Int, previous: BridgeHost?): BridgeHost? {
         return try {
+            AaShadowNav.stop()      // ПРОБНИК: одноразовый сервер 5277 нужен самому мосту AA
             val loaded = AaCreds.load(this, aaPrefs.certSet)
             AaState.setupError = null
             AaState.reset()
