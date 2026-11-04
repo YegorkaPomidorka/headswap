@@ -1089,7 +1089,9 @@ class BridgeService : Service() {
         DesktopMusicPlayback.attach(applicationContext, this, s, audioUsb,
             ready = { session === s && DexState.running && s.hasFreshDesktopVideo() },
             audioReady = { !DexPrefs(this).usbPlaybackAudio || !owner.core.audioViaUsb || DesktopAudioState.running })
-        desktopAudio.attach(owner.core, audioUsb) { session === s && s.canCaptureDesktopAudio() }
+        // h658: по Wi-Fi (tcp6) звук CarLife в режиме AA ходит, а BT A2DP ГУ рвёт сама — захват рабочего стола тоже пускаем в tcp6
+        val desktopAudioLink = audioUsb || transport.caps === TransportCaps.TCP6
+        desktopAudio.attach(owner.core, desktopAudioLink) { session === s && s.canCaptureDesktopAudio() }
         s.start()
         owner.onUsbSessionStarted()
     }

@@ -106,7 +106,9 @@ class LauncherActivity : ComponentActivity() {
         ForeignActions.reload(this, currentDisplayId(), goHome = false) // «Домой» только по onNewIntent, иначе каждый возврат на экран сбрасывал бы лаунчер
         visible = true
         connected = ownsDisplay()
-        AppLog.i("LAUNCHER активность на экране, дисплей=${currentDisplayId()}", false)
+        val wb = if (android.os.Build.VERSION.SDK_INT >= 30)
+            runCatching { windowManager.currentWindowMetrics.bounds.flattenToString() }.getOrNull() else null
+        AppLog.i("LAUNCHER активность на экране, дисплей=${currentDisplayId()} окно=$wb multiWindow=$isInMultiWindowMode", false)
         LauncherModel.reloadCatalog() // за время работы могли поставить или удалить приложение
         window.insetsController?.apply {
             hide(WindowInsets.Type.statusBars() or WindowInsets.Type.navigationBars())
