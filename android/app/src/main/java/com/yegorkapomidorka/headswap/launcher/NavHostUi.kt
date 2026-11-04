@@ -141,13 +141,15 @@ fun NavHostOverlay() {
     val h = r.height.roundToInt()
     val current = ui
     // видимая и стабильная области для навигатора: карта без наших карточек и кнопок (CarAreas)
-    LaunchedEffect(current?.javaClass, current is CarUi.Nav && (current.maneuver != null || current.eta != null), w) {
+    val hasActions = (current as? CarUi.Nav)?.actions?.isNotEmpty() ?: (current as? CarUi.Panel)?.actions?.isNotEmpty() ?: false
+    LaunchedEffect(current?.javaClass, current is CarUi.Nav && (current.maneuver != null || current.eta != null), hasActions, w) {
         val left = when (current) {
             is CarUi.Nav -> if (current.maneuver != null || current.eta != null) d.gap + maxOf(d.card, d.eta) + d.gap else 0
             is CarUi.Panel -> d.gap + d.panel + d.gap
             else -> 0
         }
-        CarAppHost.setAreas(left, d.gap + d.btn + d.gap, 0)
+        // ряд действий сверху справа: 2ГИС ставит лимит скорости в правый верхний угол видимой области
+        CarAppHost.setAreas(left, d.gap + d.btn + d.gap, if (hasActions) d.gap + d.btn else 0)
     }
     Box(
         Modifier.absoluteOffset { IntOffset(r.left.roundToInt(), r.top.roundToInt()) }

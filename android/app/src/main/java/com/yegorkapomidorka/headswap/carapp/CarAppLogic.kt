@@ -39,12 +39,13 @@ object CarAreas {
         if (w <= 0 || h <= 0) return Box(0, 0, 0, 0) to Box(0, 0, 0, 0)
         val left = leftPx.coerceIn(0, w - 1)
         val right = (w - rightPx.coerceAtLeast(0)).coerceIn(left + 1, w)
-        var top = topPx.coerceIn(0, h - 1)
-        if (top == 0) top = (h * MIN_TOP_SHARE).roundToInt().coerceIn(1, h - 1)
+        val top = topPx.coerceIn(0, h - 2)
+        // stable ниже visible: равные области 2ГИС понимает как «хост ничего не рисует»
+        val stableTop = (top + (h * MIN_TOP_SHARE).roundToInt()).coerceIn(top + 1, h - 1)
         val x = frame.left
         val y = frame.top
-        // кнопки справа - всегда на экране: вне и visible (иначе лимит и мини-карта 2ГИС уходят под них, стенд 04.11)
-        return Box(x + left, y, x + right, y + h) to Box(x + left, y + top, x + right, y + h)
+        // кнопки - всегда на экране: вне и visible (иначе лимит и мини-карта 2ГИС уходят под них, стенд 04.11)
+        return Box(x + left, y + top, x + right, y + h) to Box(x + left, y + stableTop, x + right, y + h)
     }
 
     /** Вырезка размера карточки [cw]x[ch] из центра поверхности [w]x[h]; карточка больше - вся поверхность. */
@@ -54,9 +55,9 @@ object CarAreas {
         return Box(x, y, x + minOf(cw, w), y + minOf(ch, h))
     }
 
-    /** Пока рендер не сообщил свою геометрию: как в пробнике (карточки слева 36 %, кнопки справа 10 %, сверху 15 %). */
+    /** Пока рендер не сообщил свою геометрию: как в пробнике (карточки слева 36 %, кнопки справа 10 %, stable ниже на 15 %). */
     fun default(w: Int, h: Int): Pair<Box, Box> =
-        of(w, h, (w * 0.36f).roundToInt(), (w * 0.10f).roundToInt(), (h * MIN_TOP_SHARE).roundToInt())
+        of(w, h, (w * 0.36f).roundToInt(), (w * 0.10f).roundToInt(), 0)
 }
 
 /** Числа Configuration для приложения: размер в dp, плотность. */
