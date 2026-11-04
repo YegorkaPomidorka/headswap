@@ -58,7 +58,9 @@ import com.yegorkapomidorka.headswap.carapp.CarImage
 import com.yegorkapomidorka.headswap.carapp.CarManeuver
 import com.yegorkapomidorka.headswap.carapp.CarRow
 import com.yegorkapomidorka.headswap.carapp.CarUi
+import androidx.compose.foundation.gestures.animateScrollBy
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 
 /*
@@ -266,9 +268,11 @@ private fun androidx.compose.foundation.layout.BoxScope.PanelScreen(p: CarUi.Pan
         Modifier.align(Alignment.TopStart).padding(m.dp(d.gap)).width(m.dp(d.panel)).fillMaxHeight()
             .clip(RoundedCornerShape(m.dp(d.radius))).background(look.card),
     ) {
-        Header(p.title, p.back, look, d, Modifier.height(m.dp(d.header)))
+        // Pressable забирает протяжку, поэтому список листается кнопками в заголовке (макет: «Листать вниз»)
+        val scroll = rememberScrollState()
+        Header(p.title, p.back, look, d, Modifier.height(m.dp(d.header))) { PageButtons(scroll, look, d) }
         Box(Modifier.fillMaxWidth().height(m.dp(2)).background(look.divider))
-        Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
+        Column(Modifier.weight(1f).verticalScroll(scroll)) {
             if (p.loading) Txt(stringResource(R.string.l_nh_loading), d.rowText, Modifier.padding(m.dp(d.gap)), color = look.fg2)
             else if (p.rows.isEmpty() && p.empty.isNotEmpty()) Txt(p.empty, d.rowText, Modifier.padding(m.dp(d.gap)), color = look.fg2, maxLines = 3)
             // выбор держит хост, как AA: selectedIndex в шаблоне - только начальный, 2ГИС после выбора его не меняет
@@ -286,8 +290,27 @@ private fun androidx.compose.foundation.layout.BoxScope.PanelScreen(p: CarUi.Pan
     ActionColumn(p.actions, p.mapActions, look, d)
 }
 
+/** «Вверх»/«вниз» на высоту видимой части, только когда список не помещается. */
 @Composable
-private fun Header(title: String, back: CarAction?, look: NavLook, d: NavDims, modifier: Modifier) {
+private fun PageButtons(scroll: androidx.compose.foundation.ScrollState, look: NavLook, d: NavDims) {
+    if (scroll.maxValue <= 0) return
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    val m = LocalMetrics.current
+    val page = scroll.viewportSize * 4 / 5
+    Row(horizontalArrangement = Arrangement.spacedBy(m.dp(12))) {
+        RoundButton(d.btn, stringResource(R.string.l_prev_page), onTap = { scope.launch { scroll.animateScrollBy(-page.toFloat()) } },
+            background = look.btn2, enabled = scroll.value > 0) {
+            SvgIcon(listOf("m6 15 6-6 6 6"), d.btnIc * 36 / 44, if (scroll.value > 0) look.fg else look.fg3, stroke = 2.4f)
+        }
+        RoundButton(d.btn, stringResource(R.string.l_next_page), onTap = { scope.launch { scroll.animateScrollBy(page.toFloat()) } },
+            background = look.btn2, enabled = scroll.value < scroll.maxValue) {
+            SvgIcon(listOf("m6 9 6 6 6-6"), d.btnIc * 36 / 44, if (scroll.value < scroll.maxValue) look.fg else look.fg3, stroke = 2.4f)
+        }
+    }
+}
+
+@Composable
+private fun Header(title: String, back: CarAction?, look: NavLook, d: NavDims, modifier: Modifier, end: @Composable () -> Unit = {}) {
     val m = LocalMetrics.current
     Row(modifier.fillMaxWidth().padding(horizontal = m.dp(d.gap)), verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(m.dp(16))) {
@@ -298,6 +321,7 @@ private fun Header(title: String, back: CarAction?, look: NavLook, d: NavDims, m
             }
         }
         Txt(title, d.title, Modifier.weight(1f), color = look.fg, weight = FontWeight.Bold)
+        end()
     }
 }
 
@@ -392,6 +416,7 @@ private fun SearchScreen(s: CarUi.Search, look: NavLook, d: NavDims) {
     val m = LocalMetrics.current
     var text by remember(s.initial) { mutableStateOf(s.initial) }
     val focus = remember { FocusRequester() }
+    val scroll = rememberScrollState()
     Column(Modifier.fillMaxSize().background(look.fullBg)) {
         Row(Modifier.fillMaxWidth().height(m.dp(d.header + 22)).padding(horizontal = m.dp(29)), verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(m.dp(d.gap))) {
@@ -413,8 +438,9 @@ private fun SearchScreen(s: CarUi.Search, look: NavLook, d: NavDims) {
                     keyboardActions = KeyboardActions(onSearch = { s.submitted?.invoke(text) }),
                 )
             }
+            PageButtons(scroll, look, d)
         }
-        Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(horizontal = m.dp(29))) {
+        Column(Modifier.weight(1f).verticalScroll(scroll).padding(horizontal = m.dp(29))) {
             s.rows.forEach { row -> RowView(row, false, look, d) {} }
         }
     }
