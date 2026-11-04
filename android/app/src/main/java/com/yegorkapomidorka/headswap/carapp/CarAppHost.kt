@@ -45,10 +45,10 @@ object CarAppHost {
     private var autoDpi = 160
     private var scale = 1f
     /**
-     * Ночь для навигатора; null - UI_MODE_NIGHT_UNDEFINED. При теме «авто» 2ГИС берёт режим только у хоста, а UNDEFINED
-     * превращается в ночную тему телефона (стенд 04.11: днём тёмная карта), поэтому лаунчер задаёт явно.
+     * Ночь для навигатора; null - UI_MODE_NIGHT_UNDEFINED: день/ночь решает сам навигатор по своим настройкам (Егор 04.11:
+     * фар в CarLife нет, CHANGE_MD_THEME ГУ не шлют). Стенд 04.11: 2ГИС с темой «авто» при UNDEFINED берёт тему телефона.
      */
-    private var night: Boolean? = false
+    private var night: Boolean? = null
     private var areas: Triple<Int, Int, Int>? = null
 
     /** cmd car_host_off / car_host: навигаторы на Car App Library - обычным окном (сравнить на стенде). */
