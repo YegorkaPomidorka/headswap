@@ -271,7 +271,11 @@ private fun androidx.compose.foundation.layout.BoxScope.PanelScreen(p: CarUi.Pan
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
             if (p.loading) Txt(stringResource(R.string.l_nh_loading), d.rowText, Modifier.padding(m.dp(d.gap)), color = look.fg2)
             else if (p.rows.isEmpty() && p.empty.isNotEmpty()) Txt(p.empty, d.rowText, Modifier.padding(m.dp(d.gap)), color = look.fg2, maxLines = 3)
-            p.rows.forEachIndexed { i, row -> RowView(row, i == p.selected, look, d) { p.select?.invoke(i) } }
+            // выбор держит хост, как AA: selectedIndex в шаблоне - только начальный, 2ГИС после выбора его не меняет
+            var selected by remember(p.title, p.rows.map { it.title }, p.selected) { mutableStateOf(p.selected) }
+            p.rows.forEachIndexed { i, row ->
+                RowView(row, i == selected, look, d) { if (p.select != null) { selected = i; p.select.invoke(i) } }
+            }
         }
         if (p.buttons.isNotEmpty()) {
             Row(Modifier.fillMaxWidth().padding(m.dp(d.gap)), horizontalArrangement = Arrangement.spacedBy(m.dp(d.gap))) {

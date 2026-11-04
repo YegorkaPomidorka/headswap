@@ -41,8 +41,9 @@ internal class CarUiMapper(private val app: Context, private val units: CarUnits
         is NavigationTemplate -> nav(t)
         is PlaceListNavigationTemplate -> panel(title(t.header, t.title), back(t.header, t.headerAction), t.itemList, emptyList(),
             t.actionStrip?.actions, t.mapActionStrip?.actions, t.isLoading)
+        // «В путь» обзора маршрута - всегда главная кнопка, как у AA (2ГИС не ставит ей FLAG_PRIMARY)
         is RoutePreviewNavigationTemplate -> panel(title(t.header, t.title), back(t.header, t.headerAction), t.itemList,
-            listOfNotNull(t.navigateAction), t.actionStrip?.actions, t.mapActionStrip?.actions, t.isLoading)
+            listOfNotNull(t.navigateAction), t.actionStrip?.actions, t.mapActionStrip?.actions, t.isLoading, primaryButtons = true)
         is MapTemplate -> mapTemplate(t)
         is GridTemplate -> CarUi.Grid(title(t.header, t.title), back(t.header, t.headerAction),
             t.singleList?.items.orEmpty().filterIsInstance<GridItem>().map(::gridItem), t.isLoading)
@@ -76,13 +77,13 @@ internal class CarUiMapper(private val app: Context, private val units: CarUnits
 
     private fun panel(
         title: String, back: CarAction?, list: ItemList?, buttons: List<Action>,
-        actions: List<Action>?, mapActions: List<Action>?, loading: Boolean,
+        actions: List<Action>?, mapActions: List<Action>?, loading: Boolean, primaryButtons: Boolean = false,
     ): CarUi.Panel {
         val sel = list?.onSelectedDelegate
         return CarUi.Panel(
             title, back, list?.items.orEmpty().filterIsInstance<Row>().map(::row), list?.selectedIndex ?: -1,
-            sel?.let { d -> { i: Int -> post { runCatching { d.sendSelected(i, done("выбор $i")) } } } },
-            buttons.map(::action), actions.orEmpty().map(::action),
+            sel?.let { d -> { i: Int -> post { log("выбор $i"); runCatching { d.sendSelected(i, done("выбор $i")) } } } },
+            buttons.map { action(it, primaryButtons) }, actions.orEmpty().map(::action),
             CarActions.visibleMapActions(mapActions.orEmpty()) { it.type }.map(::action), loading, text(list?.noItemsMessage),
         )
     }
@@ -111,9 +112,11 @@ internal class CarUiMapper(private val app: Context, private val units: CarUnits
         )
     }
 
-    private fun action(a: Action) = CarAction(
+    private fun action(a: Action) = action(a, false)
+
+    private fun action(a: Action, primary: Boolean) = CarAction(
         title = text(a.title), icon = image(a.icon) ?: standardIcon(a.type), type = a.type,
-        primary = a.flags and Action.FLAG_PRIMARY != 0, enabled = a.isEnabled, background = tint(a.backgroundColor),
+        primary = primary || a.flags and Action.FLAG_PRIMARY != 0, enabled = a.isEnabled, background = tint(a.backgroundColor),
         click = click(a.onClickDelegate, "действие ${text(a.title).ifEmpty { a.type.toString() }}"),
     )
 
@@ -141,7 +144,7 @@ internal class CarUiMapper(private val app: Context, private val units: CarUnits
     private fun back(h: Header?, fallback: Action?): CarAction? = (h?.startHeaderAction ?: fallback)?.let(::action)
 
     private fun click(d: OnClickDelegate?, what: String): CarClick? = d?.let {
-        CarClick { post { runCatching { it.sendClick(done(what)) }.onFailure { e -> log("$what: ${e.javaClass.simpleName}") } } }
+        CarClick { post { log("нажато: $what"); runCatching { it.sendClick(done(what)) }.onFailure { e -> log("$what: ${e.javaClass.simpleName}") } } }
     }
 
     private fun tint(c: CarColor?): CarTint? = c?.takeIf { it.type != CarColor.TYPE_DEFAULT }?.let { CarTint(it.type, it.color, it.colorDark) }
@@ -198,6 +201,8 @@ internal class CarUiMapper(private val app: Context, private val units: CarUnits
     }
 
     private fun render(inner: IconCompat): Bitmap? = runCatching {
+        // картинку приложения - как есть: через Drawable она пересэмплируется по плотности и мылится
+        if (inner.type == IconCompat.TYPE_BITMAP) inner.bitmap?.let { return it }
         val d = inner.loadDrawable(app) ?: return null
         val w = d.intrinsicWidth.takeIf { it > 0 } ?: 96
         val h = d.intrinsicHeight.takeIf { it > 0 } ?: 96
