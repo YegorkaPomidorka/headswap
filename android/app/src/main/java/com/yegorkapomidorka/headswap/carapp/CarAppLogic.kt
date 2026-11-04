@@ -29,14 +29,28 @@ object CarAreas {
      * [leftPx] - сколько px слева занято нашими карточками/панелью, [rightPx] - полоса кнопок справа,
      * [topPx] - полоса сверху над картой. Всё в px поверхности; лишнее обрезается по размеру.
      */
-    fun of(w: Int, h: Int, leftPx: Int, rightPx: Int, topPx: Int): Pair<Box, Box> {
+    fun of(w: Int, h: Int, leftPx: Int, rightPx: Int, topPx: Int): Pair<Box, Box> =
+        of(Box(0, 0, w, h), leftPx, rightPx, topPx)
+
+    /** То же внутри [frame] - части поверхности, которую видно (карточка показывает вырезку полноэкранной карты). */
+    fun of(frame: Box, leftPx: Int, rightPx: Int, topPx: Int): Pair<Box, Box> {
+        val w = frame.width
+        val h = frame.height
         if (w <= 0 || h <= 0) return Box(0, 0, 0, 0) to Box(0, 0, 0, 0)
         val left = leftPx.coerceIn(0, w - 1)
-        val visible = Box(left, 0, w, h)
         val right = (w - rightPx.coerceAtLeast(0)).coerceIn(left + 1, w)
         var top = topPx.coerceIn(0, h - 1)
         if (right == w && top == 0) top = (h * MIN_TOP_SHARE).roundToInt().coerceIn(1, h - 1)
-        return visible to Box(left, top, right, h)
+        val x = frame.left
+        val y = frame.top
+        return Box(x + left, y, x + w, y + h) to Box(x + left, y + top, x + right, y + h)
+    }
+
+    /** Вырезка размера карточки [cw]x[ch] из центра поверхности [w]x[h]; карточка больше - вся поверхность. */
+    fun crop(w: Int, h: Int, cw: Int, ch: Int): Box {
+        val x = ((w - cw) / 2).coerceAtLeast(0)
+        val y = ((h - ch) / 2).coerceAtLeast(0)
+        return Box(x, y, x + minOf(cw, w), y + minOf(ch, h))
     }
 
     /** Пока рендер не сообщил свою геометрию: как в пробнике (карточки слева 36 %, кнопки справа 10 %, сверху 15 %). */

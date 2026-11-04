@@ -34,6 +34,9 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.foundation.layout.absoluteOffset
 import com.yegorkapomidorka.headswap.R
+import com.yegorkapomidorka.headswap.carapp.CarAppHost
+import com.yegorkapomidorka.headswap.carapp.CarAreas
+import com.yegorkapomidorka.headswap.carapp.Box as CarBox
 import kotlin.math.roundToInt
 
 
@@ -55,9 +58,16 @@ fun EmbedLayers() {
 
     // навигатор: размер карточки, на весь экран справа от рейки - в режиме «Навигатор»
     val navTarget = if (area == Area.Navigator) areaRect else cardRect
-    LaunchedEffect(navKey, navTarget?.width, navTarget?.height) {
-        EmbedHost.want(EmbedHost.nav, navKey, navTarget?.width?.roundToInt() ?: 0, navTarget?.height?.roundToInt() ?: 0)
+    LaunchedEffect(navKey, navTarget?.width, navTarget?.height, areaRect?.width, areaRect?.height) {
+        EmbedHost.want(EmbedHost.nav, navKey, navTarget?.width?.roundToInt() ?: 0, navTarget?.height?.roundToInt() ?: 0,
+            areaRect?.width?.roundToInt() ?: 0, areaRect?.height?.roundToInt() ?: 0)
     }
+    // свой хост Car App: поверхность на весь экран, в карточке - её центр 1:1, туда же видимая область навигатора
+    val carNav = EmbedHost.nav.carHost
+    val navCrop = if (carNav && area != Area.Navigator && cardRect != null && areaRect != null)
+        CarAreas.crop(areaRect.width.roundToInt(), areaRect.height.roundToInt(), cardRect.width.roundToInt(), cardRect.height.roundToInt())
+    else null
+    LaunchedEffect(carNav, navCrop) { if (carNav) CarAppHost.setCrop(navCrop) }
     // приложение: одно окно на все приложения, смена приложения = launch в тот же дисплей
     val appKey = model.appKey
     LaunchedEffect(appKey, areaRect?.width, areaRect?.height) {
@@ -78,7 +88,8 @@ fun EmbedLayers() {
     EmbedLayer(EmbedHost.nav, navTarget, shown = navShown, interactive = area == Area.Navigator,
         rounded = area != Area.Navigator, background = LocalPalette.current.mapBg,
         starting = stringResource(R.string.l_nav_starting), onCardTap = { LauncherActions.openNavigator() }, tag = navTag,
-        cardViewButton = area == Area.Home && LocalMetrics.current.spec.strip)
+        cardViewButton = area == Area.Home && LocalMetrics.current.spec.strip,
+        crop = navCrop, buffer = if (carNav && areaRect != null) areaRect.width.roundToInt() to areaRect.height.roundToInt() else null)
     if (appKey != null) {
         val label = model.starting ?: ""
         EmbedLayer(EmbedHost.app, areaRect, shown = area is Area.App, interactive = true, rounded = false, background = LocalPalette.current.bgSolid,
@@ -92,6 +103,8 @@ private val OFFSCREEN = IntOffset(-100_000, -100_000)
 internal fun EmbedLayer(
     slot: EmbedSlot, target: Rect?, shown: Boolean, interactive: Boolean, rounded: Boolean, background: Color,
     starting: String, onCardTap: (() -> Unit)?, tag: String? = null, cardViewButton: Boolean = false,
+    /** Буфер текстуры [buffer] (px) больше окна: показать его часть [crop] 1:1; crop null - буфер на всё окно. */
+    crop: CarBox? = null, buffer: Pair<Int, Int>? = null,
 ) {
     var last by remember(slot) { mutableStateOf<Rect?>(null) }
     if (target != null) last = target
@@ -130,7 +143,15 @@ internal fun EmbedLayer(
                 }
             },
             modifier = Modifier.fillMaxSize(),
-            update = { v -> v.visibility = if (shown) android.view.View.VISIBLE else android.view.View.INVISIBLE },
+            update = { v ->
+                v.visibility = if (shown) android.view.View.VISIBLE else android.view.View.INVISIBLE
+                // TextureView растягивает буфер на окно; матрица возвращает масштаб 1:1 и сдвигает на вырезку
+                val b = buffer
+                v.setTransform(if (crop == null || b == null) null else android.graphics.Matrix().apply {
+                    setScale(b.first / crop.width.toFloat(), b.second / crop.height.toFloat())
+                    postTranslate(-crop.left.toFloat(), -crop.top.toFloat())
+                })
+            },
         )
         if (shown) {
             if (status != EmbedStatus.READY) {

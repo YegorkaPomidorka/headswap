@@ -99,6 +99,14 @@ object CarAppHost {
     fun setAreas(leftPx: Int, rightPx: Int, topPx: Int) { h.post { areas = Triple(leftPx, rightPx, topPx); push() } }
     fun clearAreas() { h.post { areas = null; push() } }
 
+    /**
+     * Карточка на главном показывает вырезку [crop] полноэкранной поверхности 1:1; null - навигатор на весь экран.
+     * Размер поверхности при этом не меняется: пересдача той же Surface с новым размером вешает 2ГИС (его заставка
+     * берёт lockCanvas, пока движок в другом процессе ещё держит на ней EGL; стенд 04.11).
+     */
+    fun setCrop(crop: Box?) { h.post { if (this.crop != crop) { this.crop = crop; push() } } }
+    private var crop: Box? = null
+
     /** cmd car_night: true/false - ночь/день от хоста, null - как в настройках навигатора. */
     fun setNight(value: Boolean?) { h.post { if (night != value) { night = value; push() } } }
 
@@ -117,7 +125,11 @@ object CarAppHost {
     private fun push() { session?.update(view()) }
 
     private fun view(): CarAppSession.View {
-        val (visible, stable) = areas?.let { (l, r, t) -> CarAreas.of(sw, sh, l, r, t) } ?: CarAreas.default(sw, sh)
+        val c = crop
+        val (visible, stable) = when {
+            c != null -> CarAreas.of(c, 0, 0, 0) // в карточке поверх карты ничего своего
+            else -> areas?.let { (l, r, t) -> CarAreas.of(sw, sh, l, r, t) } ?: CarAreas.default(sw, sh)
+        }
         return CarAppSession.View(surface, sw, sh, CarConfigMath.dpi(autoDpi, scale), night, visible, stable)
     }
 

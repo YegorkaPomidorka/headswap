@@ -40,6 +40,14 @@ internal class EmbedSlot(val name: String) {
     @Volatile var wantKey: String? = null
     @Volatile var wantW = 0
     @Volatile var wantH = 0
+    /** Размер на весь экран: поверхность своего хоста Car App всегда такая, карточка показывает её вырезку. */
+    @Volatile var fullW = 0
+    @Volatile var fullH = 0
+    private var carHostValue by mutableStateOf(false)
+    /** Окно рисует свой хост Car App (только nav). Пишется с рабочего потока. */
+    var carHost: Boolean
+        get() = carHostValue
+        set(value) { if (value != carHostValue) carHostValue = value }
     /** Касания в окно пересылаются (в карточке навигатора - нет: тап = развернуть). */
     @Volatile var interactive = false
 
@@ -132,8 +140,9 @@ internal object EmbedHost {
 
     // --- вызовы с главного потока ---
 
-    /** Нужное содержимое и размер слота. Тот же ключ и размер - ничего не происходит. */
-    fun want(slot: EmbedSlot, key: String?, w: Int, h: Int) {
+    /** Нужное содержимое и размер слота. Тот же ключ и размер - ничего не происходит. [fullW]x[fullH] - на весь экран. */
+    fun want(slot: EmbedSlot, key: String?, w: Int, h: Int, fullW: Int = w, fullH: Int = h) {
+        if (fullW > 0 && fullH > 0) { slot.fullW = fullW; slot.fullH = fullH }
         // другое приложение в то же окно: сразу «запускаем», не показывая на миг прежнее
         if (key != slot.wantKey) {
             slot.status = if (key == null) EmbedStatus.IDLE else EmbedStatus.STARTING
@@ -476,10 +485,11 @@ internal object EmbedHost {
         if (slot === nav) {
             val car = carTargetFor(slot.pkg)
             if (car != null) {
-                // Свой хост Car App: карта навигатора прямо в эту поверхность, в размер окна; телефонную часть
-                // навигатора не запускаем - иначе она держит его движок и машинная часть висит на заставке.
-                val w = slot.wantW
-                val h = slot.wantH
+                // Свой хост Car App: карта навигатора прямо в эту поверхность; телефонную часть навигатора не запускаем -
+                // иначе она держит его движок и машинная часть висит на заставке. Поверхность всегда на весь экран,
+                // карточка показывает её вырезку (CarAppHost.setCrop): смена размера той же Surface вешает 2ГИС.
+                val w = slot.fullW
+                val h = slot.fullH
                 if (w < 128 || h < 128) return
                 if (projSurface != null && !projCar) unproject()
                 if (slot.handle > 0) { releaseLease(slot); AppLog.i("EMBED nav: окно отдано своему хосту Car App", false) }
@@ -490,9 +500,11 @@ internal object EmbedHost {
                     projSurface = surface; projCar = true; projW = w; projH = h
                     CarAppHost.setSurface(surface, w, h, densityDpi)
                 }
+                slot.carHost = true
                 slot.status = EmbedStatus.READY
                 return
             }
+            slot.carHost = false
             if (projCar) { unproject(); dropSurface(slot) }
             if (CarAppHost.pkg != null) CarAppHost.stop() // навигатор сменили на оконный или хосту отказали
             if (AaShadowNav.projection) {

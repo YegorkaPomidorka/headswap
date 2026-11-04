@@ -29,6 +29,15 @@ class CarAppLogicTest {
         assertEquals(Box(256, 75, 641, 501), stable)
     }
 
+    @Test fun cardShowsCenterCropAndAreasFollowIt() {
+        val crop = CarAreas.crop(1136, 720, 712, 501)
+        assertEquals(Box(212, 109, 924, 610), crop)
+        val (visible, stable) = CarAreas.of(crop, 0, 0, 0)
+        assertEquals(crop, visible)
+        assertEquals(Box(212, 109 + 75, 924, 610), stable)
+        assertEquals(Box(0, 0, 1136, 720), CarAreas.crop(1136, 720, 1500, 800))
+    }
+
     @Test fun emptySurfaceGivesEmptyAreas() {
         assertEquals(Box(0, 0, 0, 0), CarAreas.of(0, 720, 10, 10, 10).first)
     }
