@@ -22,8 +22,13 @@ object DesktopGeometryPolicy {
     fun requireDensity(density: Int) {
         require(density in MIN_DENSITY..MAX_DENSITY) { "Плотность рабочего стола должна быть от $MIN_DENSITY до $MAX_DENSITY DPI" }
     }
-    // Retain the previous automatic scale for existing 480p/720p/900p profiles.
-    fun density(height: Int): Int = (160.0 * height / 900).roundToInt().coerceIn(120, MAX_DENSITY)
+    /**
+     * Авто: короткая сторона ~576 dp, не меньше 160 dpi. При 600+ dp Gboard считает экран планшетом и делит
+     * клавиатуру пополам, её настройка «Разделённая клавиатура» на это не влияет (стенд 04.11: 1280×720 при 160 -
+     * пополам, при 200, 213 и 240 - целая). 480 -> 160, 720 -> 200, 900 -> 250, 1080 -> 300. Наш лаунчер свёрстан
+     * в пикселях и от плотности не зависит; крупнее становятся клавиатура, системные окна и чужие приложения.
+     */
+    fun density(height: Int): Int = (160.0 * height / 576).roundToInt().coerceIn(160, MAX_DENSITY)
 }
 
 enum class DesktopResolution(val title: String, val width: Int, val height: Int) {

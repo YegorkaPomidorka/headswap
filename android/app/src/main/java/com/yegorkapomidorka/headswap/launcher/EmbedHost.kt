@@ -215,7 +215,7 @@ internal object EmbedHost {
 
     private fun unproject() {
         if (projSurface == null) return
-        if (projCar) CarAppHost.setSurface(null, 0, 0, densityDpi) else AaShadowNav.setSurface(null)
+        if (projCar) CarAppHost.setSurface(null, 0, 0) else AaShadowNav.setSurface(null)
         projSurface = null
         projCar = false
     }
@@ -509,7 +509,7 @@ internal object EmbedHost {
                 texture.setDefaultBufferSize(w, h)
                 if (projSurface !== surface || projW != w || projH != h) {
                     projSurface = surface; projCar = true; projW = w; projH = h
-                    CarAppHost.setSurface(surface, w, h, densityDpi)
+                    CarAppHost.setSurface(surface, w, h)
                 }
                 slot.carHost = true
                 slot.status = EmbedStatus.READY

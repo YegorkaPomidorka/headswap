@@ -33,7 +33,7 @@ class DesktopPrefsTest {
     }
     @Test fun freshInstallDefaultsAreNativeGeometryAndIndependentDesktopFps() {
         val prefs = DexPrefs(MemoryPrefs())
-        assertEquals(160, prefs.desktopDensity)
+        assertEquals(0, prefs.desktopDensity) // авто по высоте: клавиатура не делится пополам
         assertEquals(FpsSetting.FPS30, prefs.desktopFps)
         assertNotEquals(FpsSetting.DEFAULT, prefs.desktopFps) // Independent from the AA default.
         assertFalse(prefs.usbPlaybackAudio) // ADR 0020: в режиме рабочего стола звук по Bluetooth
