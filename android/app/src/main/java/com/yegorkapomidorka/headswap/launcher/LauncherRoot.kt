@@ -51,8 +51,9 @@ fun LauncherRoot(connected: Boolean) {
             delay(1000)
         }
     }
-    // день/ночь карты навигатора на своём хосте Car App - по теме лаунчера (2ГИС берёт его только у хоста)
-    LaunchedEffect(model.lightTheme) { CarAppHost.setNight(!model.lightTheme) }
+    // день/ночь карты на своём хосте Car App: фар в CarLife нет, есть только CHANGE_MD_THEME (пока ни одна ГУ не слала);
+    // при «авто» навигатор берёт режим только у хоста. Без темы ГУ - день.
+    LaunchedEffect(model.huTheme) { CarAppHost.setNight(model.huTheme == 1) }
     // состояние звонка и журнал: на главном потоке (PhoneStateListener берёт Looper потока создания)
     LaunchedEffect(Unit) {
         while (true) {

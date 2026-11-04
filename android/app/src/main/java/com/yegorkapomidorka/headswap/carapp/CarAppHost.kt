@@ -44,7 +44,11 @@ object CarAppHost {
     private var sh = 0
     private var autoDpi = 160
     private var scale = 1f
-    private var night = true
+    /**
+     * Ночь для навигатора; null - UI_MODE_NIGHT_UNDEFINED. При теме «авто» 2ГИС берёт режим только у хоста, а UNDEFINED
+     * превращается в ночную тему телефона (стенд 04.11: днём тёмная карта), поэтому лаунчер задаёт явно.
+     */
+    private var night: Boolean? = false
     private var areas: Triple<Int, Int, Int>? = null
 
     /** cmd car_host_off / car_host: навигаторы на Car App Library - обычным окном (сравнить на стенде). */
@@ -95,8 +99,8 @@ object CarAppHost {
     fun setAreas(leftPx: Int, rightPx: Int, topPx: Int) { h.post { areas = Triple(leftPx, rightPx, topPx); push() } }
     fun clearAreas() { h.post { areas = null; push() } }
 
-    /** Ночь - по теме лаунчера (для «Авто» - по фарам машины). */
-    fun setNight(value: Boolean) { h.post { if (night != value) { night = value; push() } } }
+    /** cmd car_night: true/false - ночь/день от хоста, null - как в настройках навигатора. */
+    fun setNight(value: Boolean?) { h.post { if (night != value) { night = value; push() } } }
 
     /** Ступень «Масштаба карты» (1 = «Авто»). */
     fun setScale(value: Float) { h.post { if (scale != value) { scale = value; push() } } }

@@ -53,7 +53,7 @@ internal class CarAppSession(
 
     /** Что хост отдаёт приложению сейчас (пишет CarAppHost, только поток h). */
     class View(
-        val surface: Surface?, val w: Int, val h: Int, val dpi: Int, val night: Boolean,
+        val surface: Surface?, val w: Int, val h: Int, val dpi: Int, val night: Boolean?,
         val visible: Box, val stable: Box,
     )
 
@@ -232,8 +232,12 @@ internal class CarAppSession(
             smallestScreenWidthDp = minOf(screenWidthDp, screenHeightDp)
         }
         densityDpi = dpi
-        // День/ночь - явно от лаунчера: машинная часть 2ГИС берёт его только у хоста (04.11), тема Headswap тут ни при чём
-        val night = if (v?.night != false) Configuration.UI_MODE_NIGHT_YES else Configuration.UI_MODE_NIGHT_NO
+        // День/ночь: тему Headswap не копируем (2ГИС днём был тёмным). null - UNDEFINED, решает сам навигатор.
+        val night = when (v?.night) {
+            true -> Configuration.UI_MODE_NIGHT_YES
+            false -> Configuration.UI_MODE_NIGHT_NO
+            null -> Configuration.UI_MODE_NIGHT_UNDEFINED
+        }
         uiMode = (uiMode and (Configuration.UI_MODE_TYPE_MASK or Configuration.UI_MODE_NIGHT_MASK).inv()) or
             Configuration.UI_MODE_TYPE_CAR or night
     }
