@@ -90,7 +90,8 @@ internal class CarAppSession(
                 h.post { if (!stopped) disconnected() }
             }
             override fun onBindingDied(name: ComponentName) {
-                h.post { if (!stopped) { log("бинд умер"); refuse(CarAppRefusal.DIED) } }
+                // force-stop или обновление пакета: этот бинд больше не оживёт, биндимся заново
+                h.post { if (!stopped && conn === this) rebind() }
             }
         }
         val intent = Intent(CarAppCatalog.ACTION).setComponent(ComponentName(target.pkg, target.service))
@@ -208,14 +209,35 @@ internal class CarAppSession(
     /** Процесс приложения умер (MIUI режет :androidauto_*): BIND_AUTO_CREATE поднимет сервис заново, сессия - с нуля. */
     private fun disconnected() {
         log("отключён")
+        lost()
+        noteDeath()
+    }
+
+    private fun rebind() {
+        log("бинд умер, привязываюсь заново")
+        // смерть уже посчитал onServiceDisconnected; без него (сервис не успел подключиться) - считаем здесь
+        if (carApp != null) { lost(); if (noteDeath()) return }
+        conn?.let { runCatching { app.unbindService(it) } }
+        conn = null
+        start()
+    }
+
+    private fun lost() {
         gen++
         carApp = null; appManager = null; surfaceCb = null; delivered = null; ready = false
         endNavigation()
         events.onTemplate(this, null)
+    }
+
+    /** Ещё одна смерть приложения; true - падает слишком часто, сессии отказано. */
+    private fun noteDeath(): Boolean {
         val now = SystemClock.uptimeMillis()
         deaths.addLast(now)
         while (deaths.isNotEmpty() && now - deaths.first() > DEATH_WINDOW_MS) deaths.removeFirst()
-        if (deaths.size >= MAX_DEATHS) { log("падает ${deaths.size} раз за минуту"); refuse(CarAppRefusal.DIED) }
+        if (deaths.size < MAX_DEATHS) return false
+        log("падает ${deaths.size} раз за минуту")
+        refuse(CarAppRefusal.DIED)
+        return true
     }
 
     private fun refuse(why: CarAppRefusal) {
