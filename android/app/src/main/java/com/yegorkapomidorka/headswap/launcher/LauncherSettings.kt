@@ -271,13 +271,14 @@ private fun MapScaleCard(pkg: String, d: SettingsDims, modifier: Modifier) {
                 Txt(stringResource(R.string.l_s_map_scale), s.f2)
                 Txt(stringResource(R.string.l_s_map_scale_sub, model.packageLabel(pkg)), d.sub, color = Pal.SEC, ellipsis = false)
             }
-            Row(horizontalArrangement = Arrangement.spacedBy(m.dp(s.g8))) {
+            // четыре ступени - поровну на ширину карточки (на 1280×720 по размеру текста не влезают)
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(m.dp(s.g8))) {
                 for ((i, res) in listOf(R.string.l_s_scale_smaller, R.string.l_s_theme_auto, R.string.l_s_scale_larger,
                     R.string.l_s_scale_largest).withIndex()) {
                     val label = stringResource(res)
-                    OptionBox(cur == i, Modifier.height(m.dp(d.ctl)), RoundedCornerShape(m.dp(d.ctl / 2)), label,
+                    OptionBox(cur == i, Modifier.weight(1f).height(m.dp(d.ctl)), RoundedCornerShape(m.dp(d.ctl / 2)), label,
                         unselected = LocalPalette.current.btnSet, onTap = { model.chooseMapScale(pkg, i) }) {
-                        Box(Modifier.fillMaxHeight().padding(horizontal = m.dp(d.pillPad)), contentAlignment = Alignment.Center) {
+                        Box(Modifier.fillMaxSize().padding(horizontal = m.dp(8)), contentAlignment = Alignment.Center) {
                             Txt(label, s.f2, weight = FontWeight.SemiBold, ellipsis = false)
                         }
                     }

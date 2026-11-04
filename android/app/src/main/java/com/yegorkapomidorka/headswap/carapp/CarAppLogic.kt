@@ -71,8 +71,12 @@ object CarConfigMath {
 
     fun dp(px: Int, dpi: Int): Int = if (px <= 0 || dpi <= 0) 0 else px * 160 / dpi
 
-    /** Ступени «Масштаба карты»: Мельче / Авто / Крупнее / Ещё крупнее (макет SettingsNav). */
-    val STEPS = floatArrayOf(0.75f, 1f, 1.25f, 1.5f)
+    /**
+     * Ступени «Масштаба карты» к плотности окна: Мельче / Авто / Крупнее / Ещё крупнее (макет SettingsNav: ×0,75 / ×1 /
+     * ×1,25 / ×1,5 от «Авто»). Потолок «Ещё крупнее» - сама плотность окна (160 dpi на 1280×720, Егор 04.11 на стенде),
+     * «Авто» = 160 / 1,5 ≈ 107.
+     */
+    val STEPS = floatArrayOf(0.5f, 2f / 3f, 5f / 6f, 1f)
     const val AUTO_STEP = 1
 
     fun step(i: Int): Float = STEPS[i.coerceIn(0, STEPS.size - 1)]

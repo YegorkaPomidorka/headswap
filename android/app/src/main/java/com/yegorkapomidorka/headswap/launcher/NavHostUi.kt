@@ -138,7 +138,9 @@ fun NavHostOverlay() {
     val density = LocalDensity.current
     val m = LocalMetrics.current
     val look = if (LocalPalette.current.light) LIGHT else DARK
-    val d = remember(m.spec) { NavDims(m.spec.h / 720f, m.spec.wide) }
+    // «Масштаб карты» меняет и наши карточки с кнопками - в одну меру с картой навигатора
+    val scale = CarAppHost.pkg?.let { com.yegorkapomidorka.headswap.carapp.CarConfigMath.step(LauncherModel.mapScale(it)) } ?: 1f
+    val d = remember(m.spec, scale) { NavDims(m.spec.h / 720f * scale, m.spec.wide) }
     val w = r.width.roundToInt()
     val h = r.height.roundToInt()
     val current = ui
