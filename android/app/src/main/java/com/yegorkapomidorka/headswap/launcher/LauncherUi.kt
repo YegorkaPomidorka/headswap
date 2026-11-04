@@ -2,7 +2,11 @@ package com.yegorkapomidorka.headswap.launcher
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.focusable
 import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
@@ -299,6 +303,8 @@ fun SvgIcon(paths: List<String>, sizePx: Int, color: Color, modifier: Modifier =
 /**
  * Кнопка под тач ГУ: нажатое состояние сразу на DOWN, действие на UP, долгий тап считается по времени
  * между DOWN и UP ([PressLogic]), сдвиг пальца отмену не вызывает (clickable с touch slop тут не подходит).
+ * Кнопка же - остановка фокуса шайбы ([LauncherKnob]): рамка [focusShape] (по умолчанию скругление карточек)
+ * цветом [ringColor] (по умолчанию акцент), OK - то же, что тап.
  */
 @Composable
 fun Pressable(
@@ -307,16 +313,28 @@ fun Pressable(
     description: String? = null,
     onLong: (() -> Unit)? = null,
     onPress: (() -> Unit)? = null,
+    focusShape: Shape? = null,
+    ringColor: Color? = null,
     onTap: () -> Unit,
     content: @Composable BoxScope.(pressed: Boolean) -> Unit,
 ) {
     var pressed by remember { mutableStateOf(false) }
+    var focused by remember { mutableStateOf(false) }
     val tap = rememberUpdatedState(onTap)
     val long = rememberUpdatedState(onLong)
     val press = rememberUpdatedState(onPress)
     val on = rememberUpdatedState(enabled)
+    val knob = remember { LauncherKnob.Target().apply { this.tap = { if (on.value) { press.value?.invoke(); tap.value() } } } }
+    knob.description = description
+    DisposableEffect(knob) { onDispose { LauncherKnob.focused(knob, false) } }
+    val m = LocalMetrics.current
     Box(
-        modifier
+        Modifier
+            .knobRing(focused && enabled && LauncherKnob.visible, focusShape ?: RoundedCornerShape(m.dp(m.spec.radius)),
+                ringColor ?: LocalAccent.current, LauncherKnob.gapColor(LauncherModel.lightTheme), m.spec.b4.toFloat())
+            .then(modifier)
+            .onFocusChanged { focused = it.isFocused; LauncherKnob.focused(knob, it.isFocused) }
+            .focusable(enabled)
             .semantics {
                 role = Role.Button
                 if (description != null) contentDescription = description
@@ -360,7 +378,7 @@ fun RoundButton(
     Pressable(
         modifier.size(m.dp(sizePx)).clip(CircleShape)
             .background(background), enabled = enabled, description = description, onTap = onTap, onLong = onLong,
-        onPress = onPress,
+        onPress = onPress, focusShape = CircleShape,
     ) { pressed ->
         if (pressed) Box(Modifier.matchParentSize().background(Pal.SURFACE_PRESSED))
         Box(Modifier.matchParentSize(), contentAlignment = Alignment.Center, content = content)

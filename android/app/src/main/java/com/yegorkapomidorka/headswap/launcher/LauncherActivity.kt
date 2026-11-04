@@ -22,6 +22,7 @@ import androidx.core.content.ContextCompat
 import com.yegorkapomidorka.headswap.AppLocale
 import com.yegorkapomidorka.headswap.AppLog
 import com.yegorkapomidorka.headswap.desktop.DesktopAppCatalog
+import com.yegorkapomidorka.headswap.dex.DesktopKeys
 import com.yegorkapomidorka.headswap.dex.DexState
 
 /**
@@ -86,6 +87,7 @@ class LauncherActivity : ComponentActivity() {
             override fun handleOnBackPressed() { LauncherActions.hardwareBack() }
         })
         setContent { LauncherRoot(connected) }
+        DesktopKeys.sink = LauncherKnob // шайба и NAVI/MUSIC/HOME ГУ идут сюда, а не инжектом в окно (ADR 0024)
     }
 
     /**
@@ -106,6 +108,7 @@ class LauncherActivity : ComponentActivity() {
         ForeignActions.reload(this, currentDisplayId(), goHome = false) // «Домой» только по onNewIntent, иначе каждый возврат на экран сбрасывал бы лаунчер
         visible = true
         connected = ownsDisplay()
+        LauncherKnob.resumed(this)
         val wb = if (android.os.Build.VERSION.SDK_INT >= 30)
             runCatching { windowManager.currentWindowMetrics.bounds.flattenToString() }.getOrNull() else null
         AppLog.i("LAUNCHER активность на экране, дисплей=${currentDisplayId()} окно=$wb multiWindow=$isInMultiWindowMode", false)
@@ -122,12 +125,14 @@ class LauncherActivity : ComponentActivity() {
     override fun onPause() {
         AppLog.i("LAUNCHER активность ушла с экрана (onPause), дисплей=${currentDisplayId()}", false)
         visible = false
+        LauncherKnob.paused(this)
         main.removeCallbacks(awaitOwnership)
         super.onPause()
     }
 
     override fun onDestroy() {
         runCatching { unregisterReceiver(screenEvents) }
+        LauncherKnob.paused(this) // приёмник в DesktopKeys остаётся: без живого экземпляра он сам отказывается
         main.removeCallbacksAndMessages(null)
         super.onDestroy()
     }

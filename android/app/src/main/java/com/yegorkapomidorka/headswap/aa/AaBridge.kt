@@ -1293,7 +1293,7 @@ class AaBridgeCore(
                 log("BRIDGE шайба keycode=$code проигнорирована: AA не подключён", true)
                 return
             }
-            log("BRIDGE шайба keycode=$code -> AA rotary $delta", true)
+            log("BRIDGE шайба keycode=$code -> rotary $delta", true)
             p.sendRotary(delta)
             return
         }

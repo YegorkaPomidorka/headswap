@@ -84,6 +84,12 @@ object LauncherActions {
 
     fun openPlayers() { model.go(Area.Players) }
 
+    /** Кнопка MEDIA ГУ: плеер на весь экран; плеер не выбран или не установлен - выбор плеера. */
+    fun openMusic() {
+        val pkg = MusicController.state.pkg ?: model.musicPlayer
+        if (pkg == null || model.catalog.none { it.packageName == pkg }) openPlayers() else openMusicApp()
+    }
+
     /** Старт сессии с «Включать музыку автоматически»: играет активная сессия, иначе выбранный или свой плеер. Главный поток. */
     fun autoplay() {
         val display = DexState.displayId

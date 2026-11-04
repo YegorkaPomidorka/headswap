@@ -15,6 +15,8 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -64,7 +66,13 @@ fun LauncherRoot(connected: Boolean) {
             LauncherActions.autoplay()
         }
     }
-    BoxWithConstraints(Modifier.fillMaxSize()) {
+    // шайба ГУ двигает фокус Compose этого окна
+    val focusManager = LocalFocusManager.current
+    DisposableEffect(focusManager) {
+        LauncherKnob.attach(focusManager)
+        onDispose { LauncherKnob.detach(focusManager) }
+    }
+    BoxWithConstraints(Modifier.fillMaxSize().knobTouchReset()) {
         val w = constraints.maxWidth
         val h = constraints.maxHeight
         val spec = remember(w, h) { LauncherSpecs.forSize(w, h) }
@@ -178,6 +186,8 @@ private fun Rail() {
                 .clip(RoundedCornerShape(topEnd = m.dp(s.radius))).background(accent),
             description = stringResource(R.string.l_navigation), onTap = { LauncherActions.openNavigator() },
             onPress = spin::play,
+            // на золоте золотая рамка не видна
+            focusShape = RoundedCornerShape(topEnd = m.dp(s.radius)), ringColor = Color.White,
         ) { pressed ->
             if (pressed) Box(Modifier.matchParentSize().background(Color(0x33000000)))
             Box(Modifier.matchParentSize(), contentAlignment = Alignment.Center) {
