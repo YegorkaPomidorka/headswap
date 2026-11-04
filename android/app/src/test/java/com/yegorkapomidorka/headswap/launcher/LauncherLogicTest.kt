@@ -321,4 +321,11 @@ class LauncherLogicTest {
             assertEquals(0f, (next - 90f) % 45f)
         }
     }
+
+    @Test fun needsPlusOnlyYandex() {
+        assertTrue(NavigatorPick.needsPlus("ru.yandex.yandexnavi"))
+        assertTrue(NavigatorPick.needsPlus("ru.yandex.yandexmaps"))
+        assertFalse(NavigatorPick.needsPlus("ru.dublgis.dgismobile"))
+        assertFalse(NavigatorPick.needsPlus(null))
+    }
 }

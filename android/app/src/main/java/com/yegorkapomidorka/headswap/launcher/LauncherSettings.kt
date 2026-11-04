@@ -60,7 +60,7 @@ enum class SettingsPage { LOOK, NAVIGATOR, MUSIC, HOME, SYSTEM, ABOUT }
 private val NAV_TILES = listOf(
     NavigatorPick.YANDEX_NAVI to R.string.l_nav_yandex_navi,
     "ru.dublgis.dgismobile" to R.string.l_nav_2gis,
-    "ru.yandex.yandexmaps" to R.string.l_nav_yandex_maps,
+    NavigatorPick.YANDEX_MAPS to R.string.l_nav_yandex_maps,
     "com.google.android.apps.maps" to R.string.l_nav_google_maps,
 )
 
@@ -136,8 +136,8 @@ fun LauncherSettingsScreen() {
                             val navPkg = model.navigatorPkg
                             if (EmbedHost.nav.carHost && navPkg != null) {
                                 MapScaleCard(navPkg, d, cell(2, 2).fillMaxWidth())
-                                // машинная часть Яндекс Навигатора работает только с Плюсом (Егор 04.11) - предупреждаем при выборе
-                                if (navPkg == NavigatorPick.YANDEX_NAVI) {
+                                // машинная часть Яндекс Навигатора и Карт работает только с Плюсом (Егор 04.11) - предупреждаем при выборе
+                                if (NavigatorPick.needsPlus(navPkg)) {
                                     Row(cell(4).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(m.dp(d.gap))) {
                                         RestartNavCard(d, Modifier.weight(1f).fillMaxHeight())
                                         NoteCard(stringResource(R.string.l_nav_yandex_plus), d, Modifier.weight(1f).fillMaxHeight())
