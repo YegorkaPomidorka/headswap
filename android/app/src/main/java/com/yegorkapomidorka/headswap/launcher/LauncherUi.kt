@@ -325,6 +325,7 @@ fun Pressable(
     val press = rememberUpdatedState(onPress)
     val on = rememberUpdatedState(enabled)
     val knob = remember { LauncherKnob.Target().apply { this.tap = { if (on.value) { press.value?.invoke(); tap.value() } } } }
+    knob.description = description
     DisposableEffect(knob) { onDispose { LauncherKnob.focused(knob, false) } }
     val m = LocalMetrics.current
     Box(

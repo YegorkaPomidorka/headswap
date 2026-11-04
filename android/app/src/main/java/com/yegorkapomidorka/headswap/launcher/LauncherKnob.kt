@@ -28,13 +28,20 @@ import com.yegorkapomidorka.headswap.dex.DesktopKeys
  */
 object LauncherKnob : DesktopKeys.Sink {
     /** Кнопка, которая может получить фокус шайбы; [tap] - её действие по OK. */
-    class Target { var tap: () -> Unit = {} }
+    class Target { var tap: () -> Unit = {}; var description: String? = null }
 
     /** Рамка видна: после последнего касания крутили шайбу или жали её кнопки. */
     var visible by mutableStateOf(false)
 
-    /** Активность лаунчера на экране ГУ; без неё мост шлёт клавиши в окно как раньше. */
-    @Volatile var active = false
+    /**
+     * Экземпляр активности лаунчера на экране ГУ; без него мост шлёт клавиши в окно как раньше. Свой у каждого
+     * экземпляра: старая активность (досрочный finish, переподключение) не гасит приём у живой.
+     */
+    @Volatile private var owner: Any? = null
+    @Volatile private var lastDecline: String? = null
+
+    fun resumed(o: Any) { owner = o }
+    fun paused(o: Any) { if (owner === o) owner = null }
 
     private val main = Handler(Looper.getMainLooper())
     private var focus: FocusManager? = null // только главный поток
@@ -52,28 +59,56 @@ object LauncherKnob : DesktopKeys.Sink {
     override fun key(keycode: Int): Boolean = take(KnobLogic.forKey(keycode))
 
     private fun take(k: Knob?): Boolean {
+        if (k == null) return false
         // чужой лаунчер: его окно само разбирает стрелки, HOME идёт через showDesktop
-        if (k == null || !active || LauncherModel.foreign != null) return false
+        val decline = when {
+            owner == null -> "активность лаунчера не на экране"
+            LauncherModel.foreign != null -> "чужой лаунчер"
+            else -> null
+        }
+        if (decline != lastDecline) {
+            lastDecline = decline
+            AppLog.i("LAUNCHER шайба: ${decline?.let { "не беру ($it), клавиши идут в окно" } ?: "беру сам"}", false)
+        }
+        if (decline != null) return false
         main.post { run(k) }
         return true
     }
 
     private fun run(k: Knob) {
         when (k) {
-            Knob.OK -> if (visible && target != null) target?.tap?.invoke() else reveal()
-            Knob.HOME -> { visible = false; LauncherActions.home() }
-            Knob.NAVI -> { visible = false; LauncherActions.openNavigator() }
-            Knob.MUSIC -> { visible = false; LauncherActions.openMusic() }
-            else -> if (!visible || target == null) reveal() else focus?.moveFocus(direction(k))
+            Knob.OK -> {
+                val t = target
+                if (visible && t != null) {
+                    AppLog.i("LAUNCHER шайба OK: «${t.description ?: "без подписи"}», экран=${LauncherModel.area}", false)
+                    t.tap()
+                } else reveal()
+            }
+            Knob.HOME -> act(k) { LauncherActions.home() }
+            Knob.NAVI -> act(k) { LauncherActions.openNavigator() }
+            Knob.MUSIC -> act(k) { LauncherActions.openMusic() }
+            else -> if (!visible || target == null) reveal() else {
+                val fm = focus
+                if (fm == null || !fm.moveFocus(direction(k))) AppLog.i("LAUNCHER шайба $k: фокус не сдвинулся" +
+                    (if (fm == null) " (нет FocusManager)" else ""), false)
+            }
         }
+    }
+
+    private fun act(k: Knob, action: () -> Unit) {
+        visible = false
+        AppLog.i("LAUNCHER кнопка ГУ $k, экран=${LauncherModel.area}", false)
+        action()
     }
 
     /** Рамка появляется там, где фокус был до касания; фокуса нет (сменился экран) - на первой кнопке. */
     private fun reveal() {
-        val fm = focus ?: return
+        val fm = focus
+        if (fm == null) { AppLog.i("LAUNCHER шайба: нет FocusManager, рамку не показать", false); return }
         visible = true
-        if (target == null) fm.moveFocus(FocusDirection.Next)
-        AppLog.i("LAUNCHER шайба: рамка фокуса, экран=${LauncherModel.area}", false)
+        val moved = target != null || fm.moveFocus(FocusDirection.Next)
+        AppLog.i("LAUNCHER шайба: рамка фокуса на «${target?.description ?: if (moved) "?" else "нет кнопок"}», " +
+            "экран=${LauncherModel.area}", false)
     }
 
     private fun direction(k: Knob): FocusDirection = when (k) {

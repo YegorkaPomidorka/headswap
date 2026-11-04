@@ -108,7 +108,7 @@ class LauncherActivity : ComponentActivity() {
         ForeignActions.reload(this, currentDisplayId(), goHome = false) // «Домой» только по onNewIntent, иначе каждый возврат на экран сбрасывал бы лаунчер
         visible = true
         connected = ownsDisplay()
-        LauncherKnob.active = true
+        LauncherKnob.resumed(this)
         val wb = if (android.os.Build.VERSION.SDK_INT >= 30)
             runCatching { windowManager.currentWindowMetrics.bounds.flattenToString() }.getOrNull() else null
         AppLog.i("LAUNCHER активность на экране, дисплей=${currentDisplayId()} окно=$wb multiWindow=$isInMultiWindowMode", false)
@@ -125,14 +125,14 @@ class LauncherActivity : ComponentActivity() {
     override fun onPause() {
         AppLog.i("LAUNCHER активность ушла с экрана (onPause), дисплей=${currentDisplayId()}", false)
         visible = false
-        LauncherKnob.active = false
+        LauncherKnob.paused(this)
         main.removeCallbacks(awaitOwnership)
         super.onPause()
     }
 
     override fun onDestroy() {
         runCatching { unregisterReceiver(screenEvents) }
-        if (DesktopKeys.sink === LauncherKnob) DesktopKeys.sink = null
+        LauncherKnob.paused(this) // приёмник в DesktopKeys остаётся: без живого экземпляра он сам отказывается
         main.removeCallbacksAndMessages(null)
         super.onDestroy()
     }
