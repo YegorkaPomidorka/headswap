@@ -126,11 +126,13 @@ class LauncherLogicTest {
             quickSlots(emptyList(), 5))
         assertEquals(listOf(QuickSlot.App(apps[0]), QuickSlot.App(apps[1]), QuickSlot.Plus),
             quickSlots(apps.take(2), 2).take(3))
-        // больше пяти: плюс закреплён шестым, лишние в быстрый ряд не попадают
+        // n приложений: «+» последним
+        assertEquals(QuickSlot.Plus, quickSlots(apps.take(5), 5)[5])
+        // n+1 и больше: «+» пропадает, на его месте приложение, лишние в ряд не попадают
         val full = quickSlots(apps, 5)
         assertEquals(6, full.size)
-        assertEquals(QuickSlot.App(apps[4]), full[4])
-        assertEquals(QuickSlot.Plus, full[5])
+        assertEquals(QuickSlot.App(apps[5]), full[5])
+        assertFalse(QuickSlot.Plus in full)
     }
 
     @Test fun netLabels() {
@@ -327,5 +329,12 @@ class LauncherLogicTest {
         assertTrue(NavigatorPick.needsPlus("ru.yandex.yandexmaps"))
         assertFalse(NavigatorPick.needsPlus("ru.dublgis.dgismobile"))
         assertFalse(NavigatorPick.needsPlus(null))
+    }
+
+    @Test fun doubleBackWithinWindow() {
+        assertFalse(DoubleBack.isDouble(0L, 1000L))
+        assertTrue(DoubleBack.isDouble(1000L, 2000L))
+        assertTrue(DoubleBack.isDouble(1000L, 1000L + DoubleBack.WINDOW_MS))
+        assertFalse(DoubleBack.isDouble(1000L, 1001L + DoubleBack.WINDOW_MS))
     }
 }

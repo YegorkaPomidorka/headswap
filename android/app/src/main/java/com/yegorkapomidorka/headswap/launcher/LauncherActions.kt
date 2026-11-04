@@ -135,10 +135,22 @@ object LauncherActions {
      * Кнопка «Назад» рейки: Back в открытое окно (если приложение вышло из корня - на главный); с экрана лаунчера - на
      * предыдущий экран или главный (в «О приложении» сначала шаг внутри настроек); на главном ничего.
      */
+    private var lastAppBackAt = 0L
+
     fun embeddedBack() {
         AppLog.i("LAUNCHER Назад на рейке: экран=${model.area}", false)
         when (model.area) {
-            is Area.App -> EmbedHost.back(EmbedHost.app) { backClosed(EmbedHost.app) }
+            is Area.App -> {
+                val now = android.os.SystemClock.uptimeMillis()
+                if (DoubleBack.isDouble(lastAppBackAt, now)) {
+                    lastAppBackAt = 0L
+                    AppLog.i("LAUNCHER двойное Назад: на главный, приложение в фоне", false)
+                    backClosed(EmbedHost.app)
+                } else {
+                    lastAppBackAt = now
+                    EmbedHost.back(EmbedHost.app) { backClosed(EmbedHost.app) }
+                }
+            }
             Area.Navigator -> EmbedHost.back(EmbedHost.nav) { backClosed(EmbedHost.nav) }
             Area.Home -> Unit
             Area.Settings -> if (!model.settingsBack()) model.back()
