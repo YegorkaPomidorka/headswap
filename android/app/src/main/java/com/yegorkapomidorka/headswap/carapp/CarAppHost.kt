@@ -47,7 +47,6 @@ object CarAppHost {
     private var surface: Surface? = null
     private var sw = 0
     private var sh = 0
-    private var autoDpi = 160
     private var scale = 1f
     /**
      * Ночь для навигатора; null - UI_MODE_NIGHT_UNDEFINED: день/ночь решает сам навигатор по своим настройкам (Егор 04.11:
@@ -94,9 +93,9 @@ object CarAppHost {
         }
     }
 
-    /** Поверхность окна навигатора в px; null - окна нет. [dpi] - плотность окна рабочего стола («Авто»). */
-    fun setSurface(s: Surface?, w: Int, hgt: Int, dpi: Int) {
-        h.post { surface = s; sw = w; sh = hgt; autoDpi = dpi; push() }
+    /** Поверхность окна навигатора в px; null - окна нет. dpi от ступени масштаба, не от дисплея (CarConfigMath.BASE_DPI). */
+    fun setSurface(s: Surface?, w: Int, hgt: Int) {
+        h.post { surface = s; sw = w; sh = hgt; push() }
     }
 
     /**
@@ -144,7 +143,7 @@ object CarAppHost {
             c != null -> CarAreas.of(c, 0, 0, 0) // в карточке поверх карты ничего своего
             else -> areas?.let { (l, r, t) -> CarAreas.of(sw, sh, l, r, t) } ?: CarAreas.default(sw, sh)
         }
-        return CarAppSession.View(surface, sw, sh, CarConfigMath.dpi(autoDpi, scale), night, visible, stable)
+        return CarAppSession.View(surface, sw, sh, CarConfigMath.dpi(scale), night, visible, stable)
     }
 
     private fun setStatus(s: Status) {

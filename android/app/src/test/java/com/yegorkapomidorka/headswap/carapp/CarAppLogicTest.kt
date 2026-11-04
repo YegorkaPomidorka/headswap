@@ -43,12 +43,12 @@ class CarAppLogicTest {
     }
 
     @Test fun dpiIsAutoTimesScaleWithinLimits() {
-        assertEquals(240, CarConfigMath.dpi(240, 1f))
-        assertEquals(288, CarConfigMath.dpi(240, 1.2f))
-        assertEquals(160, CarConfigMath.dpi(0, 1f))
-        assertEquals(240, CarConfigMath.dpi(240, 0f))
-        assertEquals(CarConfigMath.MAX_DPI, CarConfigMath.dpi(600, 2f))
-        assertEquals(CarConfigMath.MIN_DPI, CarConfigMath.dpi(100, 0.5f))
+        assertEquals(160, CarConfigMath.dpi(1f))
+        assertEquals(80, CarConfigMath.dpi(0.5f))
+        assertEquals(107, CarConfigMath.dpi(2f / 3f))
+        assertEquals(160, CarConfigMath.dpi(0f))
+        assertEquals(CarConfigMath.MAX_DPI, CarConfigMath.dpi(5f))
+        assertEquals(CarConfigMath.MIN_DPI, CarConfigMath.dpi(0.1f))
         assertEquals(757, CarConfigMath.dp(1136, 240))
         assertEquals(0, CarConfigMath.dp(1136, 0))
     }

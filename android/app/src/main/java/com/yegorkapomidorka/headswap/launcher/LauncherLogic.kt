@@ -99,8 +99,12 @@ object CatalogLists {
 /** Выбор навигатора по умолчанию и проверка сохранённого. */
 object NavigatorPick {
     const val YANDEX_NAVI = "ru.yandex.yandexnavi"
-    val KNOWN = listOf(YANDEX_NAVI, "ru.yandex.yandexmaps", "ru.dublgis.dgismobile",
+    const val YANDEX_MAPS = "ru.yandex.yandexmaps"
+    val KNOWN = listOf(YANDEX_NAVI, YANDEX_MAPS, "ru.dublgis.dgismobile",
         "com.google.android.apps.maps", "com.waze", "app.organicmaps")
+
+    /** Машинная часть только с подпиской Яндекс Плюс (у Карт тот же NavigationCarAppService, что у Навигатора). */
+    fun needsPlus(pkg: String?): Boolean = pkg == YANDEX_NAVI || pkg == YANDEX_MAPS
 
     fun defaultFor(installed: Set<String>): String? = KNOWN.firstOrNull { it in installed }
 

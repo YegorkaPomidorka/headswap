@@ -24,9 +24,9 @@ class DexPrefs(context: Context) {
             DesktopModePolicy.requireMode(value)
             prefs.edit().putInt("desktop_mode", value).apply()
         }
-    /** Zero selects proportional DPI. */
+    /** Zero selects proportional DPI (DesktopGeometryPolicy.density: клавиатура не делится пополам). */
     var desktopDensity: Int
-        get() = prefs.getInt("desktop_density", 160).let {
+        get() = prefs.getInt("desktop_density", 0).let {
             if (it == 0) 0 else it.coerceIn(DesktopGeometryPolicy.MIN_DENSITY, DesktopGeometryPolicy.MAX_DENSITY)
         }
         set(value) { if (value != 0) DesktopGeometryPolicy.requireDensity(value); prefs.edit().putInt("desktop_density", value).apply() }

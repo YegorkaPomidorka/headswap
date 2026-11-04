@@ -10,7 +10,7 @@ class DesktopVideoSelectionTest {
         val mode = first.resolve(1024, 768)
         assertEquals(1024 to 768, mode.outW to mode.outH)
         assertSame(mode, first.resolve(1600, 900)) // repeated INIT / software reconnect
-        assertEquals(137, first.densityFor(mode))
+        assertEquals(213, first.densityFor(mode))
         val next = DesktopVideoSelection(DesktopResolution.AUTO, 0).resolve(1280, 720)
         assertEquals(1280 to 720, next.outW to next.outH)
     }
@@ -73,9 +73,13 @@ class DesktopVideoSelectionTest {
         }
     }
     @Test fun proportionalDpiAndBoundedParentPolicyDoNotAdoptLargeChildBuffers() {
-        assertEquals(128, DesktopGeometryPolicy.density(720))
-        assertEquals(137, DesktopGeometryPolicy.density(768))
-        assertEquals(160, DesktopGeometryPolicy.density(900))
+        // короткая сторона < 600 dp, иначе Gboard делит клавиатуру пополам
+        assertEquals(160, DesktopGeometryPolicy.density(480))
+        assertEquals(200, DesktopGeometryPolicy.density(720))
+        assertEquals(213, DesktopGeometryPolicy.density(768))
+        assertEquals(250, DesktopGeometryPolicy.density(900))
+        assertEquals(300, DesktopGeometryPolicy.density(1080))
+        for (h in 480..1080 step 2) assertTrue(h * 160 / DesktopGeometryPolicy.density(h) < 600)
         assertTrue(DesktopGeometryPolicy.accepts(640, 480))
         assertTrue(DesktopGeometryPolicy.accepts(1600, 900))
         assertTrue(DesktopGeometryPolicy.accepts(1920, 1080))
