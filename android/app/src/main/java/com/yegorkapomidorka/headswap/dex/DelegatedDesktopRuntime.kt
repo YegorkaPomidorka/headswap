@@ -107,8 +107,30 @@ internal class DelegatedDesktopRuntime(private val context: Context, private val
         check(context.getSystemService(ActivityManager::class.java).isActivityStartAllowedOnDisplay(context, id, intent)) {
             "Android не разрешил запуск приложения на собственном экране"
         }
-        context.startActivity(intent, ActivityOptions.makeBasic().setLaunchDisplayId(id).toBundle())
+        context.startActivity(intent, fullscreenOptions(id).toBundle())
     }
+
+    /**
+     * h658: с включёнными «окнами произвольной формы» / режимом рабочего стола (Sony, Android 14) система кладёт
+     * лаунчер на наш дисплей портретным окном размером с телефон. Явно просим полноэкранный режим (hidden API,
+     * WINDOWING_MODE_FULLSCREEN = 1) и, на случай отказа, границы на весь дисплей.
+     */
+    private fun fullscreenOptions(id: Int): ActivityOptions {
+        val opts = ActivityOptions.makeBasic().setLaunchDisplayId(id)
+        val mode = runCatching {
+            ActivityOptions::class.java.getMethod("setLaunchWindowingMode", Int::class.javaPrimitiveType).invoke(opts, 1)
+        }
+        displays.getDisplay(id)?.let { d ->
+            val size = android.graphics.Point().also { @Suppress("DEPRECATION") d.getRealSize(it) }
+            if (size.x > 0 && size.y > 0) opts.setLaunchBounds(android.graphics.Rect(0, 0, size.x, size.y))
+        }
+        if (!fullscreenLogged) {
+            fullscreenLogged = true
+            android.util.Log.i("HeadSwap", "DESKTOP launch fullscreen windowingMode=${if (mode.isSuccess) "ok" else mode.exceptionOrNull()?.javaClass?.simpleName}")
+        }
+        return opts
+    }
+    @Volatile private var fullscreenLogged = false
 
     override fun childTaskState(id: Int, packageName: String): Int {
         check(id > 0) { "Проверка основного экрана запрещена" }
