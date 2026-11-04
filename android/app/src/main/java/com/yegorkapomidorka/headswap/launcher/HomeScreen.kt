@@ -82,7 +82,10 @@ fun HomeScreen() {
     }
 }
 
-/** Слоты быстрого ряда: первые n приложений списка и «+» сразу за ними. */
+/**
+ * Слоты быстрого ряда, всего n+1: приложения и «+» сразу за ними. Когда приложений n+1 и больше, «+» уступает место
+ * последнему из них (Егор 04.11: пятое приложение добавлялось, но пряталось за закреплённым «+»).
+ */
 sealed interface QuickSlot {
     data class App(val ref: AppRef) : QuickSlot
     data object Plus : QuickSlot
@@ -90,7 +93,7 @@ sealed interface QuickSlot {
 }
 
 fun quickSlots(apps: List<AppRef>, n: Int): List<QuickSlot> {
-    val shown = AppList.quick(apps, n)
+    val shown = AppList.quick(apps, n + 1)
     return List(n + 1) { i ->
         when {
             i < shown.size -> QuickSlot.App(shown[i])
