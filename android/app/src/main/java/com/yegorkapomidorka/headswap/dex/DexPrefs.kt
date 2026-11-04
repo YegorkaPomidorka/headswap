@@ -8,9 +8,12 @@ import com.yegorkapomidorka.headswap.aa.FpsSetting
 /** Desktop preferences are separate from the AA / bridge settings. */
 class DexPrefs(context: Context) {
     private val prefs = context.getSharedPreferences("headswap_dex", Context.MODE_PRIVATE)
-    /** First activation offers USB playback. Changing the selection takes effect on the next activation. */
+    /**
+     * Звук рабочего стола по USB неактивен (ADR 0020): всё идёт по Bluetooth. Сохранённое значение не трогаем,
+     * захват и передача остаются в коде на случай возврата.
+     */
     var usbPlaybackAudio: Boolean
-        get() = prefs.getBoolean("desktop_usb_playback_audio", true)
+        get() = false
         set(value) { prefs.edit().putBoolean("desktop_usb_playback_audio", value).apply() }
     /** Only Android Desktop is available here; any other stored value falls back to it. */
     var desktopMode: Int

@@ -68,6 +68,10 @@ class LauncherPrefs(context: Context) {
         get() = prefs.getString("navigator", null)
         set(value) { prefs.edit().putString("navigator", value).apply() }
 
+    /** «Масштаб карты» навигатора [pkg]: ступень [com.yegorkapomidorka.headswap.carapp.CarConfigMath.STEPS]. */
+    fun mapScale(pkg: String): Int = prefs.getInt("map_scale:$pkg", com.yegorkapomidorka.headswap.carapp.CarConfigMath.AUTO_STEP)
+    fun setMapScale(pkg: String, step: Int) { prefs.edit().putInt("map_scale:$pkg", step).apply() }
+
     /** Пакет текущего музыкального плеера. */
     var musicPlayer: String?
         get() = prefs.getString("music_player", null)

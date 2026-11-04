@@ -298,6 +298,30 @@ class MainActivity : Activity() {
                 "a11y_notice" -> UpgradeNotice.show(this)      // окно «Отказ от спецвозможностей» принудительно, флаг не трогает
                 "v30_notice" -> Upgrade30Notice.show(this)     // окно «Прямой проброс видео» (3.0) принудительно, флаг не трогает
                 "v40_notice" -> Upgrade40Notice.show(this)     // окно «Свой лаунчер на магнитоле» (4.0) принудительно, флаг не трогает
+                "shadow_nav" -> com.yegorkapomidorka.headswap.aa.AaShadowNav.start(this)   // ПРОБНИК: AA-сессия без видео ради навигации
+                "shadow_nav_video" -> com.yegorkapomidorka.headswap.aa.AaShadowNav.start(this, withVideo = true)
+                "shadow_nav_off" -> com.yegorkapomidorka.headswap.aa.AaShadowNav.stop()
+                "shadow_proj" -> {                             // ПРОБНИК: экран AA в окне навигатора
+                    com.yegorkapomidorka.headswap.aa.AaShadowNav.projection = true
+                    com.yegorkapomidorka.headswap.aa.AaShadowNav.start(this, withVideo = true)
+                    com.yegorkapomidorka.headswap.launcher.EmbedHost.reproject()
+                }
+                "shadow_proj_off" -> {
+                    com.yegorkapomidorka.headswap.aa.AaShadowNav.projection = false
+                    com.yegorkapomidorka.headswap.launcher.EmbedHost.reproject()
+                }
+                "car_host", "car_host_off" -> {                // свой хост Car App для навигатора: вкл (по умолчанию) / окном
+                    com.yegorkapomidorka.headswap.carapp.CarAppHost.enabled = cmd == "car_host"
+                    com.yegorkapomidorka.headswap.launcher.EmbedHost.reproject()
+                }
+                "car_click" -> com.yegorkapomidorka.headswap.carapp.CarAppHost.click(intent.getIntExtra("i", -1))
+                "car_back" -> com.yegorkapomidorka.headswap.carapp.CarAppHost.back()
+                "car_scale" -> com.yegorkapomidorka.headswap.carapp.CarAppHost.setScale(intent.getFloatExtra("v", 1f)) // dpi навигатора × v
+                "car_night" -> com.yegorkapomidorka.headswap.carapp.CarAppHost.setNight(   // --es v yes|no|app
+                    when (intent.getStringExtra("v")) { "yes" -> true; "no" -> false; else -> null })
+                "car_dump" -> com.yegorkapomidorka.headswap.carapp.CarAppHost.dumpTemplates = intent.getBooleanExtra("on", true)
+                "shadow_dump" -> com.yegorkapomidorka.headswap.aa.AaShadowNav.dump()
+                "shadow_tap" -> com.yegorkapomidorka.headswap.aa.AaShadowNav.tap(intent.getIntExtra("x", 0), intent.getIntExtra("y", 0))
                 "theme" -> {                                   // --es mode system|light|medium|dark
                     AppTheme.set(this, intent.getStringExtra("mode") ?: AppTheme.SYSTEM)
                     recreate()

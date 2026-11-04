@@ -131,7 +131,14 @@ fun LauncherSettingsScreen() {
                                 model.chooseAnimations(it)
                             }
                         }
-                        SettingsPage.NAVIGATOR -> NavigatorTiles(d, rowH, cell(0, 2).fillMaxWidth())
+                        SettingsPage.NAVIGATOR -> {
+                            NavigatorTiles(d, rowH, cell(0, 2).fillMaxWidth())
+                            val navPkg = model.navigatorPkg
+                            if (EmbedHost.nav.carHost && navPkg != null) {
+                                MapScaleCard(navPkg, d, cell(2, 2).fillMaxWidth())
+                                RestartNavCard(d, cell(4).fillMaxWidth())
+                            }
+                        }
                         SettingsPage.MUSIC -> {
                             val players by produceState(emptyList<String>()) {
                                 value = withContext(Dispatchers.IO) { PlayerChip.localPlayers(MusicController.players(model.context)) }
@@ -239,6 +246,39 @@ private fun ThemeCard(d: SettingsDims, modifier: Modifier) {
                     OptionBox(model.theme == choice, Modifier.height(m.dp(d.ctl)), RoundedCornerShape(m.dp(d.ctl / 2)), label,
                         unselected = LocalPalette.current.btnSet, onTap = { model.chooseTheme(choice) }) {
                         Box(Modifier.fillMaxHeight().padding(horizontal = m.dp(d.pillPad)), contentAlignment = Alignment.Center) {
+                            Txt(label, s.f2, weight = FontWeight.SemiBold, ellipsis = false)
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+/** «Масштаб карты» навигатора на своём хосте: dpi для приложения = «Авто» × ступень, у каждого навигатора своя. */
+@Composable
+private fun MapScaleCard(pkg: String, d: SettingsDims, modifier: Modifier) {
+    val m = LocalMetrics.current
+    val s = m.spec
+    val model = LauncherModel
+    val cur = model.mapScale(pkg)
+    Card(modifier) {
+        Column(
+            Modifier.fillMaxSize().padding(start = m.dp(d.padStart), end = m.dp(d.padEnd), top = m.dp(d.padV), bottom = m.dp(d.padV)),
+            verticalArrangement = Arrangement.spacedBy(m.dp(s.g8), Alignment.CenterVertically),
+        ) {
+            Column(verticalArrangement = Arrangement.spacedBy(m.dp(4))) {
+                Txt(stringResource(R.string.l_s_map_scale), s.f2)
+                Txt(stringResource(R.string.l_s_map_scale_sub, model.packageLabel(pkg)), d.sub, color = Pal.SEC, ellipsis = false)
+            }
+            // четыре ступени - поровну на ширину карточки (на 1280×720 по размеру текста не влезают)
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(m.dp(s.g8))) {
+                for ((i, res) in listOf(R.string.l_s_scale_smaller, R.string.l_s_theme_auto, R.string.l_s_scale_larger,
+                    R.string.l_s_scale_largest).withIndex()) {
+                    val label = stringResource(res)
+                    OptionBox(cur == i, Modifier.weight(1f).height(m.dp(d.ctl)), RoundedCornerShape(m.dp(d.ctl / 2)), label,
+                        unselected = LocalPalette.current.btnSet, onTap = { model.chooseMapScale(pkg, i) }) {
+                        Box(Modifier.fillMaxSize().padding(horizontal = m.dp(8)), contentAlignment = Alignment.Center) {
                             Txt(label, s.f2, weight = FontWeight.SemiBold, ellipsis = false)
                         }
                     }
@@ -478,6 +518,20 @@ private fun systemInfo(): List<Pair<String, String>> {
 }
 
 /** Последняя строка «Системы»: версия Headswap, тап открывает «О приложении». */
+@Composable
+private fun RestartNavCard(d: SettingsDims, modifier: Modifier) {
+    val m = LocalMetrics.current
+    val s = m.spec
+    val label = stringResource(R.string.l_nav_restart)
+    Pressable(modifier.clip(RoundedCornerShape(m.dp(s.radius))).background(Pal.SURFACE), description = label,
+        onTap = { EmbedHost.restartCar() }) { pressed ->
+        if (pressed) Box(Modifier.matchParentSize().background(Pal.SURFACE_PRESSED))
+        Row(Modifier.fillMaxSize().padding(start = m.dp(d.padStart), end = m.dp(d.padEnd)), verticalAlignment = Alignment.CenterVertically) {
+            Txt(label, s.f2, ellipsis = false)
+        }
+    }
+}
+
 @Composable
 private fun AboutLinkCard(d: SettingsDims, modifier: Modifier) {
     val m = LocalMetrics.current

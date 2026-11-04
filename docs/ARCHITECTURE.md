@@ -43,6 +43,7 @@
 | `$P/aa/` | Сторона AA и мозг моста. `AapSession` (TCP+TLS к 5277), `AapMessages` (SDR, каналы), `AaBridge.kt` (`AaBridgeCore` — всё связывание и флаги ГУ; `AaConnector` — переподключение), `BridgeHost` (держит AA между сессиями CarLife). Видео: `AaTranscoder`, `GlRelay`, `FeedQueue`, `IdrSplice`/`IdrIntra`/`RefDecoder`, `SpsCrop`, `VideoMode`, `CarPreset`, `BitratePolicy`, `IdrBitrateCeiling`, `ThermalThrottle`. Звук: `AaAudio`, `MusicResampler`, `Equalizer`, `TtsPreroll`. Микрофон: `AaMic`, `PhoneMicCapture`. Мета: `AaMeta` (`MetaRelay`). Тач: `TouchPacer`, `TouchDecimator`. Настройки: `AaSettings` (`AaPrefs`). Диагностика: `AaServerCheck`, `AaProbe`. |
 | `$P/link/` | Транспорт к ГУ. `CarTransport` + `TransportCaps`, `StreamTransport` (USB и debug-TCP, один поток), `MultiSocketTransport` (воздух, 6 сокетов). `link/bt` — RFCOMM `carlife`, вход в Wi-Fi Direct (`CarlifeBtProbe`, `P2pJoin`). `link/car` — выбранная машина, автостарт по ACL, «Wi-Fi машины» (`CarProfile`, `CarAclReceiver`, `CarNetwork`, `CarLogic`). `link/wifi` — маяк `HotspotBeacon` (UDP 7999), `HotspotDetect`. `link/diag/WLog` — лог воздуха. |
 | `$P/ui/` | Экраны (`HomeScreen`, `OnboardingScreen`, `SettingsScreen`, `DevScreen`, `DiagScreen`, `CarChooser`), чистая логика (`HeadswapState`/`HomeLogic`, `Readiness`), `LogShare` (zip логов). |
+| `$P/carapp/` | Свой хост Car App Library для навигатора рабочего стола (ADR 0021). `CarAppCatalog` (поиск по CarAppService + NAVIGATION), `CarAppSession` (одна сессия: bind → handshake → create/start/resume, поверхность, области, Trip → `aa/DesktopNavHints`), `CarAppHost` (фасад для лаунчера), `CarUiMapper` + `CarUi` (шаблоны → модель для Compose), `CarAppLogic` (чистая: области, dpi, вердикты). Шаблоны рисует `launcher/NavHostUi.kt`. |
 | `$P/diag/` | `LogDiag` — Kotlin-порт `tools/logdiag.py`, те же правила. |
 | `$P/update/` | `UpdateLogic` (GitHub releases/latest, чистая), `Updater` (скачать, SHA-256, PackageInstaller). ADR 0012. |
 | `src/debug`, `src/release` | `DebugTransport.kt`: в debug — TCP к эмулятору ГУ, в release — заглушка. |
@@ -162,6 +163,8 @@ CONTROL0, SENSOR1, VIDEO2, INPUT3, SPEECH4, SYSTEM5, MEDIA6, MIC7, BT8, MEDIA_PL
 - **Флаги `hu*` сбрасываются в `attach()`.**
 - **Состояние `BridgeService` трогает только главная нить**, колбэки с других нитей — через `main.post`.
 - Кроп-режимы в пробросе работают только через SPS-кроп (`spsCropable`), иначе откат на R720.
+- **Свой хост Car App: visible ≠ stable** (иначе 2ГИС прячет лимит, камеры, мини-карту), одна полноэкранная поверхность
+  с вырезкой, сначала onSurfaceDestroyed, потом отвязка. ADR 0021.
 - Пароли, SSID, ключи в лог не пишутся.
 - Рубильники экспериментов в companion `AaBridgeCore`: `PAUSE_KEEPALIVE_ENABLED`, `NAVI_STATUS_ENABLED`,
   `MODULE_MUSIC_ENABLED`, `ROUTE_NAVI_STATUS_ENABLED`, `AIR_WARM_RESUME_ENABLED`.
@@ -179,6 +182,7 @@ CONTROL0, SENSOR1, VIDEO2, INPUT3, SPEECH4, SYSTEM5, MEDIA6, MIC7, BT8, MEDIA_PL
 | Обрывы по воздуху | `MultiSocketTransport`, `P2pJoin`, `CarNetwork`, строки `WL`; VPN рвёт сокеты |
 | Звук молчит / приглушён | `AaAudio`, AUDIO_TRANSMISSION_MODE, TTS_STOP; источник на ГУ |
 | Нет подсказок на приборке | подписка ГУ, `MetaRelay.sendNaviTurn`, `HondaClusterRoad` |
+| 2ГИС на рабочем столе: нет лимита/камер, заставка висит, «Перезапустите 2ГИС» | `carapp/CarAppSession` (области, порядок stop), кнопка «Перезапустить навигатор»; ADR 0021 |
 | Тач мимо / рывками | `VideoGeometry.mapTouch`, `TouchDecimator`, `TouchPacer` |
 
 Конкретные машины и прошлые разборы — база кейсов ГУ в памяти Claude (`memory/hu/INDEX.md`, вне репо: там данные

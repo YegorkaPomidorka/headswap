@@ -25,7 +25,10 @@ internal class DesktopAudioLoopback private constructor(
     companion object {
         private const val RULE_MATCH_ATTRIBUTE_USAGE = 1 // AudioMixingRule.RULE_MATCH_ATTRIBUTE_USAGE
         private const val ROUTE_FLAG_LOOP_BACK = 2       // AudioMix.ROUTE_FLAG_LOOP_BACK, без RENDER: на телефоне тишина
-        private val USAGES = intArrayOf(AudioAttributes.USAGE_MEDIA, AudioAttributes.USAGE_GAME, AudioAttributes.USAGE_UNKNOWN)
+        // Голос навигатора (Яндекс: NAVIGATION_GUIDANCE) без этого уходит в BT A2DP, и ГУ его не играет.
+        // Пока он смешан с музыкой в медиа-канал; SONIFICATION (щелчки, звуки системы) не берём.
+        private val USAGES = intArrayOf(AudioAttributes.USAGE_MEDIA, AudioAttributes.USAGE_GAME, AudioAttributes.USAGE_UNKNOWN,
+            AudioAttributes.USAGE_ASSISTANCE_NAVIGATION_GUIDANCE)
 
         /** Канальная маска выходная: createAudioRecordSink сам переводит её во входную. */
         fun open(context: Context, sampleRate: Int): DesktopAudioLoopback = unwrap {

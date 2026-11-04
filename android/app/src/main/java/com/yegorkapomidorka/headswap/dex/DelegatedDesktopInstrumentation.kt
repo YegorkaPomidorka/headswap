@@ -80,6 +80,7 @@ class DelegatedDesktopInstrumentation : Instrumentation() {
             if (requestAudio) permissions.add(DesktopAudioPolicy.PERMISSION)
             // Optional (not part of hasPermissions): shells that lack it simply do not pass it on.
             permissions.add(DelegatedDesktopAccess.ADD_ALWAYS_UNLOCKED_DISPLAY)
+            permissions.add(DisplayIme.PERMISSION) // клавиатура на экране ГУ, без него - на телефоне
             if (requestAudio) permissions.add(DesktopAudioPolicy.ROUTING_PERMISSION)
             automation.adoptShellPermissionIdentity(*permissions.toTypedArray())
             adoptedHere = true
@@ -88,7 +89,7 @@ class DelegatedDesktopInstrumentation : Instrumentation() {
             lease = DelegatedDesktopAccess.begin { stop.countDown() }
             ready = true
             runCatching { PhoneActivationService.onAccessReady(context) }
-            Log.i(DelegatedDesktopAccess.LOG_TAG, "READY protocol=1 uid=${Process.myUid()} pid=${Process.myPid()} permissions=${permissions.joinToString(",")} playbackAudio=$requestAudio alwaysUnlocked=${DelegatedDesktopAccess.canKeepUnlocked(context)}")
+            Log.i(DelegatedDesktopAccess.LOG_TAG, "READY protocol=1 uid=${Process.myUid()} pid=${Process.myPid()} permissions=${permissions.joinToString(",")} playbackAudio=$requestAudio alwaysUnlocked=${DelegatedDesktopAccess.canKeepUnlocked(context)} localIme=${DisplayIme.available(context)}")
             runCatching { sendStatus(0, Bundle().apply {
                 putString("headswap_access", "ready")
                 putString("headswap_pid", Process.myPid().toString())
@@ -99,6 +100,7 @@ class DelegatedDesktopInstrumentation : Instrumentation() {
             // USB detach and producer/service shutdown must never count this latch down.
             while (!stop.await(5, TimeUnit.SECONDS)) {
                 check(DelegatedDesktopAccess.hasPermissions(context)) { "Desktop permissions were revoked" }
+                runCatching { DelegatedInputGateway.refreshImeRoutes() }
             }
         } catch (error: Throwable) {
             if (error is InterruptedException) Thread.currentThread().interrupt()

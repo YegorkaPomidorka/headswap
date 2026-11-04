@@ -163,6 +163,14 @@ class ToggleRow(
     fun setChecked(v: Boolean) {
         if (sw.isChecked != v) sw.isChecked = v
     }
+
+    /** Неактивная строка затемнена и не нажимается; значение переключателя не трогается. */
+    fun setEnabled(on: Boolean) {
+        view.isEnabled = on
+        view.isClickable = on
+        sw.isEnabled = on
+        view.alpha = if (on) 1f else 0.45f
+    }
 }
 
 /** Строка с радио-кнопкой: выбранная подсвечена pric. */

@@ -29,6 +29,7 @@ internal object LauncherDebug {
             when (intent.getStringExtra("area")) {
                 "home" -> LauncherActions.home()
                 "settings" -> model.go(Area.Settings)
+                "nav" -> LauncherActions.openNavigator()
             }
             AppLog.i("LAUNCHER debug: экран=${model.area} раздел=${model.settingsPage} тема=${model.theme} карта слева=${model.mapLeft}", false)
         }

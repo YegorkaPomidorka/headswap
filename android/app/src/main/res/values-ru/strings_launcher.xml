@@ -21,6 +21,7 @@
     <string name="l_nav_not_installed">Навигатор не установлен</string>
     <string name="l_nav_starting">Запускаем навигатор…</string>
     <string name="l_nav_failed">Окно не открылось. Нажмите, чтобы повторить.</string>
+    <string name="l_nav_restart">Перезапустить навигатор</string>
     <string name="l_view_navigator">Навигатор</string>
     <string name="l_view_clock">Часы</string>
 
@@ -98,6 +99,11 @@
     <string name="l_s_theme_auto">Авто</string>
     <string name="l_s_theme_sub">Авто — по режиму фар машины</string>
     <string name="l_s_anim">Анимации кнопок</string>
+    <string name="l_s_map_scale">Масштаб карты</string>
+    <string name="l_s_map_scale_sub">Только для %1$s · меняется сразу</string>
+    <string name="l_s_scale_smaller">Мельче</string>
+    <string name="l_s_scale_larger">Крупнее</string>
+    <string name="l_s_scale_largest">Ещё крупнее</string>
     <string name="l_s_slot1">Первый слот</string>
     <string name="l_s_slot2">Второй слот</string>
     <string name="l_s_last">Последний</string>
@@ -117,4 +123,16 @@
     <string name="l_nav_2gis">2ГИС</string>
     <string name="l_nav_yandex_maps">Яндекс Карты</string>
     <string name="l_nav_google_maps">Google Карты</string>
+    <!-- навигатор на своём хосте Car App -->
+    <string name="l_u_m">м</string>
+    <string name="l_u_km">км</string>
+    <string name="l_u_ft">фт</string>
+    <string name="l_u_mi">ми</string>
+    <string name="l_u_yd">ярд</string>
+    <string name="l_u_min">мин</string>
+    <string name="l_u_h">ч</string>
+    <string name="l_nh_arrival">прибытие</string>
+    <string name="l_nh_end">Завершить маршрут</string>
+    <string name="l_nh_search">Поиск</string>
+    <string name="l_nh_loading">Загрузка…</string>
 </resources>

@@ -79,6 +79,7 @@ class LauncherActivity : ComponentActivity() {
         val dpi = resources.displayMetrics.densityDpi.coerceIn(96, 1280)
         LauncherModel.densityDpi = dpi
         EmbedHost.densityDpi = dpi
+        EmbedHost.appContext = applicationContext
         window.setDecorFitsSystemWindows(false)
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             // Back inside the launcher must not close it and leave the video surface empty.

@@ -36,7 +36,7 @@ class DesktopPrefsTest {
         assertEquals(160, prefs.desktopDensity)
         assertEquals(FpsSetting.FPS30, prefs.desktopFps)
         assertNotEquals(FpsSetting.DEFAULT, prefs.desktopFps) // Independent from the AA default.
-        assertTrue(prefs.usbPlaybackAudio)
+        assertFalse(prefs.usbPlaybackAudio) // ADR 0020: в режиме рабочего стола звук по Bluetooth
         assertEquals(DesktopModePolicy.ANDROID_DESKTOP, prefs.desktopMode)
     }
     @Test fun desktopChoicesSurviveNewPreferenceInstances() {
@@ -78,9 +78,9 @@ class DesktopPrefsTest {
         DexPrefs(context).desktopComponent = null
         assertNull(DexPrefs(context).desktopComponent)
     }
-    @Test fun usbAudioOptOutIsKept() {
+    @Test fun usbAudioStaysInactiveEvenIfStoredOn() {
         val context = MemoryPrefs()
-        DexPrefs(context).usbPlaybackAudio = false
+        DexPrefs(context).usbPlaybackAudio = true
         assertFalse(DexPrefs(context).usbPlaybackAudio)
     }
     @Test fun unsupportedStoredModeFallsBackToAndroidDesktop() {

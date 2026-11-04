@@ -738,6 +738,7 @@ class SettingsSectionScreen(host: MainActivity, val section: SettingsSection) : 
         val seg = modeSeg ?: return
         val desktop = aa.bridgeMode == BridgeMode.DESKTOP
         seg.setSelected(if (desktop) 1 else 0)
+        refreshUsbAudio()
         val box = actHost ?: return
         if (!desktop) {
             box.visibility = View.GONE
@@ -1217,10 +1218,12 @@ class SettingsSectionScreen(host: MainActivity, val section: SettingsSection) : 
     private fun buildSound() {
         val c = ctx
         body.addView(c.sectionTitle(c.getString(R.string.set_sound)))
-        body.addView(ToggleRow(c, c.getString(R.string.set_usb_audio_title), c.getString(R.string.set_usb_audio_sub), aa.usbAudio) {
+        usbAudioRow = ToggleRow(c, c.getString(R.string.set_usb_audio_title), c.getString(R.string.set_usb_audio_sub), aa.usbAudio) {
             aa.usbAudio = it
             refreshEqEntry()
-        }.view)
+        }
+        body.addView(usbAudioRow!!.view)
+        refreshUsbAudio()
         body.addView(eqEntry(), lp(MATCH, WRAP).margins(c, 0, 6, 0, 0))
 
         body.addView(c.sectionTitle(c.getString(R.string.set_music_rate)))
@@ -1243,6 +1246,17 @@ class SettingsSectionScreen(host: MainActivity, val section: SettingsSection) : 
 
         callsRow = ToggleRow(c, c.getString(R.string.set_calls_title), c.getString(R.string.set_calls_sub), aa.callsToHu) { onCallsToggle(it) }
         body.addView(callsRow!!.view, lp(MATCH, WRAP).margins(c, 0, 12, 0, 0))
+    }
+
+    private var usbAudioRow: ToggleRow? = null
+
+    /** ADR 0020: в режиме рабочего стола звук только по Bluetooth - строка неактивна, выбор для Android Auto сохраняется. */
+    private fun refreshUsbAudio() {
+        val row = usbAudioRow ?: return
+        val desktop = BridgeMode.effective(aa.bridgeMode, Build.VERSION.SDK_INT) == BridgeMode.DESKTOP
+        row.setEnabled(!desktop)
+        row.setChecked(aa.usbAudio && !desktop)
+        row.subView?.text = ctx.getString(if (desktop) R.string.set_usb_audio_desktop else R.string.set_usb_audio_sub)
     }
 
     /** Включение просит READ_PHONE_STATE (API 31+); результат - в onPermissionResult. */
