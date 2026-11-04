@@ -22,6 +22,7 @@
     <string name="l_nav_starting">Запускаем навигатор…</string>
     <string name="l_nav_failed">Окно не открылось. Нажмите, чтобы повторить.</string>
     <string name="l_nav_restart">Перезапустить навигатор</string>
+    <string name="l_nav_yandex_plus">Работает только с активной подпиской Плюс!</string>
     <string name="l_view_navigator">Навигатор</string>
     <string name="l_view_clock">Часы</string>
 

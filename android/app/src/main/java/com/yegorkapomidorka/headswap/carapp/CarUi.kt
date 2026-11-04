@@ -88,7 +88,9 @@ sealed interface CarUi {
     ) : CarUi
 
     /** Сетка на всё окно без карты. */
-    class Grid(val title: String, val back: CarAction?, val items: List<CarGridItem>, val loading: Boolean) : CarUi
+    /** [actions] - кнопки шапки справа (Яндекс: значок поиска с полем ввода, «История»). */
+    class Grid(val title: String, val back: CarAction?, val items: List<CarGridItem>, val loading: Boolean,
+        val actions: List<CarAction> = emptyList()) : CarUi
 
     /** Поиск на всё окно: строка ввода, история/подсказки строками, клавиатура ГУ. */
     class Search(

@@ -261,6 +261,28 @@ private fun CircleAction(a: CarAction, look: NavLook, d: NavDims) {
     }
 }
 
+/**
+ * Кнопка шапки экрана на всё окно: со значком - круглая, только с подписью - «таблетка» (в круг «История» не влезает).
+ * Фон как у плиток: look.btn на fullBg не видно (стенд 04.11).
+ */
+@Composable
+private fun HeaderAction(a: CarAction, look: NavLook, d: NavDims) {
+    val m = LocalMetrics.current
+    if (a.icon != null || a.title.isEmpty()) {
+        RoundButton(d.btn, a.title, onTap = { a.click?.send() }, background = look.tile, enabled = a.enabled) {
+            if (a.icon != null) CarIconView(a.icon, d.btnIc, look.fg)
+        }
+        return
+    }
+    Pressable(Modifier.height(m.dp(d.btn)).clip(RoundedCornerShape(m.dp(d.btn / 2))).background(look.tile),
+        description = a.title, onTap = { if (a.enabled) a.click?.send() }) { pressed ->
+        if (pressed) Box(Modifier.matchParentSize().background(Pal.SURFACE_PRESSED))
+        Box(Modifier.fillMaxHeight().padding(horizontal = m.dp(28)), contentAlignment = Alignment.Center) {
+            Txt(a.title, d.rowText, color = look.fg, weight = FontWeight.SemiBold)
+        }
+    }
+}
+
 // --- панель слева: PlaceList, RoutePreview, MapTemplate+Pane ---
 
 @Composable
@@ -351,7 +373,9 @@ private fun RowView(row: CarRow, selected: Boolean, look: NavLook, d: NavDims, o
                 }
             }
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(m.dp(6))) {
-                Txt(row.title, d.rowTitle, color = look.fg, weight = FontWeight.Bold, maxLines = 2)
+                // строку без нажатия (текст MessageTemplate: «Оформите подписку Яндекс Плюс, чтобы…») - целиком
+                val passive = row.click == null && row.toggle == null && !row.browsable
+                Txt(row.title, d.rowTitle, color = look.fg, weight = FontWeight.Bold, maxLines = if (passive) 6 else 2)
                 row.texts.forEachIndexed { i, t -> Txt(t, d.rowText, color = if (i == 0) look.fg2 else look.fg3) }
             }
             val tg = row.toggle
@@ -390,7 +414,11 @@ private fun Pill(a: CarAction, look: NavLook, d: NavDims, modifier: Modifier) {
 private fun GridScreen(g: CarUi.Grid, look: NavLook, d: NavDims) {
     val m = LocalMetrics.current
     Column(Modifier.fillMaxSize().background(look.fullBg)) {
-        Header(g.title, g.back, look, d, Modifier.height(m.dp(d.header + 22)))
+        Header(g.title, g.back, look, d, Modifier.height(m.dp(d.header + 22))) {
+            Row(horizontalArrangement = Arrangement.spacedBy(m.dp(d.gap)), verticalAlignment = Alignment.CenterVertically) {
+                g.actions.forEach { HeaderAction(it, look, d) }
+            }
+        }
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(horizontal = m.dp(29), vertical = m.dp(8)),
             verticalArrangement = Arrangement.spacedBy(m.dp(d.gap))) {
             g.items.chunked(d.gridCols).forEach { line ->
