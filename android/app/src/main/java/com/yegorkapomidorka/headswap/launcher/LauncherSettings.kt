@@ -131,7 +131,10 @@ fun LauncherSettingsScreen() {
                                 model.chooseAnimations(it)
                             }
                         }
-                        SettingsPage.NAVIGATOR -> NavigatorTiles(d, rowH, cell(0, 2).fillMaxWidth())
+                        SettingsPage.NAVIGATOR -> {
+                            NavigatorTiles(d, rowH, cell(0, 2).fillMaxWidth())
+                            if (EmbedHost.nav.carHost) RestartNavCard(d, cell(2).fillMaxWidth())
+                        }
                         SettingsPage.MUSIC -> {
                             val players by produceState(emptyList<String>()) {
                                 value = withContext(Dispatchers.IO) { PlayerChip.localPlayers(MusicController.players(model.context)) }
@@ -478,6 +481,20 @@ private fun systemInfo(): List<Pair<String, String>> {
 }
 
 /** Последняя строка «Системы»: версия Headswap, тап открывает «О приложении». */
+@Composable
+private fun RestartNavCard(d: SettingsDims, modifier: Modifier) {
+    val m = LocalMetrics.current
+    val s = m.spec
+    val label = stringResource(R.string.l_nav_restart)
+    Pressable(modifier.clip(RoundedCornerShape(m.dp(s.radius))).background(Pal.SURFACE), description = label,
+        onTap = { EmbedHost.restartCar() }) { pressed ->
+        if (pressed) Box(Modifier.matchParentSize().background(Pal.SURFACE_PRESSED))
+        Row(Modifier.fillMaxSize().padding(start = m.dp(d.padStart), end = m.dp(d.padEnd)), verticalAlignment = Alignment.CenterVertically) {
+            Txt(label, s.f2, ellipsis = false)
+        }
+    }
+}
+
 @Composable
 private fun AboutLinkCard(d: SettingsDims, modifier: Modifier) {
     val m = LocalMetrics.current

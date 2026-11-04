@@ -316,6 +316,7 @@ class MainActivity : Activity() {
                 }
                 "car_click" -> com.yegorkapomidorka.headswap.carapp.CarAppHost.click(intent.getIntExtra("i", -1))
                 "car_back" -> com.yegorkapomidorka.headswap.carapp.CarAppHost.back()
+                "car_scale" -> com.yegorkapomidorka.headswap.carapp.CarAppHost.setScale(intent.getFloatExtra("v", 1f)) // dpi навигатора × v
                 "car_night" -> com.yegorkapomidorka.headswap.carapp.CarAppHost.setNight(   // --es v yes|no|app
                     when (intent.getStringExtra("v")) { "yes" -> true; "no" -> false; else -> null })
                 "car_dump" -> com.yegorkapomidorka.headswap.carapp.CarAppHost.dumpTemplates = intent.getBooleanExtra("on", true)

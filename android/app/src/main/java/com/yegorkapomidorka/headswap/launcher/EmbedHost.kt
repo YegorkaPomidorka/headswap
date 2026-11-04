@@ -184,6 +184,17 @@ internal object EmbedHost {
         worker.post { reconcile(nav) }
     }
 
+    /** Кнопка «Перезапустить навигатор»: новая сессия своего хоста на свежей поверхности (2ГИС «Перезапустите 2ГИС»). */
+    fun restartCar() {
+        worker.post {
+            if (!projCar) return@post
+            AppLog.i("EMBED nav: перезапуск навигатора на своём хосте", false)
+            unproject(); dropSurface(nav)
+            CarAppHost.stop()
+            reconcile(nav)
+        }
+    }
+
     /** Поверхность, отданная декодеру AA или своему хосту Car App (только рабочий поток). */
     private var projSurface: Surface? = null
     /** Окно навигатора рисует свой хост Car App: касания идут ему, а не в реестр. */

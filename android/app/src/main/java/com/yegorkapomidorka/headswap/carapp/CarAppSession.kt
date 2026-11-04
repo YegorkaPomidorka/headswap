@@ -330,7 +330,8 @@ internal class CarAppSession(
         val now = SystemClock.uptimeMillis()
         if (now - lastTripLog > TRIP_LOG_MS) {
             lastTripLog = now
-            log("Trip: манёвр ${man?.type} cue=\"${text(step?.cue)}\" дорога=\"${text(step?.road)}\" до манёвра $meters м, loading=${t.isLoading}")
+            log("Trip: манёвр ${man?.type} cue=\"${text(step?.cue)}\" дорога=\"${text(step?.road)}\" до манёвра $meters м, loading=${t.isLoading}, " +
+                "иконка ${runCatching { man?.icon?.icon?.bitmap?.let { "${it.width}x${it.height}" } }.getOrNull()}")
         }
         if (man == null || meters == null) return
         val road = text(step.road).ifEmpty { text(step.cue) }

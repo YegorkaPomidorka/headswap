@@ -314,7 +314,9 @@ private fun Header(title: String, back: CarAction?, look: NavLook, d: NavDims, m
     val m = LocalMetrics.current
     Row(modifier.fillMaxWidth().padding(horizontal = m.dp(d.gap)), verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(m.dp(16))) {
-        if (back != null) {
+        // APP_ICON в шапке - не «Назад», а значок приложения без нажатия (как AA): 2ГИС ставит его на стартовую страницу
+        if (back != null && back.type == CarActions.TYPE_APP_ICON && back.click == null) AppIcon(d.btn)
+        else if (back != null) {
             RoundButton(d.btn, back.title.ifEmpty { stringResource(R.string.l_back) }, onTap = { back.click?.send() ?: CarAppHost.back() }) {
                 if (back.type == CarActions.TYPE_BACK || back.icon == null || back.icon.standard != 0) SvgIcon(Ico.CHEV_BACK, d.btnIc, look.fg, stroke = 2.4f)
                 else CarIconView(back.icon, d.btnIc, null)
@@ -461,6 +463,23 @@ private object CarImages {
         cache[img.key] = b
         return b
     }
+}
+
+/** Значок навигатора хоста (Action.APP_ICON): иконка пакета из лаунчера телефона. */
+@Composable
+private fun AppIcon(sizePx: Int) {
+    val m = LocalMetrics.current
+    val ctx = androidx.compose.ui.platform.LocalContext.current
+    val pkg = CarAppHost.pkg
+    val px = m.dp(sizePx)
+    val bmp = remember(pkg) {
+        pkg?.let { p -> runCatching { ctx.packageManager.getApplicationIcon(p).let { d ->
+            Bitmap.createBitmap(128, 128, Bitmap.Config.ARGB_8888).also { b ->
+                d.setBounds(0, 0, 128, 128); d.draw(android.graphics.Canvas(b))
+            }.asImageBitmap()
+        } }.getOrNull() }
+    }
+    if (bmp != null) Image(bmp, null, Modifier.size(px).clip(CircleShape)) else Spacer(Modifier.size(px))
 }
 
 /** Иконка приложения; [tint] - перекрасить (глифы кнопок и манёвра в цвет стиля), null - как есть. */
