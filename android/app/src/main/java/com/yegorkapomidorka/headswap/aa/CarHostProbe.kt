@@ -198,9 +198,12 @@ object CarHostProbe {
             }
             if (s != null && s.isValid && delivered !== s) {
                 cb.onSurfaceAvailable(Bundleable.create(SurfaceContainer(s, sw, shh, sdpi)), done("onSurfaceAvailable"))
-                val r = Rect(0, 0, sw, shh)
-                cb.onVisibleAreaChanged(r, done("onVisibleAreaChanged"))
-                cb.onStableAreaChanged(r, done("onStableAreaChanged"))
+                // Как у AA: visible - карта без наших карточек слева, stable - ещё без полос кнопок. Если области равны,
+                // 2ГИС (libv4android, calculatePosition) прячет спидометр с камерами и мини-карту.
+                val visible = Rect((sw * 0.36f).roundToInt(), 0, sw, shh)
+                val stable = Rect(visible.left, (shh * 0.15f).roundToInt(), sw - (sw * 0.1f).roundToInt(), shh)
+                cb.onVisibleAreaChanged(visible, done("onVisibleAreaChanged"))
+                cb.onStableAreaChanged(stable, done("onStableAreaChanged"))
                 delivered = s
                 log("поверхность ${sw}x$shh dpi=$sdpi отдана")
             }
