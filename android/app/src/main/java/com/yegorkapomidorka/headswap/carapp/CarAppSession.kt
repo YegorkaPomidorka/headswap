@@ -161,6 +161,8 @@ internal class CarAppSession(
         sentConfig = null; ready = false
         var answered = false
         h.postDelayed({ if (g == gen && !answered) { log("getAppInfo: нет ответа"); refuse(CarAppRefusal.NO_APP_INFO) } }, APP_INFO_TIMEOUT_MS)
+        // рукопожатие или create/start/resume без ответа - иначе пустая карта навсегда и окно не откроется
+        h.postDelayed({ if (g == gen && !ready) { log("не поднялся за ${READY_TIMEOUT_MS / 1000} с"); refuse(CarAppRefusal.CREATE) } }, READY_TIMEOUT_MS)
         try {
             a.getAppInfo(callback(g, "getAppInfo", onFail = { answered = true; refuse(CarAppRefusal.NO_APP_INFO) }) { r ->
                 answered = true
@@ -393,6 +395,7 @@ internal class CarAppSession(
 
     private companion object {
         const val APP_INFO_TIMEOUT_MS = 5_000L
+        const val READY_TIMEOUT_MS = 15_000L
         const val DEATH_WINDOW_MS = 60_000L
         const val MAX_DEATHS = 3
         const val TRIP_LOG_MS = 3_000L

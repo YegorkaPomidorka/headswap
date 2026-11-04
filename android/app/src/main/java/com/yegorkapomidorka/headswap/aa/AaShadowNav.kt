@@ -76,6 +76,8 @@ object AaShadowNav {
         override fun onNavDistance(d: AaNavDistance) { log("дистанция $d legacy=${d.legacy}"); forward { it.onNavDistance(d) } }
 
         private inline fun forward(block: (AaMetaSink) -> Unit) {
+            // навигатор на своём хосте Car App шлёт подсказки сам: статус теневой AA не должен гасить его маршрут
+            if (com.yegorkapomidorka.headswap.carapp.CarAppHost.pkg != null) return
             val t = DesktopNavHints.target ?: return
             try { block(t) } catch (e: Throwable) { log("в мост не ушло: ${e.javaClass.simpleName}: ${e.message}") }
         }

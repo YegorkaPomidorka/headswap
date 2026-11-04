@@ -75,9 +75,9 @@ object CarAppHost {
 
     fun stop() {
         h.post {
-            val s = session ?: return@post
+            // после отказа сессии уже нет, но pkg и REFUSED надо снять
+            session?.stop()
             session = null
-            s.stop()
             pkg = null; template = null; toast = null
             setStatus(Status.IDLE)
         }
@@ -139,7 +139,8 @@ object CarAppHost {
         override fun onTemplate(s: CarAppSession, t: TemplateWrapper?) {
             if (s !== session) return
             template = t
-            CarTemplateDump.collect(t, if (dumpTemplates) ::log else null)
+            // рефлексия по всему дереву - только для разбора на стенде, NavigationTemplate приходит каждую секунду
+            if (dumpTemplates) CarTemplateDump.collect(t, ::log)
             onChange?.invoke()
         }
 
