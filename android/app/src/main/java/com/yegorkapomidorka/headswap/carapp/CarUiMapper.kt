@@ -131,7 +131,9 @@ internal class CarUiMapper(private val app: Context, private val units: CarUnits
         title = text(r.title), texts = r.texts.map(::text).filter { it.isNotBlank() }, image = image(r.image),
         toggle = r.toggle?.let { tg ->
             val d = tg.onCheckedChangeDelegate
-            CarToggle(tg.isChecked, tg.isEnabled, d?.let { { v: Boolean -> post { runCatching { it.sendCheckedChange(v, done("переключатель")) } } } })
+            CarToggle(tg.isChecked, tg.isEnabled, d?.let { { v: Boolean ->
+                post { log("переключатель ${text(r.title)} -> $v"); runCatching { it.sendCheckedChange(v, done("переключатель")) } }
+            } })
         },
         browsable = r.isBrowsable, number = r.numericDecoration.coerceAtLeast(0),
         click = click(r.onClickDelegate, "строка ${text(r.title)}"),

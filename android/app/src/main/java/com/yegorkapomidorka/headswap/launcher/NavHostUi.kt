@@ -304,7 +304,13 @@ private fun Header(title: String, back: CarAction?, look: NavLook, d: NavDims, m
 @Composable
 private fun RowView(row: CarRow, selected: Boolean, look: NavLook, d: NavDims, onSelect: () -> Unit) {
     val m = LocalMetrics.current
-    val tap = { row.toggle?.let { t -> t.change?.invoke(!t.checked) } ?: row.click?.send() ?: onSelect() }
+    // переключатель держит хост, как AA: 2ГИС после смены новое состояние не присылает
+    var checked by remember(row.title, row.toggle?.checked) { mutableStateOf(row.toggle?.checked == true) }
+    val tap = {
+        val t = row.toggle
+        if (t != null && t.change != null && t.enabled) { checked = !checked; t.change.invoke(checked) }
+        else row.click?.send() ?: onSelect()
+    }
     Pressable(Modifier.fillMaxWidth().heightIn(min = m.dp(if (row.texts.isEmpty()) 92 * d.btn / 90 else d.rowMin))
         .background(if (selected) look.sel else Color.Transparent), onTap = tap) { pressed ->
         if (pressed) Box(Modifier.matchParentSize().background(Pal.SURFACE_PRESSED))
@@ -321,7 +327,7 @@ private fun RowView(row: CarRow, selected: Boolean, look: NavLook, d: NavDims, o
                 row.texts.forEachIndexed { i, t -> Txt(t, d.rowText, color = if (i == 0) look.fg2 else look.fg3) }
             }
             val tg = row.toggle
-            if (tg != null) Switch(tg.checked, look, d)
+            if (tg != null) Switch(checked, look, d)
             else if (row.browsable) SvgIcon(Ico.CHEV_R, d.btnIc * 36 / 44, look.fg2, stroke = 2.4f)
         }
         Box(Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(m.dp(2)).background(look.divider))
