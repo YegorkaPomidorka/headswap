@@ -134,6 +134,12 @@ internal object EmbeddedSessionRegistry {
         val lease = active(uid, handle)
         return activeCall(lease) { it.childTaskPackages(lease.token)?.toList() }
     }
+    /** 1 запущенное в окно приложение в полноэкранном режиме, 0 нет, -1 не удалось узнать. */
+    fun fullscreen(uid: Int, handle: Int, packageName: String): Int {
+        val lease = active(uid, handle)
+        if (lease.packageName != packageName) return 0
+        return activeCall(lease) { it.childFullscreen(lease.token, packageName) }
+    }
     fun release(uid: Int, handle: Int) {
         val lease = synchronized(lock) { leases[handle] } ?: return // Already stopped with ACK.
         if (lease.uid != uid) throw SecurityException("Чужое встроенное окно")

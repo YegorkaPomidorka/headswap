@@ -14,6 +14,8 @@ internal interface DesktopRuntimeAccess {
     fun childTaskState(id: Int, packageName: String): Int
     /** Пакеты задач дочернего экрана, свежие первыми; null - Android не отдал или экран не опознан. */
     fun childTaskPackages(id: Int): List<String>?
+    /** Приложение дочернего экрана прячет строку состояния: 1 да, 0 нет, -1 не удалось узнать. */
+    fun childFullscreen(id: Int, packageName: String): Int
     fun registerParentDisplay(id: Int, token: IBinder, width: Int, height: Int) {}
     fun registerChildDisplay(parentId: Int, id: Int, token: IBinder, width: Int, height: Int) {}
     fun resizeRegisteredDisplay(id: Int, token: IBinder, width: Int, height: Int) {}

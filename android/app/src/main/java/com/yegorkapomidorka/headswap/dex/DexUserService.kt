@@ -375,6 +375,16 @@ class DexUserService private constructor(private val context: Context,
         }
     }
 
+    override fun childFullscreen(childToken: IBinder, packageName: String): Int {
+        enforceClient()
+        EmbeddedDisplayPolicy.requirePackage(packageName)
+        return serialized(INPUT_TIMEOUT_MS) {
+            val (_, child) = requireChild(childToken)
+            if (child.launchedPackage != packageName) return@serialized 0
+            checkNotNull(runtime).childFullscreen(checkNotNull(child.display).display.displayId, packageName)
+        }
+    }
+
     override fun childProducerLifetime(childToken: IBinder): IBinder {
         enforceClient()
         return serialized(INPUT_TIMEOUT_MS) {
