@@ -53,6 +53,7 @@ internal object LauncherModel {
 
     var area by mutableStateOf<Area>(Area.Home)
     var theme by mutableStateOf(ThemeChoice.DARK)
+    var railSize by mutableStateOf(RailSize.NORMAL)
     var mapLeft by mutableStateOf(false)
     var animations by mutableStateOf(true)
     var autoplay by mutableStateOf(true)
@@ -124,6 +125,7 @@ internal object LauncherModel {
         appCtx = ctx.applicationContext
         prefs = LauncherPrefs(appCtx)
         theme = prefs.theme
+        railSize = prefs.railSize
         mapLeft = prefs.mapLeft
         animations = prefs.animations
         autoplay = prefs.autoplay
@@ -187,6 +189,7 @@ internal object LauncherModel {
     fun removeApp(ref: AppRef) { apps = AppList.remove(apps, ref).also { prefs.apps = it } }
 
     fun chooseTheme(value: ThemeChoice) { theme = value; prefs.theme = value }
+    fun chooseRailSize(value: RailSize) { railSize = value; prefs.railSize = value }
     fun chooseMapLeft(left: Boolean) { mapLeft = left; prefs.mapLeft = left }
     fun chooseAnimations(on: Boolean) { animations = on; prefs.animations = on }
     fun chooseAutoplay(on: Boolean) { autoplay = on; prefs.autoplay = on }

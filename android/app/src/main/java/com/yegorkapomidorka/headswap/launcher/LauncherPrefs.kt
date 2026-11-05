@@ -22,6 +22,15 @@ enum class ThemeChoice {
     }
 }
 
+/** Размер боковой панели: «Маленькая», «Средняя», «Обычная»; «Обрезанная» - только на экранах высотой 480 ([LauncherSpec.h480]). */
+enum class RailSize {
+    SMALL, MEDIUM, NORMAL, CUT;
+
+    companion object {
+        fun restore(name: String?): RailSize = entries.firstOrNull { it.name == name } ?: NORMAL
+    }
+}
+
 /** Настройки лаунчера - SharedPreferences, как остальной проект (DexPrefs/AaSettings). */
 class LauncherPrefs(context: Context) {
     private val prefs = context.getSharedPreferences("headswap_launcher", Context.MODE_PRIVATE)
@@ -33,6 +42,10 @@ class LauncherPrefs(context: Context) {
     var theme: ThemeChoice
         get() = ThemeChoice.restore(prefs.getString("theme", null))
         set(value) { prefs.edit().putString("theme", value.name).apply() }
+
+    var railSize: RailSize
+        get() = RailSize.restore(prefs.getString("rail_size", null))
+        set(value) { prefs.edit().putString("rail_size", value.name).apply() }
 
     /** «Карта на главном» слева: ряды главного зеркальные, рейка остаётся слева. Новый ключ: старый right_hand двигал рейку. */
     var mapLeft: Boolean
