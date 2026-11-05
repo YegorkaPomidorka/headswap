@@ -16,4 +16,7 @@ object DesktopKeys {
     }
 
     @Volatile var sink: Sink? = null
+
+    /** Панель Алисы открылась (true) / закрылась: мост шлёт ГУ MODULE_STATUS VR. null - сессии нет. Любой поток. */
+    @Volatile var voiceStatus: ((Boolean) -> Unit)? = null
 }

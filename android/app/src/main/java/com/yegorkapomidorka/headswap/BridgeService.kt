@@ -968,6 +968,7 @@ class BridgeService : Service() {
         }
         h.core.carVwId = aaPrefs.carPreset == CarPreset.VW_ID_UNYX
         h.core.phoneAssistant = null   // режим AA: кнопка голоса идёт в AA
+        DesktopKeys.voiceStatus = null
         if (wakeLock == null) {
             wakeLock = getSystemService(PowerManager::class.java)
                 .newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "headswap:session")
@@ -1144,6 +1145,7 @@ class BridgeService : Service() {
                     main.post { PhoneAssistant.launch(applicationContext, DexState.displayId) }
                 }
             }
+            DesktopKeys.voiceStatus = { on -> core.desktopVoiceStatus(on) }
             AppLog.i("DEX: видео ${mode.outW}x${mode.outH} через CarLife; звук по USB по настройке; микрофон CarLife не передаётся")
             val h = BridgeHost(core, conn, scheduler, log, previous = previous, onTornDown = {
                 main.post { ref[0]?.let(::onDesktopHostTornDown) }

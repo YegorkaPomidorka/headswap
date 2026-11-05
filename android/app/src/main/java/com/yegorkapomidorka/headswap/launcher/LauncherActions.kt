@@ -102,6 +102,7 @@ object LauncherActions {
         if (model.assistantOpen) return
         AppLog.i("ASSIST панель открыта, экран=${model.area}", false)
         model.assistantOpen = true
+        com.yegorkapomidorka.headswap.dex.DesktopKeys.voiceStatus?.invoke(true)
     }
 
     /** Закрыть панель и отпустить дочерний дисплей; [why] - причина для лога. */
@@ -109,6 +110,7 @@ object LauncherActions {
         if (!model.assistantOpen) return
         AppLog.i("ASSIST панель закрыта: $why", false)
         model.assistantOpen = false
+        com.yegorkapomidorka.headswap.dex.DesktopKeys.voiceStatus?.invoke(false)
         com.yegorkapomidorka.headswap.dex.PhoneAssistant.stopWatch()
         val ctx = model.context.applicationContext
         // сначала закрыть задачи панели, потом отпустить дисплей (иначе Яндекс переедет под лаунчер)

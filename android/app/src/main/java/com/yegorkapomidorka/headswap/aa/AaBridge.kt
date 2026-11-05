@@ -1363,6 +1363,16 @@ class AaBridgeCore(
         return true
     }
 
+    /**
+     * Рабочий стол: панель Алисы открыта/закрыта -> MODULE_STATUS VR=1/0, как Baidu MD (prepareShowVr/prepareCloseVr).
+     * Без него Vezel через несколько секунд после кнопки голоса пишет, что голосовую сессию не активировать (поездка 05.11).
+     */
+    @Synchronized
+    fun desktopVoiceStatus(on: Boolean) {
+        val s = if (on) 1 else 0
+        if (link.sendModuleStatus(CarlifeAudio.MODULE_VR, s)) log("BRIDGE CarLife MODULE_STATUS VR=$s (панель Алисы)", true)
+    }
+
     /** MODULE_CONTROL VR=1 от ГУ (кнопка голоса) -> AA KEYCODE_SEARCH: AA открывает ассистента и сам просит микрофон. */
     fun onCarlifeVoiceKey() {
         lastUserInputMs = clockMs()
