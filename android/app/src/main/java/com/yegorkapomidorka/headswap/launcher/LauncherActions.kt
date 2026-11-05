@@ -37,6 +37,10 @@ object LauncherActions {
         PhoneController.dial(model.context, number)
     }
     fun cycleCardView() { model.nextCardView() }
+    fun swapTiles() { model.swapTiles() }
+
+    /** Тап по плашке YouTube: то же окно на весь экран (ключ тот же - только смена размера, без перезапуска). */
+    fun openYoutube() { model.youtubeKey?.let { AppRef.parse(it) }?.let { openApp(it) } }
 
     /** Карточка «Телефон» без доступа: окно Headswap на экране телефона с запросом разрешений карточки. */
     fun openPhoneRequest() {

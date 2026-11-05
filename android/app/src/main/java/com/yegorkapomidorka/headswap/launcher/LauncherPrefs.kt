@@ -72,9 +72,20 @@ class LauncherPrefs(context: Context) {
         get() = prefs.getString("online_player", null)
         set(value) { prefs.edit().putString("online_player", value).apply() }
 
+    /** Большая плашка главного (в четырёх плашках - место навигации). Ключ с прошлых версий. */
     var cardView: CardView
         get() = CardView.restore(prefs.getString("card_view", null))
         set(value) { prefs.edit().putString("card_view", value.name).apply() }
+
+    /** Малая плашка в раскладках 2:1 и 1:2. */
+    var smallView: CardView
+        get() = CardView.restore(prefs.getString("small_view", null), CardView.MUSIC)
+        set(value) { prefs.edit().putString("small_view", value.name).apply() }
+
+    /** «Раскладка» главного: четыре плашки (по умолчанию) или две. */
+    var homeLayout: HomeLayout
+        get() = HomeLayout.restore(prefs.getString("home_layout", null))
+        set(value) { prefs.edit().putString("home_layout", value.name).apply() }
 
     /** Пакет выбранного навигатора; null - по умолчанию ([NavigatorPick]). */
     var navigator: String?

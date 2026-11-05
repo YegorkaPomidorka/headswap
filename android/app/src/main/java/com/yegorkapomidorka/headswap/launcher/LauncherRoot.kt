@@ -102,9 +102,10 @@ fun LauncherRoot(connected: Boolean) {
                     }
                     run {
                         EmbedLayers()
+                        HomeTileButtons() // ⇄ и «Слои» ленты - над живыми окнами плашек
                         NavHostOverlay() // шаблоны навигатора на своём хосте Car App - над его картой, в границах области
                         // входящий звонок поверх чужого приложения или экрана без карточки «Телефон»
-                        if (PhoneController.callState == CallState.RINGING && (model.area != Area.Home || spec.strip)) {
+                        if (PhoneController.callState == CallState.RINGING && (model.area != Area.Home || spec.strip || model.homeLayout.two)) {
                             // как нижняя полоса главного: прибита к низу, скругления только сверху
                             val r = metrics.dp(spec.radius)
                             Box(Modifier.fillMaxSize().padding(end = metrics.dp(spec.m)), contentAlignment = Alignment.BottomEnd) {
@@ -196,7 +197,7 @@ private fun Rail() {
                 background = if (inSettings) accent.copy(alpha = 0.32f) else Color.Transparent) {
                 GearIcon(s.ric, if (inSettings) Pal.RAIL else Pal.SEC2) { gear.progress }
             }
-            // в ленте «Вид карточки» - стеклянная кнопка на карте (если рейка узкая - всё равно в рейке)
+            // «Вид карточки» в рейке; в ленте с обычной рейкой - стеклянная кнопка в углу большой плашки (HomeTileButtons)
             if (s.cardViewInRail) CardViewButton(s.rb, s.ric, Color.Transparent, Pal.SEC2)
         }
         // стрелка навигации: 2 оборота и стоп в случайной другой стороне света
