@@ -23,7 +23,7 @@ import com.yegorkapomidorka.headswap.embed.EmbeddedSessionRegistry
 
 internal enum class EmbedStatus { IDLE, CONNECTING, STARTING, READY, FAILED }
 
-/** Один дочерний экран: навигатор или «текущее приложение». Лимит реестра - 2 окна, значит слотов ровно два. */
+/** Один дочерний экран: навигатор, «текущее приложение» или панель Алисы. Лимит реестра - 3 окна, значит слотов ровно три. */
 internal class EmbedSlot(val name: String) {
     private var statusValue by mutableStateOf(EmbedStatus.IDLE)
 
@@ -127,7 +127,8 @@ internal object EmbedHost {
 
     val nav = EmbedSlot("nav")
     val app = EmbedSlot("app")
-    private val slots = listOf(nav, app)
+    val alice = EmbedSlot("alice")
+    private val slots = listOf(nav, app, alice)
 
     private val thread = HandlerThread("headswap-launcher-embed").apply { start() }
     private val worker = Handler(thread.looper)
@@ -139,6 +140,13 @@ internal object EmbedHost {
 
     /** Задача приложения на дочернем дисплее исчезла (Back из корня, процесс убит). Вызывается на главном потоке. */
     @Volatile var onGone: ((EmbedSlot) -> Unit)? = null
+    /** В панели Алисы открылась задача другого приложения. Главный поток. */
+    @Volatile var onAssistantOpened: ((android.app.ActivityManager.RunningTaskInfo) -> Unit)? = null
+
+    /** Дочерний дисплей окна навигатора; 0 - нет. */
+    fun aliceDisplayId(): Int = if (alice.handle <= 0) 0 else runCatching { EmbeddedSessionRegistry.childDisplayId(uid, alice.handle) }.getOrDefault(0)
+
+    fun navDisplayId(): Int = if (nav.handle <= 0) 0 else runCatching { EmbeddedSessionRegistry.childDisplayId(uid, nav.handle) }.getOrDefault(0)
 
     // --- вызовы с главного потока ---
 
@@ -592,7 +600,12 @@ internal object EmbedHost {
             val pkg = key.substringBefore('/')
             val cls = key.substringAfter('/')
             AppLog.i("EMBED ${slot.name}: запуск $key handle=${slot.handle} (state=${slot.lastState} stale=${slot.stale})", false)
+            if (slot === alice) AppLog.i("ASSIST Алиса -> дочерний дисплей, окно ${slot.geomW}x${slot.geomH}", false)
             timed(slot, "launch") { EmbeddedSessionRegistry.launch(uid, slot.handle, pkg, cls) }
+            // Яндекс-помощник по умолчанию перезапускает себя через MainActivity на экране телефона: ловим и переносим
+            // другое приложение в панели (Алиса открыла Навигатор с маршрутом) - в лаунчер
+            if (slot === alice) appContext?.let { com.yegorkapomidorka.headswap.dex.PhoneAssistant.watch(it,
+                EmbeddedSessionRegistry.childDisplayId(uid, slot.handle), pkg) { t -> main.post { onAssistantOpened?.invoke(t) } } }
             slot.launchedKey = key
             slot.launchedAt = SystemClock.uptimeMillis()
             slot.stale = false

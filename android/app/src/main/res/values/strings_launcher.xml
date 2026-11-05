@@ -20,6 +20,7 @@
     <string name="l_nav_choose">Choose a navigator</string>
     <string name="l_nav_not_installed">No navigator installed</string>
     <string name="l_nav_starting">Starting the navigator…</string>
+    <string name="l_alice_starting">Starting Alice…</string>
     <string name="l_nav_failed">The window did not open. Tap to retry.</string>
     <string name="l_nav_restart">Restart navigator</string>
     <string name="l_nav_yandex_plus">Works only with an active Plus subscription!</string>

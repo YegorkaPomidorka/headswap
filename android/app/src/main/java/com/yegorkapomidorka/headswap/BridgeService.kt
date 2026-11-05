@@ -50,10 +50,12 @@ import com.yegorkapomidorka.headswap.dex.DesktopAccess
 import com.yegorkapomidorka.headswap.dex.DesktopAudioCapture
 import com.yegorkapomidorka.headswap.dex.DesktopAudioState
 import com.yegorkapomidorka.headswap.dex.DesktopFailure
+import com.yegorkapomidorka.headswap.dex.DesktopKeys
 import com.yegorkapomidorka.headswap.dex.DesktopMusicPlayback
 import com.yegorkapomidorka.headswap.dex.DesktopRecoveryPolicy
 import com.yegorkapomidorka.headswap.dex.DexPrefs
 import com.yegorkapomidorka.headswap.dex.DexState
+import com.yegorkapomidorka.headswap.dex.PhoneAssistant
 import com.yegorkapomidorka.headswap.dex.UsbDetachPolicy
 import com.yegorkapomidorka.headswap.link.CarTransport
 import com.yegorkapomidorka.headswap.link.LinkSetupException
@@ -965,6 +967,8 @@ class BridgeService : Service() {
             h.core.spliceMs = spliceMs
         }
         h.core.carVwId = aaPrefs.carPreset == CarPreset.VW_ID_UNYX
+        h.core.phoneAssistant = null   // режим AA: кнопка голоса идёт в AA
+        DesktopKeys.voiceStatus = null
         if (wakeLock == null) {
             wakeLock = getSystemService(PowerManager::class.java)
                 .newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "headswap:session")
@@ -1072,6 +1076,7 @@ class BridgeService : Service() {
         owner.core.transcodeEnabled = true
         owner.core.spliceMs = 0L
         owner.core.carVwId = aaPrefs.carPreset == CarPreset.VW_ID_UNYX
+        // кнопка голоса: системный помощник клавишей KEYCODE_ASSIST (как долгое нажатие питания), см. createDesktopHost
         if (wakeLock == null) {
             wakeLock = getSystemService(PowerManager::class.java)
                 .newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "headswap:session")
@@ -1132,6 +1137,15 @@ class BridgeService : Service() {
             val conn = DelegatedDexConnector(applicationContext, core) { reason ->
                 main.post { ref[0]?.let { onDesktopSourceFailed(it, reason) } }
             }
+            // кнопка голоса: панель Алисы в своём лаунчере (DesktopKeys); лаунчер не на экране или чужой - Алиса на весь
+            // дисплей рабочего стола (dex/PhoneAssistant, ADR 0026). Лямбда зовётся не с главного потока
+            core.phoneAssistant = {
+                if (DesktopKeys.sink?.voice() != true) {
+                    AppLog.i("ASSIST панель не взята лаунчером, Алиса на весь дисплей")
+                    main.post { PhoneAssistant.launch(applicationContext, DexState.displayId) }
+                }
+            }
+            DesktopKeys.voiceStatus = { on -> core.desktopVoiceStatus(on) }
             AppLog.i("DEX: видео ${mode.outW}x${mode.outH} через CarLife; звук по USB по настройке; микрофон CarLife не передаётся")
             val h = BridgeHost(core, conn, scheduler, log, previous = previous, onTornDown = {
                 main.post { ref[0]?.let(::onDesktopHostTornDown) }
