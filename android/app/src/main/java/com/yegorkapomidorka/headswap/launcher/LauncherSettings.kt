@@ -151,7 +151,9 @@ fun LauncherSettingsScreen() {
                                     NavigatorPick.needsPlus(navPkg) -> R.string.l_nav_hints_off_plus
                                     else -> R.string.l_nav_hints_off
                                 })
-                                SwitchCard(stringResource(R.string.l_nav_hints), hints, d, cell(2).fillMaxWidth(), sub = sub) {
+                                // низкий ряд (экраны высотой 480): подпись не влезает под название - без неё
+                                val subFits = rowH >= ((s.f2 + d.sub) * 1.25).roundToInt() + 4 + 2 * d.padV
+                                SwitchCard(stringResource(R.string.l_nav_hints), hints, d, cell(2).fillMaxWidth(), sub = sub.takeIf { subFits }) {
                                     model.chooseNavHints(navPkg, it)
                                 }
                                 var row = 3
