@@ -64,6 +64,27 @@ class DesktopVideoSelectionTest {
         assertEquals(1920 to 836, passthrough.outW to passthrough.outH)
     }
 
+    @Test fun unsupportedEncoderSizeFallsBackToHuRequestThen720() {
+        // Helio G96 (Mazda CX-5, 05.11): 1728×648@30 энкодер не объявляет, ГУ просит 1280×480
+        val no1728: (Int, Int, Int) -> Boolean = { w, _, _ -> w != 1728 }
+        val sel = DesktopVideoSelection(DesktopResolution.CUSTOM, 0, 1728, 648)
+        val mode = sel.resolve(1280, 480, 30, no1728)
+        assertEquals(1280 to 480, mode.outW to mode.outH)
+        assertNotNull(sel.fallbackNote)
+        assertSame(mode, sel.resolve(1728, 648, 30) { _, _, _ -> true })
+        // запрос ГУ невалиден -> 1280×720
+        val noInit = DesktopVideoSelection(DesktopResolution.CUSTOM, 0, 1728, 648).resolve(0, 0, 30, no1728)
+        assertEquals(1280 to 720, noInit.outW to noInit.outH)
+        // энкодер тянет -> настройка как есть, без пометки
+        val okSel = DesktopVideoSelection(DesktopResolution.CUSTOM, 0, 1728, 648)
+        assertEquals(1728 to 648, okSel.resolve(1280, 480, 30) { _, _, _ -> true }.let { it.outW to it.outH })
+        assertNull(okSel.fallbackNote)
+        // не тянет ничего, или проверка падает -> настройка как есть, транскодер скажет причину
+        val none = DesktopVideoSelection(DesktopResolution.CUSTOM, 0, 1728, 648)
+        assertEquals(1728 to 648, none.resolve(1280, 480, 30) { _, _, _ -> error("vendor") }.let { it.outW to it.outH })
+        assertNotNull(none.fallbackNote)
+    }
+
     @Test fun invalidCustomInputsAreRejectedRatherThanRoundedOrClamped() {
         for ((w, h) in listOf(1921 to 1080, 1920 to 1081, 639 to 480, 640 to 479, 800 to 900)) {
             assertThrows(IllegalArgumentException::class.java) { DesktopVideoSelection(DesktopResolution.CUSTOM, 160, w, h) }
