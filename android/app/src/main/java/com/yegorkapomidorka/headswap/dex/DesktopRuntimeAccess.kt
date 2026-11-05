@@ -20,6 +20,8 @@ internal interface DesktopRuntimeAccess {
     fun registerChildDisplay(parentId: Int, id: Int, token: IBinder, width: Int, height: Int) {}
     fun resizeRegisteredDisplay(id: Int, token: IBinder, width: Int, height: Int) {}
     fun unregisterDisplay(id: Int, token: IBinder) {}
+    /** Дисплей уже освобождён (release); VirtualDevice без дисплеев закрывается. */
+    fun released(display: VirtualDisplay?) {}
     fun launchDesktop(mode: Int, id: Int)
     fun launchChild(parentId: Int, id: Int, packageName: String, className: String)
 }

@@ -26,21 +26,37 @@ internal class DelegatedDesktopRuntime(private val context: Context, private val
     @SuppressLint("WrongConstant")
     override fun createDisplay(surface: Surface, width: Int, height: Int, density: Int, mode: Int): VirtualDisplay {
         DelegatedDesktopPolicy.requireMode(mode)
-        return checkNotNull(displays.createVirtualDisplay("HeadSwap ${DesktopModePolicy.label(mode)}",
-            width, height, density, surface,
-            DesktopModePolicy.displayFlags(mode, Build.VERSION.SDK_INT, DelegatedDesktopAccess.canKeepUnlocked(context)))) {
+        val name = "HeadSwap ${DesktopModePolicy.label(mode)}"
+        val unlocked = DelegatedDesktopAccess.canKeepUnlocked(context)
+        val flags = DesktopModePolicy.displayFlags(mode, Build.VERSION.SDK_INT, unlocked)
+        // Android 17: дисплей внутри VirtualDevice, чтобы он не засыпал с экраном телефона (ADR 0029); отказ - прежний путь.
+        inDevice(name, width, height, density, surface, flags, unlocked)?.let { return it }
+        return checkNotNull(displays.createVirtualDisplay(name, width, height, density, surface, flags)) {
             "Android отклонил доверенный виртуальный экран"
         }
     }
 
+    private val device: DesktopVirtualDevice? = if (Build.VERSION.SDK_INT >= 34) DesktopVirtualDevice(context) else null
+
+    @SuppressLint("NewApi") // device есть только на 34+
+    private fun inDevice(name: String, width: Int, height: Int, density: Int, surface: Surface, flags: Int, unlocked: Boolean): VirtualDisplay? =
+        device?.createDisplay(name, width, height, density, surface, flags, unlocked)
+
+    @SuppressLint("NewApi")
+    override fun released(display: VirtualDisplay?) { device?.released(display) }
+
     // TRUSTED / DESTROY_CONTENT / SUPPORTS_TOUCH are permission-gated platform flags
     // omitted by the public SDK IntDef. The shared engine verifies the returned display.
     @SuppressLint("WrongConstant")
-    override fun createChildDisplay(surface: Surface, width: Int, height: Int, density: Int): VirtualDisplay =
-        checkNotNull(displays.createVirtualDisplay("HeadSwap navigator widget", width, height, density,
-            surface, EmbeddedDisplayPolicy.displayFlags(Build.VERSION.SDK_INT, DelegatedDesktopAccess.canKeepUnlocked(context)))) {
+    override fun createChildDisplay(surface: Surface, width: Int, height: Int, density: Int): VirtualDisplay {
+        val unlocked = DelegatedDesktopAccess.canKeepUnlocked(context)
+        val flags = EmbeddedDisplayPolicy.displayFlags(Build.VERSION.SDK_INT, unlocked)
+        // Виджет навигатора засыпал бы так же, как рабочий стол: туда же, в VirtualDevice.
+        inDevice("HeadSwap navigator widget", width, height, density, surface, flags, unlocked)?.let { return it }
+        return checkNotNull(displays.createVirtualDisplay("HeadSwap navigator widget", width, height, density, surface, flags)) {
             "Android отклонил экран виджета"
         }
+    }
 
     override fun inject(event: InputEvent, id: Int, actionButton: Int) {
         check(id > 0) { "Ввод на основной экран запрещён" }
