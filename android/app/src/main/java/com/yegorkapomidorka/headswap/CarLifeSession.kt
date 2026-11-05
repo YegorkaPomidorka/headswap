@@ -1229,7 +1229,10 @@ class CarLifeSession(
         }
         // h725: Honda Civic 2021 (20772104) шлёт каждое касание как DOWN, DOWN, UP с теми же x,y.
         // Повтор DOWN без UP лаунчер считает вторым нажатием: «Настройки» мигают, «Назад» двойное.
-        if (n == 1 && t.masked == 0) {
+        // Только под эту ГУ: ГУ, теряющую UP, повтор DOWN сейчас «лечит».
+        if (!bridge.huHonda20772104) {
+            singleDownHeld = false
+        } else if (n == 1 && t.masked == 0) {
             if (singleDownHeld && t.x == singleDownX && t.y == singleDownY) {
                 if (dupDownCount++ == 0) AppLog.i("TOUCH повторный DOWN без UP (x=${t.x} y=${t.y}) — отбрасываю, дальше молча")
                 return
