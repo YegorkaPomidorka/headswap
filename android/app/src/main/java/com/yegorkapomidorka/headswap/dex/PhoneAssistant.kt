@@ -11,14 +11,16 @@ import com.yegorkapomidorka.headswap.AppLog
  * (Gemini/Google, Алиса, если её выбрали цифровым помощником).
  *
  * Прямой вызов как по долгому нажатию питания (`cmd voiceinteraction show`) закрыт: и приложению, и shell нужен
- * ACCESS_VOICE_INTERACTION_SERVICE. Поэтому intent: VOICE_COMMAND (у Google это HandsFreeActivity), запасной ASSIST.
+ * ACCESS_VOICE_INTERACTION_SERVICE. Поэтому intent: VOICE_ASSIST (у Google GoogleAppVoiceAssistEntrypoint,
+ * голосовой поиск), запасные VOICE_COMMAND и ASSIST. VOICE_COMMAND - кнопка BT-гарнитуры: Google без подключённой
+ * BT-гарнитуры закрывает окно сразу («no Bluetooth headset is connected», стенд 05.11), а запуск считается успешным.
  *
  * Окно открываем явно на дисплее рабочего стола: без launchDisplayId система кладёт его на дисплей с фокусом,
  * а при заблокированном телефоне это экран телефона за блокировкой (поездка 05.11: помощник слушал, на ГУ пусто).
  * Дисплей не наш или запуск на нём запрещён - открываем как раньше, на телефоне.
  */
 object PhoneAssistant {
-    private val ACTIONS = listOf(Intent.ACTION_VOICE_COMMAND, Intent.ACTION_ASSIST)
+    private val ACTIONS = listOf(Intent.ACTION_VOICE_ASSIST, Intent.ACTION_VOICE_COMMAND, Intent.ACTION_ASSIST)
 
     fun launch(ctx: Context, displayId: Int) {
         for (action in ACTIONS) {
