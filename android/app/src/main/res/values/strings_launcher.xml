@@ -30,7 +30,7 @@
     <string name="l_nav_hints_off">As on the phone</string>
     <string name="l_nav_hints_off_plus">As on the phone · no subscription needed</string>
     <string name="l_nav_hints_off_aa">As on the phone · Android Auto is not started</string>
-    <string name="l_nav_aa_server_hint">AA on the phone → ⋮ → Start head unit server</string>
+    <string name="l_nav_aa_server_hint">Open AA settings on the phone\n⋮ → Start head unit server</string>
     <string name="l_view_navigator">Navigator</string>
     <string name="l_view_clock">Clock</string>
 
