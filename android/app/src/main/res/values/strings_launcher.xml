@@ -6,7 +6,7 @@
     <string name="l_choose_app">Choose an app</string>
     <string name="l_back">Back</string>
     <string name="l_settings">Settings</string>
-    <string name="l_card_view">Card view</string>
+    <string name="l_card_view">Change big tile</string>
     <string name="l_navigation">Navigation</string>
     <string name="l_add">Add</string>
     <string name="l_remove_q">Remove?</string>
@@ -116,9 +116,12 @@
     <string name="l_s_last">Last played</string>
     <string name="l_s_more">All players</string>
     <string name="l_s_autoplay">Start music automatically</string>
-    <string name="l_s_map">Map on home</string>
     <string name="l_s_right">Right</string>
     <string name="l_s_left">Left</string>
+    <string name="l_s_layout">Layout</string>
+    <string name="l_swap_tiles">Swap tiles</string>
+    <string name="l_expand">Full screen</string>
+    <string name="l_yt_not_installed">YouTube is not installed</string>
     <string name="l_s_hu">Head unit</string>
     <string name="l_s_link">Connection</string>
     <string name="l_s_video">Video</string>

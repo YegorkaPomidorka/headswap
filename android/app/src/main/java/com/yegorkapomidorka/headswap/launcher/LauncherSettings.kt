@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
@@ -167,7 +168,7 @@ fun LauncherSettingsScreen() {
                                 model.chooseAutoplay(it)
                             }
                         }
-                        SettingsPage.HOME -> MapSideCard(d, cell(0, 3).fillMaxWidth())
+                        SettingsPage.HOME -> MapSideCard(d, cell(0, SettingsGrid.ROWS).fillMaxWidth())
                         SettingsPage.SYSTEM -> {
                             val info = systemInfo()
                             for ((i, row) in info.withIndex()) InfoCard(row.first, row.second, d, cell(i).fillMaxWidth())
@@ -509,7 +510,13 @@ private fun PlayerIcon(opt: PlayerOpt?, selected: Boolean, d: SettingsDims, onTa
     }
 }
 
-/** «Карта на главном»: две миниатюры главного, «Справа» (по умолчанию) и «Слева». 3 ряда. */
+/** Вариант «Раскладки»: четыре плашки с картой справа/слева или две плашки 2:1 / 1:2. */
+private data class LayoutOpt(val layout: HomeLayout, val left: Boolean, val label: String)
+
+/**
+ * «Раскладка» главного на весь экран (5 рядов): сеткой 2x2 сверху четыре плашки «Справа» и «Слева», снизу две плашки
+ * «2 : 1» и «1 : 2». Один выбор на все четыре. Что в плашках, выбирают на главном («Слои», ⇄), здесь - только форма.
+ */
 @Composable
 private fun MapSideCard(d: SettingsDims, modifier: Modifier) {
     val m = LocalMetrics.current
@@ -517,19 +524,24 @@ private fun MapSideCard(d: SettingsDims, modifier: Modifier) {
     val k = s.t / 96.0
     fun r(v: Int) = max(1, (v * k).roundToInt())
     val model = LauncherModel
+    val rows = listOf(
+        listOf(LayoutOpt(HomeLayout.QUAD, false, stringResource(R.string.l_s_right)), LayoutOpt(HomeLayout.QUAD, true, stringResource(R.string.l_s_left))),
+        listOf(LayoutOpt(HomeLayout.WIDE_LEFT, false, "2 : 1"), LayoutOpt(HomeLayout.WIDE_RIGHT, false, "1 : 2")),
+    )
     Card(modifier) {
         Column(Modifier.fillMaxSize().padding(start = m.dp(r(24)), end = m.dp(r(24)), top = m.dp(r(14)), bottom = m.dp(r(20))),
             verticalArrangement = Arrangement.spacedBy(m.dp(r(14)))) {
-            Txt(stringResource(R.string.l_s_map), s.f2)
-            Row(Modifier.weight(1f).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(m.dp(r(24)))) {
-                for (left in listOf(false, true)) {
-                    val label = stringResource(if (left) R.string.l_s_left else R.string.l_s_right)
-                    OptionBox(model.mapLeft == left, Modifier.weight(1f).fillMaxHeight(), RoundedCornerShape(m.dp(s.radius)), label,
-                        unselected = Color.Transparent, onTap = { model.chooseMapLeft(left) }) {
-                        Column(Modifier.fillMaxSize().padding(m.dp(r(14))), horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.spacedBy(m.dp(r(12)))) {
-                            HomeMiniature(left, r(6), Modifier.weight(1f).fillMaxWidth())
-                            Txt(label, s.f2, weight = FontWeight.SemiBold, ellipsis = false)
+            Txt(stringResource(R.string.l_s_layout), s.f2)
+            for (row in rows) Row(Modifier.weight(1f).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(m.dp(r(24)))) {
+                for (opt in row) {
+                    val selected = model.homeLayout == opt.layout && (opt.layout != HomeLayout.QUAD || model.mapLeft == opt.left)
+                    OptionBox(selected, Modifier.weight(1f).fillMaxHeight(), RoundedCornerShape(m.dp(s.radius)), opt.label,
+                        unselected = Color.Transparent, onTap = { model.chooseHomeLayout(opt.layout, opt.left) }) {
+                        Column(Modifier.fillMaxSize().padding(m.dp(r(10))), horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(m.dp(r(8)))) {
+                            if (opt.layout == HomeLayout.QUAD) HomeMiniature(opt.left, r(6), Modifier.weight(1f).fillMaxWidth())
+                            else TwoMiniature(opt.layout == HomeLayout.WIDE_LEFT, r(6), Modifier.weight(1f).fillMaxWidth())
+                            Txt(opt.label, s.f2, weight = FontWeight.SemiBold, ellipsis = false)
                         }
                     }
                 }
@@ -538,32 +550,52 @@ private fun MapSideCard(d: SettingsDims, modifier: Modifier) {
     }
 }
 
-/** Миниатюра главного: рейка, музыка, карта (золото со стрелкой), приложения и телефон; при [left] ряды зеркальные. */
+/** Большая плашка миниатюры: золото и всё, что в ней бывает, - навигатор, YouTube, часы. */
+@Composable
+private fun RowScope.BigMiniCell(weight: Float, shape: RoundedCornerShape) {
+    val m = LocalMetrics.current
+    val k = m.spec.t / 96.0
+    Row(Modifier.weight(weight).fillMaxHeight().clip(shape).background(LocalAccent.current),
+        horizontalArrangement = Arrangement.spacedBy(m.dp(max(1, (10 * k).roundToInt())), Alignment.CenterHorizontally),
+        verticalAlignment = Alignment.CenterVertically) {
+        SvgIcon(Ico.NAV, (24 * k).roundToInt(), Pal.ON_GOLD, fill = true)
+        SvgIcon(Ico.VIDEO, (26 * k).roundToInt(), Pal.ON_GOLD, stroke = 2.4f)
+        SvgIcon(Ico.CLOCK, (24 * k).roundToInt(), Pal.ON_GOLD, stroke = 2.4f)
+    }
+}
+
+@Composable
+private fun RowScope.MusicMiniCell(weight: Float, shape: RoundedCornerShape) {
+    val k = LocalMetrics.current.spec.t / 96.0
+    Box(Modifier.weight(weight).fillMaxHeight().clip(shape).background(Color(0xFF6B5520)), contentAlignment = Alignment.Center) {
+        SvgIcon(Ico.MUSIC, (26 * k).roundToInt(), Color(0xFFF2E2B0), stroke = 2.4f)
+    }
+}
+
+/** Миниатюра двух плашек: большая (2) и музыка (1); при [bigLeft] большая слева. Рейку не рисуем (Егор 05.11). */
+@Composable
+private fun TwoMiniature(bigLeft: Boolean, gapPx: Int, modifier: Modifier) {
+    val m = LocalMetrics.current
+    val k = m.spec.t / 96.0
+    val small = RoundedCornerShape(m.dp(gapPx))
+    Row(modifier.clip(RoundedCornerShape(m.dp(max(1, (10 * k).roundToInt())))).background(LocalPalette.current.mini)
+        .padding(m.dp(gapPx)), horizontalArrangement = Arrangement.spacedBy(m.dp(gapPx))) {
+        if (bigLeft) { BigMiniCell(2f, small); MusicMiniCell(1f, small) } else { MusicMiniCell(1f, small); BigMiniCell(2f, small) }
+    }
+}
+
+/** Миниатюра четырёх плашек: музыка, большая плашка, приложения и телефон; при [left] ряды зеркальные. Без рейки. */
 @Composable
 private fun HomeMiniature(left: Boolean, gapPx: Int, modifier: Modifier) {
     val m = LocalMetrics.current
     val k = m.spec.t / 96.0
     val pal = LocalPalette.current
-    val accent = LocalAccent.current
     val gap = m.dp(gapPx)
     val small = RoundedCornerShape(m.dp(gapPx))
     Row(modifier.clip(RoundedCornerShape(m.dp(max(1, (10 * k).roundToInt())))).background(pal.mini)) {
-        Box(Modifier.fillMaxHeight().weight(0.11f).background(pal.btn2))
-        Column(Modifier.weight(0.89f).fillMaxHeight().padding(gap), verticalArrangement = Arrangement.spacedBy(gap)) {
+        Column(Modifier.weight(1f).fillMaxHeight().padding(gap), verticalArrangement = Arrangement.spacedBy(gap)) {
             Row(Modifier.weight(2f).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(gap)) {
-                val cells = listOf<@Composable androidx.compose.foundation.layout.RowScope.() -> Unit>(
-                    {
-                        Box(Modifier.weight(0.33f).fillMaxHeight().clip(small).background(Color(0xFF6B5520)), contentAlignment = Alignment.Center) {
-                            SvgIcon(Ico.MUSIC, (26 * k).roundToInt(), Color(0xFFF2E2B0), stroke = 2.4f)
-                        }
-                    },
-                    {
-                        Box(Modifier.weight(0.67f).fillMaxHeight().clip(small).background(accent), contentAlignment = Alignment.Center) {
-                            SvgIcon(Ico.NAV, (28 * k).roundToInt(), Pal.ON_GOLD, fill = true)
-                        }
-                    },
-                )
-                for (c in if (left) cells.asReversed() else cells) c(this)
+                if (left) { BigMiniCell(0.67f, small); MusicMiniCell(0.33f, small) } else { MusicMiniCell(0.33f, small); BigMiniCell(0.67f, small) }
             }
             Row(Modifier.weight(1f).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(gap)) {
                 val cells = listOf<@Composable androidx.compose.foundation.layout.RowScope.() -> Unit>(

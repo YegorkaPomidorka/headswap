@@ -48,21 +48,41 @@ fun CardBox(modifier: Modifier = Modifier, background: Color = Pal.SURFACE, shap
     }
 }
 
-/** Главный экран: строка статуса, верхний ряд (музыка | навигация) и нижний (приложения | телефон). */
+/**
+ * Главный экран: строка статуса и плашки. Четыре плашки - верхний ряд (музыка | большая плашка) и нижний
+ * (приложения | телефон). Две плашки (2:1, 1:2) - большая и малая на всю высоту, без нижнего ряда.
+ * Большая плашка - навигатор, YouTube, музыка или часы (листают «Слои»), ⇄ на стыке меняет плашки местами.
+ */
 @Composable
 fun HomeScreen() {
     val m = LocalMetrics.current
     val s = m.spec
+    val model = LauncherModel
+    val layout = model.homeLayout
+    val tiles = model.tiles
     // нижний ряд прибит к краю экрана, как блок навигации на рейке: снизу без поля
-    Column(Modifier.fillMaxSize().padding(start = m.dp(s.g), top = m.dp(s.g8), end = m.dp(s.m), bottom = m.dp(if (s.strip) s.m else 0))) {
+    Column(Modifier.fillMaxSize().padding(start = m.dp(s.g), top = m.dp(s.g8), end = m.dp(s.m),
+        bottom = m.dp(if (s.strip || layout.two) s.m else 0))) {
         StatusBar()
         Spacer(Modifier.height(m.dp(s.g8)))
+        val bigMod = Modifier.onGloballyPositioned { model.bigTileRect = it.boundsInRoot() }
+        if (layout.two) {
+            Row(Modifier.weight(1f).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(m.dp(s.g))) {
+                val cells = listOf<@Composable RowScope.() -> Unit>(
+                    { TileCard(tiles.big, Modifier.weight(1f).fillMaxHeight().then(bigMod)) },
+                    { TileCard(tiles.small, Modifier.width(m.dp(s.tileSmall)).fillMaxHeight()
+                        .onGloballyPositioned { model.smallTileRect = it.boundsInRoot() }, small = true) },
+                )
+                for (cell in if (layout == HomeLayout.WIDE_LEFT) cells else cells.asReversed()) cell(this)
+            }
+            return@Column
+        }
         // «Карта слева»: оба ряда в обратном порядке (row-reverse), рейка и содержимое карточек не зеркалятся
-        val mirror = LauncherModel.mapLeft
+        val mirror = model.mapLeft
         Row(Modifier.weight(1f).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(m.dp(s.g))) {
             val top = buildList<@Composable RowScope.() -> Unit> {
                 add { MusicCard(Modifier.width(m.dp(s.music)).fillMaxHeight()) }
-                add { NavCard(Modifier.weight(1f).fillMaxHeight()) }
+                add { TileCard(tiles.big, Modifier.weight(1f).fillMaxHeight().then(bigMod)) }
                 if (s.strip) add { CardBox(Modifier.fillMaxHeight()) { AppsGrid(columns = 2, rows = 3) } }
             }
             for (cell in if (mirror) top.asReversed() else top) cell(this)
