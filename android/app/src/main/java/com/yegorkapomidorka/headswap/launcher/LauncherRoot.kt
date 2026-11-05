@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -156,10 +157,16 @@ private fun Rail() {
                 val parts = status.time.split(":", limit = 2)
                 Column(Modifier.height(m.dp(s.clockH)), horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.spacedBy(m.dp(s.clockGap))) {
-                    Txt(parts[0], s.clockHr, Modifier.height(m.dp(s.clockHr)), color = Pal.RAIL, weight = FontWeight.SemiBold, mono = true)
+                    // строка Txt выше шрифта (lineHeight 1.15): центруем цифры в рамке clockHr, иначе зазоры у чёрточки разные
+                    Box(Modifier.height(m.dp(s.clockHr)), contentAlignment = Alignment.Center) {
+                        Txt(parts[0], s.clockHr, Modifier.wrapContentHeight(unbounded = true), color = Pal.RAIL,
+                            weight = FontWeight.SemiBold, mono = true)
+                    }
                     Box(Modifier.width(m.dp(s.sepW)).height(m.dp(s.sepH)).clip(RoundedCornerShape(m.dp(s.sepH))).background(accent))
-                    Txt(parts.getOrElse(1) { "" }, s.clockHr, Modifier.height(m.dp(s.clockHr)), color = Pal.SEC2,
-                        weight = FontWeight.SemiBold, mono = true)
+                    Box(Modifier.height(m.dp(s.clockHr)), contentAlignment = Alignment.Center) {
+                        Txt(parts.getOrElse(1) { "" }, s.clockHr, Modifier.wrapContentHeight(unbounded = true), color = Pal.SEC2,
+                            weight = FontWeight.SemiBold, mono = true)
+                    }
                 }
             }
             // «Назад» виден всегда: белый везде, кроме главного, где идти некуда (серый, без анимации)
