@@ -269,6 +269,13 @@ class LauncherLogicTest {
         assertEquals(null, PlayerChip.lastOnline(null, null))
     }
 
+    @Test fun lastLocalKeptWhileOnlinePlays() {
+        assertEquals("com.aimp", PlayerChip.lastLocal("com.aimp", PlayerChip.YANDEX))
+        assertEquals("com.spotify", PlayerChip.lastLocal("com.aimp", "com.spotify"))
+        assertEquals("com.aimp", PlayerChip.lastLocal("com.aimp", null))
+        assertEquals(null, PlayerChip.lastLocal(null, PlayerChip.VK))
+    }
+
     @Test fun settingsGridBordersMatchOnAllResolutions() {
         for (row in LauncherSpecs.TABLE) {
             val s = LauncherSpecs.forSize(row[0], row[1])

@@ -69,6 +69,7 @@ internal object LauncherModel {
     var savedNavigator by mutableStateOf<String?>(null)
     var musicPlayer by mutableStateOf<String?>(null)
     var lastOnlinePlayer by mutableStateOf<String?>(null)
+    var lastLocalPlayer by mutableStateOf<String?>(null)
     var catalog by mutableStateOf<List<DesktopAppCatalog.Entry>>(emptyList())
     var catalogLoaded by mutableStateOf(false)
     var status by mutableStateOf(StatusInfo())
@@ -132,6 +133,7 @@ internal object LauncherModel {
         savedNavigator = prefs.navigator
         musicPlayer = prefs.musicPlayer
         lastOnlinePlayer = prefs.lastOnlinePlayer
+        lastLocalPlayer = prefs.lastLocalPlayer
         missedSeenMs = prefs.missedSeenMs
         EmbedHost.onGone = { LauncherActions.embedGone(it) }
         CarAppHost.scaleFor = { pkg -> CarConfigMath.step(prefs.mapScale(pkg)) }
@@ -203,10 +205,15 @@ internal object LauncherModel {
         if (com.yegorkapomidorka.headswap.carapp.CarScaleRestart.needed(pkg)) EmbedHost.restartCar()
     }
     fun chooseMusicPlayer(pkg: String?) { musicPlayer = pkg; prefs.musicPlayer = pkg; noteOnlinePlayer(pkg) }
-    /** Выбрали или услышали [pkg]: если это онлайн-плеер, он становится вторым слотом чипа. */
+    /**
+     * Выбрали или услышали [pkg]: онлайн-плеер становится вторым слотом чипа, свой - иконкой первого.
+     * Иконка каждого слота держится, пока играет плеер другого.
+     */
     fun noteOnlinePlayer(pkg: String?) {
         val next = PlayerChip.lastOnline(lastOnlinePlayer, pkg)
         if (next != lastOnlinePlayer) { lastOnlinePlayer = next; prefs.lastOnlinePlayer = next }
+        val local = PlayerChip.lastLocal(lastLocalPlayer, pkg?.takeIf { it != context.packageName })
+        if (local != lastLocalPlayer) { lastLocalPlayer = local; prefs.lastLocalPlayer = local }
     }
     /** Пропущенные не новее этого момента просмотрены: счётчик сбрасывается после тапа по карточке. */
     var missedSeenMs by mutableLongStateOf(0L)
