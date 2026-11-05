@@ -559,7 +559,7 @@ class HeadUnit:
         # живое окно (--view): sink-и зовутся с нитей приёма и не должны блокировать; session_up - можно слать касания
         self.video_sink = None                      # callable(bytes): тело VIDEO_DATA
         self.size_sink = None                       # callable(w, h): размер из INIT_DONE моста
-        self.speakers = Speakers(self.log) if getattr(opts, "view", False) and not getattr(opts, "mute", False) else None   # --view: MEDIA/TTS в динамики ПК
+        self.speakers: Speakers | None = None       # --view: MEDIA/TTS в динамики ПК (ставит main)
         self.session_up = threading.Event()
         self.vfile = None
         self.t0 = 0.0
@@ -1322,6 +1322,8 @@ def main(argv=None) -> int:
                           pause_cycles=a.pause_cycles, pause_every=a.pause_every, pause_for=a.pause_for,
                           size=a.size))
     if a.view:
+        if not a.mute:
+            hu.speakers = Speakers(hu.log)
         return run_view(hu, a.view_scale)
     hu.run()
     return 0
