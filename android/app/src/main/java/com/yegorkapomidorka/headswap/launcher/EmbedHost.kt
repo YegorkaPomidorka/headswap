@@ -56,6 +56,8 @@ internal class EmbedSlot(val name: String) {
     val lock = Any()
     var texture: SurfaceTexture? = null
     var textureDisplay = -1
+    /** Смена значения пересоздаёт TextureView слоя: свежая текстура без старого продюсера (кнопка перезапуска). */
+    var textureGen by mutableStateOf(0)
 
     // Только рабочий поток.
     var surface: Surface? = null
@@ -192,6 +194,30 @@ internal object EmbedHost {
             unproject(); dropSurface(nav)
             CarAppHost.stop()
             reconcile(nav)
+        }
+    }
+
+    /**
+     * Кнопка «Перезапустить навигатор» для любого навигатора. Свой хост - как [restartCar]. Окно (Google Карты, Waze):
+     * отпустить окно, выбросить текстуру и запустить навигатор заново на свежей - иначе в карточке может остаться
+     * последний кадр прежнего навигатора (стенд 05.11: после Яндекса на своём хосте Google Карты «висели»).
+     */
+    fun restartNav() {
+        worker.post {
+            if (projCar) {
+                AppLog.i("EMBED nav: перезапуск навигатора на своём хосте", false)
+                unproject(); dropSurface(nav)
+                CarAppHost.stop()
+                reconcile(nav)
+                return@post
+            }
+            if (nav.wantKey == null) return@post
+            AppLog.i("EMBED nav: перезапуск навигатора окном (${nav.pkg}) на свежей текстуре", false)
+            unproject()
+            releaseLease(nav)
+            synchronized(nav.lock) { nav.texture = null }
+            nav.status = EmbedStatus.STARTING
+            main.post { nav.textureGen++ } // новый TextureView -> textureAvailable -> reconcile создаст окно и запустит
         }
     }
 

@@ -143,7 +143,7 @@ fun LauncherSettingsScreen() {
                                         NoteCard(stringResource(R.string.l_nav_yandex_plus), d, Modifier.weight(1f).fillMaxHeight())
                                     }
                                 } else RestartNavCard(d, cell(4).fillMaxWidth())
-                            }
+                            } else if (navPkg != null) RestartNavCard(d, cell(2).fillMaxWidth()) // навигатор окном (Google Карты)
                         }
                         SettingsPage.MUSIC -> {
                             val players by produceState(emptyList<String>()) {
@@ -530,7 +530,7 @@ private fun RestartNavCard(d: SettingsDims, modifier: Modifier) {
     val s = m.spec
     val label = stringResource(R.string.l_nav_restart)
     Pressable(modifier.clip(RoundedCornerShape(m.dp(s.radius))).background(Pal.SURFACE), description = label,
-        onTap = { EmbedHost.restartCar() }) { pressed ->
+        onTap = { EmbedHost.restartNav() }) { pressed ->
         if (pressed) Box(Modifier.matchParentSize().background(Pal.SURFACE_PRESSED))
         Row(Modifier.fillMaxSize().padding(start = m.dp(d.padStart), end = m.dp(d.padEnd)), verticalAlignment = Alignment.CenterVertically) {
             Txt(label, s.f2, ellipsis = false)
