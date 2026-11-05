@@ -281,6 +281,9 @@ object PlayerChip {
 
     /** Последний онлайн-плеер после того, как выбрали или услышали [pkg]: меняется, только если это онлайн-плеер. */
     fun lastOnline(previous: String?, pkg: String?): String? = pkg?.takeIf { it in ONLINE } ?: previous
+
+    /** Последний свой плеер после того, как выбрали или услышали [pkg]: меняется, только если это не онлайн-плеер. */
+    fun lastLocal(previous: String?, pkg: String?): String? = pkg?.takeIf { it !in ONLINE } ?: previous
 }
 
 /**

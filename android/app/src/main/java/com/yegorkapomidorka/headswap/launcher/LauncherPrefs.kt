@@ -110,6 +110,11 @@ class LauncherPrefs(context: Context) {
         get() = prefs.getString("last_online_player", null)
         set(value) { prefs.edit().putString("last_online_player", value).apply() }
 
+    /** Последний свой плеер (иконка первого слота чипа, пока он не закреплён): что слушали или выбирали последним. */
+    var lastLocalPlayer: String?
+        get() = prefs.getString("last_local_player", null)
+        set(value) { prefs.edit().putString("last_local_player", value).apply() }
+
     /** Пропущенные не новее этого момента уже просмотрены (тап по карточке «Телефон»). */
     var missedSeenMs: Long
         get() = prefs.getLong("missed_seen", 0L)
