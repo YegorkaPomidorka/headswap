@@ -1074,8 +1074,8 @@ class BridgeService : Service() {
         owner.core.transcodeEnabled = true
         owner.core.spliceMs = 0L
         owner.core.carVwId = aaPrefs.carPreset == CarPreset.VW_ID_UNYX
-        // кнопка голоса: теневая AA без экрана и микрофона, ассистента открываем на телефоне
-        owner.core.phoneAssistant = { main.post { PhoneAssistant.launch(applicationContext) } }
+        // кнопка голоса: теневая AA без экрана и микрофона, помощника телефона открываем на дисплее рабочего стола
+        owner.core.phoneAssistant = { main.post { PhoneAssistant.launch(applicationContext, DexState.displayId) } }
         if (wakeLock == null) {
             wakeLock = getSystemService(PowerManager::class.java)
                 .newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "headswap:session")
