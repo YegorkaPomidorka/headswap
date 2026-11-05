@@ -44,6 +44,39 @@ adb reverse tcp:7240 tcp:7240
 python carlife_hu.py --duration 120
 ```
 
+## Стенд одной командой (`stand.ps1`)
+
+Телефон по USB с adb, на ПК окно ГУ:
+
+```
+.\stand.ps1 -Build              # собрать и поставить smoke, режим рабочего стола, активация, окно
+.\stand.ps1                     # без пересборки
+.\stand.ps1 -Mode aa -Size 1920x720 -HuArgs '--touch-test'
+```
+
+Скрипт сам убирает из debug-манифеста на время сборки `TEMPLATE_RENDERER` (иначе smoke не встаёт рядом с release, ADR 0022), пишет `bridgeMode` в `aa.xml`, активирует мост с ПК (`ManualAccessLauncher`), делает `adb reverse`, запускает `carlife_hu.py --view` и сервис моста. Логи эмулятора и телефона кладёт в `out/stand-<время>/`.
+
+## Живое окно
+
+`--view` открывает окно с видео от моста в реальном времени; клики мышью уходят мосту как касания ГУ. Нужны tkinter (идёт с Python для Windows) и `ffmpeg` в PATH. Эмулятор слушает порт, поэтому запускается первым, потом мост:
+
+```
+adb reverse tcp:7240 tcp:7240
+python carlife_hu.py --view --size 1920x720
+# в другом терминале, пока окно ждёт мост:
+adb shell am start-foreground-service -n com.yegorkapomidorka.headswap.smoke/com.yegorkapomidorka.headswap.BridgeService --ei debug_tcp 7240
+```
+
+Пакет smoke (`applicationId` с суффиксом `.smoke`) собирается задачей `assembleSmoke`; в нём включён `debug_tcp`. Имя класса сервиса полное: он лежит в `namespace` `com.yegorkapomidorka.headswap`, а сокращение `.BridgeService` `am` развернёт в пакет `...smoke`. У debug-сборки пакет `com.yegorkapomidorka.headswap`, а `--ei debug_tcp 7240` тот же.
+
+- `--size WxH` (по умолчанию `1920x720`) — экран ГУ, который эмулятор просит в `VIDEO_ENCODER_INIT`. Мост отвечает своим размером в `INIT_DONE`; в логе обе цифры (`video size from INIT_DONE: 1920x720 (same as asked)`), окно подстраивается под ответ моста.
+- `--view-scale K` — масштаб окна. По умолчанию подбирается под экран ПК (не больше 1.0); координаты кликов пересчитываются обратно в пиксели видео.
+- `--duration` с `--view` по умолчанию без ограничения; закрытие окна и Ctrl+C завершают сессию так же, как истечение времени (итог в логе).
+- Левая кнопка: нажатие = DOWN, перетаскивание = MOVE (не чаще 60 раз в секунду), отпускание = UP. Правая кнопка, Esc, Backspace — хард-кнопка BACK (`TOUCH_CAR_HARD_KEY_CODE`, код 0x0E); средняя кнопка и Home — HOME (0x01; мост транслирует его в Android HOME только в режиме Headswap Desktop).
+- Работает и с `--transport tcp6`.
+
+Конвейер: видео пишется в `out/carlife_video.h264` и параллельно уходит в `ffmpeg` (`-f h264 -i pipe:0 -f rawvideo -pix_fmt rgb24`), кадры показываются через tkinter без Pillow. Сетевой цикл эмулятора окном не блокируется: ffmpeg кормится отдельной нитью, в окно идёт только последний кадр. Задержка картинки около 70 мс. Проверка конвейера без телефона: `python carlife_view.py file.h264 1920x720 0.75`.
+
 ## Режим 6 сокетов (беспроводной формат)
 
 В беспроводном формате CarLife у каждого канала свой TCP-сокет и нет внешнего заголовка. Телефон слушает шесть портов, эмулятор подключается к ним как клиент (CMD 7240, VIDEO 8240, MEDIA 9240, TTS 9241, VR 9242, TOUCH 9340). Порты достаём с телефона через `adb forward`, поэтому хост по умолчанию 127.0.0.1:
