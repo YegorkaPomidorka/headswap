@@ -13,7 +13,7 @@
     <string name="set_sound">Звук</string>
     <string name="set_usb_audio_title">Звук через Headswap</string>
     <string name="set_usb_audio_sub">В динамики машины по кабелю или Wi-Fi. Выключено — по Bluetooth</string>
-    <string name="set_usb_audio_desktop">В режиме рабочего стола звук идёт по Bluetooth</string>
+    <string name="set_usb_audio_desktop">Для звука на рабочем столе повторите активацию доступа. Пока звук идёт по Bluetooth</string>
     <string name="set_calls_title">Сообщать ГУ о звонках</string>
     <string name="set_calls_sub">Нужно разрешение «Телефон»: Headswap узнаёт о входящем и сообщает машине, музыка на время звонка глушится</string>
 
