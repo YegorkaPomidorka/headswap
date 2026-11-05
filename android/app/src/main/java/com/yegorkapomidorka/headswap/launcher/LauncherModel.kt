@@ -234,7 +234,9 @@ internal object LauncherModel {
     fun chooseNavHints(pkg: String, on: Boolean) {
         prefs.setNavHints(pkg, on); navHintsRev++
         AppLog.i("LAUNCHER подсказки на приборке $pkg: ${if (on) "вкл" else "выкл"}", false)
-        EmbedHost.reproject() // окно навигатора пересобирается: свой хост Car App или обычное окно
+        // как кнопка «Перезапустить навигатор»: старый режим закрывается целиком (хост или окно на свежей текстуре),
+        // reconcile поднимает новый - свой хост Car App или обычное окно (CarAppHost.allowFor уже видит новое значение)
+        if (navigatorPkg == pkg) EmbedHost.restartNav()
         applyShadowNav()
     }
 
