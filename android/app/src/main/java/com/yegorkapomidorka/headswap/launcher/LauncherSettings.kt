@@ -117,11 +117,16 @@ fun LauncherSettingsScreen() {
                 val top = SettingsGrid.top(row, h, gap)
                 return Modifier.offset(y = m.dp(top)).height(m.dp(SettingsGrid.bottom(row + span - 1, h, gap) - top))
             }
+            // кнопку (Pressable) в ряд ставит обёртка: рамку шайбы Pressable рисует до своего modifier, и offset из cell()
+            // её не сдвигал - рамки всех разделов рисовались поверх «Вид» (h737)
+            @Composable
+            fun Placed(row: Int, content: @Composable () -> Unit) =
+                Box(cell(row).fillMaxWidth(), propagateMinConstraints = true) { content() }
             Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(m.dp(s.g))) {
                 Box(Modifier.width(m.dp(d.catW)).fillMaxHeight()) {
                     for ((i, page) in SettingsPage.entries.filter { it != SettingsPage.ABOUT }.withIndex()) {
                         val selected = model.settingsPage == page || (page == SettingsPage.SYSTEM && model.settingsPage == SettingsPage.ABOUT)
-                        CategoryButton(page, selected, d, cell(i).fillMaxWidth())
+                        Placed(i) { CategoryButton(page, selected, d, Modifier) }
                     }
                 }
                 Box(Modifier.weight(1f).fillMaxHeight()) {
@@ -144,8 +149,8 @@ fun LauncherSettingsScreen() {
                                         RestartNavCard(d, Modifier.weight(1f).fillMaxHeight())
                                         NoteCard(stringResource(R.string.l_nav_yandex_plus), d, Modifier.weight(1f).fillMaxHeight())
                                     }
-                                } else RestartNavCard(d, cell(4).fillMaxWidth())
-                            } else if (navPkg != null) RestartNavCard(d, cell(2).fillMaxWidth()) // навигатор окном (Google Карты)
+                                } else Placed(4) { RestartNavCard(d, Modifier) }
+                            } else if (navPkg != null) Placed(2) { RestartNavCard(d, Modifier) } // навигатор окном (Google Карты)
                         }
                         SettingsPage.MUSIC -> {
                             val players by produceState(emptyList<String>()) {
@@ -167,7 +172,7 @@ fun LauncherSettingsScreen() {
                         SettingsPage.SYSTEM -> {
                             val info = systemInfo()
                             for ((i, row) in info.withIndex()) InfoCard(row.first, row.second, d, cell(i).fillMaxWidth())
-                            AboutLinkCard(d, cell(info.size).fillMaxWidth())
+                            Placed(info.size) { AboutLinkCard(d, Modifier) }
                         }
                         SettingsPage.ABOUT -> AboutPanel(d, rowH)
                     }
