@@ -268,7 +268,8 @@ class Viewer:
 
     def __init__(self, ffmpeg: str, size: tuple[int, int], scale: float | None, touch: Callable[[int, int, int], None],
                  key: Callable[[int], None], on_close: Callable[[], None], alive: Callable[[], bool],
-                 log: Callable[[str], None], back_code: int, home_code: int, title: str = "CarLife HU"):
+                 log: Callable[[str], None], back_code: int, home_code: int, title: str = "CarLife HU",
+                 wheel: list[tuple[str, Callable[[], None]]] | None = None):
         import tkinter as tk
         self.tk = tk
         self.root = tk.Tk()
@@ -282,6 +283,16 @@ class Viewer:
         self.dw, self.dh = dw, dh
         self.canvas = tk.Canvas(self.root, width=dw, height=dh, bg="#101010", highlightthickness=0)
         self.canvas.pack()
+        if wheel:                                    # кнопки руля под видео
+            bar = tk.Frame(self.root, bg="#202020")
+            bar.pack(fill="x")
+            for label, fn in wheel:
+                def press(label=label, fn=fn):
+                    self.log(f"view: руль {label}")
+                    fn()
+                tk.Button(bar, text=label, command=press, padx=10, pady=4, bg="#303030", fg="#eeeeee",
+                          activebackground="#505050", activeforeground="#ffffff", relief="flat",
+                          takefocus=0).pack(side="left", padx=2, pady=3)
         self.text = self.canvas.create_text(dw // 2, dh // 2, fill="#888888", text="Waiting for the bridge...")
         self.item = None
         self.photo = None

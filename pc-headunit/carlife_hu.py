@@ -1059,6 +1059,15 @@ class HeadUnit:
         except OSError as e:
             self.finish(f"write error: {e}")
 
+    def send_voice_key(self):
+        """Кнопка голоса как у Vezel: MODULE_CONTROL moduleID=4 (VR) statusID=1, не hard key."""
+        if not self.session_up.is_set() or self.stop.is_set():
+            return
+        try:
+            self.send_cmd(MODULE_CONTROL, cmd_inner(MODULE_CONTROL, pb_int(1, 4) + pb_int(2, 1)), "VR=1 (кнопка голоса)")
+        except OSError as e:
+            self.finish(f"write error: {e}")
+
     def send_hard_key(self, code: int):
         """Хард-кнопка ГУ (TOUCH_CAR_HARD_KEY_CODE, одно сообщение на нажатие)."""
         if not self.session_up.is_set() or self.stop.is_set():
@@ -1182,6 +1191,24 @@ def parse_args(argv=None) -> argparse.Namespace:
     return a
 
 
+def wheel_buttons(hu: HeadUnit) -> list[tuple[str, object]]:
+    """Ряд кнопок руля под окном. Vezel по CarLife шлёт только голос (MODULE_CONTROL VR=1) и BACK (0x0E);
+    треки и трубка у него идут по BT, здесь они hard key CarLife, как у других ГУ (HARD_KEY_TO_ANDROID моста)."""
+    k = hu.send_hard_key
+    return [
+        ("Голос", hu.send_voice_key),
+        ("VR_START", lambda: k(0x21)),
+        ("|<<", lambda: k(0x0F)),
+        (">>|", lambda: k(0x10)),
+        ("Play", lambda: k(0x1F)),
+        ("Pause", lambda: k(0x20)),
+        ("Трубка", lambda: k(0x02)),
+        ("Сброс", lambda: k(0x03)),
+        ("Назад", lambda: k(HARD_KEY_BACK)),
+        ("Домой", lambda: k(HARD_KEY_HOME)),
+    ]
+
+
 def run_view(hu: HeadUnit, scale: float | None) -> int:
     """--view: сессия в рабочей нити, окно tkinter в главной (tkinter другого не терпит)."""
     import signal
@@ -1194,7 +1221,7 @@ def run_view(hu: HeadUnit, scale: float | None) -> int:
     if not hu.tcp6:
         hu.listen()                                         # порт занят - узнаём сразу, до окна
     viewer = V.Viewer(ffmpeg, hu.o.size, scale, hu.send_touch_event, hu.send_hard_key, lambda: hu.finish("window closed"),
-                      lambda: worker.is_alive(), hu.log, HARD_KEY_BACK, HARD_KEY_HOME)
+                      lambda: worker.is_alive(), hu.log, HARD_KEY_BACK, HARD_KEY_HOME, wheel=wheel_buttons(hu))
     hu.video_sink, hu.size_sink = viewer.pipe.on_video, viewer.pipe.set_video_size
 
     def work():
