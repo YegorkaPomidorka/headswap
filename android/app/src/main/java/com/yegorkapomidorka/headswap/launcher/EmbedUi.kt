@@ -88,7 +88,7 @@ fun EmbedLayers() {
     EmbedLayer(EmbedHost.nav, navTarget, shown = navShown, interactive = area == Area.Navigator,
         rounded = area != Area.Navigator, background = LocalPalette.current.mapBg,
         starting = stringResource(R.string.l_nav_starting), onCardTap = { LauncherActions.openNavigator() }, tag = navTag,
-        cardViewButton = area == Area.Home && LocalMetrics.current.spec.strip,
+        cardViewButton = area == Area.Home && !LocalMetrics.current.spec.cardViewInRail,
         crop = navCrop, buffer = if (carNav && areaRect != null) areaRect.width.roundToInt() to areaRect.height.roundToInt() else null)
     if (appKey != null) {
         val label = model.starting ?: ""

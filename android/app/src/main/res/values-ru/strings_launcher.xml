@@ -99,6 +99,11 @@
     <string name="l_s_theme_light">Светлое золото</string>
     <string name="l_s_theme_auto">Авто</string>
     <string name="l_s_theme_sub">Авто — по режиму фар машины</string>
+    <string name="l_s_rail">Боковая панель</string>
+    <string name="l_s_rail_small">Маленькая</string>
+    <string name="l_s_rail_medium">Средняя</string>
+    <string name="l_s_rail_normal">Обычная</string>
+    <string name="l_s_rail_cut">Обрезанная</string>
     <string name="l_s_anim">Анимации кнопок</string>
     <string name="l_s_map_scale">Масштаб карты</string>
     <string name="l_s_map_scale_sub">Только для %1$s · меняется сразу</string>

@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -75,7 +76,8 @@ fun LauncherRoot(connected: Boolean) {
     BoxWithConstraints(Modifier.fillMaxSize().knobTouchReset()) {
         val w = constraints.maxWidth
         val h = constraints.maxHeight
-        val spec = remember(w, h) { LauncherSpecs.forSize(w, h) }
+        val railSize = model.railSize
+        val spec = remember(w, h, railSize) { LauncherSpecs.forSize(w, h, railSize) }
         val metrics = remember(spec, density) { LauncherMetrics(spec, density) }
         val pal = if (model.lightTheme) Palettes.LIGHT else Palettes.DARK
         CompositionLocalProvider(LocalMetrics provides metrics, LocalAccent provides Pal.GOLD, LocalPalette provides pal) {
@@ -148,7 +150,18 @@ private fun Rail() {
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.SpaceBetween,
         ) {
-            Txt(status.time, s.f1, color = Pal.RAIL, weight = FontWeight.SemiBold, mono = true)
+            if (s.clockInRail) Txt(status.time, s.f1, color = Pal.RAIL, weight = FontWeight.SemiBold, mono = true)
+            // «Средняя»: часы, золотая чёрточка и минуты столбиком; в «Маленькой» и «Обрезанной» часов нет
+            if (s.clockStacked) {
+                val parts = status.time.split(":", limit = 2)
+                Column(Modifier.height(m.dp(s.clockH)), horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(m.dp(s.clockGap))) {
+                    Txt(parts[0], s.clockHr, Modifier.height(m.dp(s.clockHr)), color = Pal.RAIL, weight = FontWeight.SemiBold, mono = true)
+                    Box(Modifier.width(m.dp(s.sepW)).height(m.dp(s.sepH)).clip(RoundedCornerShape(m.dp(s.sepH))).background(accent))
+                    Txt(parts.getOrElse(1) { "" }, s.clockHr, Modifier.height(m.dp(s.clockHr)), color = Pal.SEC2,
+                        weight = FontWeight.SemiBold, mono = true)
+                }
+            }
             // «Назад» виден всегда: белый везде, кроме главного, где идти некуда (серый, без анимации)
             val back = rememberPressAnim(600)
             RoundButton(s.rb, stringResource(R.string.l_back), onTap = { LauncherActions.embeddedBack() }, enabled = canBack,
@@ -176,8 +189,8 @@ private fun Rail() {
                 background = if (inSettings) accent.copy(alpha = 0.32f) else Color.Transparent) {
                 GearIcon(s.ric, if (inSettings) Pal.RAIL else Pal.SEC2) { gear.progress }
             }
-            // в ленте «Вид карточки» - стеклянная кнопка на карте
-            if (!s.strip) CardViewButton(s.rb, s.ric, Color.Transparent, Pal.SEC2)
+            // в ленте «Вид карточки» - стеклянная кнопка на карте (если рейка узкая - всё равно в рейке)
+            if (s.cardViewInRail) CardViewButton(s.rb, s.ric, Color.Transparent, Pal.SEC2)
         }
         // стрелка навигации: 2 оборота и стоп в случайной другой стороне света
         val spin = rememberNavSpin()
@@ -218,6 +231,11 @@ fun StatusBar(title: String? = null, showNet: Boolean = true) {
         Modifier.fillMaxWidth().height(m.dp(s.statusH)), verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(m.dp(s.g), Alignment.End),
     ) {
+        // в узкой рейке часов нет: время слева, прижато к краю (перед заголовком, если он есть)
+        if (s.clockInStatus) {
+            Txt(st.time, s.fs, color = Pal.TEXT, weight = FontWeight.SemiBold, mono = true)
+            if (title == null) Spacer(Modifier.weight(1f))
+        }
         // заголовок экрана слева (настройки), статус справа
         if (title != null) Txt(title, s.fs, Modifier.weight(1f), color = Pal.TEXT, weight = FontWeight.SemiBold)
         Ltr {

@@ -127,7 +127,8 @@ fun LauncherSettingsScreen() {
                     when (model.settingsPage) {
                         SettingsPage.LOOK -> {
                             ThemeCard(d, cell(0, 2).fillMaxWidth())
-                            SwitchCard(stringResource(R.string.l_s_anim), model.animations, d, cell(2).fillMaxWidth()) {
+                            RailSizeCard(d, cell(2, 2).fillMaxWidth())
+                            SwitchCard(stringResource(R.string.l_s_anim), model.animations, d, cell(4).fillMaxWidth()) {
                                 model.chooseAnimations(it)
                             }
                         }
@@ -256,6 +257,93 @@ private fun ThemeCard(d: SettingsDims, modifier: Modifier) {
                         }
                     }
                 }
+            }
+        }
+    }
+}
+
+/** «Боковая панель»: размер рейки, миниатюры вариантов на равную ширину. «Обрезанная» - только на экранах высотой 480. 2 ряда. */
+@Composable
+private fun RailSizeCard(d: SettingsDims, modifier: Modifier) {
+    val m = LocalMetrics.current
+    val s = m.spec
+    val model = LauncherModel
+    Card(modifier) {
+        Column(
+            Modifier.fillMaxSize().padding(start = m.dp(d.padStart), end = m.dp(d.padEnd), top = m.dp(d.padV), bottom = m.dp(d.padV)),
+            verticalArrangement = Arrangement.spacedBy(m.dp(s.g4)),
+        ) {
+            Txt(stringResource(R.string.l_s_rail), s.f2)
+            Row(Modifier.weight(1f).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(m.dp(s.g8))) {
+                val options = listOfNotNull(
+                    if (s.h480) RailSize.CUT to R.string.l_s_rail_cut else null,
+                    RailSize.SMALL to R.string.l_s_rail_small,
+                    RailSize.MEDIUM to R.string.l_s_rail_medium,
+                    RailSize.NORMAL to R.string.l_s_rail_normal,
+                )
+                for ((v, res) in options) {
+                    val label = stringResource(res)
+                    OptionBox(model.railSize == v, Modifier.weight(1f).fillMaxHeight(), RoundedCornerShape(m.dp(s.radius)), label,
+                        unselected = LocalPalette.current.btnSet, onTap = { model.chooseRailSize(v) }) {
+                        Column(Modifier.fillMaxSize().padding(m.dp(s.g4)), horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(m.dp(s.g4))) {
+                            RailMiniature(v, Modifier.weight(1f).fillMaxWidth())
+                            Txt(label, (s.f2 * 0.85).roundToInt(), weight = FontWeight.SemiBold, ellipsis = false)
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Миниатюра главного для варианта панели: слева рейка (кнопки точками, золотой блок навигации внизу, часы чертами),
+ * справа музыка с картой и нижний ряд. В «Маленькой» и «Обрезанной» время - чертой сверху слева в правой части.
+ */
+@Composable
+private fun RailMiniature(size: RailSize, modifier: Modifier) {
+    val m = LocalMetrics.current
+    val k = m.spec.t / 96.0
+    fun r(v: Int) = max(1, (v * k).roundToInt())
+    val pal = LocalPalette.current
+    val accent = LocalAccent.current
+    val gap = m.dp(r(4))
+    val small = RoundedCornerShape(gap)
+    val frac = when (size) {
+        RailSize.NORMAL -> 0.15f
+        RailSize.MEDIUM -> 0.11f
+        RailSize.SMALL -> 0.07f
+        RailSize.CUT -> 0.08f
+    }
+    val inStatus = size == RailSize.SMALL || size == RailSize.CUT
+    val mark = pal.fg2
+    Row(modifier.clip(RoundedCornerShape(m.dp(r(6)))).background(pal.mini)) {
+        Column(Modifier.weight(frac).fillMaxHeight().background(pal.btn2), horizontalAlignment = Alignment.CenterHorizontally) {
+            Column(Modifier.weight(0.8f).fillMaxWidth().padding(vertical = gap), horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.SpaceEvenly) {
+                when (size) {
+                    RailSize.NORMAL -> Box(Modifier.fillMaxWidth(0.6f).height(m.dp(r(2))).background(mark))
+                    RailSize.MEDIUM -> {
+                        Box(Modifier.fillMaxWidth(0.5f).height(m.dp(r(2))).background(mark))
+                        Box(Modifier.fillMaxWidth(0.3f).height(m.dp(r(2))).background(accent))
+                        Box(Modifier.fillMaxWidth(0.5f).height(m.dp(r(2))).background(mark.copy(alpha = 0.6f)))
+                    }
+                    else -> Unit
+                }
+                repeat(4) { Box(Modifier.size(m.dp(r(4))).clip(CircleShape).background(mark.copy(alpha = 0.6f))) }
+            }
+            Box(Modifier.weight(0.2f).fillMaxWidth().background(accent))
+        }
+        Column(Modifier.weight(1f - frac).fillMaxHeight().padding(gap), verticalArrangement = Arrangement.spacedBy(gap)) {
+            if (inStatus) Box(Modifier.fillMaxWidth(0.25f).height(m.dp(r(2))).background(mark))
+            Row(Modifier.weight(2f).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(gap)) {
+                Box(Modifier.weight(0.33f).fillMaxHeight().clip(small).background(Color(0xFF6B5520)))
+                Box(Modifier.weight(0.67f).fillMaxHeight().clip(small).background(accent))
+            }
+            Row(Modifier.weight(1f).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(gap)) {
+                Box(Modifier.weight(0.67f).fillMaxHeight().clip(small).background(pal.btn2))
+                Box(Modifier.weight(0.33f).fillMaxHeight().clip(small).background(pal.btn2))
             }
         }
     }
