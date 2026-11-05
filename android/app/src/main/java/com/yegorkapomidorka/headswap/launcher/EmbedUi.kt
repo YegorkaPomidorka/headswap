@@ -74,8 +74,11 @@ fun EmbedLayers() {
     val tiles = model.tiles
     val ytKey = model.youtubeKey
     val ytOnHome = area == Area.Home && ytKey != null && CardView.YOUTUBE in listOf(tiles.big, tiles.small)
+    // Плашка YouTube запомнила его как текущее приложение: «Слои» увели YouTube с плашки - окно остаётся за ним
+    // (скрыто, того же размера) и при возврате продолжает, а не запускается заново (Егор 05.11)
+    LaunchedEffect(ytOnHome, ytKey) { if (ytOnHome) model.appKey = ytKey }
     val appKey = if (ytOnHome) ytKey else model.appKey
-    val appTarget = if (ytOnHome) model.ytCardRect else areaRect
+    val appTarget = if (area == Area.Home && appKey != null && appKey == ytKey) model.ytCardRect ?: areaRect else areaRect
     LaunchedEffect(appKey, appTarget?.width, appTarget?.height) {
         EmbedHost.want(EmbedHost.app, appKey, appTarget?.width?.roundToInt() ?: 0, appTarget?.height?.roundToInt() ?: 0)
     }
