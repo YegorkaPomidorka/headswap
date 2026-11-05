@@ -110,11 +110,23 @@ object CatalogLists {
 object NavigatorPick {
     const val YANDEX_NAVI = "ru.yandex.yandexnavi"
     const val YANDEX_MAPS = "ru.yandex.yandexmaps"
+    const val GOOGLE_MAPS = "com.google.android.apps.maps"
     val KNOWN = listOf(YANDEX_NAVI, YANDEX_MAPS, "ru.dublgis.dgismobile",
-        "com.google.android.apps.maps", "com.waze", "app.organicmaps")
+        GOOGLE_MAPS, "com.waze", "app.organicmaps")
 
     /** Машинная часть только с подпиской Яндекс Плюс (у Карт тот же NavigationCarAppService, что у Навигатора). */
     fun needsPlus(pkg: String?): Boolean = pkg == YANDEX_NAVI || pkg == YANDEX_MAPS
+
+    /**
+     * «Подсказки на приборке» по умолчанию (h800, ADR 0028). Вкл - машинная часть на своём хосте Car App или теневая AA;
+     * выкл - навигатор окном, как на телефоне. По умолчанию выкл у всех (Егор 05.11): окно работает без Плюса и без AA.
+     */
+    @Suppress("UNUSED_PARAMETER")
+    fun hintsDefault(pkg: String): Boolean = false
+
+    /** Теневую AA держим, пока у выбранного навигатора подсказки включены; навигатора нет - как раньше, держим. */
+    fun shadowWanted(metaNavi: Boolean, navPkg: String?, hints: (String) -> Boolean): Boolean =
+        metaNavi && (navPkg == null || hints(navPkg))
 
     fun defaultFor(installed: Set<String>): String? = KNOWN.firstOrNull { it in installed }
 
@@ -298,11 +310,51 @@ object NetLabel {
     }
 }
 
-/** Вид центральной карточки на месте навигации (иконка «слои» переключает по кругу). */
-enum class CardView { NAVIGATOR, CLOCK;
-    fun next(): CardView = entries[(ordinal + 1) % entries.size]
+/**
+ * Что показывает плашка главного. Имена - значения prefs: «card_view» (большая, с прошлых версий NAVIGATOR/CLOCK)
+ * и «small_view» (малая).
+ */
+enum class CardView { NAVIGATOR, YOUTUBE, MUSIC, CLOCK;
+    companion object {
+        fun restore(name: String?, default: CardView = NAVIGATOR): CardView = entries.firstOrNull { it.name == name } ?: default
+    }
+}
+
+/** Раскладка главного: четыре плашки или две на всю высоту - 2:1 (большая слева) и 1:2 (большая справа). */
+enum class HomeLayout { QUAD, WIDE_LEFT, WIDE_RIGHT;
+    val two: Boolean get() = this != QUAD
 
     companion object {
-        fun restore(name: String?): CardView = entries.firstOrNull { it.name == name } ?: NAVIGATOR
+        fun restore(name: String?): HomeLayout = entries.firstOrNull { it.name == name } ?: QUAD
+    }
+}
+
+/** Содержимое большой и малой плашки. */
+data class HomeTiles(val big: CardView, val small: CardView)
+
+/**
+ * Правила плашек главного. «Слои» листают большую плашку и пропускают то, что в малой; ⇄ меняет плашки местами.
+ * В четырёх плашках малая - всегда музыка. YouTube не ставится, если его нет на телефоне ([youtube] false).
+ */
+object HomeTilesLogic {
+    fun normalize(t: HomeTiles, layout: HomeLayout, youtube: Boolean): HomeTiles {
+        val big = t.big.takeIf { youtube || it != CardView.YOUTUBE } ?: CardView.NAVIGATOR
+        if (!layout.two) return HomeTiles(if (big == CardView.MUSIC) CardView.NAVIGATOR else big, CardView.MUSIC)
+        var small = t.small.takeIf { youtube || it != CardView.YOUTUBE } ?: CardView.MUSIC
+        if (small == big) small = if (big == CardView.MUSIC) CardView.NAVIGATOR else CardView.MUSIC
+        return HomeTiles(big, small)
+    }
+
+    fun nextBig(t: HomeTiles, layout: HomeLayout, youtube: Boolean): HomeTiles {
+        val n = normalize(t, layout, youtube)
+        val order = CardView.entries.filter {
+            it == n.big || (it != n.small && (youtube || it != CardView.YOUTUBE) && (layout.two || it != CardView.MUSIC))
+        }
+        return n.copy(big = order[(order.indexOf(n.big) + 1) % order.size])
+    }
+
+    fun swap(t: HomeTiles, layout: HomeLayout, youtube: Boolean): HomeTiles {
+        val n = normalize(t, layout, youtube)
+        return if (layout.two) HomeTiles(n.small, n.big) else n
     }
 }

@@ -6,7 +6,7 @@
     <string name="l_choose_app">Choose an app</string>
     <string name="l_back">Back</string>
     <string name="l_settings">Settings</string>
-    <string name="l_card_view">Card view</string>
+    <string name="l_card_view">Change big tile</string>
     <string name="l_navigation">Navigation</string>
     <string name="l_add">Add</string>
     <string name="l_remove_q">Remove?</string>
@@ -20,9 +20,17 @@
     <string name="l_nav_choose">Choose a navigator</string>
     <string name="l_nav_not_installed">No navigator installed</string>
     <string name="l_nav_starting">Starting the navigator…</string>
+    <string name="l_alice_starting">Starting Alice…</string>
     <string name="l_nav_failed">The window did not open. Tap to retry.</string>
     <string name="l_nav_restart">Restart navigator</string>
-    <string name="l_nav_yandex_plus">Works only with an active Plus subscription!</string>
+    <string name="l_nav_hints">Hints on the cluster</string>
+    <string name="l_nav_hints_on">Navigator car mode</string>
+    <string name="l_nav_hints_on_plus">Car mode · needs Yandex Plus</string>
+    <string name="l_nav_hints_on_aa">Through Android Auto on the phone</string>
+    <string name="l_nav_hints_off">As on the phone</string>
+    <string name="l_nav_hints_off_plus">As on the phone · no subscription needed</string>
+    <string name="l_nav_hints_off_aa">As on the phone · Android Auto is not started</string>
+    <string name="l_nav_aa_server_hint">Open AA settings on the phone\n⋮ → Start head unit server</string>
     <string name="l_view_navigator">Navigator</string>
     <string name="l_view_clock">Clock</string>
 
@@ -99,6 +107,11 @@
     <string name="l_s_theme_light">Light gold</string>
     <string name="l_s_theme_auto">Auto</string>
     <string name="l_s_theme_sub">Auto follows the car headlights</string>
+    <string name="l_s_rail">Side panel</string>
+    <string name="l_s_rail_small">Small</string>
+    <string name="l_s_rail_medium">Medium</string>
+    <string name="l_s_rail_normal">Normal</string>
+    <string name="l_s_rail_cut">Compact</string>
     <string name="l_s_anim">Button animations</string>
     <string name="l_s_map_scale">Map scale</string>
     <string name="l_s_map_scale_sub">Only for %1$s · applies immediately</string>
@@ -110,9 +123,12 @@
     <string name="l_s_last">Last played</string>
     <string name="l_s_more">All players</string>
     <string name="l_s_autoplay">Start music automatically</string>
-    <string name="l_s_map">Map on home</string>
     <string name="l_s_right">Right</string>
     <string name="l_s_left">Left</string>
+    <string name="l_s_layout">Layout</string>
+    <string name="l_swap_tiles">Swap tiles</string>
+    <string name="l_expand">Full screen</string>
+    <string name="l_yt_not_installed">YouTube is not installed</string>
     <string name="l_s_hu">Head unit</string>
     <string name="l_s_link">Connection</string>
     <string name="l_s_video">Video</string>

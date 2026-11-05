@@ -148,6 +148,21 @@ internal class CarAppSession(
         } catch (e: Exception) { log("касание не ушло: ${e.javaClass.simpleName}") }
     }
 
+    /** Intent приложению (маршрут от ассистента: ACTION_NAVIGATE + geo:); сессия ещё не поднялась - отдадим после onAppResume. */
+    fun newIntent(i: Intent) {
+        val a = carApp
+        if (a == null || !ready) { pendingIntent = i; log("onNewIntent отложен до готовности"); return }
+        pendingIntent = null
+        val g = gen
+        runCatching { a.onNewIntent(i, done("onNewIntent")) }
+            .onSuccess { log("onNewIntent ${i.action} ${i.dataString}") }
+            .onFailure { log("onNewIntent упал: ${it.javaClass.simpleName}") }
+        // Яндекс Навигатор строит маршрут по следующему getTemplate корневого экрана (сигнал «экран готов» без
+        // повтора, декомпиляция 05.11), а сам invalidate не зовёт: просим шаблон ещё раз.
+        for (ms in TEMPLATE_AFTER_INTENT_MS) h.postDelayed({ if (g == gen && !stopped) pullTemplate(g) }, ms)
+    }
+    private var pendingIntent: Intent? = null
+
     fun back() {
         val m = appManager ?: return
         runCatching { m.onBackPressed(done("onBackPressed")) }.onFailure { log("назад упал: ${it.javaClass.simpleName}") }
@@ -199,6 +214,7 @@ internal class CarAppSession(
         ready = true
         events.onReady(this)
         deliverSurface()
+        pendingIntent?.let(::newIntent)
         a.getManager("app", callback(g, "getManager(app)") { r ->
             val b = runCatching { r?.get() }.getOrNull()
             appManager = (b as? IAppManager) ?: (b as? IBinder)?.let { IAppManager.Stub.asInterface(it) }
@@ -421,6 +437,7 @@ internal class CarAppSession(
     }
 
     private companion object {
+        val TEMPLATE_AFTER_INTENT_MS = longArrayOf(150L, 600L, 1500L)
         const val APP_INFO_TIMEOUT_MS = 5_000L
         const val READY_TIMEOUT_MS = 15_000L
         const val DEATH_WINDOW_MS = 60_000L

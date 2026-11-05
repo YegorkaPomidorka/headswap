@@ -316,6 +316,8 @@ class MainActivity : Activity() {
                 }
                 "car_click" -> com.yegorkapomidorka.headswap.carapp.CarAppHost.click(intent.getIntExtra("i", -1))
                 "car_back" -> com.yegorkapomidorka.headswap.carapp.CarAppHost.back()
+                "car_navigate" -> com.yegorkapomidorka.headswap.carapp.CarAppHost.newIntent(  // --es geo geo:54.7,20.5
+                    Intent(com.yegorkapomidorka.headswap.carapp.RouteIntent.ACTION_NAVIGATE, android.net.Uri.parse(intent.getStringExtra("geo") ?: "")))
                 "car_scale" -> com.yegorkapomidorka.headswap.carapp.CarAppHost.setScale(intent.getFloatExtra("v", 1f)) // dpi навигатора × v
                 "car_night" -> com.yegorkapomidorka.headswap.carapp.CarAppHost.setNight(   // --es v yes|no|app
                     when (intent.getStringExtra("v")) { "yes" -> true; "no" -> false; else -> null })

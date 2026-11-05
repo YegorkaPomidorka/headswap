@@ -143,11 +143,54 @@ class LauncherLogicTest {
         assertEquals("4G", NetLabel.cellular(null))
     }
 
-    @Test fun cardViewCyclesAndRestores() {
-        assertEquals(CardView.CLOCK, CardView.NAVIGATOR.next())
-        assertEquals(CardView.NAVIGATOR, CardView.CLOCK.next())
+    @Test fun cardViewRestoresOldPrefs() {
         assertEquals(CardView.NAVIGATOR, CardView.restore("junk"))
         assertEquals(CardView.CLOCK, CardView.restore("CLOCK"))
+        assertEquals(CardView.MUSIC, CardView.restore(null, CardView.MUSIC))
+        assertEquals(HomeLayout.QUAD, HomeLayout.restore(null))
+        assertEquals(HomeLayout.WIDE_RIGHT, HomeLayout.restore("WIDE_RIGHT"))
+    }
+
+    @Test fun layersInQuadCycleNavYoutubeClock() {
+        var t = HomeTiles(CardView.NAVIGATOR, CardView.MUSIC)
+        val seen = List(3) { t = HomeTilesLogic.nextBig(t, HomeLayout.QUAD, youtube = true); t.big }
+        assertEquals(listOf(CardView.YOUTUBE, CardView.CLOCK, CardView.NAVIGATOR), seen)
+        assertEquals(CardView.MUSIC, t.small)
+        // без YouTube - навигатор и часы
+        assertEquals(CardView.CLOCK, HomeTilesLogic.nextBig(HomeTiles(CardView.NAVIGATOR, CardView.MUSIC), HomeLayout.QUAD, youtube = false).big)
+    }
+
+    @Test fun layersInTwoTilesSkipSmallTile() {
+        var t = HomeTiles(CardView.YOUTUBE, CardView.NAVIGATOR)
+        val seen = List(3) { t = HomeTilesLogic.nextBig(t, HomeLayout.WIDE_LEFT, youtube = true); t.big }
+        assertEquals(listOf(CardView.MUSIC, CardView.CLOCK, CardView.YOUTUBE), seen)
+        assertEquals(CardView.NAVIGATOR, t.small)
+    }
+
+    @Test fun swapOnlyInTwoTiles() {
+        val t = HomeTiles(CardView.NAVIGATOR, CardView.MUSIC)
+        assertEquals(HomeTiles(CardView.MUSIC, CardView.NAVIGATOR), HomeTilesLogic.swap(t, HomeLayout.WIDE_RIGHT, youtube = true))
+        assertEquals(t, HomeTilesLogic.swap(t, HomeLayout.QUAD, youtube = true))
+    }
+
+    @Test fun normalizeKeepsTilesValid() {
+        // четыре плашки: малая - музыка, большая не музыка
+        assertEquals(HomeTiles(CardView.NAVIGATOR, CardView.MUSIC),
+            HomeTilesLogic.normalize(HomeTiles(CardView.MUSIC, CardView.NAVIGATOR), HomeLayout.QUAD, youtube = true))
+        // две плашки: одно и то же в обе не ставится
+        assertEquals(HomeTiles(CardView.CLOCK, CardView.MUSIC),
+            HomeTilesLogic.normalize(HomeTiles(CardView.CLOCK, CardView.CLOCK), HomeLayout.WIDE_LEFT, youtube = true))
+        // YouTube удалили - плашки возвращаются к навигатору и музыке
+        assertEquals(HomeTiles(CardView.NAVIGATOR, CardView.MUSIC),
+            HomeTilesLogic.normalize(HomeTiles(CardView.YOUTUBE, CardView.YOUTUBE), HomeLayout.WIDE_LEFT, youtube = false))
+    }
+
+    @Test fun smallTileIsCappedOnWideScreens() {
+        val wide = LauncherSpecs.forSize(1920, 720)
+        assertTrue(wide.tileSmall < wide.narrow)
+        assertEquals(Math.round(wide.t * 4.4).toInt(), wide.tileSmall)
+        val r720 = LauncherSpecs.forSize(1280, 720)
+        assertEquals(r720.narrow, r720.tileSmall)
     }
 
     @Test fun afterBackClosesWhenTaskIsGoneOrInBackground() {
@@ -322,6 +365,19 @@ class LauncherLogicTest {
             assertTrue((next - 90f) % 360f != 0f)
             assertEquals(0f, (next - 90f) % 45f)
         }
+    }
+
+    @Test fun hintsDefaultOffForAll() {
+        for (pkg in NavigatorPick.KNOWN) assertFalse(pkg, NavigatorPick.hintsDefault(pkg))
+    }
+
+    @Test fun shadowAaFollowsNavigatorHints() {
+        val hints = mapOf("com.google.android.apps.maps" to false, "ru.dublgis.dgismobile" to true)
+        val of = { p: String -> hints[p] ?: true }
+        assertFalse(NavigatorPick.shadowWanted(true, "com.google.android.apps.maps", of))
+        assertTrue(NavigatorPick.shadowWanted(true, "ru.dublgis.dgismobile", of))
+        assertTrue(NavigatorPick.shadowWanted(true, null, of))
+        assertFalse(NavigatorPick.shadowWanted(false, "ru.dublgis.dgismobile", of))
     }
 
     @Test fun needsPlusOnlyYandex() {

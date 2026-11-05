@@ -53,6 +53,7 @@ internal object LauncherModel {
 
     var area by mutableStateOf<Area>(Area.Home)
     var theme by mutableStateOf(ThemeChoice.DARK)
+    var railSize by mutableStateOf(RailSize.NORMAL)
     var mapLeft by mutableStateOf(false)
     var animations by mutableStateOf(true)
     var autoplay by mutableStateOf(true)
@@ -64,7 +65,20 @@ internal object LauncherModel {
     var autoplayedDisplay = -1
     /** Светлая ли палитра сейчас: выбор «Тема» и, для «Авто», режим фар машины. */
     val lightTheme: Boolean get() = ThemeChoice.light(theme, huTheme)
+    /** Большая плашка главного; малая - [smallView]; раскладка - [homeLayout]. Действуют через [tiles]. */
     var cardView by mutableStateOf(CardView.NAVIGATOR)
+    var smallView by mutableStateOf(CardView.MUSIC)
+    var homeLayout by mutableStateOf(HomeLayout.QUAD)
+    /** Ключ запуска YouTube из каталога; null - не установлен (или каталог ещё грузится). */
+    val youtubeKey: String? get() = catalog.firstOrNull { it.packageName == FullscreenApp.YOUTUBE }?.key
+    /** Плашки с учётом правил: пока каталог не загружен, YouTube считаем доступным, чтобы не сбросить выбор. */
+    val tiles: HomeTiles
+        get() = HomeTilesLogic.normalize(HomeTiles(cardView, smallView), homeLayout, !catalogLoaded || youtubeKey != null)
+    /** Где на экране большая и малая плашки (корень): по ним стоят ⇄ на стыке и «Слои» ленты поверх живых окон. */
+    var bigTileRect by mutableStateOf<Rect?>(null)
+    var smallTileRect by mutableStateOf<Rect?>(null)
+    /** Плашка с YouTube на главном: туда слой app ставит окно YouTube. */
+    var ytCardRect by mutableStateOf<Rect?>(null)
     var apps by mutableStateOf<List<AppRef>>(emptyList())
     var savedNavigator by mutableStateOf<String?>(null)
     var musicPlayer by mutableStateOf<String?>(null)
@@ -80,6 +94,8 @@ internal object LauncherModel {
 
     /** Чужой лаунчер из DexPrefs.desktopComponent в окне над панелью навигации; null - наш рабочий стол. Ведёт [ForeignActions]. */
     var foreign by mutableStateOf<AppRef?>(null)
+    /** Панель Алисы (кнопка голоса) поверх рабочего стола: слева за рейкой, под ней затемнение. */
+    var assistantOpen by mutableStateOf(false)
     /** Оверлей «Недавние» на экране. */
     var recentsOpen by mutableStateOf(false)
     /** Приложения оверлея; null - список ещё запрашивается. */
@@ -122,19 +138,24 @@ internal object LauncherModel {
         appCtx = ctx.applicationContext
         prefs = LauncherPrefs(appCtx)
         theme = prefs.theme
+        railSize = prefs.railSize
         mapLeft = prefs.mapLeft
         animations = prefs.animations
         autoplay = prefs.autoplay
         localPlayer = prefs.localPlayer
         onlinePlayer = prefs.onlinePlayer
         cardView = prefs.cardView
+        smallView = prefs.smallView
+        homeLayout = prefs.homeLayout
         apps = prefs.apps
         savedNavigator = prefs.navigator
         musicPlayer = prefs.musicPlayer
         lastOnlinePlayer = prefs.lastOnlinePlayer
         missedSeenMs = prefs.missedSeenMs
         EmbedHost.onGone = { LauncherActions.embedGone(it) }
+        EmbedHost.onAssistantOpened = { LauncherActions.assistantOpened(it) }
         CarAppHost.scaleFor = { pkg -> CarConfigMath.step(prefs.mapScale(pkg)) }
+        CarAppHost.allowFor = { pkg -> prefs.navHints(pkg) }
         ready = true
         reloadCatalog()
     }
@@ -152,7 +173,7 @@ internal object LauncherModel {
                 }
             }.getOrElse { AppLog.i("Launcher catalog: ${it.javaClass.simpleName}", false); emptyList() }
             val selected = DesktopAppCatalog.select(found, appCtx.packageName)
-            main.post { catalog = selected; catalogLoaded = true }
+            main.post { catalog = selected; catalogLoaded = true; applyShadowNav() } // выбранный навигатор известен только с каталогом
         }
     }
 
@@ -184,13 +205,50 @@ internal object LauncherModel {
     fun removeApp(ref: AppRef) { apps = AppList.remove(apps, ref).also { prefs.apps = it } }
 
     fun chooseTheme(value: ThemeChoice) { theme = value; prefs.theme = value }
+    fun chooseRailSize(value: RailSize) { railSize = value; prefs.railSize = value }
     fun chooseMapLeft(left: Boolean) { mapLeft = left; prefs.mapLeft = left }
     fun chooseAnimations(on: Boolean) { animations = on; prefs.animations = on }
     fun chooseAutoplay(on: Boolean) { autoplay = on; prefs.autoplay = on }
     fun chooseLocalPlayer(pkg: String?) { localPlayer = pkg; prefs.localPlayer = pkg }
     fun chooseOnlinePlayer(pkg: String?) { onlinePlayer = pkg; prefs.onlinePlayer = pkg }
-    fun nextCardView() { cardView = cardView.next().also { prefs.cardView = it } }
-    fun setNavigator(pkg: String?) { savedNavigator = pkg; prefs.navigator = pkg }
+    private val youtubeAvailable: Boolean get() = !catalogLoaded || youtubeKey != null
+    private fun setTiles(t: HomeTiles) {
+        cardView = t.big; prefs.cardView = t.big
+        smallView = t.small; prefs.smallView = t.small
+    }
+    /** «Слои»: следующее содержимое большой плашки. */
+    fun nextCardView() = setTiles(HomeTilesLogic.nextBig(HomeTiles(cardView, smallView), homeLayout, youtubeAvailable))
+    /** ⇄: поменять плашки местами (только в двух плашках). */
+    fun swapTiles() = setTiles(HomeTilesLogic.swap(HomeTiles(cardView, smallView), homeLayout, youtubeAvailable))
+    /** «Раскладка» в настройках: четыре плашки с картой справа/слева или две плашки. */
+    fun chooseHomeLayout(layout: HomeLayout, left: Boolean = mapLeft) {
+        homeLayout = layout; prefs.homeLayout = layout
+        if (layout == HomeLayout.QUAD) chooseMapLeft(left)
+        setTiles(HomeTilesLogic.normalize(HomeTiles(cardView, smallView), layout, youtubeAvailable))
+    }
+    fun setNavigator(pkg: String?) { savedNavigator = pkg; prefs.navigator = pkg; applyShadowNav() }
+
+    /** «Подсказки на приборке» по навигатору (h800): вкл - машинная часть / теневая AA, выкл - окно как на телефоне. */
+    private var navHintsRev by mutableIntStateOf(0)
+    fun navHints(pkg: String): Boolean { navHintsRev; return prefs.navHints(pkg) }
+    fun chooseNavHints(pkg: String, on: Boolean) {
+        prefs.setNavHints(pkg, on); navHintsRev++
+        AppLog.i("LAUNCHER подсказки на приборке $pkg: ${if (on) "вкл" else "выкл"}", false)
+        // как кнопка «Перезапустить навигатор»: старый режим закрывается целиком (хост или окно на свежей текстуре),
+        // reconcile поднимает новый - свой хост Car App или обычное окно (CarAppHost.allowFor уже видит новое значение)
+        if (navigatorPkg == pkg) EmbedHost.restartNav()
+        applyShadowNav()
+    }
+
+    /**
+     * Теневая AA (подсказки Google Карт) - только пока у выбранного навигатора подсказки включены: выкл - AA на телефоне
+     * не трогаем совсем (h800). Стартует её BridgeService вместе с рабочим столом, здесь - смена навигатора или настройки.
+     */
+    private fun applyShadowNav() {
+        if (!ready || com.yegorkapomidorka.headswap.dex.DexState.displayId <= 0) return
+        val want = NavigatorPick.shadowWanted(com.yegorkapomidorka.headswap.aa.AaPrefs(appCtx).metaNavi, navigatorPkg, prefs::navHints)
+        if (want) com.yegorkapomidorka.headswap.aa.AaShadowNav.start(appCtx) else com.yegorkapomidorka.headswap.aa.AaShadowNav.stop()
+    }
 
     /** Смена «Масштаба карты» - перерисовать карточку (сами ступени в prefs, по пакету). */
     private var mapScaleRev by mutableIntStateOf(0)

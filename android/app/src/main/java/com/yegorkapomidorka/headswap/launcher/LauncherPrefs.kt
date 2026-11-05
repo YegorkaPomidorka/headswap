@@ -22,6 +22,15 @@ enum class ThemeChoice {
     }
 }
 
+/** Размер боковой панели: «Маленькая», «Средняя», «Обычная»; «Обрезанная» - только на экранах высотой 480 ([LauncherSpec.h480]). */
+enum class RailSize {
+    SMALL, MEDIUM, NORMAL, CUT;
+
+    companion object {
+        fun restore(name: String?): RailSize = entries.firstOrNull { it.name == name } ?: NORMAL
+    }
+}
+
 /** Настройки лаунчера - SharedPreferences, как остальной проект (DexPrefs/AaSettings). */
 class LauncherPrefs(context: Context) {
     private val prefs = context.getSharedPreferences("headswap_launcher", Context.MODE_PRIVATE)
@@ -33,6 +42,10 @@ class LauncherPrefs(context: Context) {
     var theme: ThemeChoice
         get() = ThemeChoice.restore(prefs.getString("theme", null))
         set(value) { prefs.edit().putString("theme", value.name).apply() }
+
+    var railSize: RailSize
+        get() = RailSize.restore(prefs.getString("rail_size", null))
+        set(value) { prefs.edit().putString("rail_size", value.name).apply() }
 
     /** «Карта на главном» слева: ряды главного зеркальные, рейка остаётся слева. Новый ключ: старый right_hand двигал рейку. */
     var mapLeft: Boolean
@@ -59,9 +72,20 @@ class LauncherPrefs(context: Context) {
         get() = prefs.getString("online_player", null)
         set(value) { prefs.edit().putString("online_player", value).apply() }
 
+    /** Большая плашка главного (в четырёх плашках - место навигации). Ключ с прошлых версий. */
     var cardView: CardView
         get() = CardView.restore(prefs.getString("card_view", null))
         set(value) { prefs.edit().putString("card_view", value.name).apply() }
+
+    /** Малая плашка в раскладках 2:1 и 1:2. */
+    var smallView: CardView
+        get() = CardView.restore(prefs.getString("small_view", null), CardView.MUSIC)
+        set(value) { prefs.edit().putString("small_view", value.name).apply() }
+
+    /** «Раскладка» главного: четыре плашки (по умолчанию) или две. */
+    var homeLayout: HomeLayout
+        get() = HomeLayout.restore(prefs.getString("home_layout", null))
+        set(value) { prefs.edit().putString("home_layout", value.name).apply() }
 
     /** Пакет выбранного навигатора; null - по умолчанию ([NavigatorPick]). */
     var navigator: String?
@@ -71,6 +95,10 @@ class LauncherPrefs(context: Context) {
     /** «Масштаб карты» навигатора [pkg]: ступень [com.yegorkapomidorka.headswap.carapp.CarConfigMath.STEPS]. */
     fun mapScale(pkg: String): Int = prefs.getInt("map_scale:$pkg", com.yegorkapomidorka.headswap.carapp.CarConfigMath.AUTO_STEP)
     fun setMapScale(pkg: String, step: Int) { prefs.edit().putInt("map_scale:$pkg", step).apply() }
+
+    /** «Подсказки на приборке» навигатора [pkg]: машинная часть / теневая AA или окно как на телефоне ([NavigatorPick.hintsDefault]). */
+    fun navHints(pkg: String): Boolean = prefs.getBoolean("nav_hints:$pkg", NavigatorPick.hintsDefault(pkg))
+    fun setNavHints(pkg: String, on: Boolean) { prefs.edit().putBoolean("nav_hints:$pkg", on).apply() }
 
     /** Пакет текущего музыкального плеера. */
     var musicPlayer: String?
