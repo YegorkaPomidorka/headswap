@@ -9,6 +9,7 @@ import android.app.UiAutomation
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
+import android.os.ParcelFileDescriptor
 import android.os.Process
 import android.util.Log
 import androidx.annotation.Keep
@@ -55,6 +56,25 @@ class DelegatedDesktopInstrumentation : Instrumentation() {
         }
     }
 
+    /** Привязка CDM возможна только из shell, то есть сейчас, пока жив am instrument. Сбой не мешает активации. */
+    @RequiresApi(DelegatedDesktopAccess.MIN_SDK)
+    private fun prepareVirtualDevice(automation: UiAutomation) {
+        val context = targetContext
+        val line = try {
+            val granted = context.checkSelfPermission(VirtualDevicePolicy.CREATE_VIRTUAL_DEVICE) == PackageManager.PERMISSION_GRANTED
+            val association = if (Build.VERSION.SDK_INT >= 34) VirtualDeviceAssociation.ensure(context) { command ->
+                ParcelFileDescriptor.AutoCloseInputStream(automation.executeShellCommand(command)).use {
+                    it.readBytes().toString(Charsets.UTF_8)
+                }
+            } else "Android ниже 14"
+            "CREATE_VIRTUAL_DEVICE=$granted, $association"
+        } catch (e: Throwable) {
+            "привязка не сделана: ${e.javaClass.simpleName}: ${e.message}"
+        }
+        Log.i(DelegatedDesktopAccess.LOG_TAG, "VDEV $line")
+        runCatching { com.yegorkapomidorka.headswap.AppLog.i("VDEV активация: $line", false) }
+    }
+
     // The SDK IntDef omits FLAG_DONT_USE_ACCESSIBILITY; this public flag was verified
     // on the target phone and prevents engaging/suppressing accessibility services.
     @RequiresApi(DelegatedDesktopAccess.MIN_SDK)
@@ -84,8 +104,12 @@ class DelegatedDesktopInstrumentation : Instrumentation() {
             permissions.add(PhoneAssistant.MANAGE_ACTIVITY_TASKS) // задача Алисы с телефона в панель рабочего стола
             permissions.add(PhoneAssistant.REMOVE_TASKS) // Навигатор, открытый Алисой в панели, закрываем: маршрут уходит в плитку
             if (requestAudio) permissions.add(DesktopAudioPolicy.ROUTING_PERMISSION)
+            // Android 17: дисплей рабочего стола внутри VirtualDevice (ADR 0029). Необязательное: без него прежний путь.
+            val virtualDevice = VirtualDeviceGate.enabled()
+            if (virtualDevice) permissions.add(VirtualDevicePolicy.CREATE_VIRTUAL_DEVICE)
             automation.adoptShellPermissionIdentity(*permissions.toTypedArray())
             adoptedHere = true
+            if (virtualDevice) prepareVirtualDevice(automation)
             check(DelegatedDesktopAccess.hasPermissions(context)) { "Android не предоставил все права рабочего стола и управления музыкой. Повторите явную активацию HeadSwap." }
             check(!requestAudio || DesktopAudioAccess.hasPermission(context)) { "Android не разрешил захват звука приложений" }
             lease = DelegatedDesktopAccess.begin { stop.countDown() }

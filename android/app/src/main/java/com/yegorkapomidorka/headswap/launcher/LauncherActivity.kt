@@ -53,7 +53,9 @@ class LauncherActivity : ComponentActivity() {
         override fun onReceive(context: Context, intent: Intent) {
             val locked = getSystemService(KeyguardManager::class.java)?.isKeyguardLocked
             AppLog.i("SCREEN ${intent.action?.substringAfterLast('.')} keyguard=$locked дисплей=${currentDisplayId()} " +
-                "активность=${if (visible) "видна" else "не видна"} подключён=$connected", false)
+                "активность=${if (visible) "видна" else "не видна"} подключён=$connected " +
+                // ADR 0029: на Android 17 дисплей в группе телефона (0) засыпает вместе с ним
+                com.yegorkapomidorka.headswap.dex.DisplayGroups.describe(getSystemService(android.hardware.display.DisplayManager::class.java)?.getDisplay(currentDisplayId())), false)
         }
     }
 

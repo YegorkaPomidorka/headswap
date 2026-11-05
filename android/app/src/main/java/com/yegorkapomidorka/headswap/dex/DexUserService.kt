@@ -494,7 +494,7 @@ class DexUserService private constructor(private val context: Context,
         if (child.display != null) runCatching { cancelChildTouch(child) }
         child.display?.display?.displayId?.let { unregisterInputDisplay(it, child.token) }
         try {
-            child.display?.release()
+            child.display?.let { it.release(); runCatching { runtime?.released(it) } }
         } catch (error: Throwable) {
             // Do not acknowledge disposal of a Surface that might still have a native producer.
             Log.e(TAG, "child display release failed; retiring owned producer process", error)
@@ -531,7 +531,7 @@ class DexUserService private constructor(private val context: Context,
         try {
             for (child in lease.children.values.toList()) releaseChild(lease, child)
             lease.display?.display?.displayId?.let { unregisterInputDisplay(it, lease.token) }
-            lease.display?.release()
+            lease.display?.let { it.release(); runCatching { runtime?.released(it) } }
         } catch (e: Throwable) {
             releaseFailure = e
         } finally {

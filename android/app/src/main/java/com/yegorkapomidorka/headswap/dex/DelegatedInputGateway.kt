@@ -112,9 +112,12 @@ internal class DelegatedInputGateway(context: Context) : IDelegatedInputGateway.
      * гаснуть по таймауту экрана, кнопка питания его не усыпляет (goToSleep трогает только общую группу).
      */
     private fun holdAwake(displayId: Int) {
-        val flags = displays.getDisplay(displayId)?.flags ?: return
-        AppLog.i("WAKE экран $displayId: ${DisplayWakeLocks.describe(flags)}", false)
-        if (DisplayWakeLocks.shouldHold(flags)) wakeLocks.hold(displayId)
+        for (line in VirtualDeviceStatus.drain(context)) AppLog.i("VDEV $line", false) // из :delegated, ADR 0029
+        val display = displays.getDisplay(displayId) ?: return
+        val group = DisplayGroups.groupId(display)
+        AppLog.i("WAKE экран $displayId: ${DisplayWakeLocks.describe(group, display.flags)} vdev=${VirtualDeviceGate.enabled()}", false)
+        if (DisplayWakeLocks.shouldHold(group, display.flags)) wakeLocks.hold(displayId)
+        else AppLog.i("WAKE экран $displayId: в группе телефона, замок не берём (иначе экран телефона не погаснет)", false)
     }
 
     @Synchronized override fun injectInput(displayId: Int, token: IBinder, event: InputEvent, actionButton: Int) {

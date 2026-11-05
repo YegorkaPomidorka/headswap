@@ -31,10 +31,20 @@ class DesktopModePolicyTest {
 
     @Test fun wakeLockOnlyForDisplayInOwnGroup() {
         // Display.FLAG_*: TRUSTED 128, OWN_DISPLAY_GROUP 256, ALWAYS_UNLOCKED 512 (не те же биты, что VIRTUAL_DISPLAY_FLAG_*)
-        assertFalse(DisplayWakeLocks.shouldHold(128 or 1 or 8))
-        assertTrue(DisplayWakeLocks.shouldHold(128 or 256 or 512))
-        assertTrue(DisplayWakeLocks.describe(128 or 256 or 512).endsWith("ownGroup=true alwaysUnlocked=true"))
-        assertTrue(DisplayWakeLocks.describe(128).endsWith("ownGroup=false alwaysUnlocked=false"))
+        // Группу не прочитали - по флагу, как раньше
+        assertFalse(DisplayWakeLocks.shouldHold(null, 128 or 1 or 8))
+        assertTrue(DisplayWakeLocks.shouldHold(null, 128 or 256 or 512))
+        assertTrue(DisplayWakeLocks.describe(null, 128 or 256 or 512).endsWith("ownGroupFlag=true alwaysUnlocked=true"))
+        assertTrue(DisplayWakeLocks.describe(7, 128).startsWith("group=7 "))
+        assertTrue(DisplayWakeLocks.describe(null, 128).endsWith("ownGroupFlag=false alwaysUnlocked=false"))
+    }
+
+    @Test fun wakeLockFollowsRealGroupNotFlag() {
+        // Android 17 (h699, h782): флаг OWN_DISPLAY_GROUP стоит, а дисплей в группе телефона 0 - замок держал бы телефон
+        assertFalse(DisplayWakeLocks.shouldHold(0, 128 or 256 or 512))
+        assertFalse(DisplayWakeLocks.shouldHold(-1, 128 or 256 or 512))
+        // Дисплей VirtualDevice: флага нет, но группа своя
+        assertTrue(DisplayWakeLocks.shouldHold(9, 128))
     }
 
     @Test fun samsungDisplayKeepsItsVerifiedFlagSet() {

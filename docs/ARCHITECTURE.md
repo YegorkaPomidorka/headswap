@@ -168,6 +168,7 @@ CONTROL0, SENSOR1, VIDEO2, INPUT3, SPEECH4, SYSTEM5, MEDIA6, MIC7, BT8, MEDIA_PL
   «Подсказками на приборке», иначе окном; теневая AA - тоже только при них. ADR 0028.
 - **Хосту нужен свой `android.car.permission.TEMPLATE_RENDERER`** в манифесте (объявить и запросить), иначе навигаторы
   со списком хостов (Яндекс) отвечают «Unknown host» на рукопожатии. ADR 0022.
+- **Своя группа дисплея — по `displayGroupId > 0`, не по флагу OWN_DISPLAY_GROUP** (на Android 17 флаг стоит, а группа 0). Привязку CDM для VirtualDevice не удалять: это сразу закрывает дисплей рабочего стола. ADR 0029.
 - Пароли, SSID, ключи в лог не пишутся.
 - Рубильники экспериментов в companion `AaBridgeCore`: `PAUSE_KEEPALIVE_ENABLED`, `NAVI_STATUS_ENABLED`,
   `MODULE_MUSIC_ENABLED`, `ROUTE_NAVI_STATUS_ENABLED`, `AIR_WARM_RESUME_ENABLED`.
@@ -194,6 +195,7 @@ CONTROL0, SENSOR1, VIDEO2, INPUT3, SPEECH4, SYSTEM5, MEDIA6, MIC7, BT8, MEDIA_PL
 | Навигатор окном вместо хоста, в логе `handshake: отказ ... Unknown host` | TEMPLATE_RENDERER в манифесте; ADR 0022 |
 | Я.Карты/Навигатор просят Плюс, или навигатор окном без подсказок | настройка «Подсказки на приборке» (prefs `nav_hints:<pkg>`, по умолчанию выкл у всех) → `CarAppHost.allowFor` в `EmbedHost.carTargetFor`; теневая AA - `NavigatorPick.shadowWanted`; ADR 0028 |
 | Навигатор в хосте: голая карта, нет кнопок/списка | шаблон не разобран (`CarUi.Unknown`): `carapp/CarUiMapper.map`, `cmd car_dump` |
+| Android 17: погасили экран телефона, на ГУ пустая картинка | дисплей в группе телефона: `dex/DesktopVirtualDevice` (VirtualDevice + привязка CDM из `DelegatedDesktopInstrumentation`), wake lock по группе в `DisplayWakeLocks`; в логе `VDEV`, `WAKE … group=`, `SCREEN … group= state=`; ADR 0029 |
 | Тач мимо / рывками | `VideoGeometry.mapTouch`, `TouchDecimator`, `TouchPacer` |
 
 Конкретные машины и прошлые разборы — база кейсов ГУ в памяти Claude (`memory/hu/INDEX.md`, вне репо: там данные
