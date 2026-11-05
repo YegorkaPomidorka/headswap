@@ -125,13 +125,18 @@ object LauncherActions {
         val geo = com.yegorkapomidorka.headswap.carapp.RouteIntent.geoFor(data)
         if (geo == null) { AppLog.i("ASSIST $pkg не маршрут ($data), остаётся в панели", false); return }
         val navigate = android.content.Intent(com.yegorkapomidorka.headswap.carapp.RouteIntent.ACTION_NAVIGATE, android.net.Uri.parse(geo))
-        val car = com.yegorkapomidorka.headswap.carapp.CarAppHost.pkg
-        AppLog.i("ASSIST маршрут от Алисы $geo -> ${car?.let { "машинная часть $it" } ?: "окно навигатора ${model.navigatorPkg}"}", false)
+        val nav = model.navigatorPkg
+        val car = com.yegorkapomidorka.headswap.carapp.CarAppHost.pkg?.takeIf { it == nav }
+        AppLog.i("ASSIST маршрут от Алисы $geo -> ${car?.let { "машинная часть $it" } ?: "окно навигатора $nav"}", false)
         val taskId = t.taskId
+        val ctx = model.context.applicationContext
         Thread({
             val assist = com.yegorkapomidorka.headswap.dex.PhoneAssistant
-            if (car != null) assist.removeTask(taskId)
-            else EmbedHost.navDisplayId().takeIf { it > 0 }?.let { d -> runCatching { assist.moveTask(taskId, d) } } ?: assist.removeTask(taskId)
+            assist.removeTask(taskId)
+            // навигатор окном (Google Карты): маршрут его же intent'ом в его окно
+            if (car == null && nav != null) assist.openRoute(ctx, nav, geo, EmbedHost.navDisplayId())
+            // окном тот же пакет - его задачу не трогаем, иначе закроем само окно
+            if (car != null || nav != pkg) assist.closePhoneTasks(ctx, pkg)
         }, "assist-route").start()
         closeAssistant("маршрут -> навигатор")
         if (model.navigatorPkg != null && model.area != Area.Navigator) model.go(Area.Navigator)

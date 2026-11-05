@@ -100,6 +100,38 @@ object PhoneAssistant {
         runCatching { moveTask(taskId, 0) }.onSuccess { AppLog.i("ASSIST задача $taskId -> экран телефона") }
     }
 
+    /**
+     * Алиса открывает Навигатор трамплином LaunchActivity, а тот поднимает MapActivity с маршрутом в старой задаче
+     * Навигатора на экране телефона (стенд 05.11: маршрут висел на телефоне). [ms] закрываем задачу [pkg], если она
+     * стала верхней на экране телефона: маршрут уже ушёл в плитку.
+     */
+    fun closePhoneTasks(ctx: Context, pkg: String, ms: Long = 3000L) {
+        val am = ctx.getSystemService(android.app.ActivityManager::class.java)
+        val start = android.os.SystemClock.elapsedRealtime()
+        val closed = HashSet<Int>()
+        while (android.os.SystemClock.elapsedRealtime() - start < ms) {
+            @Suppress("DEPRECATION")
+            val top = runCatching { am.getRunningTasks(30) }.getOrDefault(emptyList())
+                .firstOrNull { FrameworkTaskIdentityReader.read(it)?.displayId == 0 }
+            if (top != null && top.topActivity?.packageName == pkg && closed.add(top.taskId)) {
+                AppLog.i("ASSIST $pkg с маршрутом на экране телефона (задача ${top.taskId}, ${top.topActivity?.shortClassName})")
+                removeTask(top.taskId)
+            }
+            android.os.SystemClock.sleep(100)
+        }
+    }
+
+    /** Маршрут до [geo] (geo:lat,lon) навигатору [pkg], открытому окном на [displayId]: Google Картам - сразу ведение. */
+    fun openRoute(ctx: Context, pkg: String, geo: String, displayId: Int) {
+        if (displayId <= 0) { AppLog.i("ASSIST окно навигатора не готово, маршрут не отдан"); return }
+        val point = geo.removePrefix("geo:")
+        val uri = if (pkg == "com.google.android.apps.maps") "google.navigation:q=$point" else "geo:$point?q=$point"
+        val intent = Intent(Intent.ACTION_VIEW, android.net.Uri.parse(uri)).setPackage(pkg).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        runCatching { ctx.startActivity(intent, ActivityOptions.makeBasic().setLaunchDisplayId(displayId).toBundle()) }
+            .onSuccess { AppLog.i("ASSIST маршрут $uri -> $pkg, дисплей $displayId") }
+            .onFailure { AppLog.i("ASSIST маршрут $uri -> $pkg: ${it.javaClass.simpleName}: ${it.message}") }
+    }
+
     fun launch(ctx: Context, displayId: Int) {
         if (displayId <= 0) { AppLog.i("ASSIST дисплей рабочего стола не готов"); return }
         val opts = ActivityOptions.makeBasic().setLaunchDisplayId(displayId).toBundle()
