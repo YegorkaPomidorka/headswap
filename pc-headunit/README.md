@@ -44,6 +44,18 @@ adb reverse tcp:7240 tcp:7240
 python carlife_hu.py --duration 120
 ```
 
+## Стенд одной командой (`stand.ps1`)
+
+Телефон по USB с adb, на ПК окно ГУ:
+
+```
+.\stand.ps1 -Build              # собрать и поставить smoke, режим рабочего стола, активация, окно
+.\stand.ps1                     # без пересборки
+.\stand.ps1 -Mode aa -Size 1920x720 -VoiceKeyAt 20,35 -HuArgs '--touch-test'
+```
+
+Скрипт сам убирает из debug-манифеста на время сборки `TEMPLATE_RENDERER` (иначе smoke не встаёт рядом с release, ADR 0022), пишет `bridgeMode` в `aa.xml`, активирует мост с ПК (`ManualAccessLauncher`), делает `adb reverse`, запускает `carlife_hu.py --view` и сервис моста. Логи эмулятора и телефона кладёт в `out/stand-<время>/`.
+
 ## Живое окно
 
 `--view` открывает окно с видео от моста в реальном времени; клики мышью уходят мосту как касания ГУ. Нужны tkinter (идёт с Python для Windows) и `ffmpeg` в PATH. Эмулятор слушает порт, поэтому запускается первым, потом мост:
