@@ -1,6 +1,6 @@
 # 0020. В режиме рабочего стола звук идёт по Bluetooth, музыку по USB не передаём
 
-- Статус: принято
+- Статус: заменено [0025](0025-desktop-audio-usb-toggle.md)
 - Дата: 2026-11-04
 - Источники: поездка на Vezel 04.11 (лог `headswap-20261104-111645.log`, «звук по USB выключен в UI»),
   `dex/DexPrefs.kt` (`desktop_usb_playback_audio`), `dex/DesktopAudioLoopback.kt`

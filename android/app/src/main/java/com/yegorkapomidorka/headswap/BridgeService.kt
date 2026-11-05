@@ -1137,7 +1137,7 @@ class BridgeService : Service() {
                 main.post { ref[0]?.let { onDesktopSourceFailed(it, reason) } }
             }
             // кнопка голоса: панель Алисы в своём лаунчере (DesktopKeys); лаунчер не на экране или чужой - Алиса на весь
-            // дисплей рабочего стола (dex/PhoneAssistant, ADR 0025). Лямбда зовётся не с главного потока
+            // дисплей рабочего стола (dex/PhoneAssistant, ADR 0026). Лямбда зовётся не с главного потока
             core.phoneAssistant = {
                 if (DesktopKeys.sink?.voice() != true) {
                     AppLog.i("ASSIST панель не взята лаунчером, Алиса на весь дисплей")

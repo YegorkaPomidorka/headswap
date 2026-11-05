@@ -2,7 +2,7 @@ package com.yegorkapomidorka.headswap.carapp
 
 /**
  * Маршрут, который ассистент отдал приложению диплинком, - в geo:-uri для CarContext.ACTION_NAVIGATE: так хост AA
- * передаёт навигатору «поехали туда» от Ассистента (ADR 0025). Без android.net.Uri - для юнит-тестов.
+ * передаёт навигатору «поехали туда» от Ассистента (ADR 0026). Без android.net.Uri - для юнит-тестов.
  */
 object RouteIntent {
     const val ACTION_NAVIGATE = "androidx.car.app.action.NAVIGATE"
