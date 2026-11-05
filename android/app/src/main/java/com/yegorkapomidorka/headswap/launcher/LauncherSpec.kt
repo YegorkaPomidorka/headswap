@@ -48,7 +48,7 @@ class LauncherSpec(
     val clockStacked = rs == RailSize.MEDIUM
     /** Часов в рейке нет, время - слева в строке статуса («Маленькая», «Обрезанная»). */
     val clockInStatus = rs == RailSize.SMALL || rs == RailSize.CUT
-    val clockHr = r(f1 * 0.85)
+    val clockHr = r(f1 * 1.1)
     val sepW = r(clockHr * 0.5)
     val sepH = max(3, b4)
     val clockGap = max(4, g4)
