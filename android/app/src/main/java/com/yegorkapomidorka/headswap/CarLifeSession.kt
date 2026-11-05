@@ -159,6 +159,10 @@ class CarLifeSession(
     private var touchCount = 0
     private var maxFingers = 0
     private var lastMoveFingers = 0
+    private var singleDownHeld = false
+    private var singleDownX = -1
+    private var singleDownY = -1
+    private var dupDownCount = 0
     private val rxByType = java.util.TreeMap<Int, Int>()
     private var huInfo: String? = null
     private var huStatistic: String? = null
@@ -1222,6 +1226,19 @@ class CarLifeSession(
         if (t.masked != 2 || n != lastMoveFingers) {
             AppLog.i("TOUCH action=${t.action} пальцев=$n тело=${m.body.size} байт", false)
             lastMoveFingers = if (t.masked == 2) n else 0
+        }
+        // h725: Honda Civic 2021 (20772104) шлёт каждое касание как DOWN, DOWN, UP с теми же x,y.
+        // Повтор DOWN без UP лаунчер считает вторым нажатием: «Настройки» мигают, «Назад» двойное.
+        if (n == 1 && t.masked == 0) {
+            if (singleDownHeld && t.x == singleDownX && t.y == singleDownY) {
+                if (dupDownCount++ == 0) AppLog.i("TOUCH повторный DOWN без UP (x=${t.x} y=${t.y}) — отбрасываю, дальше молча")
+                return
+            }
+            singleDownHeld = true
+            singleDownX = t.x
+            singleDownY = t.y
+        } else if (n > 1 || t.masked == 1 || t.masked == 3) {
+            singleDownHeld = false
         }
         // Gesture opcodes also normalize to action 3; only raw TOUCH_ACTION means CANCEL.
         val desktopCancel = bridge.desktopInputEnabled && m.type == Msg.TOUCH_ACTION && t.masked == 3
