@@ -367,11 +367,8 @@ class LauncherLogicTest {
         }
     }
 
-    @Test fun hintsDefaultOffOnlyForYandexMaps() {
-        assertFalse(NavigatorPick.hintsDefault("ru.yandex.yandexmaps"))
-        assertTrue(NavigatorPick.hintsDefault("ru.yandex.yandexnavi"))
-        assertTrue(NavigatorPick.hintsDefault("ru.dublgis.dgismobile"))
-        assertTrue(NavigatorPick.hintsDefault("com.google.android.apps.maps"))
+    @Test fun hintsDefaultOffForAll() {
+        for (pkg in NavigatorPick.KNOWN) assertFalse(pkg, NavigatorPick.hintsDefault(pkg))
     }
 
     @Test fun shadowAaFollowsNavigatorHints() {

@@ -119,9 +119,10 @@ object NavigatorPick {
 
     /**
      * «Подсказки на приборке» по умолчанию (h800, ADR 0028). Вкл - машинная часть на своём хосте Car App или теневая AA;
-     * выкл - навигатор окном, как на телефоне. Я.Карты без Плюса в машинной части пустые, поэтому у них по умолчанию выкл.
+     * выкл - навигатор окном, как на телефоне. По умолчанию выкл у всех (Егор 05.11): окно работает без Плюса и без AA.
      */
-    fun hintsDefault(pkg: String): Boolean = pkg != YANDEX_MAPS
+    @Suppress("UNUSED_PARAMETER")
+    fun hintsDefault(pkg: String): Boolean = false
 
     /** Теневую AA держим, пока у выбранного навигатора подсказки включены; навигатора нет - как раньше, держим. */
     fun shadowWanted(metaNavi: Boolean, navPkg: String?, hints: (String) -> Boolean): Boolean =
