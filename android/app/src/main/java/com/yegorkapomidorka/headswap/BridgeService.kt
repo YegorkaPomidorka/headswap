@@ -54,6 +54,7 @@ import com.yegorkapomidorka.headswap.dex.DesktopMusicPlayback
 import com.yegorkapomidorka.headswap.dex.DesktopRecoveryPolicy
 import com.yegorkapomidorka.headswap.dex.DexPrefs
 import com.yegorkapomidorka.headswap.dex.DexState
+import com.yegorkapomidorka.headswap.dex.PhoneAssistant
 import com.yegorkapomidorka.headswap.dex.UsbDetachPolicy
 import com.yegorkapomidorka.headswap.link.CarTransport
 import com.yegorkapomidorka.headswap.link.LinkSetupException
@@ -965,6 +966,7 @@ class BridgeService : Service() {
             h.core.spliceMs = spliceMs
         }
         h.core.carVwId = aaPrefs.carPreset == CarPreset.VW_ID_UNYX
+        h.core.phoneAssistant = null   // режим AA: кнопка голоса идёт в AA
         if (wakeLock == null) {
             wakeLock = getSystemService(PowerManager::class.java)
                 .newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "headswap:session")
@@ -1072,6 +1074,8 @@ class BridgeService : Service() {
         owner.core.transcodeEnabled = true
         owner.core.spliceMs = 0L
         owner.core.carVwId = aaPrefs.carPreset == CarPreset.VW_ID_UNYX
+        // кнопка голоса: теневая AA без экрана и микрофона, ассистента открываем на телефоне
+        owner.core.phoneAssistant = { main.post { PhoneAssistant.launch(applicationContext) } }
         if (wakeLock == null) {
             wakeLock = getSystemService(PowerManager::class.java)
                 .newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "headswap:session")

@@ -177,6 +177,7 @@ CONTROL0, SENSOR1, VIDEO2, INPUT3, SPEECH4, SYSTEM5, MEDIA6, MIC7, BT8, MEDIA_PL
 |---|---|
 | EIO через секунды после PAUSE | heartbeat на PAUSE: `CarLifeSession.pauseHeartbeat`, флаг `huVw20082120`; ADR 0007 |
 | EIO сразу после крупного IDR | `IdrBitrateCeiling`, потолки по каналу; ADR 0008 |
+| Рабочий стол: кнопка голоса молчит | `AaBridgeCore.phoneAssistant` → `dex/PhoneAssistant`, в логе `ASSIST`; ADR 0025 |
 | USB встаёт после большого пакета | нарезка `Wire.CHUNK`, `huMazda20622111`; ADR 0009 |
 | Чёрный экран после камеры заднего хода | свой IDR (`IdrSplice`); ADR 0005 |
 | Поля, растянуто, не тот размер | `VideoMode`, `SpsCrop`, VIDEO_ENCODER_INIT в логе |
