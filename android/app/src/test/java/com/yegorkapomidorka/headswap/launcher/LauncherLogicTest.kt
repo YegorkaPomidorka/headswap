@@ -367,6 +367,19 @@ class LauncherLogicTest {
         }
     }
 
+    @Test fun hintsDefaultOffForAll() {
+        for (pkg in NavigatorPick.KNOWN) assertFalse(pkg, NavigatorPick.hintsDefault(pkg))
+    }
+
+    @Test fun shadowAaFollowsNavigatorHints() {
+        val hints = mapOf("com.google.android.apps.maps" to false, "ru.dublgis.dgismobile" to true)
+        val of = { p: String -> hints[p] ?: true }
+        assertFalse(NavigatorPick.shadowWanted(true, "com.google.android.apps.maps", of))
+        assertTrue(NavigatorPick.shadowWanted(true, "ru.dublgis.dgismobile", of))
+        assertTrue(NavigatorPick.shadowWanted(true, null, of))
+        assertFalse(NavigatorPick.shadowWanted(false, "ru.dublgis.dgismobile", of))
+    }
+
     @Test fun needsPlusOnlyYandex() {
         assertTrue(NavigatorPick.needsPlus("ru.yandex.yandexnavi"))
         assertTrue(NavigatorPick.needsPlus("ru.yandex.yandexmaps"))

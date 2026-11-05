@@ -23,7 +23,14 @@
     <string name="l_alice_starting">Starting Alice…</string>
     <string name="l_nav_failed">The window did not open. Tap to retry.</string>
     <string name="l_nav_restart">Restart navigator</string>
-    <string name="l_nav_yandex_plus">Works only with an active Plus subscription!</string>
+    <string name="l_nav_hints">Hints on the cluster</string>
+    <string name="l_nav_hints_on">Navigator car mode</string>
+    <string name="l_nav_hints_on_plus">Car mode · needs Yandex Plus</string>
+    <string name="l_nav_hints_on_aa">Through Android Auto on the phone</string>
+    <string name="l_nav_hints_off">As on the phone</string>
+    <string name="l_nav_hints_off_plus">As on the phone · no subscription needed</string>
+    <string name="l_nav_hints_off_aa">As on the phone · Android Auto is not started</string>
+    <string name="l_nav_aa_server_hint">Open AA settings on the phone\n⋮ → Start head unit server</string>
     <string name="l_view_navigator">Navigator</string>
     <string name="l_view_clock">Clock</string>
 

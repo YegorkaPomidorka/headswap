@@ -89,6 +89,8 @@ private class SettingsDims(s: LauncherSpec, rowH: Int) {
     val knob = r(52 * kc)
     val knobPad = r(6 * kc)
     val switchW = r(136 * kc)
+    /** Ступень степпера «Масштаб карты»: влезает «Ещё крупнее» (макет 150 px под цифры, у нас слова). */
+    val stepValueW = r(230 * k)
     val tileIcon = min(r(86 * k), rowH - 2 * padV)
     val tileGap = r(20 * k)
     val playerIcon = min(r(68 * k), rowH - 2 * padV - 2 * r(6 * k))
@@ -141,16 +143,31 @@ fun LauncherSettingsScreen() {
                         SettingsPage.NAVIGATOR -> {
                             NavigatorTiles(d, rowH, cell(0, 2).fillMaxWidth())
                             val navPkg = model.navigatorPkg
-                            if (EmbedHost.nav.carHost && navPkg != null) {
-                                MapScaleCard(navPkg, d, cell(2, 2).fillMaxWidth())
-                                // машинная часть Яндекс Навигатора и Карт работает только с Плюсом (Егор 04.11) - предупреждаем при выборе
-                                if (NavigatorPick.needsPlus(navPkg)) {
-                                    Row(cell(4).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(m.dp(d.gap))) {
-                                        RestartNavCard(d, Modifier.weight(1f).fillMaxHeight())
-                                        NoteCard(stringResource(R.string.l_nav_yandex_plus), d, Modifier.weight(1f).fillMaxHeight())
-                                    }
-                                } else Placed(4) { RestartNavCard(d, Modifier) }
-                            } else if (navPkg != null) Placed(2) { RestartNavCard(d, Modifier) } // навигатор окном (Google Карты)
+                            if (navPkg != null) {
+                                // h800: подсказки на приборке - машинная часть (Яндекс - только с Плюсом) или теневая AA (Google);
+                                // выкл - окно как на телефоне, без подписки и без AA. Своё значение у каждого навигатора.
+                                val hints = model.navHints(navPkg)
+                                val google = navPkg == NavigatorPick.GOOGLE_MAPS
+                                val sub = stringResource(when {
+                                    hints && google -> R.string.l_nav_hints_on_aa
+                                    hints && NavigatorPick.needsPlus(navPkg) -> R.string.l_nav_hints_on_plus
+                                    hints -> R.string.l_nav_hints_on
+                                    google -> R.string.l_nav_hints_off_aa
+                                    NavigatorPick.needsPlus(navPkg) -> R.string.l_nav_hints_off_plus
+                                    else -> R.string.l_nav_hints_off
+                                })
+                                // низкий ряд (экраны высотой 480): подпись не влезает под название - без неё
+                                val subFits = rowH >= ((s.f2 + d.sub) * 1.25).roundToInt() + 4 + 2 * d.padV
+                                SwitchCard(stringResource(R.string.l_nav_hints), hints, d, cell(2).fillMaxWidth(), sub = sub.takeIf { subFits }) {
+                                    model.chooseNavHints(navPkg, it)
+                                }
+                                var row = 3
+                                // масштаб - dpi своего хоста Car App; навигатору окном и через AA он не нужен
+                                if (EmbedHost.nav.carHost) MapScaleCard(navPkg, d, cell(row++).fillMaxWidth())
+                                Placed(row++) { RestartNavCard(d, Modifier) } // кнопка - через обёртку, рамка шайбы (h737)
+                                // Google через AA: сервер ГУ живёт в Android Auto, перезапуск - в её настройках на телефоне
+                                if (hints && google) AaServerHintCard(d, cell(row).fillMaxWidth())
+                            }
                         }
                         SettingsPage.MUSIC -> {
                             val players by produceState(emptyList<String>()) {
@@ -362,35 +379,52 @@ private fun MapScaleCard(pkg: String, d: SettingsDims, modifier: Modifier) {
     val s = m.spec
     val model = LauncherModel
     val cur = model.mapScale(pkg)
+    val steps = listOf(R.string.l_s_scale_smaller, R.string.l_s_theme_auto, R.string.l_s_scale_larger, R.string.l_s_scale_largest)
+    // один ряд (h800: место под «Подсказки на приборке»): название, «−», ступень, «+», как степпер макета
     Card(modifier) {
-        Column(
-            Modifier.fillMaxSize().padding(start = m.dp(d.padStart), end = m.dp(d.padEnd), top = m.dp(d.padV), bottom = m.dp(d.padV)),
-            verticalArrangement = Arrangement.spacedBy(m.dp(s.g8), Alignment.CenterVertically),
-        ) {
-            Column(verticalArrangement = Arrangement.spacedBy(m.dp(4))) {
-                Txt(stringResource(R.string.l_s_map_scale), s.f2)
-                Txt(stringResource(R.string.l_s_map_scale_sub, model.packageLabel(pkg)), d.sub, color = Pal.SEC, ellipsis = false)
+        Row(Modifier.fillMaxSize().padding(start = m.dp(d.padStart), end = m.dp(d.padEnd)), verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(m.dp(s.g))) {
+            Txt(stringResource(R.string.l_s_map_scale), s.f2, Modifier.weight(1f), ellipsis = false)
+            StepButton("−", stringResource(R.string.l_s_scale_smaller), cur > 0, d) { model.chooseMapScale(pkg, cur - 1) }
+            Box(Modifier.width(m.dp(d.stepValueW)), contentAlignment = Alignment.Center) {
+                Txt(stringResource(steps[cur.coerceIn(0, steps.size - 1)]), s.f2, weight = FontWeight.SemiBold, ellipsis = false)
             }
-            // четыре ступени - поровну на ширину карточки (на 1280×720 по размеру текста не влезают)
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(m.dp(s.g8))) {
-                for ((i, res) in listOf(R.string.l_s_scale_smaller, R.string.l_s_theme_auto, R.string.l_s_scale_larger,
-                    R.string.l_s_scale_largest).withIndex()) {
-                    val label = stringResource(res)
-                    OptionBox(cur == i, Modifier.weight(1f).height(m.dp(d.ctl)), RoundedCornerShape(m.dp(d.ctl / 2)), label,
-                        unselected = LocalPalette.current.btnSet, onTap = { model.chooseMapScale(pkg, i) }) {
-                        Box(Modifier.fillMaxSize().padding(horizontal = m.dp(8)), contentAlignment = Alignment.Center) {
-                            Txt(label, s.f2, weight = FontWeight.SemiBold, ellipsis = false)
-                        }
-                    }
-                }
-            }
+            StepButton("+", stringResource(R.string.l_s_scale_larger), cur < steps.size - 1, d) { model.chooseMapScale(pkg, cur + 1) }
+        }
+    }
+}
+
+/** Круглая кнопка степпера «−» / «+» размером с контрол ряда. */
+@Composable
+private fun StepButton(sign: String, description: String, enabled: Boolean, d: SettingsDims, onTap: () -> Unit) {
+    val m = LocalMetrics.current
+    Pressable(Modifier.size(m.dp(d.ctl)).clip(CircleShape).background(LocalPalette.current.btnSet).alpha(if (enabled) 1f else 0.4f),
+        enabled = enabled, description = description, onTap = onTap) { pressed ->
+        if (pressed) Box(Modifier.matchParentSize().background(Pal.SURFACE_PRESSED))
+        Box(Modifier.matchParentSize(), contentAlignment = Alignment.Center) {
+            Txt(sign, m.spec.f1, weight = FontWeight.SemiBold, ellipsis = false)
+        }
+    }
+}
+
+/**
+ * Подсказка без нажатия (Google Карты через теневую AA): сервер ГУ перезапускают в настройках AA на телефоне. Кнопкой
+ * на ГУ нельзя: реестр встраивания берёт только приложения со значком в списке запуска, а у настроек AA его нет
+ * (стенд 05.11: «Виджет принимает только доступное приложение из списка запуска»).
+ */
+@Composable
+private fun AaServerHintCard(d: SettingsDims, modifier: Modifier) {
+    val m = LocalMetrics.current
+    Card(modifier) {
+        Box(Modifier.fillMaxSize().padding(start = m.dp(d.padStart), end = m.dp(d.padEnd)), contentAlignment = Alignment.CenterStart) {
+            Txt(stringResource(R.string.l_nav_aa_server_hint), d.sub, color = Pal.SEC, maxLines = 2, ellipsis = false)
         }
     }
 }
 
 /** Карточка с переключателем: трек 120x64, ручка 52, тач-зона 136x96 (на 1280x720). */
 @Composable
-private fun SwitchCard(label: String, on: Boolean, d: SettingsDims, modifier: Modifier, onChange: (Boolean) -> Unit) {
+private fun SwitchCard(label: String, on: Boolean, d: SettingsDims, modifier: Modifier, sub: String? = null, onChange: (Boolean) -> Unit) {
     val m = LocalMetrics.current
     val s = m.spec
     val accent = LocalAccent.current
@@ -398,7 +432,11 @@ private fun SwitchCard(label: String, on: Boolean, d: SettingsDims, modifier: Mo
     Card(modifier) {
         Row(Modifier.fillMaxSize().padding(start = m.dp(d.padStart), end = m.dp(8)), verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(m.dp(s.g))) {
-            Txt(label, s.f2, Modifier.weight(1f), ellipsis = false)
+            if (sub == null) Txt(label, s.f2, Modifier.weight(1f), ellipsis = false)
+            else Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(m.dp(4))) {
+                Txt(label, s.f2, ellipsis = false)
+                Txt(sub, d.sub, color = Pal.SEC, ellipsis = true)
+            }
             Pressable(Modifier.width(m.dp(d.switchW)).height(m.dp(d.ctl)), description = label, onTap = { onChange(!on) }) {
                 Box(Modifier.matchParentSize(), contentAlignment = Alignment.Center) {
                     Box(
@@ -648,28 +686,33 @@ private fun systemInfo(): List<Pair<String, String>> {
     )
 }
 
-/** Последняя строка «Системы»: версия Headswap, тап открывает «О приложении». */
+/**
+ * Карточка-действие: подсветка, пока палец на ней, и вспышка акцентом на 500 мс после касания - короткий тап
+ * (мышь стенда, быстрый DOWN/UP ГУ) иначе не видно (Егор 05.11, «Перезапустить навигатор»). Вспышка - как остальные
+ * анимации кнопок, выключается настройкой «Анимации кнопок».
+ */
+@Composable
+private fun ActionCard(label: String, modifier: Modifier, onTap: () -> Unit, content: @Composable () -> Unit) {
+    val m = LocalMetrics.current
+    val accent = LocalAccent.current
+    val flash = rememberPressAnim(500)
+    Pressable(modifier.clip(RoundedCornerShape(m.dp(m.spec.radius))).background(Pal.SURFACE), description = label,
+        onPress = { flash.play() }, onTap = onTap) { pressed ->
+        if (pressed) Box(Modifier.matchParentSize().background(Pal.SURFACE_PRESSED))
+        Box(Modifier.matchParentSize().background(accent.copy(alpha = 0.32f * (1f - flash.progress))))
+        content()
+    }
+}
+
+/** «Перезапустить навигатор»: новая сессия своего хоста или окно на свежей текстуре. */
 @Composable
 private fun RestartNavCard(d: SettingsDims, modifier: Modifier) {
     val m = LocalMetrics.current
     val s = m.spec
     val label = stringResource(R.string.l_nav_restart)
-    Pressable(modifier.clip(RoundedCornerShape(m.dp(s.radius))).background(Pal.SURFACE), description = label,
-        onTap = { EmbedHost.restartNav() }) { pressed ->
-        if (pressed) Box(Modifier.matchParentSize().background(Pal.SURFACE_PRESSED))
+    ActionCard(label, modifier, onTap = { EmbedHost.restartNav() }) {
         Row(Modifier.fillMaxSize().padding(start = m.dp(d.padStart), end = m.dp(d.padEnd)), verticalAlignment = Alignment.CenterVertically) {
             Txt(label, s.f2, ellipsis = false)
-        }
-    }
-}
-
-/** Карточка-пояснение без нажатия (Яндекс: «только с Плюсом»). */
-@Composable
-private fun NoteCard(text: String, d: SettingsDims, modifier: Modifier) {
-    val m = LocalMetrics.current
-    Card(modifier) {
-        Box(Modifier.fillMaxSize().padding(start = m.dp(d.padStart), end = m.dp(d.padEnd)), contentAlignment = Alignment.CenterStart) {
-            Txt(text, d.sub, color = Pal.SEC, maxLines = 3, ellipsis = false)
         }
     }
 }

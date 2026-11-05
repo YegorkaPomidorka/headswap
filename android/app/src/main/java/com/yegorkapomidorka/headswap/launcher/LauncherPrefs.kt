@@ -96,6 +96,10 @@ class LauncherPrefs(context: Context) {
     fun mapScale(pkg: String): Int = prefs.getInt("map_scale:$pkg", com.yegorkapomidorka.headswap.carapp.CarConfigMath.AUTO_STEP)
     fun setMapScale(pkg: String, step: Int) { prefs.edit().putInt("map_scale:$pkg", step).apply() }
 
+    /** «Подсказки на приборке» навигатора [pkg]: машинная часть / теневая AA или окно как на телефоне ([NavigatorPick.hintsDefault]). */
+    fun navHints(pkg: String): Boolean = prefs.getBoolean("nav_hints:$pkg", NavigatorPick.hintsDefault(pkg))
+    fun setNavHints(pkg: String, on: Boolean) { prefs.edit().putBoolean("nav_hints:$pkg", on).apply() }
+
     /** Пакет текущего музыкального плеера. */
     var musicPlayer: String?
         get() = prefs.getString("music_player", null)

@@ -110,11 +110,23 @@ object CatalogLists {
 object NavigatorPick {
     const val YANDEX_NAVI = "ru.yandex.yandexnavi"
     const val YANDEX_MAPS = "ru.yandex.yandexmaps"
+    const val GOOGLE_MAPS = "com.google.android.apps.maps"
     val KNOWN = listOf(YANDEX_NAVI, YANDEX_MAPS, "ru.dublgis.dgismobile",
-        "com.google.android.apps.maps", "com.waze", "app.organicmaps")
+        GOOGLE_MAPS, "com.waze", "app.organicmaps")
 
     /** Машинная часть только с подпиской Яндекс Плюс (у Карт тот же NavigationCarAppService, что у Навигатора). */
     fun needsPlus(pkg: String?): Boolean = pkg == YANDEX_NAVI || pkg == YANDEX_MAPS
+
+    /**
+     * «Подсказки на приборке» по умолчанию (h800, ADR 0028). Вкл - машинная часть на своём хосте Car App или теневая AA;
+     * выкл - навигатор окном, как на телефоне. По умолчанию выкл у всех (Егор 05.11): окно работает без Плюса и без AA.
+     */
+    @Suppress("UNUSED_PARAMETER")
+    fun hintsDefault(pkg: String): Boolean = false
+
+    /** Теневую AA держим, пока у выбранного навигатора подсказки включены; навигатора нет - как раньше, держим. */
+    fun shadowWanted(metaNavi: Boolean, navPkg: String?, hints: (String) -> Boolean): Boolean =
+        metaNavi && (navPkg == null || hints(navPkg))
 
     fun defaultFor(installed: Set<String>): String? = KNOWN.firstOrNull { it in installed }
 

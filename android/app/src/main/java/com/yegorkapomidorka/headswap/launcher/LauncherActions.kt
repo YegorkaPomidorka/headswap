@@ -79,6 +79,7 @@ object LauncherActions {
         model.go(Area.App(ref))
     }
 
+
     /** Тап по телу карточки музыки: приложение плеера на весь экран справа от рейки. */
     fun openMusicApp() {
         val pkg = MusicController.state.pkg ?: model.musicPlayer ?: return

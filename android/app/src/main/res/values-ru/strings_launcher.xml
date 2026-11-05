@@ -23,7 +23,14 @@
     <string name="l_alice_starting">Запускаем Алису…</string>
     <string name="l_nav_failed">Окно не открылось. Нажмите, чтобы повторить.</string>
     <string name="l_nav_restart">Перезапустить навигатор</string>
-    <string name="l_nav_yandex_plus">Работает только с активной подпиской Плюс!</string>
+    <string name="l_nav_hints">Подсказки на приборке</string>
+    <string name="l_nav_hints_on">Машинный режим навигатора</string>
+    <string name="l_nav_hints_on_plus">Машинный режим · нужен Яндекс Плюс</string>
+    <string name="l_nav_hints_on_aa">Через Android Auto на телефоне</string>
+    <string name="l_nav_hints_off">Как на телефоне</string>
+    <string name="l_nav_hints_off_plus">Как на телефоне · подписка не нужна</string>
+    <string name="l_nav_hints_off_aa">Как на телефоне · Android Auto не запускаем</string>
+    <string name="l_nav_aa_server_hint">Откройте настройки AA на телефоне\n⋮ → Вкл. сервер головного устройства</string>
     <string name="l_view_navigator">Навигатор</string>
     <string name="l_view_clock">Часы</string>
 

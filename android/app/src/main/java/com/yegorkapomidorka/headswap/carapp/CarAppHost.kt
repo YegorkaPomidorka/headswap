@@ -58,6 +58,9 @@ object CarAppHost {
     /** cmd car_host_off / car_host: навигаторы на Car App Library - обычным окном (сравнить на стенде). */
     @Volatile var enabled = true
 
+    /** «Подсказки на приборке» навигатора (настройка лаунчера, h800): false - этот пакет окном, как на телефоне. */
+    @Volatile var allowFor: (String) -> Boolean = { true }
+
     /** cmd car_dump: писать шаблоны целиком в лог (для разбора новых навигаторов). */
     @Volatile var dumpTemplates = false
 

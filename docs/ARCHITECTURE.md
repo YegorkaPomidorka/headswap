@@ -164,7 +164,8 @@ CONTROL0, SENSOR1, VIDEO2, INPUT3, SPEECH4, SYSTEM5, MEDIA6, MIC7, BT8, MEDIA_PL
 - **Состояние `BridgeService` трогает только главная нить**, колбэки с других нитей — через `main.post`.
 - Кроп-режимы в пробросе работают только через SPS-кроп (`spsCropable`), иначе откат на R720.
 - **Свой хост Car App: visible ≠ stable** (иначе 2ГИС прячет лимит, камеры, мини-карту), одна полноэкранная поверхность
-  с вырезкой, сначала onSurfaceDestroyed, потом отвязка. ADR 0021.
+  с вырезкой, сначала onSurfaceDestroyed, потом отвязка. ADR 0021. В хост идёт только навигатор с включёнными
+  «Подсказками на приборке», иначе окном; теневая AA - тоже только при них. ADR 0028.
 - **Хосту нужен свой `android.car.permission.TEMPLATE_RENDERER`** в манифесте (объявить и запросить), иначе навигаторы
   со списком хостов (Яндекс) отвечают «Unknown host» на рукопожатии. ADR 0022.
 - Пароли, SSID, ключи в лог не пишутся.
@@ -191,6 +192,7 @@ CONTROL0, SENSOR1, VIDEO2, INPUT3, SPEECH4, SYSTEM5, MEDIA6, MIC7, BT8, MEDIA_PL
 | Шайба/кнопки ГУ не действуют в своём лаунчере | `DelegatedDexConnector.sendRotary/sendKey` → `DesktopKeys.sink` → `launcher/LauncherKnob` (фокус в `Pressable`), коды в `KnobLogic`, ADR 0024 |
 | 2ГИС на рабочем столе: нет лимита/камер, заставка висит, «Перезапустите 2ГИС» | `carapp/CarAppSession` (области, порядок stop), кнопка «Перезапустить навигатор»; ADR 0021 |
 | Навигатор окном вместо хоста, в логе `handshake: отказ ... Unknown host` | TEMPLATE_RENDERER в манифесте; ADR 0022 |
+| Я.Карты/Навигатор просят Плюс, или навигатор окном без подсказок | настройка «Подсказки на приборке» (prefs `nav_hints:<pkg>`, по умолчанию выкл у всех) → `CarAppHost.allowFor` в `EmbedHost.carTargetFor`; теневая AA - `NavigatorPick.shadowWanted`; ADR 0028 |
 | Навигатор в хосте: голая карта, нет кнопок/списка | шаблон не разобран (`CarUi.Unknown`): `carapp/CarUiMapper.map`, `cmd car_dump` |
 | Тач мимо / рывками | `VideoGeometry.mapTouch`, `TouchDecimator`, `TouchPacer` |
 
