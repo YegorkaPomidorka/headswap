@@ -84,6 +84,34 @@ object LauncherActions {
 
     fun openPlayers() { model.go(Area.Players) }
 
+    /** «Яндекс — с Алисой», потом «Яндекс Старт» (старое имя пакета): тот же порядок, что в [com.yegorkapomidorka.headswap.dex.PhoneAssistant]. */
+    private val ALICE_PACKAGES = listOf("com.yandex.searchapp", "ru.yandex.searchplugin")
+    private const val ALICE_CLASS = "ru.yandex.searchplugin.AssistantActivityAlias"
+
+    /** Ключ «пакет/класс» Алисы для дочернего окна: установленный пакет из списка, не нашли - первый (окно покажет ошибку). */
+    internal fun aliceKey(): String {
+        val pm = model.context.packageManager
+        val pkg = ALICE_PACKAGES.firstOrNull { runCatching { pm.getApplicationInfo(it, 0) }.isSuccess } ?: ALICE_PACKAGES[0]
+        return "$pkg/$ALICE_CLASS"
+    }
+
+    /** Кнопка голоса: панель Алисы слева за рейкой; повторное нажатие закрывает. Главный поток. */
+    fun toggleAssistant() { if (model.assistantOpen) closeAssistant("повторная кнопка голоса") else openAssistant() }
+
+    fun openAssistant() {
+        if (model.assistantOpen) return
+        AppLog.i("ASSIST панель открыта, экран=${model.area}", false)
+        model.assistantOpen = true
+    }
+
+    /** Закрыть панель и отпустить дочерний дисплей; [why] - причина для лога. */
+    fun closeAssistant(why: String) {
+        if (!model.assistantOpen) return
+        AppLog.i("ASSIST панель закрыта: $why", false)
+        model.assistantOpen = false
+        EmbedHost.want(EmbedHost.alice, null, 0, 0)
+    }
+
     /** Кнопка MEDIA ГУ: плеер на весь экран; плеер не выбран или не установлен - выбор плеера. */
     fun openMusic() {
         val pkg = MusicController.state.pkg ?: model.musicPlayer
@@ -139,6 +167,8 @@ object LauncherActions {
 
     fun embeddedBack() {
         AppLog.i("LAUNCHER Назад на рейке: экран=${model.area}", false)
+        // панель Алисы закрывается сама, Back в Яндекс не шлём
+        if (model.assistantOpen) { closeAssistant("Назад"); return }
         when (model.area) {
             is Area.App -> {
                 val now = android.os.SystemClock.uptimeMillis()
@@ -168,6 +198,7 @@ object LauncherActions {
 
     /** Слот сообщил, что задачи приложения больше нет (процесс убит, Back из корня, окно потеряно): слой убираем. */
     internal fun embedGone(slot: EmbedSlot) {
+        if (slot === EmbedHost.alice) { closeAssistant("задача Алисы исчезла"); return }
         if (model.foreign != null) { if (slot === EmbedHost.app) ForeignActions.gone(); return }
         backClosed(slot)
     }

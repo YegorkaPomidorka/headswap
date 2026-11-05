@@ -80,6 +80,8 @@ internal object LauncherModel {
 
     /** Чужой лаунчер из DexPrefs.desktopComponent в окне над панелью навигации; null - наш рабочий стол. Ведёт [ForeignActions]. */
     var foreign by mutableStateOf<AppRef?>(null)
+    /** Панель Алисы (кнопка голоса) поверх рабочего стола: слева за рейкой, под ней затемнение. */
+    var assistantOpen by mutableStateOf(false)
     /** Оверлей «Недавние» на экране. */
     var recentsOpen by mutableStateOf(false)
     /** Приложения оверлея; null - список ещё запрашивается. */

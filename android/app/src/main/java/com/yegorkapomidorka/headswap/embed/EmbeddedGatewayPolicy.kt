@@ -6,7 +6,7 @@ import com.yegorkapomidorka.headswap.dex.EmbeddedDisplayPolicy
 
 /** Pure argument bounds; caller identity and live session generation are checked by the service. */
 object EmbeddedGatewayPolicy {
-    const val MAX_LEASES = 2
+    const val MAX_LEASES = 3
 
     private val packagePattern = Regex("[A-Za-z][A-Za-z0-9_]*(\\.[A-Za-z][A-Za-z0-9_]*)+")
     private val classPattern = Regex("[A-Za-z_$][A-Za-z0-9_$]*(\\.[A-Za-z_$][A-Za-z0-9_$]*)+")

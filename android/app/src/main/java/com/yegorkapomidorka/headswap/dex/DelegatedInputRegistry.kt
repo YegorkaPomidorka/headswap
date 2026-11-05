@@ -31,7 +31,7 @@ internal class DelegatedInputRegistry {
         require(id > 0) { "Основной экран телефона запрещён" }
         EmbeddedDisplayPolicy.requireDimensions(width, height)
         check(generation > 0 && displays[parent]?.parent == null && displays.containsKey(parent)) { "Родительский экран недоступен" }
-        check(id != parent && !displays.containsKey(id) && displays.size < 3 && token != expectedParentToken &&
+        check(id != parent && !displays.containsKey(id) && displays.size < 4 && token != expectedParentToken &&
             displays.values.none { it.token == token }) { "Недопустимый экран виджета" }
         requireChildBudget(id, width, height)
         displays[id] = Entry(id, token, parent, width, height)

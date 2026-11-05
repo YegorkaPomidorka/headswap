@@ -23,7 +23,7 @@ import com.yegorkapomidorka.headswap.embed.EmbeddedSessionRegistry
 
 internal enum class EmbedStatus { IDLE, CONNECTING, STARTING, READY, FAILED }
 
-/** Один дочерний экран: навигатор или «текущее приложение». Лимит реестра - 2 окна, значит слотов ровно два. */
+/** Один дочерний экран: навигатор, «текущее приложение» или панель Алисы. Лимит реестра - 3 окна, значит слотов ровно три. */
 internal class EmbedSlot(val name: String) {
     private var statusValue by mutableStateOf(EmbedStatus.IDLE)
 
@@ -125,7 +125,8 @@ internal object EmbedHost {
 
     val nav = EmbedSlot("nav")
     val app = EmbedSlot("app")
-    private val slots = listOf(nav, app)
+    val alice = EmbedSlot("alice")
+    private val slots = listOf(nav, app, alice)
 
     private val thread = HandlerThread("headswap-launcher-embed").apply { start() }
     private val worker = Handler(thread.looper)
@@ -566,7 +567,11 @@ internal object EmbedHost {
             val pkg = key.substringBefore('/')
             val cls = key.substringAfter('/')
             AppLog.i("EMBED ${slot.name}: запуск $key handle=${slot.handle} (state=${slot.lastState} stale=${slot.stale})", false)
+            if (slot === alice) AppLog.i("ASSIST Алиса -> дочерний дисплей, окно ${slot.geomW}x${slot.geomH}", false)
             timed(slot, "launch") { EmbeddedSessionRegistry.launch(uid, slot.handle, pkg, cls) }
+            // Яндекс-помощник по умолчанию перезапускает себя через MainActivity на экране телефона: ловим и переносим
+            if (slot === alice) appContext?.let { com.yegorkapomidorka.headswap.dex.PhoneAssistant.pullToDisplay(it,
+                EmbeddedSessionRegistry.childDisplayId(uid, slot.handle), pkg) }
             slot.launchedKey = key
             slot.launchedAt = SystemClock.uptimeMillis()
             slot.stale = false

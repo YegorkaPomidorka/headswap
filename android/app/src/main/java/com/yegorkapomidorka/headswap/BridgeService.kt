@@ -50,6 +50,7 @@ import com.yegorkapomidorka.headswap.dex.DesktopAccess
 import com.yegorkapomidorka.headswap.dex.DesktopAudioCapture
 import com.yegorkapomidorka.headswap.dex.DesktopAudioState
 import com.yegorkapomidorka.headswap.dex.DesktopFailure
+import com.yegorkapomidorka.headswap.dex.DesktopKeys
 import com.yegorkapomidorka.headswap.dex.DesktopMusicPlayback
 import com.yegorkapomidorka.headswap.dex.DesktopRecoveryPolicy
 import com.yegorkapomidorka.headswap.dex.DexPrefs
@@ -1074,8 +1075,7 @@ class BridgeService : Service() {
         owner.core.transcodeEnabled = true
         owner.core.spliceMs = 0L
         owner.core.carVwId = aaPrefs.carPreset == CarPreset.VW_ID_UNYX
-        // кнопка голоса: теневая AA без экрана и микрофона, помощника телефона открываем на дисплее рабочего стола
-        owner.core.phoneAssistant = { main.post { PhoneAssistant.launch(applicationContext, DexState.displayId) } }
+        // кнопка голоса: системный помощник клавишей KEYCODE_ASSIST (как долгое нажатие питания), см. createDesktopHost
         if (wakeLock == null) {
             wakeLock = getSystemService(PowerManager::class.java)
                 .newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "headswap:session")
@@ -1135,6 +1135,14 @@ class BridgeService : Service() {
             val ref = arrayOfNulls<BridgeHost>(1)
             val conn = DelegatedDexConnector(applicationContext, core) { reason ->
                 main.post { ref[0]?.let { onDesktopSourceFailed(it, reason) } }
+            }
+            // кнопка голоса: панель Алисы в своём лаунчере (DesktopKeys); лаунчер не на экране или чужой - Алиса на весь
+            // дисплей рабочего стола (dex/PhoneAssistant, ADR 0025). Лямбда зовётся не с главного потока
+            core.phoneAssistant = {
+                if (DesktopKeys.sink?.voice() != true) {
+                    AppLog.i("ASSIST панель не взята лаунчером, Алиса на весь дисплей")
+                    main.post { PhoneAssistant.launch(applicationContext, DexState.displayId) }
+                }
             }
             AppLog.i("DEX: видео ${mode.outW}x${mode.outH} через CarLife; звук по USB по настройке; микрофон CarLife не передаётся")
             val h = BridgeHost(core, conn, scheduler, log, previous = previous, onTornDown = {
