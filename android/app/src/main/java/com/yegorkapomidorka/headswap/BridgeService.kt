@@ -1124,7 +1124,10 @@ class BridgeService : Service() {
             core.mapHomeKey = true
             core.desktopInputEnabled = true
             DesktopNavHints.target = core   // подсказки навигатора рабочего стола (свой хост Car App, теневая AA) в MetaRelay
-            if (aaPrefs.metaNavi) AaShadowNav.start(this)   // в машине adb нет: стартуем вместе с рабочим столом
+            // в машине adb нет: стартуем вместе с рабочим столом; у навигатора выключены подсказки на приборке - AA не трогаем (h800).
+            // Сохранённый навигатор, а не выбранный по каталогу: каталог знает лаунчер, он и поправит (LauncherModel.applyShadowNav)
+            val lp = com.yegorkapomidorka.headswap.launcher.LauncherPrefs(this)
+            if (com.yegorkapomidorka.headswap.launcher.NavigatorPick.shadowWanted(aaPrefs.metaNavi, lp.navigator, lp::navHints)) AaShadowNav.start(this)
             core.touchDecimationProvider = { aaPrefs.touchDecimation }
             core.transcodeEnabled = true
             core.refDecoderFactory = { sink -> RefDecoder(sink) { AppLog.i(it, false) } }

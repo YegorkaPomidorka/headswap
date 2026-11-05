@@ -258,6 +258,10 @@ internal object EmbedHost {
     private fun carTargetFor(pkg: String?): CarAppTarget? {
         val ctx = appContext
         if (pkg == null || ctx == null || !CarAppHost.enabled) return null
+        if (!CarAppHost.allowFor(pkg)) {
+            if (carPkg == pkg) { carPkg = null; AppLog.i("EMBED nav: $pkg - подсказки на приборке выключены, окном", false) }
+            return null
+        }
         if (pkg != carPkg) {
             carPkg = pkg
             carTarget = CarAppCatalog.usable(ctx, pkg)

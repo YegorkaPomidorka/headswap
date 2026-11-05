@@ -155,6 +155,7 @@ internal object LauncherModel {
         EmbedHost.onGone = { LauncherActions.embedGone(it) }
         EmbedHost.onAssistantOpened = { LauncherActions.assistantOpened(it) }
         CarAppHost.scaleFor = { pkg -> CarConfigMath.step(prefs.mapScale(pkg)) }
+        CarAppHost.allowFor = { pkg -> prefs.navHints(pkg) }
         ready = true
         reloadCatalog()
     }
@@ -172,7 +173,7 @@ internal object LauncherModel {
                 }
             }.getOrElse { AppLog.i("Launcher catalog: ${it.javaClass.simpleName}", false); emptyList() }
             val selected = DesktopAppCatalog.select(found, appCtx.packageName)
-            main.post { catalog = selected; catalogLoaded = true }
+            main.post { catalog = selected; catalogLoaded = true; applyShadowNav() } // выбранный навигатор известен только с каталогом
         }
     }
 
@@ -225,7 +226,27 @@ internal object LauncherModel {
         if (layout == HomeLayout.QUAD) chooseMapLeft(left)
         setTiles(HomeTilesLogic.normalize(HomeTiles(cardView, smallView), layout, youtubeAvailable))
     }
-    fun setNavigator(pkg: String?) { savedNavigator = pkg; prefs.navigator = pkg }
+    fun setNavigator(pkg: String?) { savedNavigator = pkg; prefs.navigator = pkg; applyShadowNav() }
+
+    /** «Подсказки на приборке» по навигатору (h800): вкл - машинная часть / теневая AA, выкл - окно как на телефоне. */
+    private var navHintsRev by mutableIntStateOf(0)
+    fun navHints(pkg: String): Boolean { navHintsRev; return prefs.navHints(pkg) }
+    fun chooseNavHints(pkg: String, on: Boolean) {
+        prefs.setNavHints(pkg, on); navHintsRev++
+        AppLog.i("LAUNCHER подсказки на приборке $pkg: ${if (on) "вкл" else "выкл"}", false)
+        EmbedHost.reproject() // окно навигатора пересобирается: свой хост Car App или обычное окно
+        applyShadowNav()
+    }
+
+    /**
+     * Теневая AA (подсказки Google Карт) - только пока у выбранного навигатора подсказки включены: выкл - AA на телефоне
+     * не трогаем совсем (h800). Стартует её BridgeService вместе с рабочим столом, здесь - смена навигатора или настройки.
+     */
+    private fun applyShadowNav() {
+        if (!ready || com.yegorkapomidorka.headswap.dex.DexState.displayId <= 0) return
+        val want = NavigatorPick.shadowWanted(com.yegorkapomidorka.headswap.aa.AaPrefs(appCtx).metaNavi, navigatorPkg, prefs::navHints)
+        if (want) com.yegorkapomidorka.headswap.aa.AaShadowNav.start(appCtx) else com.yegorkapomidorka.headswap.aa.AaShadowNav.stop()
+    }
 
     /** Смена «Масштаба карты» - перерисовать карточку (сами ступени в prefs, по пакету). */
     private var mapScaleRev by mutableIntStateOf(0)
