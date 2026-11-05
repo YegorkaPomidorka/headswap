@@ -15,11 +15,21 @@ class EmbeddedDisplayPolicyTest {
         EmbeddedDisplayPolicy.requireParent(DesktopModePolicy.ANDROID_DESKTOP, 24)
         EmbeddedDisplayPolicy.requireCapacity(0)
         EmbeddedDisplayPolicy.requireCapacity(1)
-        rejects { EmbeddedDisplayPolicy.requireCapacity(2) }
+        EmbeddedDisplayPolicy.requireCapacity(2)
+        rejects { EmbeddedDisplayPolicy.requireCapacity(3) }
         rejects { EmbeddedDisplayPolicy.requireCapacity(-1) }
         rejects { EmbeddedDisplayPolicy.requireParent(DesktopModePolicy.ANDROID_DESKTOP, 0) }
         rejects { EmbeddedDisplayPolicy.requireParent(DesktopModePolicy.SAMSUNG_DEX, 24) }
         rejects { EmbeddedDisplayPolicy.requireParent(2, 24) } // The former DriveDeck mode no longer exists.
+    }
+
+    @Test fun onlyAliceAssistantActivityLaunchesWithoutLauncherCategory() {
+        assertTrue(EmbeddedDisplayPolicy.assistLaunch("com.yandex.searchapp", "ru.yandex.searchplugin.AssistantActivityAlias"))
+        assertTrue(EmbeddedDisplayPolicy.assistLaunch("ru.yandex.searchplugin", "ru.yandex.searchplugin.AssistantActivityAlias"))
+        assertFalse(EmbeddedDisplayPolicy.assistLaunch("com.yandex.searchapp", "ru.yandex.searchplugin.MainActivity"))
+        assertFalse(EmbeddedDisplayPolicy.assistLaunch("com.yandex.searchapp", ".AssistantActivityAlias"))
+        assertFalse(EmbeddedDisplayPolicy.assistLaunch("com.example.app", "ru.yandex.searchplugin.AssistantActivityAlias"))
+        assertFalse(EmbeddedDisplayPolicy.assistLaunch("com.yandex.maps", "ru.yandex.searchplugin.AssistantActivityAlias"))
     }
 
     @Test fun validatesWidgetGeometryBeforeAllocation() {

@@ -88,6 +88,75 @@ object LauncherActions {
 
     fun openPlayers() { model.go(Area.Players) }
 
+    /** «Яндекс — с Алисой», потом «Яндекс Старт» (старое имя пакета): тот же порядок, что в [com.yegorkapomidorka.headswap.dex.PhoneAssistant]. */
+    private val ALICE_PACKAGES = listOf("com.yandex.searchapp", "ru.yandex.searchplugin")
+    private const val ALICE_CLASS = "ru.yandex.searchplugin.AssistantActivityAlias"
+
+    /** Ключ «пакет/класс» Алисы для дочернего окна: установленный пакет из списка, не нашли - первый (окно покажет ошибку). */
+    internal fun aliceKey(): String {
+        val pm = model.context.packageManager
+        val pkg = ALICE_PACKAGES.firstOrNull { runCatching { pm.getApplicationInfo(it, 0) }.isSuccess } ?: ALICE_PACKAGES[0]
+        return "$pkg/$ALICE_CLASS"
+    }
+
+    /** Кнопка голоса: панель Алисы слева за рейкой; повторное нажатие закрывает. Главный поток. */
+    fun toggleAssistant() { if (model.assistantOpen) closeAssistant("повторная кнопка голоса") else openAssistant() }
+
+    fun openAssistant() {
+        if (model.assistantOpen) return
+        AppLog.i("ASSIST панель открыта, экран=${model.area}", false)
+        model.assistantOpen = true
+        com.yegorkapomidorka.headswap.dex.DesktopKeys.voiceStatus?.invoke(true)
+    }
+
+    /** Закрыть панель и отпустить дочерний дисплей; [why] - причина для лога. */
+    fun closeAssistant(why: String) {
+        if (!model.assistantOpen) return
+        AppLog.i("ASSIST панель закрыта: $why", false)
+        model.assistantOpen = false
+        com.yegorkapomidorka.headswap.dex.DesktopKeys.voiceStatus?.invoke(false)
+        com.yegorkapomidorka.headswap.dex.PhoneAssistant.stopWatch()
+        val ctx = model.context.applicationContext
+        // сначала закрыть задачи панели, потом отпустить дисплей (иначе Яндекс переедет под лаунчер)
+        Thread({
+            com.yegorkapomidorka.headswap.dex.PhoneAssistant.clearDisplay(ctx, EmbedHost.aliceDisplayId())
+            android.os.Handler(android.os.Looper.getMainLooper()).post {
+                // успели открыть снова: задачу мы только что закрыли - пусть слот перезапустит Алису
+                if (!model.assistantOpen) EmbedHost.want(EmbedHost.alice, null, 0, 0) else EmbedHost.refresh(EmbedHost.alice)
+            }
+        }, "assist-close").start()
+    }
+
+    /**
+     * Алиса открыла в своей панели другое приложение. Маршрут (Навигатор по yandexnavi://build_route_on_map) - как в AA:
+     * задачу закрываем, панель тоже, навигатор на всю область и ACTION_NAVIGATE + geo: в его машинную часть. Навигатор
+     * обычным окном - переносим задачу в его окно. Не маршрут - оставляем в панели. Главный поток.
+     */
+    internal fun assistantOpened(t: android.app.ActivityManager.RunningTaskInfo) {
+        if (!model.assistantOpen) return
+        val pkg = t.topActivity?.packageName ?: return
+        val data = t.baseIntent.dataString
+        val geo = com.yegorkapomidorka.headswap.carapp.RouteIntent.geoFor(data)
+        if (geo == null) { AppLog.i("ASSIST $pkg не маршрут ($data), остаётся в панели", false); return }
+        val navigate = android.content.Intent(com.yegorkapomidorka.headswap.carapp.RouteIntent.ACTION_NAVIGATE, android.net.Uri.parse(geo))
+        val nav = model.navigatorPkg
+        val car = com.yegorkapomidorka.headswap.carapp.CarAppHost.pkg?.takeIf { it == nav }
+        AppLog.i("ASSIST маршрут от Алисы $geo -> ${car?.let { "машинная часть $it" } ?: "окно навигатора $nav"}", false)
+        val taskId = t.taskId
+        val ctx = model.context.applicationContext
+        Thread({
+            val assist = com.yegorkapomidorka.headswap.dex.PhoneAssistant
+            assist.removeTask(taskId)
+            // навигатор окном (Google Карты): маршрут его же intent'ом в его окно
+            if (car == null && nav != null) assist.openRoute(ctx, nav, geo, EmbedHost.navDisplayId())
+            // окном тот же пакет - его задачу не трогаем, иначе закроем само окно
+            if (car != null || nav != pkg) assist.closePhoneTasks(ctx, pkg)
+        }, "assist-route").start()
+        closeAssistant("маршрут -> навигатор")
+        if (model.navigatorPkg != null && model.area != Area.Navigator) model.go(Area.Navigator)
+        if (car != null) com.yegorkapomidorka.headswap.carapp.CarAppHost.newIntent(navigate)
+    }
+
     /** Кнопка MEDIA ГУ: плеер на весь экран; плеер не выбран или не установлен - выбор плеера. */
     fun openMusic() {
         val pkg = MusicController.state.pkg ?: model.musicPlayer
@@ -143,6 +212,8 @@ object LauncherActions {
 
     fun embeddedBack() {
         AppLog.i("LAUNCHER Назад на рейке: экран=${model.area}", false)
+        // панель Алисы закрывается сама, Back в Яндекс не шлём
+        if (model.assistantOpen) { closeAssistant("Назад"); return }
         when (model.area) {
             is Area.App -> {
                 val now = android.os.SystemClock.uptimeMillis()
@@ -172,6 +243,7 @@ object LauncherActions {
 
     /** Слот сообщил, что задачи приложения больше нет (процесс убит, Back из корня, окно потеряно): слой убираем. */
     internal fun embedGone(slot: EmbedSlot) {
+        if (slot === EmbedHost.alice) { closeAssistant("задача Алисы исчезла"); return }
         if (model.foreign != null) { if (slot === EmbedHost.app) ForeignActions.gone(); return }
         backClosed(slot)
     }

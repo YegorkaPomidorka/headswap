@@ -58,6 +58,21 @@ object LauncherKnob : DesktopKeys.Sink {
     override fun rotate(delta: Int): Boolean = take(KnobLogic.forRotary(delta))
     override fun key(keycode: Int): Boolean = take(KnobLogic.forKey(keycode))
 
+    /** Кнопка голоса: панель Алисы; чужой лаунчер или активность не на экране - не беру, Алиса пойдёт на весь дисплей. */
+    override fun voice(): Boolean {
+        val decline = when {
+            owner == null -> "активность лаунчера не на экране"
+            LauncherModel.foreign != null -> "чужой лаунчер"
+            else -> null
+        }
+        if (decline != null) {
+            AppLog.i("ASSIST кнопка голоса: лаунчер не берёт ($decline)", false)
+            return false
+        }
+        main.post { LauncherActions.toggleAssistant() }
+        return true
+    }
+
     private fun take(k: Knob?): Boolean {
         if (k == null) return false
         // чужой лаунчер: его окно само разбирает стрелки, HOME идёт через showDesktop

@@ -127,6 +127,13 @@ object CarAppHost {
     /** «Назад» хоста: приложение само решает, что закрыть. */
     fun back() { h.post { session?.back() } }
 
+    /** Intent навигатору хоста (маршрут от Алисы); хост не поднят - false, и intent не ушёл. */
+    fun newIntent(i: android.content.Intent): Boolean {
+        if (pkg == null) return false
+        h.post { session?.newIntent(i) ?: log("onNewIntent: сессии нет") }
+        return true
+    }
+
     /** cmd car_click --ei i N: нажать N-й кликабельный элемент текущего шаблона. */
     fun click(i: Int) { h.post { CarTemplateDump.click(i) } }
 

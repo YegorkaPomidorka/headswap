@@ -11,7 +11,12 @@ object DesktopKeys {
         fun rotate(delta: Int): Boolean
         /** Android keycode от моста (AaBridge.HARD_KEY_TO_ANDROID). false - не взял. Любой поток. */
         fun key(keycode: Int): Boolean
+        /** Кнопка голоса: панель Алисы в лаунчере. false - не взял (чужой лаунчер, активность не на экране). Любой поток. */
+        fun voice(): Boolean
     }
 
     @Volatile var sink: Sink? = null
+
+    /** Панель Алисы открылась (true) / закрылась: мост шлёт ГУ MODULE_STATUS VR. null - сессии нет. Любой поток. */
+    @Volatile var voiceStatus: ((Boolean) -> Unit)? = null
 }

@@ -33,6 +33,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.foundation.layout.absoluteOffset
+import com.yegorkapomidorka.headswap.AppLog
 import com.yegorkapomidorka.headswap.R
 import com.yegorkapomidorka.headswap.carapp.CarAppHost
 import com.yegorkapomidorka.headswap.carapp.CarAreas
@@ -112,6 +113,31 @@ fun EmbedLayers() {
                 starting = stringResource(R.string.l_starting, label), onCardTap = null)
         }
     }
+
+    // панель Алисы: слева за рейкой, на всю высоту, шириной 0,8 высоты; справа затемнение, тап по нему закрывает
+    val assistOpen = model.assistantOpen
+    val aliceKey = remember(assistOpen) { if (assistOpen) LauncherActions.aliceKey() else null }
+    val aliceRect = areaRect?.let { Rect(it.left, it.top, it.left + (it.height * 0.8f).roundToInt(), it.bottom) }
+    LaunchedEffect(aliceKey, aliceRect?.width, aliceRect?.height) {
+        if (aliceKey != null && aliceRect != null) {
+            val w = aliceRect.width.roundToInt()
+            val h = aliceRect.height.roundToInt()
+            AppLog.i("ASSIST панель ${w}x$h, окно $aliceKey", false)
+            EmbedHost.want(EmbedHost.alice, aliceKey, w, h)
+        } else EmbedHost.want(EmbedHost.alice, null, 0, 0)
+    }
+    if (assistOpen && aliceRect != null) {
+        val startDp = with(LocalDensity.current) { aliceRect.right.roundToInt().toDp() }
+        Pressable(Modifier.fillMaxSize().padding(start = startDp).background(Color(0xAA000000)),
+            onTap = { LauncherActions.closeAssistant("тап по затемнению") }) {}
+    }
+    // слой живёт и после закрытия (как у приложения): TextureView должен пережить панель
+    var aliceUsed by remember { mutableStateOf(false) }
+    if (assistOpen) aliceUsed = true
+    if (aliceUsed) {
+        EmbedLayer(EmbedHost.alice, aliceRect, shown = assistOpen, interactive = true, rounded = false,
+            background = LocalPalette.current.bgSolid, starting = stringResource(R.string.l_alice_starting), onCardTap = null)
+    }
 }
 
 private val OFFSCREEN = IntOffset(-100_000, -100_000)
@@ -142,7 +168,8 @@ internal fun EmbedLayer(
         Modifier.absoluteOffset { if (shown) IntOffset(rect.left.roundToInt(), rect.top.roundToInt()) else OFFSCREEN }
             .size(w, h).clip(shape),
     ) {
-        AndroidView(
+        // textureGen: кнопка перезапуска просит новый TextureView (свежая текстура без старого продюсера)
+        androidx.compose.runtime.key(slot.textureGen) { AndroidView(
             factory = { ctx ->
                 TextureView(ctx).apply {
                     isOpaque = true
@@ -169,7 +196,7 @@ internal fun EmbedLayer(
                     postTranslate(-crop.left.toFloat(), -crop.top.toFloat())
                 })
             },
-        )
+        ) }
         if (shown) {
             if (status != EmbedStatus.READY) {
                 Box(Modifier.fillMaxSize().background(background), contentAlignment = Alignment.Center) {
@@ -289,7 +316,7 @@ fun HomeTileButtons() {
             }
         }
     }
-    if (s.strip && big != null) {
+    if (!s.cardViewInRail && big != null) {
         Box(Modifier.absoluteOffset { IntOffset(Math.round(big.right) - s.pcB - s.g8, Math.round(big.top) + s.g8) }) {
             CardViewButton(s.pcB, s.pcIc, GlassBg, Pal.WHITE.copy(alpha = 0.75f), Modifier.border(m.dp(1), GlassBorder, CircleShape))
         }

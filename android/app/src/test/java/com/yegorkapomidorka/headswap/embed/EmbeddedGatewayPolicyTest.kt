@@ -39,10 +39,11 @@ class EmbeddedGatewayPolicyTest {
         }
     }
 
-    @Test fun thirdOrUnaccountedLeaseCannotBeAllocated() {
+    @Test fun fourthOrUnaccountedLeaseCannotBeAllocated() {
         EmbeddedGatewayPolicy.requireCanAllocate(0)
         EmbeddedGatewayPolicy.requireCanAllocate(1)
-        for (count in listOf(-1, 2, 3, Int.MAX_VALUE)) {
+        EmbeddedGatewayPolicy.requireCanAllocate(2)
+        for (count in listOf(-1, 3, 4, Int.MAX_VALUE)) {
             rejected { EmbeddedGatewayPolicy.requireCanAllocate(count) }
         }
     }

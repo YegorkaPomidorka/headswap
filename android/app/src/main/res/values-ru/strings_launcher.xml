@@ -20,6 +20,7 @@
     <string name="l_nav_choose">Выберите навигатор</string>
     <string name="l_nav_not_installed">Навигатор не установлен</string>
     <string name="l_nav_starting">Запускаем навигатор…</string>
+    <string name="l_alice_starting">Запускаем Алису…</string>
     <string name="l_nav_failed">Окно не открылось. Нажмите, чтобы повторить.</string>
     <string name="l_nav_restart">Перезапустить навигатор</string>
     <string name="l_nav_yandex_plus">Работает только с активной подпиской Плюс!</string>
@@ -99,6 +100,11 @@
     <string name="l_s_theme_light">Светлое золото</string>
     <string name="l_s_theme_auto">Авто</string>
     <string name="l_s_theme_sub">Авто — по режиму фар машины</string>
+    <string name="l_s_rail">Боковая панель</string>
+    <string name="l_s_rail_small">Маленькая</string>
+    <string name="l_s_rail_medium">Средняя</string>
+    <string name="l_s_rail_normal">Обычная</string>
+    <string name="l_s_rail_cut">Обрезанная</string>
     <string name="l_s_anim">Анимации кнопок</string>
     <string name="l_s_map_scale">Масштаб карты</string>
     <string name="l_s_map_scale_sub">Только для %1$s · меняется сразу</string>
