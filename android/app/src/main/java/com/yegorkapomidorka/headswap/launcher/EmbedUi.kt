@@ -98,10 +98,11 @@ fun EmbedLayers() {
         crop = navCrop, buffer = if (carNav && areaRect != null) areaRect.width.roundToInt() to areaRect.height.roundToInt() else null)
     if (appKey != null) {
         if (ytOnHome) {
-            // плашка YouTube - как карточка навигатора: касания в приложение не идут, тап разворачивает его на весь экран
-            // (тот же ключ - окно только меняет размер, без перезапуска)
-            EmbedLayer(EmbedHost.app, appTarget, shown = true, interactive = false, rounded = true, background = LocalPalette.current.mapBg,
-                starting = stringResource(R.string.l_starting, "YouTube"), onCardTap = { LauncherActions.openYoutube() }, tag = "YouTube")
+            // плашка YouTube: касания идут в приложение - окно размером с плашку, и полноэкранный режим самого YouTube
+            // растягивает видео ровно на плашку. На весь экран - кнопкой «Развернуть» в углу (HomeTileButtons).
+            // Некликабельная плашка не годилась: YouTube в окне показывает ленту и сворачивает видео в мини-плеер (Егор 05.11)
+            EmbedLayer(EmbedHost.app, appTarget, shown = true, interactive = true, rounded = true, background = LocalPalette.current.mapBg,
+                starting = stringResource(R.string.l_starting, "YouTube"), onCardTap = null)
         } else {
             val label = model.starting ?: ""
             EmbedLayer(EmbedHost.app, areaRect, shown = area is Area.App, interactive = true, rounded = false, background = LocalPalette.current.bgSolid,
@@ -267,6 +268,21 @@ fun HomeTileButtons() {
             if (pressed) Box(Modifier.matchParentSize().background(Pal.SURFACE_PRESSED))
             Box(Modifier.matchParentSize(), contentAlignment = Alignment.Center) {
                 SvgIcon(Ico.SWAP, Math.round(size * 0.5f), Pal.WHITE.copy(alpha = 0.8f), stroke = 2.4f)
+            }
+        }
+    }
+    // «Развернуть» YouTube на весь экран: касания плашки уходят в YouTube, поэтому отдельная кнопка в левом нижнем углу
+    val tiles = model.tiles
+    val yt = model.ytCardRect
+    if (yt != null && model.youtubeKey != null && CardView.YOUTUBE in listOf(tiles.big, tiles.small)) {
+        Pressable(
+            Modifier.absoluteOffset { IntOffset(Math.round(yt.left) + s.g8, Math.round(yt.bottom) - s.pcB - s.g8) }.size(m.dp(s.pcB))
+                .clip(CircleShape).background(GlassBg).border(m.dp(1), GlassBorder, CircleShape),
+            description = stringResource(R.string.l_expand), onTap = { LauncherActions.openYoutube() }, focusShape = CircleShape,
+        ) { pressed ->
+            if (pressed) Box(Modifier.matchParentSize().background(Pal.SURFACE_PRESSED))
+            Box(Modifier.matchParentSize(), contentAlignment = Alignment.Center) {
+                SvgIcon(Ico.EXPAND, s.pcIc, Pal.WHITE.copy(alpha = 0.8f), stroke = 2.4f)
             }
         }
     }

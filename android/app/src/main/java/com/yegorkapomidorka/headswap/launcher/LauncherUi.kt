@@ -220,6 +220,8 @@ object Ico {
     val CHECK = listOf("m5 12 5 5 9-10")
     /** ⇄ на стыке двух плашек главного. */
     val SWAP = listOf("M7 4 3 8l4 4", "M3 8h14", "m17 20 4-4-4-4", "M21 16H7")
+    /** «Развернуть» плашку YouTube на весь экран. */
+    val EXPAND = listOf("M14 4h6v6", "M20 4l-7 7", "M10 20H4v-6", "M4 20l7-7")
     /** Миниатюры «Раскладки»: YouTube (рамка с треугольником) и часы. */
     val VIDEO = listOf(roundRectPath(2f, 5.5f, 20f, 13f, 4f), "M10 9v6l5.2-3z")
     val CLOCK = listOf(circle(12, 12, 9), "M12 7v5l3 2")
