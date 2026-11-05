@@ -160,8 +160,8 @@ fun LauncherSettingsScreen() {
                                 // масштаб - dpi своего хоста Car App; навигатору окном и через AA он не нужен
                                 if (EmbedHost.nav.carHost) MapScaleCard(navPkg, d, cell(row++).fillMaxWidth())
                                 RestartNavCard(d, cell(row++).fillMaxWidth())
-                                // Google через AA: сервер ГУ живёт в Android Auto, перезапуск - из её настроек на экране ГУ
-                                if (hints && google) AaSettingsCard(d, cell(row).fillMaxWidth())
+                                // Google через AA: сервер ГУ живёт в Android Auto, перезапуск - в её настройках на телефоне
+                                if (hints && google) AaServerHintCard(d, cell(row).fillMaxWidth())
                             }
                         }
                         SettingsPage.MUSIC -> {
@@ -402,18 +402,17 @@ private fun StepButton(sign: String, description: String, enabled: Boolean, d: S
     }
 }
 
-/** «Открыть настройки AA» (Google Карты через теневую AA): настройки Android Auto в окне приложения, там перезапуск сервера ГУ. */
+/**
+ * Подсказка без нажатия (Google Карты через теневую AA): сервер ГУ перезапускают в настройках AA на телефоне. Кнопкой
+ * на ГУ нельзя: реестр встраивания берёт только приложения со значком в списке запуска, а у настроек AA его нет
+ * (стенд 05.11: «Виджет принимает только доступное приложение из списка запуска»).
+ */
 @Composable
-private fun AaSettingsCard(d: SettingsDims, modifier: Modifier) {
+private fun AaServerHintCard(d: SettingsDims, modifier: Modifier) {
     val m = LocalMetrics.current
-    val s = m.spec
-    val label = stringResource(R.string.l_nav_open_aa)
-    Pressable(modifier.clip(RoundedCornerShape(m.dp(s.radius))).background(Pal.SURFACE), description = label,
-        onTap = { LauncherActions.openAaSettings() }) { pressed ->
-        if (pressed) Box(Modifier.matchParentSize().background(Pal.SURFACE_PRESSED))
-        Row(Modifier.fillMaxSize().padding(start = m.dp(d.padStart), end = m.dp(d.padEnd)), verticalAlignment = Alignment.CenterVertically) {
-            Txt(label, s.f2, Modifier.weight(1f), ellipsis = false)
-            Txt("›", s.f2, color = Pal.SEC, weight = FontWeight.SemiBold, ellipsis = false)
+    Card(modifier) {
+        Box(Modifier.fillMaxSize().padding(start = m.dp(d.padStart), end = m.dp(d.padEnd)), contentAlignment = Alignment.CenterStart) {
+            Txt(stringResource(R.string.l_nav_aa_server_hint), d.sub, color = Pal.SEC, maxLines = 2, ellipsis = false)
         }
     }
 }
@@ -682,15 +681,31 @@ private fun systemInfo(): List<Pair<String, String>> {
     )
 }
 
-/** Последняя строка «Системы»: версия Headswap, тап открывает «О приложении». */
+/**
+ * Карточка-действие: подсветка, пока палец на ней, и вспышка акцентом на 500 мс после касания - короткий тап
+ * (мышь стенда, быстрый DOWN/UP ГУ) иначе не видно (Егор 05.11, «Перезапустить навигатор»). Вспышка - как остальные
+ * анимации кнопок, выключается настройкой «Анимации кнопок».
+ */
+@Composable
+private fun ActionCard(label: String, modifier: Modifier, onTap: () -> Unit, content: @Composable () -> Unit) {
+    val m = LocalMetrics.current
+    val accent = LocalAccent.current
+    val flash = rememberPressAnim(500)
+    Pressable(modifier.clip(RoundedCornerShape(m.dp(m.spec.radius))).background(Pal.SURFACE), description = label,
+        onPress = { flash.play() }, onTap = onTap) { pressed ->
+        if (pressed) Box(Modifier.matchParentSize().background(Pal.SURFACE_PRESSED))
+        Box(Modifier.matchParentSize().background(accent.copy(alpha = 0.32f * (1f - flash.progress))))
+        content()
+    }
+}
+
+/** «Перезапустить навигатор»: новая сессия своего хоста или окно на свежей текстуре. */
 @Composable
 private fun RestartNavCard(d: SettingsDims, modifier: Modifier) {
     val m = LocalMetrics.current
     val s = m.spec
     val label = stringResource(R.string.l_nav_restart)
-    Pressable(modifier.clip(RoundedCornerShape(m.dp(s.radius))).background(Pal.SURFACE), description = label,
-        onTap = { EmbedHost.restartNav() }) { pressed ->
-        if (pressed) Box(Modifier.matchParentSize().background(Pal.SURFACE_PRESSED))
+    ActionCard(label, modifier, onTap = { EmbedHost.restartNav() }) {
         Row(Modifier.fillMaxSize().padding(start = m.dp(d.padStart), end = m.dp(d.padEnd)), verticalAlignment = Alignment.CenterVertically) {
             Txt(label, s.f2, ellipsis = false)
         }

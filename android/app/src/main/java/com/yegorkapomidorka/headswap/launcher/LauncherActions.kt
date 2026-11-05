@@ -79,9 +79,6 @@ object LauncherActions {
         model.go(Area.App(ref))
     }
 
-    /** «Открыть настройки AA» (Google Карты через теневую AA): настройки Android Auto окном справа от рейки - там перезапуск сервера ГУ. */
-    fun openAaSettings() = openApp(AppRef("com.google.android.projection.gearhead",
-        "com.google.android.projection.gearhead.companion.settings.DefaultSettingsActivity"))
 
     /** Тап по телу карточки музыки: приложение плеера на весь экран справа от рейки. */
     fun openMusicApp() {
