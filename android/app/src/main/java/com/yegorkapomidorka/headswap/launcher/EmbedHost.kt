@@ -142,6 +142,8 @@ internal object EmbedHost {
     @Volatile var onAssistantOpened: ((android.app.ActivityManager.RunningTaskInfo) -> Unit)? = null
 
     /** Дочерний дисплей окна навигатора; 0 - нет. */
+    fun aliceDisplayId(): Int = if (alice.handle <= 0) 0 else runCatching { EmbeddedSessionRegistry.childDisplayId(uid, alice.handle) }.getOrDefault(0)
+
     fun navDisplayId(): Int = if (nav.handle <= 0) 0 else runCatching { EmbeddedSessionRegistry.childDisplayId(uid, nav.handle) }.getOrDefault(0)
 
     // --- вызовы с главного потока ---

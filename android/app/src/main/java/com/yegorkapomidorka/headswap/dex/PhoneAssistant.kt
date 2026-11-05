@@ -56,20 +56,42 @@ object PhoneAssistant {
                         runCatching { onForeign(t) }.onFailure { AppLog.i("ASSIST разбор $top: ${it.javaClass.simpleName}: ${it.message}") }
                     }
                 }
+                // не только с телефона: старая задача Яндекса после закрытия панели жила под лаунчером на дисплее
+                // рабочего стола, и Алиса уходила в неё (поездка 05.11, wm_task_moved на 491)
                 val found = if (!pulling) emptyList() else tasks.filter { t ->
-                    t.topActivity?.packageName == pkg && (moved[t.taskId] ?: 0) < 3 &&
-                        FrameworkTaskIdentityReader.read(t)?.displayId == 0
+                    val d = FrameworkTaskIdentityReader.read(t)?.displayId
+                    t.topActivity?.packageName == pkg && (moved[t.taskId] ?: 0) < 3 && d != null && d != displayId
                 }
                 for (t in found) {
                     moved[t.taskId] = (moved[t.taskId] ?: 0) + 1
                     val ms = android.os.SystemClock.elapsedRealtime() - start
+                    val from = FrameworkTaskIdentityReader.read(t)?.displayId
                     runCatching { moveTask(t.taskId, displayId) }
-                        .onSuccess { AppLog.i("ASSIST ${t.topActivity?.shortClassName} задача ${t.taskId} с телефона -> дисплей $displayId через $ms мс") }
+                        .onSuccess { AppLog.i("ASSIST ${t.topActivity?.shortClassName} задача ${t.taskId} с дисплея $from -> дисплей $displayId через $ms мс") }
                         .onFailure { AppLog.i("ASSIST перенос задачи ${t.taskId}: ${it.cause ?: it}") }
                 }
                 android.os.SystemClock.sleep(if (pulling) 40 else 250)
             }
         }, "assist-watch").apply { isDaemon = true; start() }
+    }
+
+    /**
+     * Закрыть все задачи на дисплее панели перед тем, как его отпустить: иначе Android переносит их на родительский
+     * дисплей рабочего стола под лаунчер, и следующий вызов Алисы уходит в эту старую задачу (поездка 05.11).
+     */
+    fun clearDisplay(ctx: Context, displayId: Int) {
+        if (displayId <= 0) return
+        val am = ctx.getSystemService(android.app.ActivityManager::class.java)
+        @Suppress("DEPRECATION")
+        val tasks = runCatching { am.getRunningTasks(30) }.getOrDefault(emptyList())
+            .filter { FrameworkTaskIdentityReader.read(it)?.displayId == displayId }
+        for (t in tasks) {
+            val ok = runCatching {
+                val (atm, type) = atm()
+                type.getMethod("removeTask", Int::class.javaPrimitiveType).invoke(atm, t.taskId) as? Boolean ?: true
+            }.getOrDefault(false)
+            AppLog.i("ASSIST панель: задача ${t.taskId} ${t.topActivity?.shortClassName} ${if (ok) "закрыта" else "не закрылась"}")
+        }
     }
 
     /** Панель Алисы закрыта: слежение [watch] кончается на следующем шаге. */

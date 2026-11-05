@@ -110,7 +110,15 @@ object LauncherActions {
         AppLog.i("ASSIST панель закрыта: $why", false)
         model.assistantOpen = false
         com.yegorkapomidorka.headswap.dex.PhoneAssistant.stopWatch()
-        EmbedHost.want(EmbedHost.alice, null, 0, 0)
+        val ctx = model.context.applicationContext
+        // сначала закрыть задачи панели, потом отпустить дисплей (иначе Яндекс переедет под лаунчер)
+        Thread({
+            com.yegorkapomidorka.headswap.dex.PhoneAssistant.clearDisplay(ctx, EmbedHost.aliceDisplayId())
+            android.os.Handler(android.os.Looper.getMainLooper()).post {
+                // успели открыть снова: задачу мы только что закрыли - пусть слот перезапустит Алису
+                if (!model.assistantOpen) EmbedHost.want(EmbedHost.alice, null, 0, 0) else EmbedHost.refresh(EmbedHost.alice)
+            }
+        }, "assist-close").start()
     }
 
     /**
