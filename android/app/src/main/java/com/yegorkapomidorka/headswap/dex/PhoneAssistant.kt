@@ -18,29 +18,45 @@ object PhoneAssistant {
     private val ALICE_PACKAGES = listOf("com.yandex.searchapp", "ru.yandex.searchplugin")
 
     const val MANAGE_ACTIVITY_TASKS = "android.permission.MANAGE_ACTIVITY_TASKS"
+    const val REMOVE_TASKS = "android.permission.REMOVE_TASKS"
     private const val PULL_MS = 4000L
-    @Volatile private var puller: Thread? = null
+    private const val WATCH_MS = 10 * 60_000L
+    @Volatile private var watcher: Thread? = null
+    @Volatile private var watchGen = 0
 
     /**
-     * Яндекс, выбранный помощником по умолчанию, открывает себя цепочкой AssistantActivityAlias -> MainActivity ->
-     * YandexBrowserMainActivity, и последняя уходит на экран телефона (стенд 05.11). [PULL_MS] ловим задачу [pkg]
-     * на телефоне и переносим на [displayId] (панель рабочего стола). Главный процесс: MANAGE_ACTIVITY_TASKS из
-     * активации, скрытый API (--no-hidden-api-checks).
+     * Пока панель Алисы открыта ([stopWatch] или [WATCH_MS]):
+     * - первые [PULL_MS]: Яндекс, выбранный помощником по умолчанию, открывает себя цепочкой AssistantActivityAlias ->
+     *   MainActivity -> YandexBrowserMainActivity, и последняя уходит на экран телефона (стенд 05.11). Задачу [pkg]
+     *   на телефоне переносим на [displayId] (панель рабочего стола);
+     * - всё время: задача другого приложения на [displayId] (Алиса открыла Навигатор с маршрутом) - в [onForeign],
+     *   один раз на задачу, с поточного потока.
+     * Главный процесс: MANAGE_ACTIVITY_TASKS из активации, скрытый API (--no-hidden-api-checks).
      */
-    fun pullToDisplay(ctx: Context, displayId: Int, pkg: String) {
+    fun watch(ctx: Context, displayId: Int, pkg: String, onForeign: (android.app.ActivityManager.RunningTaskInfo) -> Unit) {
         if (displayId <= 0) { AppLog.i("ASSIST дочерний дисплей Алисы неизвестен"); return }
         if (ctx.checkSelfPermission(MANAGE_ACTIVITY_TASKS) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
             AppLog.i("ASSIST нет MANAGE_ACTIVITY_TASKS: если Яндекс уйдёт на телефон, в панель не вернётся (повторите активацию)")
-            return
         }
-        if (puller?.isAlive == true) return
-        puller = Thread({
+        val gen = ++watchGen
+        watcher = Thread({
             val am = ctx.getSystemService(android.app.ActivityManager::class.java)
             val start = android.os.SystemClock.elapsedRealtime()
             val moved = HashMap<Int, Int>()
-            while (android.os.SystemClock.elapsedRealtime() - start < PULL_MS) {
+            val reported = HashSet<Int>()
+            while (gen == watchGen && android.os.SystemClock.elapsedRealtime() - start < WATCH_MS) {
+                val pulling = android.os.SystemClock.elapsedRealtime() - start < PULL_MS
                 @Suppress("DEPRECATION")
-                val found = runCatching { am.getRunningTasks(20) }.getOrDefault(emptyList()).filter { t ->
+                val tasks = runCatching { am.getRunningTasks(30) }.getOrDefault(emptyList())
+                for (t in tasks) {
+                    val top = t.topActivity?.packageName ?: continue
+                    val display = FrameworkTaskIdentityReader.read(t)?.displayId
+                    if (display == displayId && top != pkg && reported.add(t.taskId)) {
+                        AppLog.i("ASSIST на панели Алисы открылось $top (задача ${t.taskId}): ${t.baseIntent.action} ${t.baseIntent.dataString}")
+                        runCatching { onForeign(t) }.onFailure { AppLog.i("ASSIST разбор $top: ${it.javaClass.simpleName}: ${it.message}") }
+                    }
+                }
+                val found = if (!pulling) emptyList() else tasks.filter { t ->
                     t.topActivity?.packageName == pkg && (moved[t.taskId] ?: 0) < 3 &&
                         FrameworkTaskIdentityReader.read(t)?.displayId == 0
                 }
@@ -51,20 +67,37 @@ object PhoneAssistant {
                         .onSuccess { AppLog.i("ASSIST ${t.topActivity?.shortClassName} задача ${t.taskId} с телефона -> дисплей $displayId через $ms мс") }
                         .onFailure { AppLog.i("ASSIST перенос задачи ${t.taskId}: ${it.cause ?: it}") }
                 }
-                android.os.SystemClock.sleep(40)
+                android.os.SystemClock.sleep(if (pulling) 40 else 250)
             }
-        }, "assist-pull").apply { isDaemon = true; start() }
+        }, "assist-watch").apply { isDaemon = true; start() }
     }
 
-    private fun moveTask(taskId: Int, displayId: Int) {
+    /** Панель Алисы закрыта: слежение [watch] кончается на следующем шаге. */
+    fun stopWatch() { watchGen++ }
+
+    private fun atm(): Pair<Any, Class<*>> {
         val binder = Class.forName("android.os.ServiceManager").getMethod("getService", String::class.java)
             .invoke(null, "activity_task") as android.os.IBinder
         val atm = Class.forName("android.app.IActivityTaskManager\$Stub")
             .getMethod("asInterface", android.os.IBinder::class.java).invoke(null, binder)
-        val type = Class.forName("android.app.IActivityTaskManager")
+        return atm to Class.forName("android.app.IActivityTaskManager")
+    }
+
+    fun moveTask(taskId: Int, displayId: Int) {
+        val (atm, type) = atm()
         val m = runCatching { type.getMethod("moveRootTaskToDisplay", Int::class.javaPrimitiveType, Int::class.javaPrimitiveType) }
             .getOrElse { type.getMethod("moveStackToDisplay", Int::class.javaPrimitiveType, Int::class.javaPrimitiveType) }
         m.invoke(atm, taskId, displayId)
+    }
+
+    /** Закрыть задачу (Навигатор, которого Алиса открыла в панели: маршрут уже ушёл в плитку). Не вышло - на экран телефона. */
+    fun removeTask(taskId: Int) {
+        val ok = runCatching {
+            val (atm, type) = atm()
+            type.getMethod("removeTask", Int::class.javaPrimitiveType).invoke(atm, taskId) as? Boolean ?: true
+        }.onFailure { AppLog.i("ASSIST removeTask $taskId: ${it.cause ?: it}") }.getOrDefault(false)
+        if (ok) { AppLog.i("ASSIST задача $taskId закрыта"); return }
+        runCatching { moveTask(taskId, 0) }.onSuccess { AppLog.i("ASSIST задача $taskId -> экран телефона") }
     }
 
     fun launch(ctx: Context, displayId: Int) {

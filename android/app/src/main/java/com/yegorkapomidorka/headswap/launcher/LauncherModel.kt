@@ -136,6 +136,7 @@ internal object LauncherModel {
         lastOnlinePlayer = prefs.lastOnlinePlayer
         missedSeenMs = prefs.missedSeenMs
         EmbedHost.onGone = { LauncherActions.embedGone(it) }
+        EmbedHost.onAssistantOpened = { LauncherActions.assistantOpened(it) }
         CarAppHost.scaleFor = { pkg -> CarConfigMath.step(prefs.mapScale(pkg)) }
         ready = true
         reloadCatalog()

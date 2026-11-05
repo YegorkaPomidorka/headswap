@@ -109,7 +109,33 @@ object LauncherActions {
         if (!model.assistantOpen) return
         AppLog.i("ASSIST панель закрыта: $why", false)
         model.assistantOpen = false
+        com.yegorkapomidorka.headswap.dex.PhoneAssistant.stopWatch()
         EmbedHost.want(EmbedHost.alice, null, 0, 0)
+    }
+
+    /**
+     * Алиса открыла в своей панели другое приложение. Маршрут (Навигатор по yandexnavi://build_route_on_map) - как в AA:
+     * задачу закрываем, панель тоже, навигатор на всю область и ACTION_NAVIGATE + geo: в его машинную часть. Навигатор
+     * обычным окном - переносим задачу в его окно. Не маршрут - оставляем в панели. Главный поток.
+     */
+    internal fun assistantOpened(t: android.app.ActivityManager.RunningTaskInfo) {
+        if (!model.assistantOpen) return
+        val pkg = t.topActivity?.packageName ?: return
+        val data = t.baseIntent.dataString
+        val geo = com.yegorkapomidorka.headswap.carapp.RouteIntent.geoFor(data)
+        if (geo == null) { AppLog.i("ASSIST $pkg не маршрут ($data), остаётся в панели", false); return }
+        val navigate = android.content.Intent(com.yegorkapomidorka.headswap.carapp.RouteIntent.ACTION_NAVIGATE, android.net.Uri.parse(geo))
+        val car = com.yegorkapomidorka.headswap.carapp.CarAppHost.pkg
+        AppLog.i("ASSIST маршрут от Алисы $geo -> ${car?.let { "машинная часть $it" } ?: "окно навигатора ${model.navigatorPkg}"}", false)
+        val taskId = t.taskId
+        Thread({
+            val assist = com.yegorkapomidorka.headswap.dex.PhoneAssistant
+            if (car != null) assist.removeTask(taskId)
+            else EmbedHost.navDisplayId().takeIf { it > 0 }?.let { d -> runCatching { assist.moveTask(taskId, d) } } ?: assist.removeTask(taskId)
+        }, "assist-route").start()
+        closeAssistant("маршрут -> навигатор")
+        if (model.navigatorPkg != null && model.area != Area.Navigator) model.go(Area.Navigator)
+        if (car != null) com.yegorkapomidorka.headswap.carapp.CarAppHost.newIntent(navigate)
     }
 
     /** Кнопка MEDIA ГУ: плеер на весь экран; плеер не выбран или не установлен - выбор плеера. */

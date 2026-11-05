@@ -138,6 +138,11 @@ internal object EmbedHost {
 
     /** Задача приложения на дочернем дисплее исчезла (Back из корня, процесс убит). Вызывается на главном потоке. */
     @Volatile var onGone: ((EmbedSlot) -> Unit)? = null
+    /** В панели Алисы открылась задача другого приложения. Главный поток. */
+    @Volatile var onAssistantOpened: ((android.app.ActivityManager.RunningTaskInfo) -> Unit)? = null
+
+    /** Дочерний дисплей окна навигатора; 0 - нет. */
+    fun navDisplayId(): Int = if (nav.handle <= 0) 0 else runCatching { EmbeddedSessionRegistry.childDisplayId(uid, nav.handle) }.getOrDefault(0)
 
     // --- вызовы с главного потока ---
 
@@ -570,8 +575,9 @@ internal object EmbedHost {
             if (slot === alice) AppLog.i("ASSIST Алиса -> дочерний дисплей, окно ${slot.geomW}x${slot.geomH}", false)
             timed(slot, "launch") { EmbeddedSessionRegistry.launch(uid, slot.handle, pkg, cls) }
             // Яндекс-помощник по умолчанию перезапускает себя через MainActivity на экране телефона: ловим и переносим
-            if (slot === alice) appContext?.let { com.yegorkapomidorka.headswap.dex.PhoneAssistant.pullToDisplay(it,
-                EmbeddedSessionRegistry.childDisplayId(uid, slot.handle), pkg) }
+            // другое приложение в панели (Алиса открыла Навигатор с маршрутом) - в лаунчер
+            if (slot === alice) appContext?.let { com.yegorkapomidorka.headswap.dex.PhoneAssistant.watch(it,
+                EmbeddedSessionRegistry.childDisplayId(uid, slot.handle), pkg) { t -> main.post { onAssistantOpened?.invoke(t) } } }
             slot.launchedKey = key
             slot.launchedAt = SystemClock.uptimeMillis()
             slot.stale = false
