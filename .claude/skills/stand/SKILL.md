@@ -18,7 +18,7 @@ powershell -File pc-headunit\stand.ps1             # без пересборки
 
 Запускать через PowerShell с `run_in_background: true`: скрипт ждёт, пока окно не закроют (по умолчанию `-Duration 3600`).
 
-Параметры: `-Mode desktop|aa|keep` (bridgeMode, по умолчанию desktop), `-Size 1280x720` (под Vezel; 1920x720 — широкие ГУ), `-VoiceKeyAt 20,35` (авто-нажатия голоса), `-HuArgs '--touch-test'` (любые флаги `carlife_hu.py`), `-NoView`.
+Параметры: `-Mode desktop|aa|keep` (bridgeMode, по умолчанию desktop), `-Size 1280x720` (под Vezel; 1920x720 — широкие ГУ), `-HuArgs '--touch-test'` (любые флаги `carlife_hu.py`), `-NoView`.
 
 Что делает скрипт: на время сборки убирает из debug-манифеста `TEMPLATE_RENDERER` (иначе smoke не встаёт рядом с release, ADR 0022), ставит smoke, пишет `bridgeMode`, активирует мост с ПК (`ManualAccessLauncher`), `adb reverse tcp:7240`, запускает `carlife_hu.py --view` и `BridgeService --ei debug_tcp 7240`. Логи эмулятора и телефона кладёт в `pc-headunit/out/stand-<время>/`.
 

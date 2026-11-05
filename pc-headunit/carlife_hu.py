@@ -401,11 +401,9 @@ class Options:
                  discover=False, beacon_port=BEACON_PORT, bind_ip="0.0.0.0", discover_timeout=60.0,
                  probe_8999=False, probe_port=PROBE_PORT,
                  video_kbps=0, dip_kbps=0, dip_at=20.0, dip_for=5.0,
-                 pause_cycles=0, pause_every=10.0, pause_for=3.0, voice_key_at: list[float] | None = None,
+                 pause_cycles=0, pause_every=10.0, pause_for=3.0,
                  size: tuple[int, int] = DEFAULT_SIZE):
         self.host, self.port, self.duration = host, port, duration
-        # кнопка голоса на руле: MODULE_CONTROL moduleID=4 (VR) statusID=1 через N с от первого кадра (как Vezel)
-        self.voice_key_at = sorted(voice_key_at or [])
         self.size = size                                    # какой экран ГУ объявляем в VIDEO_ENCODER_INIT
         # циклы паузы: pause_every с от первого кадра (потом от каждого START) шлём PAUSE, через pause_for с - START
         self.pause_cycles, self.pause_every, self.pause_for = pause_cycles, pause_every, pause_for
@@ -482,7 +480,6 @@ class HeadUnit:
         self.shape_kbps = 0
         self.first_frame_at: float | None = None
         self.last_frame_at: float | None = None
-        self.voice_keys_left = list(self.o.voice_key_at)
         self.vid_size = opts.size                   # до INIT_DONE моста - то, что просили мы; потом - выбор моста
         # живое окно (--view): sink-и зовутся с нитей приёма и не должны блокировать; session_up - можно слать касания
         self.video_sink = None                      # callable(bytes): тело VIDEO_DATA
@@ -1024,10 +1021,6 @@ class HeadUnit:
                 self.log(f"video: {self.frames} frames, {self.vbytes} B total, {n / 5:.1f} fps, {kbps:.0f} kbit/s (last 5 s)")
             if self.o.pause_cycles:
                 self.pause_tick(now)
-            while (self.voice_keys_left and self.first_frame_at is not None
-                    and now - self.first_frame_at >= self.voice_keys_left[0]):
-                self.voice_keys_left.pop(0)
-                self.send_cmd(MODULE_CONTROL, cmd_inner(MODULE_CONTROL, pb_int(1, 4) + pb_int(2, 1)), "VR=1 (кнопка голоса)")
             if (self.o.touch_test and not touched and self.first_frame_at is not None
                     and now - self.first_frame_at >= self.TOUCH_DELAY):
                 touched = True
@@ -1168,8 +1161,6 @@ def parse_args(argv=None) -> argparse.Namespace:
     p.add_argument("--no-auth", action="store_true", help="do not send HU_AUTHEN_REQUEST")
     p.add_argument("--touch-test", action="store_true",
                    help="15 s after the first video frame send a tap (DOWN+UP) at the centre")
-    p.add_argument("--voice-key-at", type=float, action="append", metavar="S",
-                   help="press the voice key (MODULE_CONTROL VR=1) S seconds after the first video frame; repeatable")
     p.add_argument("--out", type=Path, default=HERE / "out", help="output directory (default pc-headunit/out)")
     a = p.parse_args(argv)
     try:
@@ -1249,7 +1240,7 @@ def main(argv=None) -> int:
                           discover_timeout=a.discover_timeout, probe_8999=a.probe_8999,
                           video_kbps=a.video_kbps, dip_kbps=a.dip_kbps, dip_at=a.dip_at, dip_for=a.dip_for,
                           pause_cycles=a.pause_cycles, pause_every=a.pause_every, pause_for=a.pause_for,
-                          voice_key_at=a.voice_key_at, size=a.size))
+                          size=a.size))
     if a.view:
         return run_view(hu, a.view_scale)
     hu.run()

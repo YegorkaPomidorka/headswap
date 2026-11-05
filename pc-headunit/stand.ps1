@@ -14,7 +14,7 @@
   5. Copies the smoke log next to the emulator log in -Out.
 
 .EXAMPLE
-  .\stand.ps1 -Build -VoiceKeyAt 20,35
+  .\stand.ps1 -Build
   .\stand.ps1 -Duration 300 -HuArgs '--touch-test'
 #>
 param(
@@ -22,7 +22,6 @@ param(
     [ValidateSet('desktop', 'aa', 'keep')][string]$Mode = 'desktop',
     [int]$Duration = 3600,
     [string]$Size = '1280x720',
-    [int[]]$VoiceKeyAt = @(),
     [string[]]$HuArgs = @(),
     [string]$Out = '',
     [switch]$NoView
@@ -109,7 +108,6 @@ AdbOk reverse tcp:7240 tcp:7240 | Out-Null
 $env:PYTHONIOENCODING = 'utf-8'
 $pyArgs = @('carlife_hu.py', '--duration', $Duration, '--out', "`"$Out`"", '--size', $Size)
 if (-not $NoView) { $pyArgs += '--view' }   # live window: mouse = touches, BACK/HOME keys (carlife_view.py)
-foreach ($s in $VoiceKeyAt) { $pyArgs += @('--voice-key-at', $s) }
 $pyArgs += $HuArgs
 $hu = Start-Process python -ArgumentList $pyArgs -WorkingDirectory $Here -NoNewWindow -PassThru
 Start-Sleep -Seconds 3
