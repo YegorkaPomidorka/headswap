@@ -13,6 +13,7 @@ Video goes to out/carlife_video.h264, the whole log to out/carlife_hu.log. Stand
 --pause-cycles N (with --pause-every S, --pause-for S) repeats VIDEO_ENCODER_PAUSE -> wait -> VIDEO_ENCODER_START and
 reports start->first frame, start->IDR and frames received during the pause.
 
+--view also plays MEDIA/TTS on the PC speakers when the optional sounddevice module is installed (--mute turns it off).
 --view opens a live window (tkinter + ffmpeg from PATH, see carlife_view.py): the bridge's video in real time, mouse clicks
 and drags go to the bridge as TOUCH_ACTION (pixels of the video), right click / Esc / BackSpace = hard key BACK, middle
 click / Home = hard key HOME. --size WxH is the screen size the HU asks for in VIDEO_ENCODER_INIT (default 1920x720).
@@ -218,6 +219,80 @@ def pb_render(body: bytes, limit: int = 200) -> str:
             parts.append(f"f{f}={v if w == 0 else bytes(v).hex()}")
     s = " ".join(parts)
     return "{" + (s if len(s) <= limit else s[:limit] + "...") + "}"
+
+
+# ---- звук в динамики ПК (--view) ----
+
+MEDIA_INIT, MEDIA_DATA, TTS_INIT, TTS_DATA = 0x00030001, 0x00030006, 0x00040001, 0x00040003
+
+
+class _PcmOut:
+    """Один поток вывода. Нить приёма только кладёт PCM в буфер: в режиме stream один сокет на всё, блокирующий
+    write задержал бы видео. Буфер больше 1 с режем с головы - лучше пропуск, чем растущая задержка."""
+
+    def __init__(self, sd, rate: int, ch: int):
+        self.buf = bytearray()
+        self.lock = threading.Lock()
+        self.cap = rate * ch * 2               # 1 с PCM 16 бит
+        self.stream = sd.RawOutputStream(samplerate=rate, channels=ch, dtype="int16", callback=self._cb)
+        self.stream.start()
+
+    def _cb(self, out, frames, _time, _status):
+        n = len(out)
+        with self.lock:
+            k = min(n, len(self.buf))
+            out[:k] = self.buf[:k]
+            del self.buf[:k]
+        if k < n:
+            out[k:] = b"\x00" * (n - k)
+
+    def write(self, pcm: bytes):
+        with self.lock:
+            self.buf += pcm
+            if len(self.buf) > self.cap:
+                del self.buf[:len(self.buf) - self.cap]
+
+    def close(self):
+        self.stream.close()
+
+
+class Speakers:
+    """--view: PCM каналов MEDIA и TTS (голос навигатора) в динамики ПК, как у настоящей ГУ.
+    Модуль sounddevice необязателен: нет его - одна строка в лог и тишина."""
+
+    def __init__(self, log):
+        self.log = log
+        self.outs: dict[int, _PcmOut] = {}
+        try:
+            import sounddevice
+            self.sd = sounddevice
+        except Exception as e:  # noqa: BLE001 - любой сбой импорта = без звука
+            self.sd = None
+            log(f"speakers: no sound ({e}); pip install sounddevice")
+
+    def on(self, chan: int, mtype: int, body: bytes):
+        if self.sd is None:
+            return
+        if mtype in (MEDIA_INIT, TTS_INIT):
+            f = pb_parse(body)
+            rate, ch = pb_get_int(f, 1) or 48000, pb_get_int(f, 2) or 2
+            old = self.outs.pop(chan, None)
+            if old:
+                old.close()
+            try:
+                self.outs[chan] = _PcmOut(self.sd, rate, ch)
+                self.log(f"speakers: {CH_NAMES[chan]} {rate} Hz {ch} ch -> {self.sd.query_devices(kind='output')['name']}")
+            except Exception as e:  # noqa: BLE001
+                self.log(f"speakers: {CH_NAMES[chan]} open failed: {e}")
+        elif mtype in (MEDIA_DATA, TTS_DATA):
+            out = self.outs.get(chan)
+            if out:
+                out.write(body)
+
+    def close(self):
+        for out in self.outs.values():
+            out.close()
+        self.outs.clear()
 
 
 # ---- кадры ----
@@ -484,6 +559,7 @@ class HeadUnit:
         # живое окно (--view): sink-и зовутся с нитей приёма и не должны блокировать; session_up - можно слать касания
         self.video_sink = None                      # callable(bytes): тело VIDEO_DATA
         self.size_sink = None                       # callable(w, h): размер из INIT_DONE моста
+        self.speakers = Speakers(self.log) if getattr(opts, "view", False) and not getattr(opts, "mute", False) else None   # --view: MEDIA/TTS в динамики ПК
         self.session_up = threading.Event()
         self.vfile = None
         self.t0 = 0.0
@@ -555,6 +631,8 @@ class HeadUnit:
         if chan == CH_VIDEO and mtype == VIDEO_DATA:
             self.on_video(body)
             return
+        if self.speakers and chan in (CH_MEDIA, CH_TTS):
+            self.speakers.on(chan, mtype, body)
         self.counts[(chan, mtype)] += 1
         extra = " TRUNCATED" if trunc else ""
         name = msg_name(mtype)
@@ -1153,6 +1231,8 @@ def parse_args(argv=None) -> argparse.Namespace:
     p.add_argument("--view", action="store_true",
                    help="live window: video from the bridge (needs ffmpeg in PATH), mouse = touches, right click/Esc/BackSpace = "
                         "BACK, middle click/Home = HOME; closing the window ends the session")
+    p.add_argument("--mute", action="store_true",
+                   help="--view: do not play MEDIA/TTS on the PC speakers (playback needs the sounddevice module)")
     p.add_argument("--view-scale", type=float, default=None, metavar="K",
                    help="--view: window scale (default: fit to the PC screen, at most 1.0); click coordinates are mapped back")
     p.add_argument("--size", default="1920x720", metavar="WxH",
