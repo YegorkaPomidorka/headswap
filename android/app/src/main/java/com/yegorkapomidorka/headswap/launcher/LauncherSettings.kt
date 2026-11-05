@@ -119,11 +119,16 @@ fun LauncherSettingsScreen() {
                 val top = SettingsGrid.top(row, h, gap)
                 return Modifier.offset(y = m.dp(top)).height(m.dp(SettingsGrid.bottom(row + span - 1, h, gap) - top))
             }
+            // кнопку (Pressable) в ряд ставит обёртка: рамку шайбы Pressable рисует до своего modifier, и offset из cell()
+            // её не сдвигал - рамки всех разделов рисовались поверх «Вид» (h737)
+            @Composable
+            fun Placed(row: Int, content: @Composable () -> Unit) =
+                Box(cell(row).fillMaxWidth(), propagateMinConstraints = true) { content() }
             Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(m.dp(s.g))) {
                 Box(Modifier.width(m.dp(d.catW)).fillMaxHeight()) {
                     for ((i, page) in SettingsPage.entries.filter { it != SettingsPage.ABOUT }.withIndex()) {
                         val selected = model.settingsPage == page || (page == SettingsPage.SYSTEM && model.settingsPage == SettingsPage.ABOUT)
-                        CategoryButton(page, selected, d, cell(i).fillMaxWidth())
+                        Placed(i) { CategoryButton(page, selected, d, Modifier) }
                     }
                 }
                 Box(Modifier.weight(1f).fillMaxHeight()) {
@@ -159,7 +164,7 @@ fun LauncherSettingsScreen() {
                                 var row = 3
                                 // масштаб - dpi своего хоста Car App; навигатору окном и через AA он не нужен
                                 if (EmbedHost.nav.carHost) MapScaleCard(navPkg, d, cell(row++).fillMaxWidth())
-                                RestartNavCard(d, cell(row++).fillMaxWidth())
+                                Placed(row++) { RestartNavCard(d, Modifier) } // кнопка - через обёртку, рамка шайбы (h737)
                                 // Google через AA: сервер ГУ живёт в Android Auto, перезапуск - в её настройках на телефоне
                                 if (hints && google) AaServerHintCard(d, cell(row).fillMaxWidth())
                             }
@@ -184,7 +189,7 @@ fun LauncherSettingsScreen() {
                         SettingsPage.SYSTEM -> {
                             val info = systemInfo()
                             for ((i, row) in info.withIndex()) InfoCard(row.first, row.second, d, cell(i).fillMaxWidth())
-                            AboutLinkCard(d, cell(info.size).fillMaxWidth())
+                            Placed(info.size) { AboutLinkCard(d, Modifier) }
                         }
                         SettingsPage.ABOUT -> AboutPanel(d, rowH)
                     }
