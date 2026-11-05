@@ -24,7 +24,8 @@ param(
     [string]$Size = '1280x720',
     [string[]]$HuArgs = @(),
     [string]$Out = '',
-    [switch]$NoView
+    [switch]$NoView,
+    [switch]$Audio      # activation with --audio: desktop sound capture over the CarLife MEDIA channel (ADR 0025)
 )
 # Continue: in Windows PowerShell 5.1 any stderr line of a native command (adb progress) is an error record;
 # failures are checked by exit code below.
@@ -99,7 +100,7 @@ if ($Mode -ne 'keep') {
 
 Step 'activation (ManualAccessLauncher)'
 $apkPath = ((& adb shell pm path $Pkg) -replace 'package:', '').Trim()
-$act = & adb shell "CLASSPATH=$apkPath app_process / com.yegorkapomidorka.headswap.dex.ManualAccessLauncher --package $Pkg --token $token" 2>&1
+$act = & adb shell "CLASSPATH=$apkPath app_process / com.yegorkapomidorka.headswap.dex.ManualAccessLauncher --package $Pkg --token $token$(if ($Audio) { ' --audio' })" 2>&1
 if (($act -join "`n") -notmatch 'HEADSWAP_READY') { $act | Select-Object -Last 10 | Write-Host; throw 'Activation failed' }
 
 # 4. emulator + bridge + view
