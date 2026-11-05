@@ -125,7 +125,8 @@ internal fun EmbedLayer(
         Modifier.absoluteOffset { if (shown) IntOffset(rect.left.roundToInt(), rect.top.roundToInt()) else OFFSCREEN }
             .size(w, h).clip(shape),
     ) {
-        AndroidView(
+        // textureGen: кнопка перезапуска просит новый TextureView (свежая текстура без старого продюсера)
+        androidx.compose.runtime.key(slot.textureGen) { AndroidView(
             factory = { ctx ->
                 TextureView(ctx).apply {
                     isOpaque = true
@@ -152,7 +153,7 @@ internal fun EmbedLayer(
                     postTranslate(-crop.left.toFloat(), -crop.top.toFloat())
                 })
             },
-        )
+        ) }
         if (shown) {
             if (status != EmbedStatus.READY) {
                 Box(Modifier.fillMaxSize().background(background), contentAlignment = Alignment.Center) {
