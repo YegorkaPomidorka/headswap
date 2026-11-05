@@ -218,6 +218,11 @@ object Ico {
     val MUSIC = listOf("M9 18V5l12-2v13", circle(6, 18, 3), circle(18, 16, 3))
     val HOME = listOf("m3 11 9-8 9 8", "M5 10v10h14V10")
     val CHECK = listOf("m5 12 5 5 9-10")
+    /** ⇄ на стыке двух плашек главного. */
+    val SWAP = listOf("M7 4 3 8l4 4", "M3 8h14", "m17 20 4-4-4-4", "M21 16H7")
+    /** Миниатюры «Раскладки»: YouTube (рамка с треугольником) и часы. */
+    val VIDEO = listOf(roundRectPath(2f, 5.5f, 20f, 13f, 4f), "M10 9v6l5.2-3z")
+    val CLOCK = listOf(circle(12, 12, 9), "M12 7v5l3 2")
     /** Разделы настроек: «Главный экран» (раскладка) и «Система» (экран ГУ). */
     val LAYOUT = listOf(roundRectPath(3f, 4f, 18f, 16f, 2f), "M8 4v16", "M8 14h13")
     val SCREEN = listOf(roundRectPath(2f, 5f, 20f, 13f, 2f), "M8 21h8")

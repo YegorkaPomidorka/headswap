@@ -64,7 +64,20 @@ internal object LauncherModel {
     var autoplayedDisplay = -1
     /** Светлая ли палитра сейчас: выбор «Тема» и, для «Авто», режим фар машины. */
     val lightTheme: Boolean get() = ThemeChoice.light(theme, huTheme)
+    /** Большая плашка главного; малая - [smallView]; раскладка - [homeLayout]. Действуют через [tiles]. */
     var cardView by mutableStateOf(CardView.NAVIGATOR)
+    var smallView by mutableStateOf(CardView.MUSIC)
+    var homeLayout by mutableStateOf(HomeLayout.QUAD)
+    /** Ключ запуска YouTube из каталога; null - не установлен (или каталог ещё грузится). */
+    val youtubeKey: String? get() = catalog.firstOrNull { it.packageName == FullscreenApp.YOUTUBE }?.key
+    /** Плашки с учётом правил: пока каталог не загружен, YouTube считаем доступным, чтобы не сбросить выбор. */
+    val tiles: HomeTiles
+        get() = HomeTilesLogic.normalize(HomeTiles(cardView, smallView), homeLayout, !catalogLoaded || youtubeKey != null)
+    /** Где на экране большая и малая плашки (корень): по ним стоят ⇄ на стыке и «Слои» ленты поверх живых окон. */
+    var bigTileRect by mutableStateOf<Rect?>(null)
+    var smallTileRect by mutableStateOf<Rect?>(null)
+    /** Плашка с YouTube на главном: туда слой app ставит окно YouTube. */
+    var ytCardRect by mutableStateOf<Rect?>(null)
     var apps by mutableStateOf<List<AppRef>>(emptyList())
     var savedNavigator by mutableStateOf<String?>(null)
     var musicPlayer by mutableStateOf<String?>(null)
@@ -128,6 +141,8 @@ internal object LauncherModel {
         localPlayer = prefs.localPlayer
         onlinePlayer = prefs.onlinePlayer
         cardView = prefs.cardView
+        smallView = prefs.smallView
+        homeLayout = prefs.homeLayout
         apps = prefs.apps
         savedNavigator = prefs.navigator
         musicPlayer = prefs.musicPlayer
@@ -189,7 +204,21 @@ internal object LauncherModel {
     fun chooseAutoplay(on: Boolean) { autoplay = on; prefs.autoplay = on }
     fun chooseLocalPlayer(pkg: String?) { localPlayer = pkg; prefs.localPlayer = pkg }
     fun chooseOnlinePlayer(pkg: String?) { onlinePlayer = pkg; prefs.onlinePlayer = pkg }
-    fun nextCardView() { cardView = cardView.next().also { prefs.cardView = it } }
+    private val youtubeAvailable: Boolean get() = !catalogLoaded || youtubeKey != null
+    private fun setTiles(t: HomeTiles) {
+        cardView = t.big; prefs.cardView = t.big
+        smallView = t.small; prefs.smallView = t.small
+    }
+    /** «Слои»: следующее содержимое большой плашки. */
+    fun nextCardView() = setTiles(HomeTilesLogic.nextBig(HomeTiles(cardView, smallView), homeLayout, youtubeAvailable))
+    /** ⇄: поменять плашки местами (только в двух плашках). */
+    fun swapTiles() = setTiles(HomeTilesLogic.swap(HomeTiles(cardView, smallView), homeLayout, youtubeAvailable))
+    /** «Раскладка» в настройках: четыре плашки с картой справа/слева или две плашки. */
+    fun chooseHomeLayout(layout: HomeLayout, left: Boolean = mapLeft) {
+        homeLayout = layout; prefs.homeLayout = layout
+        if (layout == HomeLayout.QUAD) chooseMapLeft(left)
+        setTiles(HomeTilesLogic.normalize(HomeTiles(cardView, smallView), layout, youtubeAvailable))
+    }
     fun setNavigator(pkg: String?) { savedNavigator = pkg; prefs.navigator = pkg }
 
     /** Смена «Масштаба карты» - перерисовать карточку (сами ступени в prefs, по пакету). */

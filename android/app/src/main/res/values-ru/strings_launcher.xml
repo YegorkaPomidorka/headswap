@@ -6,7 +6,7 @@
     <string name="l_choose_app">Выберите приложение</string>
     <string name="l_back">Назад</string>
     <string name="l_settings">Настройки</string>
-    <string name="l_card_view">Вид карточки</string>
+    <string name="l_card_view">Сменить большую плашку</string>
     <string name="l_navigation">Навигация</string>
     <string name="l_add">Добавить</string>
     <string name="l_remove_q">Убрать?</string>
@@ -110,9 +110,11 @@
     <string name="l_s_last">Последний</string>
     <string name="l_s_more">Все плееры</string>
     <string name="l_s_autoplay">Включать музыку автоматически</string>
-    <string name="l_s_map">Карта на главном</string>
     <string name="l_s_right">Справа</string>
     <string name="l_s_left">Слева</string>
+    <string name="l_s_layout">Раскладка</string>
+    <string name="l_swap_tiles">Поменять плашки местами</string>
+    <string name="l_yt_not_installed">YouTube не установлен</string>
     <string name="l_s_hu">Головное устройство</string>
     <string name="l_s_link">Подключение</string>
     <string name="l_s_video">Видео</string>

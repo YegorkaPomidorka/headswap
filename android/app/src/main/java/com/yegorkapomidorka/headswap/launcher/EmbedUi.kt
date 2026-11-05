@@ -68,10 +68,16 @@ fun EmbedLayers() {
         CarAreas.crop(areaRect.width.roundToInt(), areaRect.height.roundToInt(), cardRect.width.roundToInt(), cardRect.height.roundToInt())
     else null
     LaunchedEffect(carNav, navCrop) { if (carNav) CarAppHost.setCrop(navCrop) }
-    // приложение: одно окно на все приложения, смена приложения = launch в тот же дисплей
-    val appKey = model.appKey
-    LaunchedEffect(appKey, areaRect?.width, areaRect?.height) {
-        EmbedHost.want(EmbedHost.app, appKey, areaRect?.width?.roundToInt() ?: 0, areaRect?.height?.roundToInt() ?: 0)
+    // приложение: одно окно на все приложения, смена приложения = launch в тот же дисплей.
+    // Плашка YouTube на главном занимает это же окно размером с плашку: открыть другое приложение - вытеснить YouTube,
+    // вернуться на главный - запустить его снова (слотов всего два, второй - навигатор).
+    val tiles = model.tiles
+    val ytKey = model.youtubeKey
+    val ytOnHome = area == Area.Home && ytKey != null && CardView.YOUTUBE in listOf(tiles.big, tiles.small)
+    val appKey = if (ytOnHome) ytKey else model.appKey
+    val appTarget = if (ytOnHome) model.ytCardRect else areaRect
+    LaunchedEffect(appKey, appTarget?.width, appTarget?.height) {
+        EmbedHost.want(EmbedHost.app, appKey, appTarget?.width?.roundToInt() ?: 0, appTarget?.height?.roundToInt() ?: 0)
     }
     LaunchedEffect(area) {
         when (area) {
@@ -81,19 +87,26 @@ fun EmbedLayers() {
         }
     }
 
-    val navShown = navKey != null && (area == Area.Navigator || (area == Area.Home && model.cardView == CardView.NAVIGATOR))
+    val navShown = navKey != null &&
+        (area == Area.Navigator || (area == Area.Home && CardView.NAVIGATOR in listOf(tiles.big, tiles.small)))
     // подпись окна навигатора в углу карточки (макет v2); на весь экран не нужна
     val navPkg = model.navigatorPkg
     val navTag = if (area != Area.Navigator && navPkg != null) remember(navPkg) { LauncherModel.packageLabel(navPkg) } else null
     EmbedLayer(EmbedHost.nav, navTarget, shown = navShown, interactive = area == Area.Navigator,
         rounded = area != Area.Navigator, background = LocalPalette.current.mapBg,
         starting = stringResource(R.string.l_nav_starting), onCardTap = { LauncherActions.openNavigator() }, tag = navTag,
-        cardViewButton = area == Area.Home && LocalMetrics.current.spec.strip,
         crop = navCrop, buffer = if (carNav && areaRect != null) areaRect.width.roundToInt() to areaRect.height.roundToInt() else null)
     if (appKey != null) {
-        val label = model.starting ?: ""
-        EmbedLayer(EmbedHost.app, areaRect, shown = area is Area.App, interactive = true, rounded = false, background = LocalPalette.current.bgSolid,
-            starting = stringResource(R.string.l_starting, label), onCardTap = null)
+        if (ytOnHome) {
+            // плашка YouTube - как карточка навигатора: касания в приложение не идут, тап разворачивает его на весь экран
+            // (тот же ключ - окно только меняет размер, без перезапуска)
+            EmbedLayer(EmbedHost.app, appTarget, shown = true, interactive = false, rounded = true, background = LocalPalette.current.mapBg,
+                starting = stringResource(R.string.l_starting, "YouTube"), onCardTap = { LauncherActions.openYoutube() }, tag = "YouTube")
+        } else {
+            val label = model.starting ?: ""
+            EmbedLayer(EmbedHost.app, areaRect, shown = area is Area.App, interactive = true, rounded = false, background = LocalPalette.current.bgSolid,
+                starting = stringResource(R.string.l_starting, label), onCardTap = null)
+        }
     }
 }
 
@@ -102,7 +115,7 @@ private val OFFSCREEN = IntOffset(-100_000, -100_000)
 @Composable
 internal fun EmbedLayer(
     slot: EmbedSlot, target: Rect?, shown: Boolean, interactive: Boolean, rounded: Boolean, background: Color,
-    starting: String, onCardTap: (() -> Unit)?, tag: String? = null, cardViewButton: Boolean = false,
+    starting: String, onCardTap: (() -> Unit)?, tag: String? = null,
     /** Буфер текстуры [buffer] (px) больше окна: показать его часть [crop] 1:1; crop null - буфер на всё окно. */
     crop: CarBox? = null, buffer: Pair<Int, Int>? = null,
 ) {
@@ -179,23 +192,41 @@ internal fun EmbedLayer(
                         .padding(horizontal = m.dp(m.spec.g8), vertical = m.dp(m.spec.b4)),
                 ) { Txt(tag, m.spec.tag, color = Pal.SEC2) }
             }
-            // лента: «Вид карточки» на карте поверх окна навигатора (в рейке ему места нет)
-            if (cardViewButton) MapCardViewButton(Modifier.align(Alignment.TopEnd))
         }
     }
 }
 
-/** Карточка на месте навигации: живое окно навигатора (рисует слой), выбор навигатора или большие часы. */
+/** Плашка главного по её содержимому; [small] - малая плашка (часы мельче). */
+@Composable
+fun TileCard(view: CardView, modifier: Modifier, small: Boolean = false) {
+    when (view) {
+        CardView.NAVIGATOR -> NavCard(modifier)
+        CardView.YOUTUBE -> YoutubeCard(modifier)
+        CardView.MUSIC -> MusicCard(modifier)
+        CardView.CLOCK -> CardBox(modifier, background = LocalPalette.current.mapBg) { ClockFace(small) }
+    }
+}
+
+/** Плашка YouTube: окно рисует слой app по [LauncherModel.ytCardRect]; здесь фон и «не установлен». */
+@Composable
+private fun YoutubeCard(modifier: Modifier) {
+    val model = LauncherModel
+    val s = LocalMetrics.current.spec
+    CardBox(modifier.onGloballyPositioned { model.ytCardRect = it.boundsInRoot() }, background = LocalPalette.current.mapBg) {
+        if (model.catalogLoaded && model.youtubeKey == null) Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            Txt(stringResource(R.string.l_yt_not_installed), s.f1, color = Pal.SEC2, weight = FontWeight.Medium, align = TextAlign.Center)
+        }
+    }
+}
+
+/** Карточка навигатора: живое окно навигатора (рисует слой по [LauncherModel.navCardRect]) или выбор навигатора. */
 @Composable
 fun NavCard(modifier: Modifier) {
     val model = LauncherModel
     val m = LocalMetrics.current
     val s = m.spec
-    CardBox(modifier.onGloballyPositioned { if (model.cardView == CardView.NAVIGATOR) model.navCardRect = it.boundsInRoot() }, background = LocalPalette.current.mapBg) {
-        // копия кнопки ленты для часов и выбора навигатора: окна навигатора поверх нет, а значит, нет и его копии
-        if (s.strip) MapCardViewButton(Modifier.align(Alignment.TopEnd).zIndex(1f))
+    CardBox(modifier.onGloballyPositioned { model.navCardRect = it.boundsInRoot() }, background = LocalPalette.current.mapBg) {
         when {
-            model.cardView == CardView.CLOCK -> ClockFace()
             model.navigatorPkg == null -> Pressable(Modifier.fillMaxSize(), onTap = { LauncherActions.openNavigatorChoice() }) { pressed ->
                 if (pressed) Box(Modifier.matchParentSize().background(Pal.SURFACE_PRESSED))
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -212,25 +243,50 @@ fun NavCard(modifier: Modifier) {
     }
 }
 
-/** Стеклянная кнопка «Вид карточки» в правом верхнем углу карты (только лента 1280x480). */
+/**
+ * Кнопки главного поверх живых окон (слои встраивания лежат над экраном и забирают касания в своих границах):
+ * ⇄ на стыке двух плашек и стеклянные «Слои» в углу большой плашки в ленте 1280x480 (в её рейке места нет).
+ */
 @Composable
-private fun MapCardViewButton(modifier: Modifier) {
+fun HomeTileButtons() {
+    val model = LauncherModel
+    if (model.area != Area.Home) return
     val m = LocalMetrics.current
     val s = m.spec
-    CardViewButton(s.pcB, s.pcIc, GlassBg, Pal.WHITE.copy(alpha = 0.75f),
-        modifier.padding(top = m.dp(s.g8), end = m.dp(s.g8)).border(m.dp(1), GlassBorder, CircleShape))
+    val big = model.bigTileRect
+    val small = model.smallTileRect
+    if (model.homeLayout.two && big != null && small != null) {
+        val size = Math.round(s.t * 0.8f)
+        val cx = Math.round(if (big.left < small.left) (big.right + small.left) / 2 else (small.right + big.left) / 2)
+        val cy = Math.round(big.center.y)
+        Pressable(
+            Modifier.absoluteOffset { IntOffset(cx - size / 2, cy - size / 2) }.size(m.dp(size)).clip(CircleShape)
+                .background(GlassBg).border(m.dp(1), GlassBorder, CircleShape),
+            description = stringResource(R.string.l_swap_tiles), onTap = { LauncherActions.swapTiles() }, focusShape = CircleShape,
+        ) { pressed ->
+            if (pressed) Box(Modifier.matchParentSize().background(Pal.SURFACE_PRESSED))
+            Box(Modifier.matchParentSize(), contentAlignment = Alignment.Center) {
+                SvgIcon(Ico.SWAP, Math.round(size * 0.5f), Pal.WHITE.copy(alpha = 0.8f), stroke = 2.4f)
+            }
+        }
+    }
+    if (s.strip && big != null) {
+        Box(Modifier.absoluteOffset { IntOffset(Math.round(big.right) - s.pcB - s.g8, Math.round(big.top) + s.g8) }) {
+            CardViewButton(s.pcB, s.pcIc, GlassBg, Pal.WHITE.copy(alpha = 0.75f), Modifier.border(m.dp(1), GlassBorder, CircleShape))
+        }
+    }
 }
 
-/** Вид «Часы»: крупные часы и дата. */
+/** Вид «Часы»: крупные часы и дата; в малой плашке мельче, чтобы время влезло по ширине. */
 @Composable
-private fun ClockFace() {
+private fun ClockFace(small: Boolean) {
     val m = LocalMetrics.current
     val s = m.spec
     val st = LauncherModel.status
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Txt(st.time, s.t * 2, weight = FontWeight.Bold, mono = true)
-            Txt(st.date, s.f1, color = Pal.SEC2)
+            Txt(st.time, if (small) s.t else s.t * 2, weight = FontWeight.Bold, mono = true)
+            Txt(st.date, if (small) s.f2 else s.f1, color = Pal.SEC2)
         }
     }
 }
