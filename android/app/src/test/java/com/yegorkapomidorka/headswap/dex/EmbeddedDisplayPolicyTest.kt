@@ -118,6 +118,15 @@ class EmbeddedDisplayPolicyTest {
         }
     }
 
+    @Test fun onlyTelegramLaunchesMultiWindow() {
+        for (pkg in listOf("org.telegram.messenger", "org.telegram.messenger.web", "org.telegram.messenger.beta")) {
+            assertEquals(true, EmbeddedDisplayPolicy.multiWindowLaunch(pkg))
+        }
+        for (pkg in listOf("com.google.android.youtube", "ru.yandex.yandexnavi", "org.telegram.messengerx")) {
+            assertEquals(false, EmbeddedDisplayPolicy.multiWindowLaunch(pkg))
+        }
+    }
+
     @Test fun childInputUsesItsOwnPixelBoundsAndPreservesDragAndRelease() {
         val state = EmbeddedTouchState(800, 850)
         assertEquals(listOf(EmbeddedTouchState.Event(0, 100f, 200f)), state.events(0, 100f, 200f))

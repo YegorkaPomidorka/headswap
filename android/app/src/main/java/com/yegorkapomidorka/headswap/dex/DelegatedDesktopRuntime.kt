@@ -109,7 +109,12 @@ internal class DelegatedDesktopRuntime(private val context: Context, private val
         check(context.getSystemService(ActivityManager::class.java).isActivityStartAllowedOnDisplay(context, id, intent)) {
             "Android не разрешил запуск приложения на собственном экране"
         }
-        context.startActivity(intent, fullscreenOptions(id).toBundle())
+        val options = if (!ownActivity && EmbeddedDisplayPolicy.multiWindowLaunch(component.packageName)) {
+            // Без границ запуска: в многооконном режиме система держит их буквально, и окно не следует за размером плитки.
+            ActivityOptions.makeBasic().setLaunchDisplayId(id).toBundle()
+                .apply { putInt(EmbeddedDisplayPolicy.KEY_LAUNCH_WINDOWING_MODE, EmbeddedDisplayPolicy.WINDOWING_MULTI_WINDOW) }
+        } else fullscreenOptions(id).toBundle()
+        context.startActivity(intent, options)
     }
 
     /**
