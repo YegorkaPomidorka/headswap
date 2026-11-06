@@ -657,7 +657,9 @@ private fun LayerSlot(v: CardView, sizePx: Int, removable: Boolean = false, cand
         CardView.CLOCK -> pal.btn2 to Pal.TEXT
     }
     Box(Modifier.size(m.dp(sizePx))) {
-        Pressable(Modifier.matchParentSize().clip(CircleShape).alpha(if (candidate) 0.6f else 1f), description = desc, onTap = onTap) { pressed ->
+        // тап по иконке слоя ничего не делает - убирает только крестик (Егор 06.11); кандидат добавляется тапом по иконке
+        Pressable(Modifier.matchParentSize().clip(CircleShape).alpha(if (candidate) 0.6f else 1f), enabled = candidate,
+            description = if (candidate) desc else name, onTap = onTap) { pressed ->
             Box(Modifier.matchParentSize().background(bg), contentAlignment = Alignment.Center) {
                 when (v) {
                     CardView.NAVIGATOR -> SvgIcon(Ico.NAV, sizePx / 2, fg, fill = true)
@@ -669,10 +671,14 @@ private fun LayerSlot(v: CardView, sizePx: Int, removable: Boolean = false, cand
             if (pressed) Box(Modifier.matchParentSize().background(Pal.SURFACE_PRESSED))
         }
         if (removable) {
-            // крестик - знак, что тап убирает; касание ловит вся иконка
-            Box(Modifier.align(Alignment.TopEnd).offset(x = m.dp(r(4)), y = m.dp(-r(4))).size(m.dp(r(38))).clip(CircleShape)
-                .background(pal.bgSolid).border(m.dp(max(1, r(2))), Pal.SEC, CircleShape), contentAlignment = Alignment.Center) {
-                SvgIcon(Ico.CLOSE, r(20), Pal.SEC2, stroke = 3f)
+            // крестик - отдельная кнопка: зона касания 56 (под палец на ГУ), видимый кружок 38
+            Pressable(Modifier.align(Alignment.TopEnd).offset(x = m.dp(r(13)), y = m.dp(-r(13))).size(m.dp(r(56))).clip(CircleShape),
+                description = desc, onTap = onTap) { pressed ->
+                Box(Modifier.align(Alignment.Center).size(m.dp(r(38))).clip(CircleShape)
+                    .background(if (pressed) Pal.SURFACE_PRESSED else pal.bgSolid)
+                    .border(m.dp(max(1, r(2))), Pal.SEC, CircleShape), contentAlignment = Alignment.Center) {
+                    SvgIcon(Ico.CLOSE, r(20), Pal.SEC2, stroke = 3f)
+                }
             }
         }
     }
