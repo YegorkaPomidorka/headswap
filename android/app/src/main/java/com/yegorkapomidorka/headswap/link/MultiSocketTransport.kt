@@ -297,9 +297,8 @@ class MultiSocketTransport internal constructor(
     override val label: String,
     private val closeListener: () -> Unit,
     private val clock: () -> Long = { SystemClock.elapsedRealtime() },
+    override val caps: TransportCaps = TransportCaps.TCP6,
 ) : CarTransport {
-
-    override val caps = TransportCaps.TCP6
 
     private val queues = sockets.keys.associateWith { LinkedBlockingQueue<ByteArray>() }
     private val videoBytes = AtomicLong()
@@ -359,9 +358,19 @@ class MultiSocketTransport internal constructor(
         closeAll()
     }
 
+    val isClosed: Boolean get() = closed.get()
+
+    /**
+     * Закрыть только сокеты, не помечая транспорт закрытым: нити чтения получат ошибку и закроют его сами,
+     * ровно один onClosed (ADB: повторный accept у ГУ сбрасывает набор, сессия должна узнать об этом).
+     */
+    fun severSockets() {
+        for (s in sockets.values) Tcp6Listener.quiet { s.close() }
+    }
+
     private fun fail(chan: Int, why: String) {
         if (!closed.compareAndSet(false, true)) return
-        val reason = "tcp6 ${Ch.name(chan)}(${ports[chan]}): $why"
+        val reason = "${caps.kind} ${Ch.name(chan)}(${ports[chan]}): $why"
         WLog.ev(WLog.TCP, "close", "by" to "link", "chan" to Ch.name(chan), "why" to why, *endStats())
         closeAll()
         onClosedCb?.invoke(reason)
