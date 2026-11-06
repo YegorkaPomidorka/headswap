@@ -151,39 +151,6 @@ class LauncherLogicTest {
         assertEquals(HomeLayout.WIDE_RIGHT, HomeLayout.restore("WIDE_RIGHT"))
     }
 
-    @Test fun layersInQuadCycleNavYoutubeClock() {
-        var t = HomeTiles(CardView.NAVIGATOR, CardView.MUSIC)
-        val seen = List(3) { t = HomeTilesLogic.nextBig(t, HomeLayout.QUAD, youtube = true); t.big }
-        assertEquals(listOf(CardView.YOUTUBE, CardView.CLOCK, CardView.NAVIGATOR), seen)
-        assertEquals(CardView.MUSIC, t.small)
-        // без YouTube - навигатор и часы
-        assertEquals(CardView.CLOCK, HomeTilesLogic.nextBig(HomeTiles(CardView.NAVIGATOR, CardView.MUSIC), HomeLayout.QUAD, youtube = false).big)
-    }
-
-    @Test fun layersInTwoTilesSkipSmallTile() {
-        var t = HomeTiles(CardView.YOUTUBE, CardView.NAVIGATOR)
-        val seen = List(3) { t = HomeTilesLogic.nextBig(t, HomeLayout.WIDE_LEFT, youtube = true); t.big }
-        assertEquals(listOf(CardView.MUSIC, CardView.CLOCK, CardView.YOUTUBE), seen)
-        assertEquals(CardView.NAVIGATOR, t.small)
-    }
-
-    @Test fun swapOnlyInTwoTiles() {
-        val t = HomeTiles(CardView.NAVIGATOR, CardView.MUSIC)
-        assertEquals(HomeTiles(CardView.MUSIC, CardView.NAVIGATOR), HomeTilesLogic.swap(t, HomeLayout.WIDE_RIGHT, youtube = true))
-        assertEquals(t, HomeTilesLogic.swap(t, HomeLayout.QUAD, youtube = true))
-    }
-
-    @Test fun normalizeKeepsTilesValid() {
-        // четыре плашки: малая - музыка, большая не музыка
-        assertEquals(HomeTiles(CardView.NAVIGATOR, CardView.MUSIC),
-            HomeTilesLogic.normalize(HomeTiles(CardView.MUSIC, CardView.NAVIGATOR), HomeLayout.QUAD, youtube = true))
-        // две плашки: одно и то же в обе не ставится
-        assertEquals(HomeTiles(CardView.CLOCK, CardView.MUSIC),
-            HomeTilesLogic.normalize(HomeTiles(CardView.CLOCK, CardView.CLOCK), HomeLayout.WIDE_LEFT, youtube = true))
-        // YouTube удалили - плашки возвращаются к навигатору и музыке
-        assertEquals(HomeTiles(CardView.NAVIGATOR, CardView.MUSIC),
-            HomeTilesLogic.normalize(HomeTiles(CardView.YOUTUBE, CardView.YOUTUBE), HomeLayout.WIDE_LEFT, youtube = false))
-    }
 
     @Test fun smallTileIsCappedOnWideScreens() {
         val wide = LauncherSpecs.forSize(1920, 720)

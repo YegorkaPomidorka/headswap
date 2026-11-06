@@ -138,6 +138,7 @@ fun AllAppsScreen() {
 @Composable
 fun PickerScreen() {
     val model = LauncherModel
+    if (model.pickerForLayers) { LayerPickerScreen(); return }
     val f1 = LocalMetrics.current.spec.f1
     var page by remember { mutableIntStateOf(0) }
     val items = CatalogLists.pickable(model.catalog.map { AppRef(it.packageName, it.className) }, model.apps)

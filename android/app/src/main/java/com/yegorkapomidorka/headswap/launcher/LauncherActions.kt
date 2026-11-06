@@ -16,7 +16,14 @@ object LauncherActions {
 
     /** Домой, единственная точка возврата на главный экран. */
     fun home() { if (model.foreign != null) ForeignActions.home() else model.home() }
-    fun openPicker() { model.go(Area.Picker) }
+    fun openPicker() { model.pickerForLayers = false; model.go(Area.Picker) }
+    /** «+» в «Слоях» (настройки «Экран»): тот же выбор приложения, выбранное уходит в слои, Назад - в настройки. */
+    fun openLayerPicker() { model.pickerForLayers = true; model.go(Area.Picker) }
+    fun addLayer(l: Layer) {
+        model.addLayer(l)
+        model.pickerForLayers = false
+        model.back()
+    }
     /** Шестерёнка на рейке: настройки; повторное нажатие - назад. */
     fun openSettings() {
         if (model.area == Area.Settings) { model.back(); return }
@@ -39,8 +46,8 @@ object LauncherActions {
     fun cycleCardView() { model.nextCardView() }
     fun swapTiles() { model.swapTiles() }
 
-    /** Тап по плашке YouTube: то же окно на весь экран (ключ тот же - только смена размера, без перезапуска). */
-    fun openYoutube() { model.youtubeKey?.let { AppRef.parse(it) }?.let { openApp(it) } }
+    /** «Развернуть» плашку-приложение: то же окно на весь экран (ключ тот же - только смена размера, без перезапуска). */
+    fun openTileApp() { model.tileAppKey?.let { AppRef.parse(it) }?.let { openApp(it) } }
 
     /** Карточка «Телефон» без доступа: окно Headswap на экране телефона с запросом разрешений карточки. */
     fun openPhoneRequest() {

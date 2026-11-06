@@ -23,8 +23,10 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -185,7 +187,20 @@ fun LauncherSettingsScreen() {
                                 model.chooseAutoplay(it)
                             }
                         }
-                        SettingsPage.HOME -> MapSideCard(d, cell(0, SettingsGrid.ROWS).fillMaxWidth())
+                        SettingsPage.HOME -> {
+                            // «Раскладка» ужата до 0,87 высоты, чтобы снизу выглядывала шапка «Слои» - видно, что есть
+                            // куда листать (макет SettingsHomeLayers, Егор 06.11). «Слои» - два ряда в том же масштабе.
+                            val layoutH = (h * HOME_SHRINK).roundToInt()
+                            val layersH = ((2 * rowH + gap) * HOME_SHRINK).roundToInt()
+                            // прокрутка живёт в модели: после выбора слоя в Picker возвращаемся к «Слоям», а не наверх
+                            val scroll = rememberScrollState(model.settingsHomeScroll)
+                            LaunchedEffect(scroll.value) { model.settingsHomeScroll = scroll.value }
+                            Column(Modifier.fillMaxSize().verticalScroll(scroll),
+                                verticalArrangement = Arrangement.spacedBy(m.dp(gap))) {
+                                MapSideCard(d, Modifier.fillMaxWidth().height(m.dp(layoutH)))
+                                LayersCard(layersH, Modifier.fillMaxWidth().height(m.dp(layersH)))
+                            }
+                        }
                         SettingsPage.SYSTEM -> {
                             val info = systemInfo()
                             for ((i, row) in info.withIndex()) InfoCard(row.first, row.second, d, cell(i).fillMaxWidth())
@@ -553,7 +568,8 @@ private data class LayoutOpt(val layout: HomeLayout, val left: Boolean, val labe
 
 /**
  * «Раскладка» главного на весь экран (5 рядов): сеткой 2x2 сверху четыре плашки «Справа» и «Слева», снизу две плашки
- * «2 : 1» и «1 : 2». Один выбор на все четыре. Что в плашках, выбирают на главном («Слои», ⇄), здесь - только форма.
+ * «2 : 1» и «1 : 2». Один выбор на все четыре. Что в плашках, выбирают на главном («Слои», ⇄), здесь - форма,
+ * а ниже, под прокруткой, - что листают «Слои» ([LayersCard]).
  */
 @Composable
 private fun MapSideCard(d: SettingsDims, modifier: Modifier) {
@@ -587,6 +603,9 @@ private fun MapSideCard(d: SettingsDims, modifier: Modifier) {
         }
     }
 }
+
+/** Доля высоты экрана настроек под «Раскладку» в разделе «Экран»: остаток - шапка «Слоёв» под прокрутку. */
+private const val HOME_SHRINK = 0.87
 
 /** Большая плашка миниатюры: золото и всё, что в ней бывает, - навигатор, YouTube, часы. */
 @Composable

@@ -69,16 +69,26 @@ internal object LauncherModel {
     var cardView by mutableStateOf(CardView.NAVIGATOR)
     var smallView by mutableStateOf(CardView.MUSIC)
     var homeLayout by mutableStateOf(HomeLayout.QUAD)
-    /** Ключ запуска YouTube из каталога; null - не установлен (или каталог ещё грузится). */
-    val youtubeKey: String? get() = catalog.firstOrNull { it.packageName == FullscreenApp.YOUTUBE }?.key
-    /** Плашки с учётом правил: пока каталог не загружен, YouTube считаем доступным, чтобы не сбросить выбор. */
+    /** Что листают «Слои» и в каком порядке ([LayerList]). */
+    var layers by mutableStateOf(LayerList.DEFAULT)
+    /** Пакет приложения плашки-приложения ([CardView.APP]); по умолчанию YouTube. */
+    var tileApp by mutableStateOf(FullscreenApp.YOUTUBE)
+    /** Ключ запуска приложения плашки из каталога; null - не установлено (или каталог ещё грузится). */
+    val tileAppKey: String? get() = catalog.firstOrNull { it.packageName == tileApp }?.key
+    /** Установлено ли приложение; пока каталог не загружен - да, чтобы не сбросить выбор. Навигатор - нет: у него своё окно. */
+    fun installed(pkg: String): Boolean = pkg != navigatorPkg && (!catalogLoaded || catalog.any { it.packageName == pkg })
+    /** Плашки с учётом правил. */
     val tiles: HomeTiles
-        get() = HomeTilesLogic.normalize(HomeTiles(cardView, smallView), homeLayout, !catalogLoaded || youtubeKey != null)
+        get() = HomeTilesLogic.normalize(HomeTiles(cardView, smallView, tileApp), homeLayout, installed(tileApp))
     /** Где на экране большая и малая плашки (корень): по ним стоят ⇄ на стыке и «Слои» ленты поверх живых окон. */
     var bigTileRect by mutableStateOf<Rect?>(null)
     var smallTileRect by mutableStateOf<Rect?>(null)
-    /** Плашка с YouTube на главном: туда слой app ставит окно YouTube. */
-    var ytCardRect by mutableStateOf<Rect?>(null)
+    /** Плашка-приложение на главном: туда слой app ставит окно приложения. */
+    var appCardRect by mutableStateOf<Rect?>(null)
+    /** Выбор приложения (Picker) открыт из «Слоёв»: выбранное уходит в слои, а не в нижний ряд. */
+    var pickerForLayers by mutableStateOf(false)
+    /** Прокрутка раздела «Экран»: после выбора слоя возвращаемся туда же, где «Слои». */
+    var settingsHomeScroll = 0
     var apps by mutableStateOf<List<AppRef>>(emptyList())
     var savedNavigator by mutableStateOf<String?>(null)
     var musicPlayer by mutableStateOf<String?>(null)
@@ -148,6 +158,8 @@ internal object LauncherModel {
         cardView = prefs.cardView
         smallView = prefs.smallView
         homeLayout = prefs.homeLayout
+        layers = prefs.layers
+        tileApp = prefs.tileApp
         apps = prefs.apps
         savedNavigator = prefs.navigator
         musicPlayer = prefs.musicPlayer
@@ -213,20 +225,24 @@ internal object LauncherModel {
     fun chooseAutoplay(on: Boolean) { autoplay = on; prefs.autoplay = on }
     fun chooseLocalPlayer(pkg: String?) { localPlayer = pkg; prefs.localPlayer = pkg }
     fun chooseOnlinePlayer(pkg: String?) { onlinePlayer = pkg; prefs.onlinePlayer = pkg }
-    private val youtubeAvailable: Boolean get() = !catalogLoaded || youtubeKey != null
+    private val currentTiles: HomeTiles get() = HomeTiles(cardView, smallView, tileApp)
     private fun setTiles(t: HomeTiles) {
         cardView = t.big; prefs.cardView = t.big
         smallView = t.small; prefs.smallView = t.small
+        if (t.app != tileApp) { tileApp = t.app; prefs.tileApp = t.app }
     }
     /** «Слои»: следующее содержимое большой плашки. */
-    fun nextCardView() = setTiles(HomeTilesLogic.nextBig(HomeTiles(cardView, smallView), homeLayout, youtubeAvailable))
+    fun nextCardView() = setTiles(HomeTilesLogic.nextBig(currentTiles, homeLayout, ::installed, layers))
+    /** Блок «Слои» в настройках «Экран»: что листает кнопка, по порядку. */
+    fun addLayer(l: Layer) { layers = LayerList.add(layers, l).also { prefs.layers = it } }
+    fun removeLayer(l: Layer) { layers = LayerList.remove(layers, l).also { prefs.layers = it } }
     /** ⇄: поменять плашки местами (только в двух плашках). */
-    fun swapTiles() = setTiles(HomeTilesLogic.swap(HomeTiles(cardView, smallView), homeLayout, youtubeAvailable))
+    fun swapTiles() = setTiles(HomeTilesLogic.swap(currentTiles, homeLayout, installed(tileApp)))
     /** «Раскладка» в настройках: четыре плашки с картой справа/слева или две плашки. */
     fun chooseHomeLayout(layout: HomeLayout, left: Boolean = mapLeft) {
         homeLayout = layout; prefs.homeLayout = layout
         if (layout == HomeLayout.QUAD) chooseMapLeft(left)
-        setTiles(HomeTilesLogic.normalize(HomeTiles(cardView, smallView), layout, youtubeAvailable))
+        setTiles(HomeTilesLogic.normalize(currentTiles, layout, installed(tileApp)))
     }
     fun setNavigator(pkg: String?) { savedNavigator = pkg; prefs.navigator = pkg; applyShadowNav() }
 
