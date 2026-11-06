@@ -23,6 +23,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -191,7 +192,10 @@ fun LauncherSettingsScreen() {
                             // куда листать (макет SettingsHomeLayers, Егор 06.11). «Слои» - два ряда в том же масштабе.
                             val layoutH = (h * HOME_SHRINK).roundToInt()
                             val layersH = ((2 * rowH + gap) * HOME_SHRINK).roundToInt()
-                            Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()),
+                            // прокрутка живёт в модели: после выбора слоя в Picker возвращаемся к «Слоям», а не наверх
+                            val scroll = rememberScrollState(model.settingsHomeScroll)
+                            LaunchedEffect(scroll.value) { model.settingsHomeScroll = scroll.value }
+                            Column(Modifier.fillMaxSize().verticalScroll(scroll),
                                 verticalArrangement = Arrangement.spacedBy(m.dp(gap))) {
                                 MapSideCard(d, Modifier.fillMaxWidth().height(m.dp(layoutH)))
                                 LayersCard(layersH, Modifier.fillMaxWidth().height(m.dp(layersH)))
@@ -602,95 +606,6 @@ private fun MapSideCard(d: SettingsDims, modifier: Modifier) {
 
 /** Доля высоты экрана настроек под «Раскладку» в разделе «Экран»: остаток - шапка «Слоёв» под прокрутку. */
 private const val HOME_SHRINK = 0.87
-
-/**
- * «Слои» под «Раскладкой»: значок и подпись, ниже - что листает кнопка «Слои», иконками строкой, как нижняя панель
- * главного. Крестик убирает (последнее не убирается), «+» добавляет: одно свободное - сразу, несколько - показывает их
- * приглушёнными, тап по нужному добавляет. До [LayerList.MAX].
- */
-@Composable
-private fun LayersCard(heightPx: Int, modifier: Modifier) {
-    val m = LocalMetrics.current
-    val s = m.spec
-    val k = s.t / 96.0
-    fun r(v: Int) = max(1, (v * k).roundToInt())
-    val model = LauncherModel
-    var adding by remember { mutableStateOf(false) }
-    val free = model.freeLayers
-    val padV = r(14)
-    val headIcon = r(36)
-    val headH = max(headIcon, (s.f2 * 1.25).roundToInt())
-    val icon = max(1, min(r(112), heightPx - 2 * padV - headH - r(18)))
-    Card(modifier) {
-        Column(Modifier.fillMaxSize().padding(horizontal = m.dp(r(24)), vertical = m.dp(padV)),
-            verticalArrangement = Arrangement.spacedBy(m.dp(r(18)), Alignment.CenterVertically)) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(m.dp(r(14)))) {
-                SvgIcon(Ico.LAYERS, headIcon, Pal.TEXT, stroke = 2f)
-                Txt(stringResource(R.string.l_s_layers), s.f2, ellipsis = false)
-            }
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(m.dp(r(28)))) {
-                for (v in model.layers) LayerSlot(v, icon, removable = model.layers.size > 1) { model.removeLayer(v) }
-                if (adding && free.size > 1) {
-                    for (v in free) LayerSlot(v, icon, candidate = true) { model.addLayer(v); adding = false }
-                } else if (free.isNotEmpty()) {
-                    PlusTile(labelled = false, iconPx = icon) { if (free.size == 1) model.addLayer(free[0]) else adding = true }
-                }
-            }
-        }
-    }
-}
-
-/** Иконка слоя: круг со значком; [removable] - крестик в углу (тап убирает), [candidate] - приглушён, тап добавляет. */
-@Composable
-private fun LayerSlot(v: CardView, sizePx: Int, removable: Boolean = false, candidate: Boolean = false, onTap: () -> Unit) {
-    val m = LocalMetrics.current
-    val k = m.spec.t / 96.0
-    fun r(x: Int) = max(1, (x * k).roundToInt())
-    val pal = LocalPalette.current
-    val name = layerName(v)
-    val desc = if (candidate) stringResource(R.string.l_s_layer_add, name) else stringResource(R.string.l_s_layer_remove, name)
-    val yt = if (v == CardView.YOUTUBE) rememberPackageIcon(FullscreenApp.YOUTUBE) else null
-    val (bg, fg) = when (v) {
-        CardView.NAVIGATOR -> LocalAccent.current to Pal.ON_GOLD
-        CardView.YOUTUBE -> Color.White to Color(0xFFFF0033)
-        CardView.MUSIC -> Color(0xFF6B5520) to Color(0xFFF2E2B0)
-        CardView.CLOCK -> pal.btn2 to Pal.TEXT
-    }
-    Box(Modifier.size(m.dp(sizePx))) {
-        // тап по иконке слоя ничего не делает - убирает только крестик (Егор 06.11); кандидат добавляется тапом по иконке
-        Pressable(Modifier.matchParentSize().clip(CircleShape).alpha(if (candidate) 0.6f else 1f), enabled = candidate,
-            description = if (candidate) desc else name, onTap = onTap) { pressed ->
-            Box(Modifier.matchParentSize().background(bg), contentAlignment = Alignment.Center) {
-                when (v) {
-                    CardView.NAVIGATOR -> SvgIcon(Ico.NAV, sizePx / 2, fg, fill = true)
-                    CardView.YOUTUBE -> if (yt != null) Image(yt, null, Modifier.fillMaxSize()) else SvgIcon(Ico.VIDEO, sizePx * 3 / 5, fg, stroke = 2.4f)
-                    CardView.MUSIC -> SvgIcon(Ico.MUSIC, sizePx / 2, fg, stroke = 2.4f)
-                    CardView.CLOCK -> SvgIcon(Ico.CLOCK, sizePx / 2, fg, stroke = 2.4f)
-                }
-            }
-            if (pressed) Box(Modifier.matchParentSize().background(Pal.SURFACE_PRESSED))
-        }
-        if (removable) {
-            // крестик - отдельная кнопка: зона касания 56 (под палец на ГУ), видимый кружок 38
-            Pressable(Modifier.align(Alignment.TopEnd).offset(x = m.dp(r(13)), y = m.dp(-r(13))).size(m.dp(r(56))).clip(CircleShape),
-                description = desc, onTap = onTap) { pressed ->
-                Box(Modifier.align(Alignment.Center).size(m.dp(r(38))).clip(CircleShape)
-                    .background(if (pressed) Pal.SURFACE_PRESSED else pal.bgSolid)
-                    .border(m.dp(max(1, r(2))), Pal.SEC, CircleShape), contentAlignment = Alignment.Center) {
-                    SvgIcon(Ico.CLOSE, r(20), Pal.SEC2, stroke = 3f)
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun layerName(v: CardView): String = when (v) {
-    CardView.NAVIGATOR -> stringResource(R.string.l_sec_nav)
-    CardView.YOUTUBE -> "YouTube"
-    CardView.MUSIC -> stringResource(R.string.l_sec_music)
-    CardView.CLOCK -> stringResource(R.string.l_s_clock)
-}
 
 /** Большая плашка миниатюры: золото и всё, что в ней бывает, - навигатор, YouTube, часы. */
 @Composable

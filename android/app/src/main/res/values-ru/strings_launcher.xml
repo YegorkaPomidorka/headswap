@@ -132,7 +132,7 @@
     <string name="l_s_layer_remove">Убрать из слоёв: %1$s</string>
     <string name="l_swap_tiles">Поменять плашки местами</string>
     <string name="l_expand">На весь экран</string>
-    <string name="l_yt_not_installed">YouTube не установлен</string>
+    <string name="l_app_not_installed">Приложение не установлено</string>
     <string name="l_s_hu">Головное устройство</string>
     <string name="l_s_link">Подключение</string>
     <string name="l_s_video">Видео</string>

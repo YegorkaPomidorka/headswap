@@ -83,9 +83,14 @@ class LauncherPrefs(context: Context) {
         set(value) { prefs.edit().putString("small_view", value.name).apply() }
 
     /** Что листают «Слои», по порядку ([LayerList]). */
-    var layers: List<CardView>
-        get() = LayerList.decode(prefs.getString("layers", null))
-        set(value) { prefs.edit().putString("layers", LayerList.encode(value)).apply() }
+    var layers: List<Layer>
+        get() = LayerList.decode(prefs.getString("layer_list", null))
+        set(value) { prefs.edit().putString("layer_list", LayerList.encode(value)).apply() }
+
+    /** Пакет приложения в плашке-приложении ([CardView.APP]); до «Слоёв» это всегда был YouTube. */
+    var tileApp: String
+        get() = prefs.getString("tile_app", null) ?: FullscreenApp.YOUTUBE
+        set(value) { prefs.edit().putString("tile_app", value).apply() }
 
     /** «Раскладка» главного: четыре плашки (по умолчанию) или две. */
     var homeLayout: HomeLayout

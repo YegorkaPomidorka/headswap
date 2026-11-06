@@ -70,16 +70,16 @@ fun EmbedLayers() {
     else null
     LaunchedEffect(carNav, navCrop) { if (carNav) CarAppHost.setCrop(navCrop) }
     // приложение: одно окно на все приложения, смена приложения = launch в тот же дисплей.
-    // Плашка YouTube на главном занимает это же окно размером с плашку: открыть другое приложение - вытеснить YouTube,
-    // вернуться на главный - запустить его снова (слотов всего два, второй - навигатор).
+    // Плашка-приложение на главном (YouTube или любое из «Слоёв») занимает это же окно размером с плашку: открыть
+    // другое приложение - вытеснить его, вернуться на главный - запустить снова (слотов всего два, второй - навигатор).
     val tiles = model.tiles
-    val ytKey = model.youtubeKey
-    val ytOnHome = area == Area.Home && ytKey != null && CardView.YOUTUBE in listOf(tiles.big, tiles.small)
-    // Плашка YouTube запомнила его как текущее приложение: «Слои» увели YouTube с плашки - окно остаётся за ним
+    val tileKey = model.tileAppKey
+    val tileOnHome = area == Area.Home && tileKey != null && CardView.APP in listOf(tiles.big, tiles.small)
+    // Плашка запомнила приложение как текущее: «Слои» увели его с плашки - окно остаётся за ним
     // (скрыто, того же размера) и при возврате продолжает, а не запускается заново (Егор 05.11)
-    LaunchedEffect(ytOnHome, ytKey) { if (ytOnHome) model.appKey = ytKey }
-    val appKey = if (ytOnHome) ytKey else model.appKey
-    val appTarget = if (area == Area.Home && appKey != null && appKey == ytKey) model.ytCardRect ?: areaRect else areaRect
+    LaunchedEffect(tileOnHome, tileKey) { if (tileOnHome) model.appKey = tileKey }
+    val appKey = if (tileOnHome) tileKey else model.appKey
+    val appTarget = if (area == Area.Home && appKey != null && appKey == tileKey) model.appCardRect ?: areaRect else areaRect
     LaunchedEffect(appKey, appTarget?.width, appTarget?.height) {
         EmbedHost.want(EmbedHost.app, appKey, appTarget?.width?.roundToInt() ?: 0, appTarget?.height?.roundToInt() ?: 0)
     }
@@ -101,12 +101,13 @@ fun EmbedLayers() {
         starting = stringResource(R.string.l_nav_starting), onCardTap = { LauncherActions.openNavigator() }, tag = navTag,
         crop = navCrop, buffer = if (carNav && areaRect != null) areaRect.width.roundToInt() to areaRect.height.roundToInt() else null)
     if (appKey != null) {
-        if (ytOnHome) {
-            // плашка YouTube: касания идут в приложение - окно размером с плашку, и полноэкранный режим самого YouTube
+        if (tileOnHome) {
+            // плашка-приложение: касания идут в приложение - окно размером с плашку, и полноэкранный режим самого YouTube
             // растягивает видео ровно на плашку. На весь экран - кнопкой «Развернуть» в углу (HomeTileButtons).
             // Некликабельная плашка не годилась: YouTube в окне показывает ленту и сворачивает видео в мини-плеер (Егор 05.11)
+            val tileLabel = remember(model.tileApp) { model.packageLabel(model.tileApp) }
             EmbedLayer(EmbedHost.app, appTarget, shown = true, interactive = true, rounded = true, background = LocalPalette.current.mapBg,
-                starting = stringResource(R.string.l_starting, "YouTube"), onCardTap = null)
+                starting = stringResource(R.string.l_starting, tileLabel), onCardTap = null)
         } else {
             val label = model.starting ?: ""
             EmbedLayer(EmbedHost.app, areaRect, shown = area is Area.App, interactive = true, rounded = false, background = LocalPalette.current.bgSolid,
@@ -232,20 +233,20 @@ internal fun EmbedLayer(
 fun TileCard(view: CardView, modifier: Modifier, small: Boolean = false) {
     when (view) {
         CardView.NAVIGATOR -> NavCard(modifier)
-        CardView.YOUTUBE -> YoutubeCard(modifier)
+        CardView.APP -> AppTileCard(modifier)
         CardView.MUSIC -> MusicCard(modifier)
         CardView.CLOCK -> CardBox(modifier, background = LocalPalette.current.mapBg) { ClockFace(small) }
     }
 }
 
-/** Плашка YouTube: окно рисует слой app по [LauncherModel.ytCardRect]; здесь фон и «не установлен». */
+/** Плашка-приложение: окно рисует слой app по [LauncherModel.appCardRect]; здесь фон и «не установлено». */
 @Composable
-private fun YoutubeCard(modifier: Modifier) {
+private fun AppTileCard(modifier: Modifier) {
     val model = LauncherModel
     val s = LocalMetrics.current.spec
-    CardBox(modifier.onGloballyPositioned { model.ytCardRect = it.boundsInRoot() }, background = LocalPalette.current.mapBg) {
-        if (model.catalogLoaded && model.youtubeKey == null) Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            Txt(stringResource(R.string.l_yt_not_installed), s.f1, color = Pal.SEC2, weight = FontWeight.Medium, align = TextAlign.Center)
+    CardBox(modifier.onGloballyPositioned { model.appCardRect = it.boundsInRoot() }, background = LocalPalette.current.mapBg) {
+        if (model.catalogLoaded && model.tileAppKey == null) Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            Txt(stringResource(R.string.l_app_not_installed), s.f1, color = Pal.SEC2, weight = FontWeight.Medium, align = TextAlign.Center)
         }
     }
 }
@@ -301,14 +302,14 @@ fun HomeTileButtons() {
             }
         }
     }
-    // «Развернуть» YouTube на весь экран: касания плашки уходят в YouTube, поэтому отдельная кнопка в левом нижнем углу
+    // «Развернуть» плашку-приложение на весь экран: касания плашки уходят в приложение, поэтому отдельная кнопка в углу
     val tiles = model.tiles
-    val yt = model.ytCardRect
-    if (yt != null && model.youtubeKey != null && CardView.YOUTUBE in listOf(tiles.big, tiles.small)) {
+    val yt = model.appCardRect
+    if (yt != null && model.tileAppKey != null && CardView.APP in listOf(tiles.big, tiles.small)) {
         Pressable(
             Modifier.absoluteOffset { IntOffset(Math.round(yt.left) + s.g8, Math.round(yt.bottom) - s.pcB - s.g8) }.size(m.dp(s.pcB))
                 .clip(CircleShape).background(GlassBg).border(m.dp(1), GlassBorder, CircleShape),
-            description = stringResource(R.string.l_expand), onTap = { LauncherActions.openYoutube() }, focusShape = CircleShape,
+            description = stringResource(R.string.l_expand), onTap = { LauncherActions.openTileApp() }, focusShape = CircleShape,
         ) { pressed ->
             if (pressed) Box(Modifier.matchParentSize().background(Pal.SURFACE_PRESSED))
             Box(Modifier.matchParentSize(), contentAlignment = Alignment.Center) {

@@ -132,7 +132,7 @@
     <string name="l_s_layer_remove">Remove from layers: %1$s</string>
     <string name="l_swap_tiles">Swap tiles</string>
     <string name="l_expand">Full screen</string>
-    <string name="l_yt_not_installed">YouTube is not installed</string>
+    <string name="l_app_not_installed">App is not installed</string>
     <string name="l_s_hu">Head unit</string>
     <string name="l_s_link">Connection</string>
     <string name="l_s_video">Video</string>
