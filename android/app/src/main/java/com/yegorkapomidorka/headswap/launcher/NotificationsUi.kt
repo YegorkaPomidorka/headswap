@@ -74,7 +74,18 @@ private class Shown {
     var head: NotifItem? = null
     var shade = false
     var items: List<NotifItem> = emptyList()
+    /** центр панели (язычок или шторка) по X в координатах корня, пишется при раскладке */
+    var panelCx = 0f
+    /** где стоит золотая полоска (X корня) в режиме «за язычком»: центр последнего показанного язычка */
+    var lineX: Float? = null
 }
+
+/**
+ * Где золотая полоска (Егор 06.11, по кадрам со стенда): на 1280×640 — над стыком плиток, и на язычке/шторке тоже там;
+ * на остальных — в центре язычка (он упирается в рейку и съезжает правее стыка), и на строке статуса она остаётся там же.
+ * Цель одна: полоска не прыгает между строкой, язычком и шторкой.
+ */
+internal fun notifLineAtSeam(w: Int, h: Int) = w == 1280 && h == 640
 
 /**
  * Язычок и шторка: панель цвета строки статуса, растущая из её нижнего края с вогнутыми «ушами» сверху ([NotchShape]).
@@ -129,6 +140,12 @@ fun NotificationsOverlay() {
         if (big.left - area.left > s.g) big.left - s.g / 2f else big.right + s.g / 2f
     } else area.center.x
     val dragThr = px(30f).toFloat()
+    val ear0 = px(32f)
+    val atSeam = notifLineAtSeam(s.w, s.h)
+    // до первого язычка — там, где встал бы самый узкий язычок
+    val fallbackX = max(centerX, area.left + (NotifGeom.tongueWidth(s.t, Math.round(area.width), ear0, s.g).first + 2 * ear0) / 2f)
+    fun lineX(): Float = if (atSeam) centerX else shown.lineX ?: fallbackX
+    val lineDx: () -> Int = { Math.round(lineX() - shown.panelCx) }
 
     Ltr {
         // полоска на строке статуса: только если строка есть и есть что показать
@@ -136,7 +153,7 @@ fun NotificationsOverlay() {
             val hitW = 2 * s.t
             // смещение - на обёртке: рамку шайбы Pressable рисует до своего modifier и offset внутри её не сдвинул бы
             Box(
-                Modifier.absoluteOffset { IntOffset(Math.round(centerX) - hitW / 2, Math.round(barCy) - s.t / 2) }
+                Modifier.absoluteOffset { IntOffset(Math.round(lineX()) - hitW / 2, Math.round(barCy) - s.t / 2) }
                     .graphicsLayer { alpha = 1f - p.value },
             ) {
                 Pressable(
@@ -174,6 +191,8 @@ fun NotificationsOverlay() {
                         Modifier.layout { measurable, constraints ->
                             val pl = measurable.measure(constraints.copy(minWidth = 0))
                             val x = Math.round(centerX - area.left - pl.width / 2f).coerceIn(0, max(0, constraints.maxWidth - pl.width))
+                            shown.panelCx = area.left + x + pl.width / 2f
+                            if (!inShade && !atSeam) shown.lineX = shown.panelCx
                             layout(constraints.maxWidth, pl.height) { pl.place(x, 0) }
                         }
                             .graphicsLayer { translationY = -size.height * (1f - p.value) }
@@ -187,9 +206,9 @@ fun NotificationsOverlay() {
                         if (inShade) {
                             val items = liveItems.ifEmpty { shown.items }
                             val listMax = NotifGeom.listMaxHeight(Math.round(area.bottom), Math.round(topY), s.t, px(8f))
-                            ShadeBody(items, maxW, listMax, dragThr)
+                            ShadeBody(items, maxW, listMax, dragThr, lineDx)
                         } else {
-                            shown.head?.let { TongueBody(it, minW, maxW, dragThr) }
+                            shown.head?.let { TongueBody(it, minW, maxW, dragThr, lineDx) }
                         }
                     }
                 }
@@ -202,7 +221,7 @@ private val EASE_OUT = CubicBezierEasing(0.2f, 0.8f, 0.2f, 1f)
 
 /** Язычок: аватар со значком и одна-две строки текста; на нижнем краю - золотая полоска (тап и потянуть вниз = шторка). */
 @Composable
-private fun TongueBody(item: NotifItem, minW: Int, maxW: Int, dragThr: Float) {
+private fun TongueBody(item: NotifItem, minW: Int, maxW: Int, dragThr: Float, lineDx: () -> Int) {
     val m = LocalMetrics.current
     val s = m.spec
     val k = s.t / 96f
@@ -223,21 +242,24 @@ private fun TongueBody(item: NotifItem, minW: Int, maxW: Int, dragThr: Float) {
             Txt(item.entry.text, s.f1, color = Pal.TEXT, weight = FontWeight.Medium, maxLines = 2)
         }
         // полоска лежит на нижнем крае вместе с язычком; тач-зона - T x 2T от нижней кромки вверх
-        Pressable(
-            Modifier.align(Alignment.BottomCenter).size(m.dp(2 * s.t), m.dp(s.t)),
-            description = stringResource(R.string.l_notif_show_all, repo.items.size),
-            focusShape = RoundedCornerShape(m.dp(s.t / 2)),
-            onSwipe = { _, dy -> if (dy > dragThr) { repo.openShade(item.key); true } else false },
-            onTap = { repo.openShade(item.key) },
-        ) {
-            Box(Modifier.matchParentSize().padding(bottom = m.dp(px(14f))), contentAlignment = Alignment.BottomCenter) { GoldHandle() }
+        // сдвиг к месту полоски на строке статуса — на обёртке (рамку шайбы Pressable рисует до своего modifier)
+        Box(Modifier.align(Alignment.BottomCenter).offset { IntOffset(lineDx(), 0) }) {
+            Pressable(
+                Modifier.size(m.dp(2 * s.t), m.dp(s.t)),
+                description = stringResource(R.string.l_notif_show_all, repo.items.size),
+                focusShape = RoundedCornerShape(m.dp(s.t / 2)),
+                onSwipe = { _, dy -> if (dy > dragThr) { repo.openShade(item.key); true } else false },
+                onTap = { repo.openShade(item.key) },
+            ) {
+                Box(Modifier.matchParentSize().padding(bottom = m.dp(px(14f))), contentAlignment = Alignment.BottomCenter) { GoldHandle() }
+            }
         }
     }
 }
 
 /** Шторка: строки со списком (прокрутка, если не влезло), внизу золотая полоска (свернуть) и «Очистить всё». */
 @Composable
-private fun ShadeBody(items: List<NotifItem>, width: Int, listMax: Int, dragThr: Float) {
+private fun ShadeBody(items: List<NotifItem>, width: Int, listMax: Int, dragThr: Float, lineDx: () -> Int) {
     val m = LocalMetrics.current
     val s = m.spec
     val k = s.t / 96f
@@ -248,14 +270,16 @@ private fun ShadeBody(items: List<NotifItem>, width: Int, listMax: Int, dragThr:
             for (item in items) NotifRow(item, repo.expandedKey == item.key)
         }
         Box(Modifier.fillMaxWidth().height(m.dp(s.t))) {
-            Pressable(
-                Modifier.align(Alignment.Center).size(m.dp(2 * s.t), m.dp(s.t)),
-                description = stringResource(R.string.l_notif_collapse),
-                focusShape = RoundedCornerShape(m.dp(s.t / 2)),
-                onSwipe = { _, dy -> if (dy < -dragThr) { repo.closeShade(); true } else false },
-                onTap = { repo.closeShade() },
-            ) {
-                Box(Modifier.matchParentSize(), contentAlignment = Alignment.Center) { GoldHandle() }
+            Box(Modifier.align(Alignment.Center).offset { IntOffset(lineDx(), 0) }) {
+                Pressable(
+                    Modifier.size(m.dp(2 * s.t), m.dp(s.t)),
+                    description = stringResource(R.string.l_notif_collapse),
+                    focusShape = RoundedCornerShape(m.dp(s.t / 2)),
+                    onSwipe = { _, dy -> if (dy < -dragThr) { repo.closeShade(); true } else false },
+                    onTap = { repo.closeShade() },
+                ) {
+                    Box(Modifier.matchParentSize(), contentAlignment = Alignment.Center) { GoldHandle() }
+                }
             }
             val clear = stringResource(R.string.l_notif_clear_all)
             Box(Modifier.align(Alignment.CenterEnd).padding(end = m.dp(px(8f)))) {
