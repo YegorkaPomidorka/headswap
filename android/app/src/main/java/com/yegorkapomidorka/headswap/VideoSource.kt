@@ -99,13 +99,28 @@ class VideoSource(
         renderThread = Thread({ renderLoop() }, "video-render").also { it.start() }
     }
 
+    /**
+     * Лесенка форматов: Baseline держим до последнего. Без профиля OMX.qcom на Xiaomi (h841) отдаёт High profile,
+     * старые ГУ (Desay DS03H) рисуют вместо заглушки цветные полосы.
+     */
     private fun configureFallback(c: MediaCodec) {
-        try {
-            c.configure(format(withExtras = true), null, null, MediaCodec.CONFIGURE_FLAG_ENCODE)
-        } catch (e: Exception) {
-            AppLog.e("configure с profile/CBR не прошёл, пробую минимальный формат", e)
-            c.reset()
-            c.configure(format(withExtras = false), null, null, MediaCodec.CONFIGURE_FLAG_ENCODE)
+        val steps = listOf(
+            "Baseline+CBR" to format(profile = true, mode = MediaCodecInfo.EncoderCapabilities.BITRATE_MODE_CBR),
+            "Baseline+VBR" to format(profile = true, mode = MediaCodecInfo.EncoderCapabilities.BITRATE_MODE_VBR),
+            "Baseline" to format(profile = true, mode = null),
+            "минимальный формат" to format(profile = false, mode = null),
+        )
+        for ((i, step) in steps.withIndex()) {
+            val (name, fmt) = step
+            try {
+                c.configure(fmt, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE)
+                if (i > 0) AppLog.i("заглушка: энкодер настроен как $name")
+                return
+            } catch (e: Exception) {
+                if (i == steps.lastIndex) throw e
+                AppLog.e("configure $name не прошёл, пробую ${steps[i + 1].first}", e)
+                c.reset()
+            }
         }
     }
 
@@ -124,17 +139,17 @@ class VideoSource(
         return f
     }
 
-    private fun format(withExtras: Boolean): MediaFormat {
+    private fun format(profile: Boolean, mode: Int?): MediaFormat {
         val f = MediaFormat.createVideoFormat(MIME, width, height)
         f.setInteger(MediaFormat.KEY_COLOR_FORMAT, MediaCodecInfo.CodecCapabilities.COLOR_FormatSurface)
         f.setInteger(MediaFormat.KEY_BIT_RATE, bitrate)
         f.setInteger(MediaFormat.KEY_FRAME_RATE, fps)
         f.setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, 1)
-        if (withExtras) {
+        if (profile) {
             f.setInteger(MediaFormat.KEY_PROFILE, MediaCodecInfo.CodecProfileLevel.AVCProfileBaseline)
-            f.setInteger(MediaFormat.KEY_BITRATE_MODE, MediaCodecInfo.EncoderCapabilities.BITRATE_MODE_CBR)
             f.setInteger(MediaFormat.KEY_MAX_B_FRAMES, 0)
         }
+        if (mode != null) f.setInteger(MediaFormat.KEY_BITRATE_MODE, mode)
         return f
     }
 
