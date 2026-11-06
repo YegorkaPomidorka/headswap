@@ -155,7 +155,8 @@ fun NotificationsOverlay() {
             if (open) {
                 // тап мимо шторки - свернуть; чуть затемняет остальное
                 Box(
-                    Modifier.fillMaxSize().graphicsLayer { alpha = p.value }.background(Color(0x40000000))
+                    // без затемнения: оно темнило и строку статуса, и шторка переставала с ней сливаться (Егор 06.11)
+                    Modifier.fillMaxSize()
                         .pointerInput(Unit) { detectTapGestures { repo.closeShade() } },
                 )
             }
