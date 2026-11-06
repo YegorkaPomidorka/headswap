@@ -69,6 +69,8 @@ internal object LauncherModel {
     var cardView by mutableStateOf(CardView.NAVIGATOR)
     var smallView by mutableStateOf(CardView.MUSIC)
     var homeLayout by mutableStateOf(HomeLayout.QUAD)
+    /** Что листают «Слои» и в каком порядке ([LayerList]). */
+    var layers by mutableStateOf(LayerList.DEFAULT)
     /** Ключ запуска YouTube из каталога; null - не установлен (или каталог ещё грузится). */
     val youtubeKey: String? get() = catalog.firstOrNull { it.packageName == FullscreenApp.YOUTUBE }?.key
     /** Плашки с учётом правил: пока каталог не загружен, YouTube считаем доступным, чтобы не сбросить выбор. */
@@ -148,6 +150,7 @@ internal object LauncherModel {
         cardView = prefs.cardView
         smallView = prefs.smallView
         homeLayout = prefs.homeLayout
+        layers = prefs.layers
         apps = prefs.apps
         savedNavigator = prefs.navigator
         musicPlayer = prefs.musicPlayer
@@ -219,7 +222,12 @@ internal object LauncherModel {
         smallView = t.small; prefs.smallView = t.small
     }
     /** «Слои»: следующее содержимое большой плашки. */
-    fun nextCardView() = setTiles(HomeTilesLogic.nextBig(HomeTiles(cardView, smallView), homeLayout, youtubeAvailable))
+    fun nextCardView() = setTiles(HomeTilesLogic.nextBig(HomeTiles(cardView, smallView), homeLayout, youtubeAvailable, layers))
+    /** Блок «Слои» в настройках «Экран»: что листает кнопка, по порядку. */
+    fun addLayer(v: CardView) { layers = LayerList.add(layers, v).also { prefs.layers = it } }
+    fun removeLayer(v: CardView) { layers = LayerList.remove(layers, v).also { prefs.layers = it } }
+    /** Что ещё можно добавить в «Слои». */
+    val freeLayers: List<CardView> get() = LayerList.free(layers, youtubeAvailable)
     /** ⇄: поменять плашки местами (только в двух плашках). */
     fun swapTiles() = setTiles(HomeTilesLogic.swap(HomeTiles(cardView, smallView), homeLayout, youtubeAvailable))
     /** «Раскладка» в настройках: четыре плашки с картой справа/слева или две плашки. */

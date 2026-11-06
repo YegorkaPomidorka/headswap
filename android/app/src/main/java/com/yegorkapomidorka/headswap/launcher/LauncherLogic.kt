@@ -332,6 +332,32 @@ enum class HomeLayout { QUAD, WIDE_LEFT, WIDE_RIGHT;
     }
 }
 
+/**
+ * Что листают «Слои» (настройки «Экран», блок под «Раскладкой»): до [MAX] разных [CardView] в порядке пользователя,
+ * минимум одно. По умолчанию все четыре - как было до настройки.
+ */
+object LayerList {
+    const val MAX = 4
+    val DEFAULT: List<CardView> = CardView.entries
+
+    fun decode(s: String?): List<CardView> {
+        if (s == null) return DEFAULT
+        val list = s.split(',').mapNotNull { n -> CardView.entries.firstOrNull { it.name == n } }.distinct().take(MAX)
+        return list.ifEmpty { DEFAULT }
+    }
+
+    fun encode(list: List<CardView>): String = list.joinToString(",") { it.name }
+
+    /** Что ещё можно добавить; YouTube - только если он есть на телефоне. */
+    fun free(list: List<CardView>, youtube: Boolean): List<CardView> =
+        if (list.size >= MAX) emptyList() else CardView.entries.filter { it !in list && (youtube || it != CardView.YOUTUBE) }
+
+    fun add(list: List<CardView>, v: CardView): List<CardView> = if (v in list || list.size >= MAX) list else list + v
+
+    /** Последнее не убирается: листать было бы нечего. */
+    fun remove(list: List<CardView>, v: CardView): List<CardView> = if (list.size <= 1) list else list - v
+}
+
 /** Содержимое большой и малой плашки. */
 data class HomeTiles(val big: CardView, val small: CardView)
 
@@ -348,12 +374,18 @@ object HomeTilesLogic {
         return HomeTiles(big, small)
     }
 
-    fun nextBig(t: HomeTiles, layout: HomeLayout, youtube: Boolean): HomeTiles {
+    /**
+     * «Слои»: следующее из [layers] (выбор в настройках «Экран», порядок пользователя). Пропускает малую плашку,
+     * YouTube без YouTube и музыку в четырёх плашках. Большой нет в списке - встаёт первое подходящее.
+     */
+    fun nextBig(t: HomeTiles, layout: HomeLayout, youtube: Boolean, layers: List<CardView> = CardView.entries): HomeTiles {
         val n = normalize(t, layout, youtube)
-        val order = CardView.entries.filter {
+        val order = layers.filter {
             it == n.big || (it != n.small && (youtube || it != CardView.YOUTUBE) && (layout.two || it != CardView.MUSIC))
         }
-        return n.copy(big = order[(order.indexOf(n.big) + 1) % order.size])
+        if (order.isEmpty()) return n
+        val i = order.indexOf(n.big)
+        return n.copy(big = if (i < 0) order[0] else order[(i + 1) % order.size])
     }
 
     fun swap(t: HomeTiles, layout: HomeLayout, youtube: Boolean): HomeTiles {

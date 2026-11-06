@@ -167,6 +167,32 @@ class LauncherLogicTest {
         assertEquals(CardView.NAVIGATOR, t.small)
     }
 
+    @Test fun layersFollowUserList() {
+        val list = listOf(CardView.CLOCK, CardView.NAVIGATOR)
+        var t = HomeTiles(CardView.NAVIGATOR, CardView.MUSIC)
+        val seen = List(3) { t = HomeTilesLogic.nextBig(t, HomeLayout.QUAD, youtube = true, layers = list); t.big }
+        assertEquals(listOf(CardView.CLOCK, CardView.NAVIGATOR, CardView.CLOCK), seen)
+        // большой нет в списке - встаёт первое подходящее
+        assertEquals(CardView.CLOCK,
+            HomeTilesLogic.nextBig(HomeTiles(CardView.YOUTUBE, CardView.MUSIC), HomeLayout.QUAD, youtube = true, layers = list).big)
+        // в списке только малая плашка - большая не меняется
+        assertEquals(HomeTiles(CardView.NAVIGATOR, CardView.MUSIC),
+            HomeTilesLogic.nextBig(HomeTiles(CardView.NAVIGATOR, CardView.MUSIC), HomeLayout.WIDE_LEFT, youtube = true, layers = listOf(CardView.MUSIC)))
+    }
+
+    @Test fun layerListLimits() {
+        assertEquals(CardView.entries, LayerList.decode(null))
+        assertEquals(CardView.entries, LayerList.decode("junk"))
+        assertEquals(listOf(CardView.CLOCK, CardView.YOUTUBE), LayerList.decode("CLOCK,YOUTUBE,CLOCK"))
+        assertEquals("CLOCK,YOUTUBE", LayerList.encode(listOf(CardView.CLOCK, CardView.YOUTUBE)))
+        val one = listOf(CardView.NAVIGATOR)
+        assertEquals(one, LayerList.remove(one, CardView.NAVIGATOR))
+        assertEquals(one + CardView.CLOCK, LayerList.add(one, CardView.CLOCK))
+        assertEquals(CardView.entries, LayerList.add(CardView.entries, CardView.CLOCK))
+        assertEquals(emptyList<CardView>(), LayerList.free(CardView.entries, youtube = true))
+        assertEquals(listOf(CardView.MUSIC, CardView.CLOCK), LayerList.free(one, youtube = false))
+    }
+
     @Test fun swapOnlyInTwoTiles() {
         val t = HomeTiles(CardView.NAVIGATOR, CardView.MUSIC)
         assertEquals(HomeTiles(CardView.MUSIC, CardView.NAVIGATOR), HomeTilesLogic.swap(t, HomeLayout.WIDE_RIGHT, youtube = true))

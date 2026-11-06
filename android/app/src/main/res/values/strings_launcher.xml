@@ -126,6 +126,10 @@
     <string name="l_s_right">Right</string>
     <string name="l_s_left">Left</string>
     <string name="l_s_layout">Layout</string>
+    <string name="l_s_layers">Layers</string>
+    <string name="l_s_clock">Clock</string>
+    <string name="l_s_layer_add">Add to layers: %1$s</string>
+    <string name="l_s_layer_remove">Remove from layers: %1$s</string>
     <string name="l_swap_tiles">Swap tiles</string>
     <string name="l_expand">Full screen</string>
     <string name="l_yt_not_installed">YouTube is not installed</string>

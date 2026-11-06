@@ -82,6 +82,11 @@ class LauncherPrefs(context: Context) {
         get() = CardView.restore(prefs.getString("small_view", null), CardView.MUSIC)
         set(value) { prefs.edit().putString("small_view", value.name).apply() }
 
+    /** Что листают «Слои», по порядку ([LayerList]). */
+    var layers: List<CardView>
+        get() = LayerList.decode(prefs.getString("layers", null))
+        set(value) { prefs.edit().putString("layers", LayerList.encode(value)).apply() }
+
     /** «Раскладка» главного: четыре плашки (по умолчанию) или две. */
     var homeLayout: HomeLayout
         get() = HomeLayout.restore(prefs.getString("home_layout", null))

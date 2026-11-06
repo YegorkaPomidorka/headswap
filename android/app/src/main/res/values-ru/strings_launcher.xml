@@ -126,6 +126,10 @@
     <string name="l_s_right">Справа</string>
     <string name="l_s_left">Слева</string>
     <string name="l_s_layout">Раскладка</string>
+    <string name="l_s_layers">Слои</string>
+    <string name="l_s_clock">Часы</string>
+    <string name="l_s_layer_add">Добавить в слои: %1$s</string>
+    <string name="l_s_layer_remove">Убрать из слоёв: %1$s</string>
     <string name="l_swap_tiles">Поменять плашки местами</string>
     <string name="l_expand">На весь экран</string>
     <string name="l_yt_not_installed">YouTube не установлен</string>
