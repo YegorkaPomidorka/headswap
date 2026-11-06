@@ -1,0 +1,403 @@
+package com.yegorkapomidorka.headswap.launcher
+
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.CubicBezierEasing
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.absoluteOffset
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Outline
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.LayoutDirection
+import com.yegorkapomidorka.headswap.R
+import kotlin.math.abs
+import kotlin.math.max
+import kotlin.math.min
+
+/**
+ * Что показано в оверлее, пока он уезжает: после снятия уведомлений или конца таймера содержимое должно доехать
+ * наверх, а не пропасть кадром. Меняется только из композиции, состоянием не является.
+ */
+private class Shown {
+    var head: NotifItem? = null
+    var shade = false
+    var items: List<NotifItem> = emptyList()
+}
+
+/**
+ * Язычок и шторка: панель цвета строки статуса, растущая из её нижнего края с вогнутыми «ушами» сверху ([NotchShape]).
+ * Золотая полоска - одна на строке статуса и в панели: на строке гаснет, пока панель внизу, в панели лежит на её нижнем крае.
+ *
+ * Касания: корень оверлея их не берёт. Хит-цели - только полоска на строке (T x 2T вокруг неё), сама панель (контейнер
+ * обрезан по нижнему краю строки, спрятанная панель за обрезкой не попадается под палец) и, пока шторка открыта,
+ * подложка «тап мимо - свернуть». Всё остальное достаётся лаунчеру и живым окнам приложений под оверлеем.
+ */
+@Composable
+fun NotificationsOverlay() {
+    val model = LauncherModel
+    val repo = NotificationsRepo
+    val area = model.areaRect
+    // оверлей на экране ГУ: без него таймер язычка не идёт, и репозиторий язычок не выпускает ([NotificationsRepo.screenShown])
+    DisposableEffect(Unit) { repo.screenShown(); onDispose { repo.screenGone() } }
+    if (!model.notifications || area == null) return
+    val m = LocalMetrics.current
+    val s = m.spec
+    val pal = LocalPalette.current
+    val k = s.t / 96f
+    fun px(v: Float) = Math.round(v * k)
+
+    val liveItems = repo.items
+    val head = repo.headsUp
+    val open = repo.shadeOpen && liveItems.isNotEmpty()
+    val show = open || head != null
+    val shown = remember { Shown() }
+    if (liveItems.isNotEmpty()) shown.items = liveItems
+    if (head != null) shown.head = head.item
+    if (open) shown.shade = true else if (head != null) shown.shade = false // язычок после шторки не должен уезжать шторкой
+
+    val p = remember { Animatable(0f) }
+    LaunchedEffect(show) {
+        p.animateTo(if (show) 1f else 0f, tween(if (show) 420 else 300, easing = if (show) EASE_OUT else FastOutSlowInEasing))
+        if (!show) { shown.shade = false; shown.head = null }
+    }
+    // язычок убирает себя сам: 4 с и секунда на каждые 40 символов
+    LaunchedEffect(head?.seq) {
+        val h = head ?: return@LaunchedEffect
+        kotlinx.coroutines.delay(NotificationsLogic.showMs(h.item.entry.text))
+        repo.endHeadsUp(h.seq)
+    }
+
+    val topY = model.statusBottom ?: area.top
+    val ear = px(32f)
+    val barCy = (model.statusBottom ?: area.top) - s.statusBandH / 2f
+    val centerX = area.center.x
+    val dragThr = px(30f).toFloat()
+
+    Ltr {
+        // полоска на строке статуса: только если строка есть и есть что показать
+        if (liveItems.isNotEmpty() && model.statusBottom != null) {
+            val hitW = 2 * s.t
+            // смещение - на обёртке: рамку шайбы Pressable рисует до своего modifier и offset внутри её не сдвинул бы
+            Box(
+                Modifier.absoluteOffset { IntOffset(Math.round(centerX) - hitW / 2, Math.round(barCy) - s.t / 2) }
+                    .graphicsLayer { alpha = 1f - p.value },
+            ) {
+                Pressable(
+                    Modifier.size(m.dp(hitW), m.dp(s.t)),
+                    enabled = !show && p.value == 0f,
+                    description = stringResource(R.string.l_notif_show_all, liveItems.size),
+                    focusShape = RoundedCornerShape(m.dp(s.t / 2)),
+                    onSwipe = { _, dy -> if (dy > dragThr) { repo.openShade(); true } else false },
+                    onTap = { repo.openShade() },
+                ) {
+                    Box(Modifier.matchParentSize(), contentAlignment = Alignment.Center) { GoldHandle() }
+                }
+            }
+        }
+        if (show || p.value > 0f) {
+            if (open) {
+                // тап мимо шторки - свернуть; чуть затемняет остальное
+                Box(
+                    Modifier.fillMaxSize().graphicsLayer { alpha = p.value }.background(Color(0x40000000))
+                        .pointerInput(Unit) { detectTapGestures { repo.closeShade() } },
+                )
+            }
+            val panelAreaH = area.bottom - topY
+            if (panelAreaH > 0f) {
+                Box(
+                    Modifier.absoluteOffset { IntOffset(Math.round(area.left), Math.round(topY)) }
+                        .size(m.dp(Math.round(area.width)), m.dp(Math.round(panelAreaH))).clipToBounds(),
+                ) {
+                    val shape = remember(ear) { NotchShape(ear.toFloat(), px(44f).toFloat()) }
+                    val (minW, maxW) = NotifGeom.tongueWidth(s.t, Math.round(area.width), ear, s.g)
+                    val inShade = open || (shown.shade && !show)
+                    Column(
+                        Modifier.align(Alignment.TopCenter)
+                            .graphicsLayer { translationY = -size.height * (1f - p.value) }
+                            .shadow(m.dp(px(12f)), shape, clip = false)
+                            .clip(shape).background(pal.bar, shape)
+                            .animateContentSize(tween(260, easing = EASE_OUT))
+                            // тап по пустому месту самой шторки не должен падать на подложку и сворачивать её (кнопки забирают свои касания раньше)
+                            .then(if (inShade) Modifier.pointerInput(Unit) { detectTapGestures { } } else Modifier)
+                            .padding(horizontal = m.dp(ear)),
+                    ) {
+                        if (inShade) {
+                            val items = liveItems.ifEmpty { shown.items }
+                            val listMax = NotifGeom.listMaxHeight(Math.round(area.bottom), Math.round(topY), s.t, px(8f))
+                            ShadeBody(items, maxW, listMax, dragThr)
+                        } else {
+                            shown.head?.let { TongueBody(it, minW, maxW, dragThr) }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+private val EASE_OUT = CubicBezierEasing(0.2f, 0.8f, 0.2f, 1f)
+
+/** Язычок: аватар со значком и одна-две строки текста; на нижнем краю - золотая полоска (тап и потянуть вниз = шторка). */
+@Composable
+private fun TongueBody(item: NotifItem, minW: Int, maxW: Int, dragThr: Float) {
+    val m = LocalMetrics.current
+    val s = m.spec
+    val k = s.t / 96f
+    fun px(v: Float) = Math.round(v * k)
+    val repo = NotificationsRepo
+    Pressable(
+        Modifier.widthIn(min = m.dp(minW), max = m.dp(maxW)).width(IntrinsicSize.Max),
+        description = item.entry.who + ": " + item.entry.text,
+        focusShape = RoundedCornerShape(bottomStart = m.dp(px(44f)), bottomEnd = m.dp(px(44f))),
+        onTap = { repo.openShade(item.key) },
+    ) {
+        Row(
+            Modifier.heightIn(min = m.dp(px(128f))).padding(start = m.dp(px(36f)), end = m.dp(px(44f)), top = m.dp(px(18f)), bottom = m.dp(px(40f))),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            NotifAvatar(item, px(72f))
+            Spacer(Modifier.width(m.dp(px(28f))))
+            Txt(item.entry.text, s.f1, color = Pal.TEXT, weight = FontWeight.Medium, maxLines = 2)
+        }
+        // полоска лежит на нижнем крае вместе с язычком; тач-зона - T x 2T от нижней кромки вверх
+        Pressable(
+            Modifier.align(Alignment.BottomCenter).size(m.dp(2 * s.t), m.dp(s.t)),
+            description = stringResource(R.string.l_notif_show_all, repo.items.size),
+            focusShape = RoundedCornerShape(m.dp(s.t / 2)),
+            onSwipe = { _, dy -> if (dy > dragThr) { repo.openShade(item.key); true } else false },
+            onTap = { repo.openShade(item.key) },
+        ) {
+            Box(Modifier.matchParentSize().padding(bottom = m.dp(px(14f))), contentAlignment = Alignment.BottomCenter) { GoldHandle() }
+        }
+    }
+}
+
+/** Шторка: строки со списком (прокрутка, если не влезло), внизу золотая полоска (свернуть) и «Очистить всё». */
+@Composable
+private fun ShadeBody(items: List<NotifItem>, width: Int, listMax: Int, dragThr: Float) {
+    val m = LocalMetrics.current
+    val s = m.spec
+    val k = s.t / 96f
+    fun px(v: Float) = Math.round(v * k)
+    val repo = NotificationsRepo
+    Column(Modifier.width(m.dp(width)).padding(horizontal = m.dp(px(20f)))) {
+        Column(Modifier.heightIn(max = m.dp(max(0, listMax))).verticalScroll(rememberScrollState()).padding(top = m.dp(px(8f)))) {
+            for (item in items) NotifRow(item, repo.expandedKey == item.key)
+        }
+        Box(Modifier.fillMaxWidth().height(m.dp(s.t))) {
+            Pressable(
+                Modifier.align(Alignment.Center).size(m.dp(2 * s.t), m.dp(s.t)),
+                description = stringResource(R.string.l_notif_collapse),
+                focusShape = RoundedCornerShape(m.dp(s.t / 2)),
+                onSwipe = { _, dy -> if (dy < -dragThr) { repo.closeShade(); true } else false },
+                onTap = { repo.closeShade() },
+            ) {
+                Box(Modifier.matchParentSize(), contentAlignment = Alignment.Center) { GoldHandle() }
+            }
+            val clear = stringResource(R.string.l_notif_clear_all)
+            Box(Modifier.align(Alignment.CenterEnd).padding(end = m.dp(px(8f)))) {
+                Pressable(
+                    Modifier.height(m.dp(s.t)).clip(RoundedCornerShape(m.dp(s.t / 2))),
+                    description = clear, focusShape = RoundedCornerShape(m.dp(s.t / 2)), onTap = { repo.clearAll() },
+                ) { pressed ->
+                    if (pressed) Box(Modifier.matchParentSize().background(Pal.SURFACE_PRESSED))
+                    Box(Modifier.height(m.dp(s.t)).padding(horizontal = m.dp(px(24f))), contentAlignment = Alignment.Center) {
+                        Txt(clear, s.f2, color = Pal.SEC2, ellipsis = false)
+                    }
+                }
+            }
+        }
+    }
+}
+
+/** Строка шторки: тап - раскрыть/свернуть текст, смахнуть вбок или × - убрать; в раскрытой - «Открыть в приложении». */
+@Composable
+private fun NotifRow(item: NotifItem, expanded: Boolean) {
+    val m = LocalMetrics.current
+    val s = m.spec
+    val k = s.t / 96f
+    fun px(v: Float) = Math.round(v * k)
+    val repo = NotificationsRepo
+    val e = item.entry
+    val launch = if (expanded) repo.launchRef(e.pkg) else null
+    Column(Modifier.fillMaxWidth()) {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            // cooperative: список под строками прокручивается пальцем; сдвиг по горизонтали дальше порога убирает строку
+            Pressable(
+                Modifier.weight(1f).heightIn(min = m.dp(s.t)),
+                description = e.who + ": " + e.text,
+                cooperative = true,
+                onSwipe = { dx, dy -> if (abs(dx) > px(80f) && abs(dx) > 2 * abs(dy)) { repo.dismiss(item.key); true } else false },
+                onTap = { repo.toggleExpanded(item.key) },
+            ) { pressed ->
+                if (pressed) Box(Modifier.matchParentSize().background(Pal.SURFACE_PRESSED))
+                Row(
+                    Modifier.fillMaxWidth().padding(start = m.dp(px(16f)), end = m.dp(px(8f)), top = m.dp(px(14f)), bottom = m.dp(px(14f))),
+                    verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(m.dp(px(24f))),
+                ) {
+                    NotifAvatar(item, px(64f))
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(m.dp(2))) {
+                        Txt(e.who, s.f2, color = Pal.TEXT, weight = FontWeight.Bold)
+                        Txt(e.text, s.f2, color = Pal.SEC2, maxLines = if (expanded) 40 else 2)
+                    }
+                    Txt(NotificationsLogic.time(e.postTime), max(14, Math.round(s.f2 * 0.8f)), color = Pal.SEC2, weight = FontWeight.SemiBold, mono = true)
+                }
+            }
+            val dismiss = stringResource(R.string.l_notif_dismiss)
+            RoundButton(s.t, dismiss, onTap = { repo.dismiss(item.key) }) {
+                SvgIcon(Ico.CLOSE, s.ic / 2 + 2, Pal.SEC2, stroke = 2.4f)
+            }
+        }
+        if (launch != null) {
+            Box(Modifier.padding(start = m.dp(px(16f + 64f + 24f)), bottom = m.dp(px(16f)))) {
+                PillButton(stringResource(R.string.l_notif_open_in, item.appLabel), { repo.open(item) }, filled = false)
+            }
+        }
+        Box(Modifier.fillMaxWidth().height(m.dp(1)).background(LocalPalette.current.sep))
+    }
+}
+
+/** Аватар отправителя кругом и значок приложения в углу; аватара нет - иконка приложения скруглённым квадратом без значка. */
+@Composable
+private fun NotifAvatar(item: NotifItem, sizePx: Int) {
+    val m = LocalMetrics.current
+    val pal = LocalPalette.current
+    val size = m.dp(sizePx)
+    val av = item.avatar
+    val icon = item.appIcon
+    Box(Modifier.size(size)) {
+        when {
+            av != null -> Image(av, null, Modifier.fillMaxSize().clip(CircleShape))
+            icon != null -> Image(icon, null, Modifier.fillMaxSize().clip(RoundedCornerShape(size * 0.22f)))
+            else -> Box(Modifier.fillMaxSize().clip(CircleShape).background(Pal.SURFACE_HI), contentAlignment = Alignment.Center) {
+                Txt(item.entry.who.trim().take(1).uppercase(), Math.round(sizePx * 0.45f), weight = FontWeight.Bold)
+            }
+        }
+        if (av != null && icon != null) {
+            val badge = m.dp(Math.round(sizePx * 0.42f))
+            Image(
+                icon, null,
+                Modifier.align(Alignment.BottomEnd).offset(m.dp(Math.round(sizePx * 0.06f)), m.dp(Math.round(sizePx * 0.06f)))
+                    .size(badge).clip(CircleShape).border(m.dp(max(2, Math.round(sizePx * 0.04f))), pal.bar, CircleShape),
+            )
+        }
+    }
+}
+
+/** Золотая переливающаяся полоска 96x8 (при T 96) с мягким свечением; «Анимации кнопок» выключены - стоит спокойно. */
+@Composable
+private fun GoldHandle(modifier: Modifier = Modifier) {
+    val m = LocalMetrics.current
+    val t = m.spec.t
+    val lineW = t.toFloat()
+    val lineH = max(4, Math.round(t / 12f)).toFloat()
+    val pad = lineH * 1.6f
+    val anim = LauncherModel.animations
+    val tr = rememberInfiniteTransition(label = "gold-handle")
+    val shimmer = tr.animateFloat(0f, 1f, infiniteRepeatable(tween(2400, easing = LinearEasing)), label = "shimmer")
+    val glow = tr.animateFloat(0.35f, 0.85f, infiniteRepeatable(tween(1200, easing = FastOutSlowInEasing), RepeatMode.Reverse), label = "glow")
+    val density = androidx.compose.ui.platform.LocalDensity.current
+    val wDp = with(density) { (lineW + 2 * pad).toDp() }
+    val hDp = with(density) { (lineH + 2 * pad).toDp() }
+    Canvas(modifier.size(wDp, hDp)) {
+        val g = if (anim) glow.value else 0.55f
+        val x = if (anim) shimmer.value else 0.5f
+        val left = pad
+        val top = pad
+        // свечение: несколько расширяющихся слоёв всё прозрачнее
+        for (i in 3 downTo 1) {
+            val grow = lineH * 0.5f * i
+            drawRoundRect(
+                Pal.GOLD.copy(alpha = g * 0.10f), Offset(left - grow, top - grow),
+                Size(lineW + 2 * grow, lineH + 2 * grow), CornerRadius(lineH / 2 + grow),
+            )
+        }
+        // перелив: светлая полоса идёт слева направо, как background-position в макете
+        val cx = left + lineW * (x * 1.4f - 0.2f)
+        val half = lineW * 0.9f
+        val brush = Brush.horizontalGradient(
+            0f to Pal.GOLD, 0.35f to Pal.GOLD, 0.5f to GOLD_LIGHT, 0.65f to Pal.GOLD, 1f to Pal.GOLD,
+            startX = cx - half, endX = cx + half,
+        )
+        drawRoundRect(brush, Offset(left, top), Size(lineW, lineH), CornerRadius(lineH / 2))
+    }
+}
+
+private val GOLD_LIGHT = Color(0xFFFFF1B8)
+
+/**
+ * Панель из-под строки статуса: верхняя кромка во всю ширину (вровень с полосой), от неё вогнутые «уши» радиусом [ear]
+ * к телу, тело со скруглением [bottom] внизу. Размер области включает уши: тело уже на 2 * ear.
+ */
+private class NotchShape(private val ear: Float, private val bottom: Float) : Shape {
+    override fun createOutline(size: Size, layoutDirection: LayoutDirection, density: Density): Outline {
+        val w = size.width
+        val h = size.height
+        val r = min(ear, h / 2)
+        val b = max(0f, min(bottom, min((w - 2 * r) / 2, h - r)))
+        val path = Path().apply {
+            moveTo(0f, 0f)
+            lineTo(w, 0f)
+            arcTo(Rect(w - r, 0f, w + r, 2 * r), 270f, -90f, false)
+            lineTo(w - r, h - b)
+            arcTo(Rect(w - r - 2 * b, h - 2 * b, w - r, h), 0f, 90f, false)
+            lineTo(r + b, h)
+            arcTo(Rect(r, h - 2 * b, r + 2 * b, h), 90f, 90f, false)
+            lineTo(r, r)
+            arcTo(Rect(-r, 0f, r, 2 * r), 0f, -90f, false)
+            close()
+        }
+        return Outline.Generic(path)
+    }
+}

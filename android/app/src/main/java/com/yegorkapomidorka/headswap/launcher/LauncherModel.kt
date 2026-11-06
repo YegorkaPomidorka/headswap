@@ -57,6 +57,8 @@ internal object LauncherModel {
     var mapLeft by mutableStateOf(false)
     var animations by mutableStateOf(true)
     var autoplay by mutableStateOf(true)
+    /** «Уведомления» телефона на экране ГУ (слушатель - [NotificationsRepo]). */
+    var notifications by mutableStateOf(true)
     var localPlayer by mutableStateOf<String?>(null)
     var onlinePlayer by mutableStateOf<String?>(null)
     /** Режим темы ГУ (CHANGE_MD_THEME, 0 день, 1 ночь, 2 авто); null - ГУ ещё не присылала. Обновляет [LauncherRoot]. */
@@ -102,6 +104,8 @@ internal object LauncherModel {
     /** Область справа от рейки и карточка навигации - в координатах корня Compose. */
     var areaRect by mutableStateOf<Rect?>(null)
     var navCardRect by mutableStateOf<Rect?>(null)
+    /** Нижний край сплошной строки статуса в координатах корня; null - на этом экране строки нет (оверлей уведомлений вешается на верх области). */
+    var statusBottom by mutableStateOf<Float?>(null)
 
     /** Чужой лаунчер из DexPrefs.desktopComponent в окне над панелью навигации; null - наш рабочий стол. Ведёт [ForeignActions]. */
     var foreign by mutableStateOf<AppRef?>(null)
@@ -153,6 +157,8 @@ internal object LauncherModel {
         mapLeft = prefs.mapLeft
         animations = prefs.animations
         autoplay = prefs.autoplay
+        notifications = prefs.notifications
+        NotificationsRepo.setEnabled(notifications)
         localPlayer = prefs.localPlayer
         onlinePlayer = prefs.onlinePlayer
         cardView = prefs.cardView
@@ -223,6 +229,7 @@ internal object LauncherModel {
     fun chooseMapLeft(left: Boolean) { mapLeft = left; prefs.mapLeft = left }
     fun chooseAnimations(on: Boolean) { animations = on; prefs.animations = on }
     fun chooseAutoplay(on: Boolean) { autoplay = on; prefs.autoplay = on }
+    fun chooseNotifications(on: Boolean) { notifications = on; prefs.notifications = on; NotificationsRepo.setEnabled(on) }
     fun chooseLocalPlayer(pkg: String?) { localPlayer = pkg; prefs.localPlayer = pkg }
     fun chooseOnlinePlayer(pkg: String?) { onlinePlayer = pkg; prefs.onlinePlayer = pkg }
     private val currentTiles: HomeTiles get() = HomeTiles(cardView, smallView, tileApp)

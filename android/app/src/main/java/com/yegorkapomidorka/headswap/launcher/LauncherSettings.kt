@@ -204,7 +204,10 @@ fun LauncherSettingsScreen() {
                         SettingsPage.SYSTEM -> {
                             val info = systemInfo()
                             for ((i, row) in info.withIndex()) InfoCard(row.first, row.second, d, cell(i).fillMaxWidth())
-                            Placed(info.size) { AboutLinkCard(d, Modifier) }
+                            SwitchCard(stringResource(R.string.l_s_notifications), model.notifications, d, cell(info.size).fillMaxWidth()) {
+                                model.chooseNotifications(it)
+                            }
+                            Placed(info.size + 1) { AboutLinkCard(d, Modifier) }
                         }
                         SettingsPage.ABOUT -> AboutPanel(d, rowH)
                     }
@@ -699,8 +702,7 @@ private fun systemInfo(): List<Pair<String, String>> {
     return listOf(
         stringResource(R.string.l_s_hu) to hu,
         stringResource(R.string.l_s_link) to link,
-        // телефон кодирует свой экран один раз и отдаёт ГУ готовый H.264 - по сути прямой проброс
-        stringResource(R.string.l_s_video) to stringResource(R.string.set_direct_title),
+        // строка «Видео: прямой проброс» убрана: в пятирядной сетке место понадобилось переключателю «Уведомления»
         stringResource(R.string.l_s_res) to res,
     )
 }
