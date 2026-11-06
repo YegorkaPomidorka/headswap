@@ -43,9 +43,21 @@ import com.yegorkapomidorka.headswap.update.Updater
  * (`--es cmd ...`). Вся работа с сервисами и USB - в ui.Actions, экраны - в пакете ui.
  */
 class MainActivity : Activity() {
+    /** Контекст activity до обёрток языка и темы: его outer context - сама activity. */
+    private var rawBase: Context? = null
+
     override fun attachBaseContext(base: Context) {
+        rawBase = base
         super.attachBaseContext(AppTheme.wrap(AppLocale.wrap(base)))
     }
+
+    /**
+     * CompanionDeviceManager берётся из необёрнутого контекста: у обёртки createConfigurationContext outer context -
+     * ContextImpl, а associate на API 29-32 приводит его к Activity и падает ClassCastException (выбор машины, Huawei A12).
+     */
+    override fun getSystemService(name: String): Any? =
+        if (name == Context.COMPANION_DEVICE_SERVICE) rawBase?.getSystemService(name) ?: super.getSystemService(name)
+        else super.getSystemService(name)
 
     private lateinit var root: FrameLayout
     private val stack = ArrayList<Screen>()
