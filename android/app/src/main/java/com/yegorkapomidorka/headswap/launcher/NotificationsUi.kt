@@ -55,6 +55,7 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Density
@@ -121,7 +122,12 @@ fun NotificationsOverlay() {
     val topY = model.statusBottom ?: area.top
     val ear = px(32f)
     val barCy = (model.statusBottom ?: area.top) - s.statusBandH / 2f
-    val centerX = area.center.x
+    // Егор 06.11: полоска и язычок — над стыком плиток верхнего ряда на главном (между музыкой и картой), а не по центру области.
+    // На других экранах со строкой статуса (настройки, вызовы) стыка нет — по центру.
+    val big = model.bigTileRect
+    val centerX = if (model.area == Area.Home && big != null && big.width > 0f) {
+        if (big.left - area.left > s.g) big.left - s.g / 2f else big.right + s.g / 2f
+    } else area.center.x
     val dragThr = px(30f).toFloat()
 
     Ltr {
@@ -163,7 +169,12 @@ fun NotificationsOverlay() {
                     val (minW, maxW) = NotifGeom.tongueWidth(s.t, Math.round(area.width), ear, s.g)
                     val inShade = open || (shown.shade && !show)
                     Column(
-                        Modifier.align(Alignment.TopCenter)
+                        // по центру над стыком плиток, но не вылезая за область справа от рейки
+                        Modifier.layout { measurable, constraints ->
+                            val pl = measurable.measure(constraints.copy(minWidth = 0))
+                            val x = Math.round(centerX - area.left - pl.width / 2f).coerceIn(0, max(0, constraints.maxWidth - pl.width))
+                            layout(constraints.maxWidth, pl.height) { pl.place(x, 0) }
+                        }
                             .graphicsLayer { translationY = -size.height * (1f - p.value) }
                             .shadow(m.dp(px(12f)), shape, clip = false)
                             .clip(shape).background(pal.bar, shape)
