@@ -62,6 +62,7 @@ public final class ManualAccessLauncher {
                 check(lock != null, "Другая ручная активация ещё выполняется. Дождитесь её завершения.");
                 int uid = packageUid(options.packageName);
                 activate(uid, options);
+                grantNotificationAccess(options.packageName);
                 try {
                     String opened = run(5000, prepend("am", ManualAccessPolicy.openAppArguments(options.packageName)));
                     if (opened.contains("Error:") || opened.contains("Exception")) throw new IOException("Activity launch rejected");
@@ -145,6 +146,27 @@ public final class ManualAccessLauncher {
             }
             // Never force-stop the app, kill by process name, or destroy an unverified launcher PID.
             try { launcher.getInputStream().close(); } catch (IOException ignored) { }
+        }
+    }
+
+    /**
+     * Phone notifications on the head unit screen: the listener is enabled from the shell, like the other grants, and
+     * (Android 15+) allowed to see sensitive content such as one-time codes. Optional: any failure is only reported,
+     * the activation itself never depends on it.
+     */
+    private static void grantNotificationAccess(String packageName) {
+        try {
+            run(5000, "cmd", "notification", "allow_listener", ManualAccessPolicy.notificationListener(packageName));
+        } catch (Exception error) {
+            System.out.println("Уведомления на экране ГУ: доступ не выдан (" + safe(error.getMessage()) + ").");
+        }
+        // The op appeared in Android 15; older systems have nothing to allow and would print a spurious error.
+        if (Build.VERSION.SDK_INT >= 35) {
+            try {
+                run(5000, "appops", "set", packageName, "RECEIVE_SENSITIVE_NOTIFICATIONS", "allow");
+            } catch (Exception error) {
+                System.out.println("Уведомления на экране ГУ: содержимое скрытых уведомлений недоступно (" + safe(error.getMessage()) + ").");
+            }
         }
     }
 

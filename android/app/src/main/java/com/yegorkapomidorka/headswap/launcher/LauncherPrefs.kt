@@ -62,6 +62,11 @@ class LauncherPrefs(context: Context) {
         get() = prefs.getBoolean("autoplay", true)
         set(value) { prefs.edit().putBoolean("autoplay", value).apply() }
 
+    /** «Уведомления» телефона на экране ГУ. */
+    var notifications: Boolean
+        get() = prefs.getBoolean("notifications", true)
+        set(value) { prefs.edit().putBoolean("notifications", value).apply() }
+
     /** Первый слот чипа плееров: свой плеер на телефоне; null - первый найденный. */
     var localPlayer: String?
         get() = prefs.getString("local_player", null)
