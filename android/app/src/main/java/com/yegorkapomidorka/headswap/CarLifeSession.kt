@@ -1227,10 +1227,11 @@ class CarLifeSession(
             AppLog.i("TOUCH action=${t.action} пальцев=$n тело=${m.body.size} байт", false)
             lastMoveFingers = if (t.masked == 2) n else 0
         }
-        // h725: Honda Civic 2021 (20772104) шлёт каждое касание как DOWN, DOWN, UP с теми же x,y.
+        // Honda (h725 Civic 20772104, h864 XR-V 20772122) шлёт каждое касание как DOWN, DOWN, UP с теми же x,y.
         // Повтор DOWN без UP лаунчер считает вторым нажатием: «Настройки» мигают, «Назад» двойное.
-        // Только под эту ГУ: ГУ, теряющую UP, повтор DOWN сейчас «лечит».
-        if (!bridge.huHonda20772104) {
+        // По умолчанию фильтр только у Honda, переопределяется в «Для разработчиков» (DupDownFilter).
+        // Для всех ГУ не включаем: ГУ, теряющую UP, повтор DOWN сейчас «лечит».
+        if (!bridge.dupDownFilterActive()) {
             singleDownHeld = false
         } else if (n == 1 && t.masked == 0) {
             if (singleDownHeld && t.x == singleDownX && t.y == singleDownY) {
