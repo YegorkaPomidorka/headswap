@@ -346,7 +346,7 @@ class AaBridgeCore(
     @Volatile var huVwCns2Delphi = false       // VW CNS2 Delphi 20082114 (h425): речь AA в голосовой сессии молчит в TTS, шлём в VR
     @Volatile var huIdleVideoHeartbeat = false // 20082114 (h425), Skoda CNS3 21290002 (h625): без видео 5-6 с рвёт USB и вне PAUSE
     private var vrReply = false                // поток ответа ассистента открыт в канале VR (VR_INIT ушёл)
-    @Volatile var huVw20082120 = false        // VW (STATISTIC_INFO channel 20082120 h93, 20082122 h222): без heartbeat рвёт USB через 3,7-5,6 с PAUSE
+    @Volatile var huVw20082120 = false        // VW (STATISTIC_INFO channel 20082120 h93, 20082122 h222, 20082130 h897, 20082134 h224): без heartbeat рвёт USB через 3,7-5,6 с PAUSE
         private set
     @Volatile var huVw20082138 = false         // VW ID (channel 20082138 кроме "VW BT 1420"; ID.6 Crozz: 20082128 + "VW BT 9491"; пресет ID. UNYX): IDR > ~600 КиБ рвёт USB EIO
         private set
@@ -726,7 +726,8 @@ class AaBridgeCore(
     /**
      * MODULE_CONTROL MUSIC в режиме рабочего стола: AA нет, музыку играет плеер телефона. MUSIC=0 - ГУ ушло на свой
      * источник или гаснет (Vezel шлёт его за ~1 с до обрыва USB при выключении машины, лог 2026-11-03): плеер на паузу.
-     * MUSIC=1 - ГУ вернулось на CarLife-музыку: MEDIA снова пересылаем, а Desay G6S/Vezel после нашей паузы - play.
+     * MUSIC=1 - ГУ вернулось на CarLife-музыку: MEDIA снова пересылаем, а Desay G6S/Vezel/VW CNS3 после нашей паузы - play
+     * (CNS3 h897: после радио плеер оставался на паузе). На START без MUSIC=1 play не шлём (h33).
      */
     private fun onDesktopMusicControl(media: DesktopMedia, status: Int?): Boolean {
         val now = clockMs()
@@ -749,7 +750,7 @@ class AaBridgeCore(
         if (status == 1 && huPausedAa) {
             huPausedAa = false
             callPausedAa = false
-            if (HU_MUSIC_RESUME_ENABLED && resumeOnHuMusic && (huDesayG6S || huHondaVezel)) {
+            if (HU_MUSIC_RESUME_ENABLED && resumeOnHuMusic && (huDesayG6S || huHondaVezel || huVw20082120)) {
                 resumeOnHuMusic = false
                 lastHuResumeMs = now
                 lastUserInputMs = now
@@ -954,8 +955,8 @@ class AaBridgeCore(
             huMazda20622111 = true
             log("BRIDGE ГУ Mazda 20622111: VIDEO_DATA режу на куски ≤ $MAZDA_20622111_MAX_VIDEO_PACKET Б, потолок ${MAZDA_20622111_CEILING_BPS / 1000} кбит/с", true)
         }
-        if (channel == VW_20082120_CHANNEL || channel == VW_CNS3_20082122_CHANNEL || channel == VW_CNS3_20082134_CHANNEL ||
-            channel == VW_CNS2_20082114_CHANNEL || channel == SKODA_CNS3_21290002_CHANNEL) huVw20082120 = true
+        if (channel == VW_20082120_CHANNEL || channel == VW_CNS3_20082122_CHANNEL || channel == VW_CNS3_20082130_CHANNEL ||
+            channel == VW_CNS3_20082134_CHANNEL || channel == VW_CNS2_20082114_CHANNEL || channel == SKODA_CNS3_21290002_CHANNEL) huVw20082120 = true
         if (channel == VW_CNS2_20082114_CHANNEL || channel == SKODA_CNS3_21290002_CHANNEL) huIdleVideoHeartbeat = true
         if (channel == VW_CNS2_20082114_CHANNEL && !huVwCns2Delphi) {
             huVwCns2Delphi = true
@@ -3161,6 +3162,7 @@ class AaBridgeCore(
         const val KIA_20032131_CHANNEL = "20032131"       // Kia Seltos 2026 Китай, QTI sm6150_au madison (h672)
         const val VW_20082120_CHANNEL = "20082120"        // VW, protocol 1.0, versionName="RADIO" (h93)
         const val VW_CNS3_20082122_CHANNEL = "20082122"   // VW CNS3 (Tharu и др.): рвёт USB через ~5,6 с PAUSE без heartbeat (h222)
+        const val VW_CNS3_20082130_CHANNEL = "20082130"   // VW CNS3 (Lamando L, Octavia h897): по Wi-Fi рвёт CarLife через ~5,5 с без трафика (PAUSE + MUSIC=0)
         const val VW_CNS3_20082134_CHANNEL = "20082134"   // VW CNS3 Tiguan L Pro: рвёт CarLife по Wi-Fi через ~5,1-5,7 с PAUSE (h224)
         const val VW_CNS2_20082114_CHANNEL = "20082114"   // VW CNS2 Delphi (Tharu 2020): рвёт USB через 6-8 с PAUSE (h425)
         const val SKODA_CNS3_21290002_CHANNEL = "21290002" // Skoda Octavia Pro CNS3: рвёт USB через 5-6 с PAUSE и статичного AA (h625)
