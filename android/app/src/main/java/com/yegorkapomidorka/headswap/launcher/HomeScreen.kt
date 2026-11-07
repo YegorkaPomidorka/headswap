@@ -39,13 +39,11 @@ import com.yegorkapomidorka.headswap.R
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
-/** Подложка карточки главного экрана. */
+/** Подложка карточки главного экрана. Содержимое следует направлению языка; физические куски (медиа-ряд) берут [Ltr] сами. */
 @Composable
 fun CardBox(modifier: Modifier = Modifier, background: Color = Pal.SURFACE, shape: Shape? = null, content: @Composable BoxScope.() -> Unit) {
     val m = LocalMetrics.current
-    Box(modifier.clip(shape ?: RoundedCornerShape(m.dp(m.spec.radius))).background(background)) {
-        Ltr { content() }
-    }
+    Box(modifier.clip(shape ?: RoundedCornerShape(m.dp(m.spec.radius))).background(background), content = content)
 }
 
 /**
@@ -60,6 +58,8 @@ fun HomeScreen() {
     val model = LauncherModel
     val layout = model.homeLayout
     val tiles = model.tiles
+    // «Карта слева» и «2 : 1» - физические стороны экрана при любом языке: в RTL Row кладёт первую плашку справа
+    val rtl = localeRtl()
     // нижний ряд прибит к краю экрана, как блок навигации на рейке: снизу без поля
     Column(Modifier.fillMaxSize().padding(start = m.dp(s.g), top = m.dp(s.g8), end = m.dp(s.m),
         bottom = m.dp(if (s.strip || layout.two) s.m else 0))) {
@@ -74,12 +74,12 @@ fun HomeScreen() {
                     { TileCard(tiles.small, Modifier.width(m.dp(s.tileSmall)).fillMaxHeight()
                         .onGloballyPositioned { model.smallTileRect = it.boundsInRoot() }, small = true) },
                 )
-                for (cell in if (layout == HomeLayout.WIDE_LEFT) cells else cells.asReversed()) cell(this)
+                for (cell in if ((layout == HomeLayout.WIDE_LEFT) != rtl) cells else cells.asReversed()) cell(this)
             }
             return@Column
         }
-        // «Карта слева»: оба ряда в обратном порядке (row-reverse), рейка и содержимое карточек не зеркалятся
-        val mirror = model.mapLeft
+        // «Карта слева»: оба ряда в обратном порядке (row-reverse); в RTL Row уже кладёт первое справа, порядок обратный
+        val mirror = model.mapLeft != rtl
         Row(Modifier.weight(1f).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(m.dp(s.g))) {
             val top = buildList<@Composable RowScope.() -> Unit> {
                 add { MusicCard(Modifier.width(m.dp(s.music)).fillMaxHeight()) }

@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- update/Updater.kt: settings, home banner, dialogs -->
+    <string name="upd_title">التحديثات</string>
+    <string name="upd_check_title">البحث عن تحديثات</string>
+    <string name="upd_check_sub">البحث عن إصدار جديد على GitHub عند فتح التطبيق</string>
+    <string name="upd_status_never">لم يتم الفحص بعد</string>
+    <string name="upd_status_latest">لديك أحدث إصدار</string>
+    <string name="upd_status_checking">جارٍ الفحص…</string>
+    <string name="upd_status_available">الإصدار %1$s متاح</string>
+    <string name="upd_status_downloading">جارٍ تنزيل %1$s… %2$d%%</string>
+    <string name="upd_status_installing">جارٍ فتح المثبّت…</string>
+    <string name="upd_btn_check">فحص</string>
+    <string name="upd_btn_update">تحديث</string>
+    <string name="upd_btn_update_now">تحديث الآن</string>
+    <string name="upd_banner_sub">اضغط للتحديث، وستبقى الإعدادات</string>
+    <string name="upd_later">لاحقًا</string>
+
+    <string name="upd_dialog_title">Headswap %1$s</string>
+    <string name="upd_dialog_size">التنزيل: %1$s. يُثبَّت التحديث فوق الإصدار الحالي وتبقى الإعدادات.</string>
+    <string name="upd_dialog_no_size">يُثبَّت التحديث فوق الإصدار الحالي وتبقى الإعدادات.</string>
+    <string name="upd_dialog_bridge">السيارة متصلة الآن: سيقطع التحديث الاتصال.</string>
+    <string name="upd_unknown_title">السماح بتثبيت التحديثات</string>
+    <string name="upd_unknown_message">ستُفتح إعدادات Android: فعّل «السماح من هذا المصدر» لتطبيق Headswap، ثم ارجع واضغط «تحديث» مرة أخرى.</string>
+
+    <string name="upd_err_check">تعذّر الفحص: %1$s</string>
+    <string name="upd_err_download">تعذّر تنزيل التحديث: %1$s</string>
+    <string name="upd_err_install">تعذّر تثبيت التحديث: %1$s</string>
+    <string name="upd_err_no_release">لا توجد إصدارات على GitHub بعد</string>
+    <string name="upd_err_no_apk">لا يحتوي الإصدار %1$s على APK</string>
+    <string name="upd_err_incomplete">لم يكتمل تنزيل الملف</string>
+    <string name="upd_err_checksum">مجموع التحقق غير مطابق</string>
+    <string name="upd_err_not_apk">الملف ليس APK لتطبيق Headswap</string>
+    <string name="upd_err_not_newer">الإصدار على GitHub (%1$s) ليس أحدث من الإصدار المثبّت (%2$s)</string>
+    <string name="upd_err_conflict">تعارض مع التطبيق المثبّت (موقّع بمفتاح مختلف؟)</string>
+</resources>

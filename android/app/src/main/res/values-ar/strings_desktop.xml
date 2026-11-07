@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- BridgeService, режим Headswap Desktop -->
+    <string name="desk_not_activated">Headswap Desktop غير مفعّل: افتح الإعدادات ← الوضع واضغط «تفعيل»</string>
+    <string name="desk_cert_na">غير مطلوبة (سطح المكتب)</string>
+    <string name="desk_connecting">جارٍ تشغيل سطح المكتب…</string>
+    <string name="desk_waiting_frame">سطح المكتب: بانتظار إطار…</string>
+    <string name="desk_disconnected">انقطع اتصال سطح المكتب. أوقف التشغيل ثم اتصل مرة أخرى.</string>
+    <string name="desk_recovering">جارٍ استعادة سطح المكتب (%1$d/2)…</string>
+    <string name="desk_recovery_stopped">توقفت الاستعادة. تحقق من USB والوصول إلى سطح المكتب وافتح قفل الهاتف</string>
+    <string name="desk_recovery_screen_busy">لم يتم تحرير الشاشة السابقة بعد؛ أُلغيت الاستعادة التلقائية</string>
+
+    <!-- Activation from the phone itself (wireless debugging), Settings - Mode -->
+    <string name="pa_title">تفعيل Headswap</string>
+    <string name="pa_step_1">افتح «خيارات المطوّر» ← «تصحيح الأخطاء اللاسلكي» وفعّله.</string>
+    <string name="pa_step_2">اضغط «إقران الجهاز برمز الإقران».</string>
+    <string name="pa_step_3">اكتب الرمز في إشعار Headswap.</string>
+    <string name="pa_step_paired">اضغط «تفعيل». الهاتف مقترن بالفعل، ولا حاجة إلى رمز.</string>
+    <string name="pa_hint">كرّر التفعيل بعد إعادة تشغيل الهاتف.</string>
+    <string name="pa_button">تفعيل</string>
+    <string name="pa_button_again">تفعيل مرة أخرى</string>
+    <string name="pa_cancel">إلغاء</string>
+    <string name="pa_manual_toggle">إدخال المنفذ والرمز يدويًا</string>
+    <string name="pa_manual_hint">المنفذ والرمز من نافذة الإقران. بعد الإقران يكفي منفذ تصحيح الأخطاء.</string>
+    <string name="pa_field_pair_port">منفذ الإقران</string>
+    <string name="pa_field_code">رمز من ستة أرقام</string>
+    <string name="pa_field_connect_port">منفذ تصحيح الأخطاء اللاسلكي</string>
+    <string name="pa_manual_go">تفعيل بهذه القيم</string>
+    <string name="pa_forget">إقران من جديد</string>
+    <string name="pa_forget_done">تم نسيان الإقران. سيطلب Headswap رمزًا جديدًا في المرة القادمة.</string>
+    <string name="pa_need_notif">اسمح بإشعارات Headswap: يُكتب رمز الإقران في أحدها. أو أدخل المنفذ والرمز يدويًا.</string>
+    <string name="pa_need_wifi_debug">فعّل «تصحيح الأخطاء اللاسلكي» في خيارات المطوّر (تصلح أي شبكة Wi-Fi، ولا حاجة إلى الإنترنت)، ثم اضغط «تفعيل» مرة أخرى.</string>
+    <string name="pa_field_bad_port">المنفذ: من 1 إلى 65535</string>
+    <string name="pa_field_bad_code">ستة أرقام</string>
+
+    <string name="pa_s_searching">جارٍ البحث عن تصحيح الأخطاء اللاسلكي…</string>
+    <string name="pa_s_wait_code">بانتظار رمز الإقران: اكتبه في إشعار Headswap.</string>
+    <string name="pa_s_pairing">جارٍ الإقران…</string>
+    <string name="pa_s_connecting">جارٍ الاتصال بتصحيح الأخطاء اللاسلكي…</string>
+    <string name="pa_s_starting">جارٍ تشغيل سطح المكتب. قد يُعاد تشغيل Headswap.</string>
+    <string name="pa_s_pending">بانتظار تأكيد الوصول من Headswap بعد إعادة تشغيله…</string>
+    <string name="pa_s_failed">لم يتم التفعيل: %1$s</string>
+    <string name="pa_s_expired">لم يكتمل التفعيل. افتح الإعدادات ← الوضع واضغط «تفعيل» مرة أخرى.</string>
+    <string name="pa_s_expired_why">لم يكتمل التفعيل: %1$s</string>
+
+    <string name="pa_notif_channel_progress">التفعيل من الهاتف</string>
+    <string name="pa_notif_channel_code">رمز الإقران</string>
+    <string name="pa_notif_title">تفعيل Headswap Desktop</string>
+    <string name="pa_notif_cancel">إلغاء</string>
+    <string name="pa_notif_code_title">أدخل رمز الإقران</string>
+    <string name="pa_notif_code_text">في «تصحيح الأخطاء اللاسلكي» اضغط «إقران الجهاز برمز الإقران»، ثم اكتب الأرقام الستة هنا.</string>
+    <string name="pa_notif_code_error">%1$s اكتب الرمز مرة أخرى.</string>
+    <string name="pa_notif_code_label">رمز من ستة أرقام</string>
+    <string name="pa_notif_reply">إدخال الرمز</string>
+    <string name="pa_notif_done">تم تفعيل Headswap Desktop</string>
+
+    <string name="pa_err_no_wifi">لا يوجد Wi-Fi. يعمل تصحيح الأخطاء اللاسلكي عبر Wi-Fi فقط: اتصل بشبكة وأعد المحاولة.</string>
+    <string name="pa_err_port">يجب أن يكون المنفذ رقمًا من 1 إلى 65535.</string>
+    <string name="pa_err_code">الرمز مكوّن من ستة أرقام من نافذة الإقران في النظام.</string>
+    <string name="pa_err_no_pair_port">لم يتم العثور على نافذة الإقران. أبقِ «إقران الجهاز برمز الإقران» مفتوحة أثناء كتابة الرمز. في Android 17 اسمح لـ Headswap بالوصول إلى الشبكة المحلية، أو أدخل المنفذ يدويًا.</string>
+    <string name="pa_err_no_connect_port">تصحيح الأخطاء اللاسلكي متوقف أو غير موجود. فعّل «تصحيح الأخطاء اللاسلكي» في خيارات المطوّر (يجب تشغيل Wi-Fi)، أو أدخل المنفذ يدويًا.</string>
+    <string name="pa_err_refused">المنفذ مغلق: تصحيح الأخطاء اللاسلكي متوقف أو تغيّر المنفذ. تحقق من شاشة تصحيح الأخطاء اللاسلكي.</string>
+    <string name="pa_err_timeout">لا توجد استجابة في الوقت المحدد. تحقق من Wi-Fi ومن تشغيل تصحيح الأخطاء اللاسلكي.</string>
+    <string name="pa_err_permission">حظر Android الاتصال بالشبكة. اسمح لـ Headswap بالوصول إلى الشبكة المحلية وأعد المحاولة.</string>
+    <string name="pa_err_pair_rejected">الرمز خاطئ أو أُغلقت نافذة الإقران. افتحها مرة أخرى واستخدم الرمز الجديد.</string>
+    <string name="pa_err_not_paired">لم يعد الهاتف يعرف هذا الجهاز. أعد الإقران برمز جديد.</string>
+    <string name="pa_err_tls">رُفض الاتصال الآمن. تحقق من تصحيح الأخطاء اللاسلكي وأعد الإقران عند الحاجة.</string>
+    <string name="pa_err_tls_provider">تعطّل مكوّن TLS في النظام. احفظ السجل وأبلغ عن المشكلة.</string>
+    <string name="pa_err_closed">أغلق الهاتف الاتصال. تحقق من المنفذ في شاشة تصحيح الأخطاء اللاسلكي.</string>
+    <string name="pa_err_identity">يتعذر قراءة مفتاح ADB المحفوظ. أعد الإقران.</string>
+    <string name="pa_err_shell">لم يمنح تصحيح الأخطاء اللاسلكي وصولًا إلى shell. تحقق من قائمة الأجهزة المقترنة.</string>
+    <string name="pa_err_package">تغيّر Headswap المثبّت. افتح التطبيق مرة أخرى وأعد المحاولة.</string>
+    <string name="pa_err_unsupported">لا يمكن لنظام هذا الجهاز بدء التفعيل من الهاتف.</string>
+    <string name="pa_err_dispatch">لم يتم تأكيد التشغيل. افتح الإعدادات ← الوضع واضغط «تفعيل» مرة أخرى.</string>
+    <string name="pa_err_io">فشل التواصل مع تصحيح الأخطاء اللاسلكي. احفظ السجل وأعد المحاولة.</string>
+    <string name="pa_err_internal">خطأ داخلي أثناء تجهيز الاتصال. احفظ السجل وأعد المحاولة.</string>
+    <string name="pa_need_usb_debug">في Android 17 فعّل أيضًا «تصحيح أخطاء USB» في خيارات المطوّر (مع إبقاء تصحيح الأخطاء اللاسلكي مفعّلًا): بدونه قد تنطفئ شاشة السيارة مع شاشة الهاتف. ثم اضغط «تفعيل» مرة أخرى.</string>
+</resources>

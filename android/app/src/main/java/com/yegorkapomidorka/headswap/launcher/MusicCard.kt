@@ -100,9 +100,12 @@ fun MusicCard(modifier: Modifier) {
     CardBox(modifier, background = Color.Transparent) {
         Box(Modifier.fillMaxSize().musicBackground())
         if (st.art == null) {
-            BoxWithConstraints(Modifier.fillMaxSize()) {
-                SvgIcon(Ico.MUSIC, s.cover, Pal.WHITE.copy(alpha = 0.3f), stroke = 1.2f,
-                    modifier = Modifier.offset(maxWidth * 0.32f, maxHeight * 0.22f))
+            // нота лежит у золотого пятна фона, а оно нарисовано физически: Ltr, чтобы в RTL нота не уезжала от него
+            Ltr {
+                BoxWithConstraints(Modifier.fillMaxSize()) {
+                    SvgIcon(Ico.MUSIC, s.cover, Pal.WHITE.copy(alpha = 0.3f), stroke = 1.2f,
+                        modifier = Modifier.offset(maxWidth * 0.32f, maxHeight * 0.22f))
+                }
             }
         }
         st.art?.let { Image(it, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop) }
@@ -128,24 +131,27 @@ fun MusicCard(modifier: Modifier) {
                 }
             }
         }
-        Row(
-            Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(bottom = m.dp(s.g8)).height(m.dp(s.t)),
-            verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceEvenly,
-        ) {
-            if (st.hasSession) {
-                RoundButton(s.tp, stringResource(R.string.l_prev), onTap = { MusicController.previous() }) {
-                    SvgIcon(Ico.PREV, s.tpIc, Pal.WHITE, fill = true)
+        // prev / play / next всегда слева направо, как значки плеера: ряд создаётся внутри Ltr
+        Ltr {
+            Row(
+                Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(bottom = m.dp(s.g8)).height(m.dp(s.t)),
+                verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceEvenly,
+            ) {
+                if (st.hasSession) {
+                    RoundButton(s.tp, stringResource(R.string.l_prev), onTap = { MusicController.previous() }) {
+                        SvgIcon(Ico.PREV, s.tpIc, Pal.WHITE, fill = true)
+                    }
                 }
-            }
-            if (st.hasSession || (st.access && player != null)) {
-                RoundButton(s.t, stringResource(if (st.playing) R.string.l_pause else R.string.l_play),
-                    onTap = { MusicController.playPause(ctx, player) }, background = Color(0x29FFFFFF)) {
-                    SvgIcon(if (st.playing) Ico.PAUSE else Ico.PLAY, s.ic, Pal.WHITE, fill = true)
+                if (st.hasSession || (st.access && player != null)) {
+                    RoundButton(s.t, stringResource(if (st.playing) R.string.l_pause else R.string.l_play),
+                        onTap = { MusicController.playPause(ctx, player) }, background = Color(0x29FFFFFF)) {
+                        SvgIcon(if (st.playing) Ico.PAUSE else Ico.PLAY, s.ic, Pal.WHITE, fill = true)
+                    }
                 }
-            }
-            if (st.hasSession) {
-                RoundButton(s.tp, stringResource(R.string.l_next), onTap = { MusicController.next() }) {
-                    SvgIcon(Ico.NEXT, s.tpIc, Pal.WHITE, fill = true)
+                if (st.hasSession) {
+                    RoundButton(s.tp, stringResource(R.string.l_next), onTap = { MusicController.next() }) {
+                        SvgIcon(Ico.NEXT, s.tpIc, Pal.WHITE, fill = true)
+                    }
                 }
             }
         }

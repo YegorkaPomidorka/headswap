@@ -1,0 +1,288 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Settings screen -->
+    <string name="set_title">الإعدادات</string>
+    <string name="set_back">رجوع</string>
+
+    <string name="theme_title">السمة</string>
+    <string name="theme_system">النظام</string>
+    <string name="theme_light">فاتحة</string>
+    <string name="theme_medium">متوسطة</string>
+    <string name="theme_dark">داكنة</string>
+
+    <string name="set_sound">الصوت</string>
+    <string name="set_usb_audio_title">الصوت عبر Headswap</string>
+    <string name="set_usb_audio_sub">إلى مكبرات السيارة عبر الكابل أو Wi-Fi. عند الإيقاف: عبر Bluetooth</string>
+    <string name="set_usb_audio_desktop">للحصول على صوت سطح المكتب، فعّل الوصول مرة أخرى. حتى ذلك الحين يُشغَّل الصوت عبر Bluetooth</string>
+    <string name="set_calls_title">إبلاغ شاشة السيارة بالمكالمات</string>
+    <string name="set_calls_sub">يتطلب إذن «الهاتف»: يعلم Headswap بالمكالمة الواردة ويبلغ بها السيارة، ويُكتم صوت الموسيقى أثناء المكالمة</string>
+
+    <string name="eq_title">المعادل الصوتي</string>
+    <string name="eq_presets">الإعداد المسبق</string>
+    <string name="eq_preset_flat">إيقاف</string>
+    <string name="eq_preset_bass">الجهير</string>
+    <string name="eq_preset_vocal">الغناء</string>
+    <string name="eq_preset_rock">روك</string>
+    <string name="eq_preset_electronic">إلكترونية</string>
+    <string name="eq_preset_custom">مخصص</string>
+    <string name="eq_bands">النطاقات</string>
+    <string name="eq_preamp">التضخيم المسبق</string>
+    <string name="eq_reset">إعادة ضبط</string>
+    <string name="eq_db">%1$s ديسيبل</string>
+    <string name="eq_hz">%1$s هرتز</string>
+    <string name="eq_khz">%1$s كيلوهرتز</string>
+    <string name="eq_note">للموسيقى فقط: لا تتم معالجة تنبيهات الملاحة والصوت. يعمل عبر الكابل وWi-Fi ويُطبَّق فورًا.</string>
+    <string name="eq_usb_only">يعمل فقط مع الصوت عبر Headswap؛ الصوت الآن عبر Bluetooth</string>
+    <string name="eq_sum_usb_only">يعمل فقط مع الصوت عبر Headswap</string>
+    <string name="eq_sum">المعادل: %1$s</string>
+
+    <string name="set_video">الفيديو</string>
+    <string name="set_transcode_title">إعادة الترميز</string>
+    <string name="set_transcode_desc">يعيد هاتفك ترميز الفيديو ليناسب شاشة السيارة: أي دقة وأي معدل إطارات.</string>
+    <string name="set_transcode_plus">+ أكثر استقرارًا ويناسب أي شاشة سيارة</string>
+    <string name="set_transcode_minus">− حمل على الهاتف واستهلاك للبطارية وتأخير +60 مللي ثانية</string>
+    <string name="set_direct_title">التمرير المباشر</string>
+    <string name="set_direct_desc">يصل فيديو Android Auto إلى شاشة السيارة كما هو. وتقصّ الشاشة نفسها الشاشات العريضة.</string>
+    <string name="set_direct_plus">+ تأخير وحرارة واستهلاك بطارية أقل</string>
+    <string name="set_direct_minus">− معدل الإطارات غير قابل للتعديل</string>
+    <string name="set_direct_desktop_desc">في وضع «مشغّل خاص» يرمّز الهاتف شاشته مرة واحدة ويسلّم شاشة السيارة بثًا جاهزًا بصيغة H.264 دون إعادة ترميز.</string>
+
+    <string name="set_resolution">دقة الفيديو</string>
+    <string name="set_res_pick">اختر الدقة</string>
+    <string name="set_res_group_standard">الشاشات العادية</string>
+    <string name="set_res_group_wide">الشاشات العريضة</string>
+    <string name="set_res_group_portrait">الشاشات العمودية</string>
+    <string name="set_res_ratio_wide_976">2.3:1</string>
+    <string name="set_apply_next">سيُطبَّق عند الاتصال التالي.</string>
+    <string name="set_needs_transcode">يتطلب إعادة ترميز</string>
+    <string name="set_custom_res_active">الدقة المخصصة %1$s سارية (%2$s)</string>
+
+    <string name="set_music_rate">معدل عيّنات الموسيقى</string>
+    <string name="set_music_rate_note">معدل أقل: حمل أقل على اتصال USB وعلى شاشات السيارة الضعيفة، لكن الجودة أقل. تلقائي: 48 كيلوهرتز، و32 كيلوهرتز لشاشات Hyundai CN7. يُطبَّق عند الاتصال التالي.</string>
+    <string name="set_fps">معدل الإطارات</string>
+    <string name="set_fps_note">يُطبَّق عند الاتصال التالي. في التمرير المباشر لا يمكن تغيير معدل الإطارات.</string>
+    <string name="set_fps_direct">في التمرير المباشر يحدد Android Auto معدل الإطارات</string>
+    <string name="set_aa_density">مقياس واجهة Android Auto</string>
+    <string name="set_aa_density_auto">تلقائي · %1$d dpi</string>
+    <string name="set_aa_density_manual">%1$d dpi</string>
+    <string name="set_aa_density_auto_sub">كما هو محدد للدقة</string>
+    <string name="set_aa_density_manual_sub">يدوي، القيمة التلقائية لهذه الدقة: %1$d</string>
+    <string name="set_aa_density_reset">تلقائي</string>
+    <string name="set_aa_density_smaller">أصغر</string>
+    <string name="set_aa_density_larger">أكبر</string>
+    <string name="set_aa_density_note">كلما زادت قيمة dpi كبر العرض. يُطبَّق عند الاتصال التالي. عند قيمة dpi مرتفعة قد يغيّر Android Auto التخطيط: عمود واحد بدل الشاشة المقسّمة.</string>
+    <string name="set_sum_density">%1$d dpi</string>
+
+    <string name="set_cert">شهادة شاشة السيارة</string>
+    <string name="set_cert_hint">غيّرها إذا لم يتصل Android Auto</string>
+
+    <string name="set_car_make">ماركة السيارة</string>
+    <string name="set_car_make_default">بلا ماركة (يعمل الفيديو وYouTube عبر Fermata)</string>
+    <string name="set_car_make_default_short">بلا ماركة</string>
+    <string name="set_car_make_note">شعار ماركة السيارة على زر الخروج من Android Auto. عند اختيار ماركة يُخفي Android Auto تطبيقات الفيديو الخارجية (Fermata Auto). يُطبَّق عند الاتصال التالي.</string>
+
+    <string name="set_mic">الميكروفون</string>
+    <string name="mic_car_title">السيارة</string>
+    <string name="mic_car_sub">ميكروفون شاشة السيارة</string>
+    <string name="mic_phone_title">الهاتف</string>
+    <string name="mic_phone_sub">ميكروفون الهاتف، يتطلب إذن تسجيل الصوت</string>
+    <string name="mic_auto_title">تلقائي</string>
+    <string name="mic_auto_sub">السيارة أولًا، ثم الهاتف بعد 2 ث من الصمت</string>
+    <string name="mic_no_permission">لا يوجد إذن لتسجيل الصوت: لن يعمل ميكروفون الهاتف.</string>
+
+    <string name="set_report_title">الإبلاغ عن مشكلة</string>
+    <string name="set_report_note">السجل + التقرير</string>
+    <string name="set_rerun_setup">إعادة تشغيل الإعداد</string>
+    <string name="set_check_ready">فحص الجاهزية</string>
+    <string name="set_for_devs">للمطوّرين</string>
+    <string name="set_support">دعم Yegor</string>
+    <string name="set_support_url">https://yegorkapomidorka.com/headswap/en/#donate</string>
+    <string name="set_sec_appearance">المظهر</string>
+    <string name="set_sec_sound">الصوت والميكروفون</string>
+    <string name="set_sec_headunit">شاشة السيارة</string>
+    <string name="set_sec_apps">تطبيقات شاشة السيارة</string>
+    <string name="set_sum_apps">تم العثور على: %1$d</string>
+    <string name="apps_warn_banner">الفيديو للاستخدام أثناء التوقف فقط. أثناء القيادة انتبه إلى الطريق: الاستخدام على مسؤوليتك.</string>
+    <string name="apps_warn_title">الفيديو والقيادة</string>
+    <string name="apps_warn_text">لا يحظر Headswap الفيديو أثناء حركة السيارة. السائق مسؤول عن السلامة: لا تشاهد الفيديو أثناء القيادة، واستخدمه عند التوقف فقط.</string>
+    <string name="apps_warn_ok">حسنًا</string>
+    <string name="apps_installed_title">مثبّتة على هذا الهاتف</string>
+    <string name="apps_installed_note">ليست من Google Play — تظهر في Android Auto فقط عند تفعيل «المصادر غير المعروفة»</string>
+    <string name="apps_installed_empty">لم يُعثر على شيء بعد. ثبّت تطبيقًا من القائمة أدناه أو أي تطبيق آخر لـ Android Auto.</string>
+    <string name="apps_recommended_title">موصى بها</string>
+    <string name="apps_download">تنزيل</string>
+    <string name="apps_open">فتح</string>
+    <string name="apps_fermata_desc">فيديو من الهاتف، YouTube، عكس الشاشة</string>
+    <string name="apps_parkedtube_desc">YouTube بملء شاشة السيارة ولوحة مفاتيح روسية</string>
+    <string name="apps_aabrowser_desc">متصفح بملء شاشة السيارة</string>
+    <string name="apps_aabrowser_req">يتطلب Android 15+</string>
+    <string name="apps_unsupported">لن يعمل على هذا الهاتف: يلزم Android 15 أو أحدث.</string>
+    <string name="apps_hint_title">لا أرى التطبيق في Android Auto</string>
+    <string name="apps_hint_text">تحقق من تفعيل خيار «المصادر غير المعروفة» في Android Auto ومن ضبط «ماركة السيارة» على «بلا ماركة»: عند اختيار ماركة يُخفي Android Auto تطبيقات الفيديو. ثم أعد تشغيل خادم شاشة السيارة. بعد تحديث Android Auto تختفي التطبيقات أحيانًا — وهذا من جانب Google.</string>
+    <string name="set_mode">الوضع</string>
+    <string name="set_help">المساعدة</string>
+    <string name="set_sum_appearance">اللغة: %1$s · السمة: %2$s</string>
+    <string name="set_sum_mic">الميكروفون: %1$s</string>
+    <string name="set_sum_headunit">الشهادة %1$s</string>
+    <string name="set_footer">Headswap %1$s</string>
+
+    <!-- Video modes (VideoMode) -->
+    <string name="video_r800_title">⁦800×480⁩</string>
+    <string name="video_r800_sub">للشاشات الصغيرة</string>
+    <string name="video_r1024_title">⁦1024×600⁩</string>
+    <string name="video_r1024_sub">لشاشات السيارة بدقة ⁦1024×600⁩، دون تمديد</string>
+    <string name="video_r720_title">⁦1280×720⁩ (قياسي)</string>
+    <string name="video_r720_sub">يناسب معظم شاشات السيارة</string>
+    <string name="video_r1080_title">⁦1920×1080⁩</string>
+    <string name="video_r1080_sub">أوضح، لكنه أثقل على الهاتف وشاشة السيارة</string>
+    <string name="video_wide_title">عريض 8:3 (قص)</string>
+    <string name="video_wide_sub">للشاشات العريضة: ⁦1280×480⁩، بحجم أكبر</string>
+    <string name="video_wide_mid_title">عريض 8:3 متوسط (Mazda CX-5)</string>
+    <string name="video_wide_mid_sub">⁦1728×648⁩: الدقة الأصلية لشاشة Mazda</string>
+    <string name="video_wide_hd_title">عريض 8:3 HD (قص)</string>
+    <string name="video_wide_hd_sub">⁦1920×720⁩: أوضح وأصغر، ويتسع المزيد على الشاشة</string>
+    <string name="video_wide_640_title">عريض 3:1 (Citroen C5 X)</string>
+    <string name="video_wide_640_sub">⁦1920×640⁩: الدقة الأصلية لشاشة Citroen C5 X، دون أشرطة جانبية</string>
+    <string name="video_wide_2_1_title">عريض 2:1 (Octavia Pro, VW Discover Pro 9.2)</string>
+    <string name="video_wide_2_1_sub">⁦1280×640⁩: الدقة الأصلية لشاشتي Octavia Pro وVW Discover Pro 9.2، دون تمديد</string>
+    <string name="video_wide_976_title">عريض ⁦2240×976⁩ (VW Tiguan L Pro)</string>
+    <string name="video_wide_976_sub">قص عريض مُقاس لنافذة CarLife في شاشة VW CNS3</string>
+    <string name="video_wide_836_title">عريض ⁦1920×836⁩ (VW Tiguan L Pro، تمرير مباشر)</string>
+    <string name="video_wide_836_sub">نسبة نافذة ⁦2240×976⁩ دون تحجيم على الهاتف: تتولى شاشة السيارة التحجيم. للقص دون إعادة ترميز</string>
+    <string name="video_portrait_960_title">عمودي 3:4</string>
+    <string name="video_portrait_960_sub">⁦960×1280⁩: الشاشة العمودية كاملة</string>
+    <string name="video_portrait_1152_title">عمودي 5:6 (Hyundai Tucson NX4c)</string>
+    <string name="video_portrait_1152_sub">⁦960×1152⁩: شاشة ⁦960×1280⁩ دون شريط التكييف في الأسفل، دون تمديد</string>
+
+    <!-- Music sample rate (MusicRate) -->
+    <string name="mrate_auto">تلقائي</string>
+    <string name="mrate_48">48 كيلوهرتز</string>
+    <string name="mrate_44">44.1 كيلوهرتز</string>
+    <string name="mrate_32">32 كيلوهرتز</string>
+    <string name="mrate_24">24 كيلوهرتز</string>
+    <string name="mrate_22">22 كيلوهرتز</string>
+
+    <!-- Music packet size (MediaChunk) -->
+    <string name="mchunk_auto">كما يرسله Android Auto</string>
+    <string name="mchunk_4096">4096 بايت</string>
+    <string name="mchunk_2560">2560 بايت (مثل Baidu)</string>
+    <string name="mchunk_2048">2048 بايت</string>
+    <string name="mchunk_1024">1024 بايت</string>
+
+    <!-- Voice packet size (VoiceChunk) -->
+    <string name="vchunk_auto">تلقائي</string>
+    <string name="vchunk_2048">2048 بايت</string>
+    <string name="vchunk_1024">1024 بايت</string>
+    <string name="vchunk_512">512 بايت</string>
+
+    <!-- Silence before prompt (TtsPreroll) -->
+    <string name="tpreroll_auto">تلقائي</string>
+    <string name="tpreroll_0">إيقاف</string>
+    <string name="tpreroll_100">100 مللي ثانية</string>
+    <string name="tpreroll_200">200 مللي ثانية</string>
+    <string name="tpreroll_400">400 مللي ثانية</string>
+
+    <!-- Touch decimation (TouchDecimation) -->
+    <string name="tdec_off">إيقاف</string>
+    <string name="tdec_x2">⁦×2⁩</string>
+
+    <!-- Frame rate (FpsSetting) -->
+    <string name="fps_auto_title">تلقائي</string>
+    <string name="fps_auto_sub">كما تطلب شاشة السيارة</string>
+    <string name="fps_15_title">15 FPS</string>
+    <string name="fps_15_sub">أخف لشاشات السيارة الضعيفة والاتصال</string>
+    <string name="fps_30_title">30 FPS</string>
+    <string name="fps_30_sub">أكثر سلاسة، لكنه أثقل</string>
+    <string name="fps_60_title">60 FPS</string>
+    <string name="fps_60_sub">معدل إطارات أعلى؛ يتطلب هاتفًا وشاشة سيارة قادرين على ذلك</string>
+
+    <!-- Wireless (branch B) -->
+    <string name="wl_title">لاسلكي</string>
+    <string name="wl_note">للسيارات التي تدعم CarLife اللاسلكي. شغّل نقطة الاتصال على الهاتف، وصِل شاشة السيارة بها (في قائمة شاشة السيارة: Wi-Fi)، وافتح CarLife على شاشة السيارة ثم اضغط الزر أدناه. لا حاجة إلى كابل؛ وإذا وصلت كابلًا فسيُعتمد USB.</string>
+    <string name="wl_start">انتظار السيارة عبر Wi-Fi</string>
+    <string name="wl_status_line">الحالة: %1$s</string>
+    <string name="wl_off">متوقف</string>
+    <string name="wl_no_permission">بدون إذن «الأجهزة القريبة» لن تتمكن السيارة من الاتصال عبر Wi-Fi</string>
+    <string name="wl_report">إرسال تقرير الاتصال اللاسلكي</string>
+    <string name="wl_car_line">السيارة: %1$s</string>
+    <string name="wl_car_none">غير محددة</string>
+    <string name="wl_car_note">عندما يتصل الهاتف بهذه السيارة عبر Bluetooth، يبدأ Headswap تلقائيًا بانتظارها عبر Wi-Fi</string>
+    <string name="wl_car_pick">اختيار السيارة</string>
+    <string name="wl_car_forget">نسيان السيارة</string>
+    <string name="wl_car_no_permission">بدون إذن «الأجهزة القريبة» لا تصل أحداث Bluetooth من السيارة</string>
+    <string name="wl_car_unavailable">لا يستطيع هذا الهاتف إقران سيارة (لا يدعم companion device setup)</string>
+    <string name="wl_cw_note">إذا بقي الهاتف على شبكة Wi-Fi أخرى (مثلًا في المنزل)، يستطيع Headswap الانضمام إلى نقطة اتصال السيارة تلقائيًا: يبقى الإنترنت على شبكتك الرئيسية. أدخل الاسم وكلمة المرور اللذين تعرضهما شاشة السيارة.</string>
+    <string name="wl_cw_line">Wi-Fi السيارة: %1$s</string>
+    <string name="wl_cw_none">غير مضبوط</string>
+    <string name="wl_cw_set">مضبوط: %1$s</string>
+    <string name="wl_cw_ssid_hint">اسم الشبكة (SSID)</string>
+    <string name="wl_cw_pass_hint">كلمة المرور (فارغة: شبكة مفتوحة)</string>
+    <string name="wl_cw_save">حفظ وفحص</string>
+    <string name="wl_cw_forget">حذف</string>
+    <string name="wl_cw_need_ssid">أدخل اسم الشبكة</string>
+    <string name="wl_cw_checking">جارٍ الاتصال بـ Wi-Fi السيارة… أكّد طلب النظام</string>
+    <string name="wl_cw_ok">تم الاتصال بـ Wi-Fi السيارة</string>
+    <string name="wl_cw_fail">تعذّر الاتصال: السيارة خارج النطاق، أو كلمة المرور خاطئة، أو تم رفض الطلب</string>
+
+    <!-- My car (CarPreset) -->
+    <string name="car_title">سيارتي</string>
+    <string name="car_other_title">سيارتي غير موجودة في القائمة</string>
+    <string name="car_citroen_c5_x">Citroen C5 X</string>
+    <string name="car_dongfeng_df6_2023">Dongfeng DF6 2023</string>
+    <string name="car_peugeot_5008_2024">Dongfeng Peugeot 5008 2024</string>
+    <string name="car_honda_breeze_2">Honda Breeze، الجيل الثاني</string>
+    <string name="car_honda_crv_6">Honda CR-V، الجيل السادس، قبل التحديث</string>
+    <string name="car_honda_crv_2026">Honda CR-V 2026 1.5T</string>
+    <string name="car_honda_crv_2026_hybrid">Honda CR-V 2026 هجينة</string>
+    <string name="car_honda_vezel_2022">Honda Vezel 2022–2024 (GAC Honda)</string>
+    <string name="car_hyundai_elantra_7">Hyundai Elantra، الجيل السابع، قبل التحديث</string>
+    <string name="car_hyundai_ix35_2021">Hyundai ix35 2021</string>
+    <string name="car_hyundai_tucson_nx4c">Hyundai Tucson NX4c</string>
+    <string name="car_jetta_vs">Jetta VS5/VS7 (Baidu CarLife فقط، وليس J-Link)</string>
+    <string name="car_kia_k3_2023">Kia K3 2023</string>
+    <string name="car_kia_sportage_ace">Kia Sportage Ace</string>
+    <string name="car_mazda_3_cn_2025">Mazda 3 2025 (الصين)</string>
+    <string name="car_mazda_cx5_2025">Mazda CX-5 2025–2026</string>
+    <string name="car_mazda_cx50">Mazda CX-50</string>
+    <string name="car_mitsubishi_outlander_4">Mitsubishi Outlander 4 2022</string>
+    <string name="car_skoda_kamiq_gt_2021">Skoda Kamiq GT 2021</string>
+    <string name="car_skoda_octavia_pro">Skoda Octavia Pro</string>
+    <string name="car_toyota_corolla_cross_2024">Toyota Corolla Cross 2024–2025</string>
+    <string name="car_toyota_levin">Toyota Levin</string>
+    <string name="car_toyota_rav4_2025">Toyota RAV4 2025</string>
+    <string name="car_vw_bora_2021">Volkswagen Bora 2021</string>
+    <string name="car_vw_discover_pro_9_2">Volkswagen Discover Pro 9.2 (⁦1280×640⁩)</string>
+    <string name="car_vw_golf_8_pro">Volkswagen Golf 8 Pro 2021</string>
+    <string name="car_vw_id_unyx">Volkswagen ID.Unyx</string>
+    <string name="car_vw_lamando_l">Volkswagen Lamando L</string>
+    <string name="car_vw_sagitar_2021">Volkswagen Sagitar 2021–2022، قبل التحديث</string>
+    <string name="car_vw_troc_2026">Volkswagen T-Roc بعد التحديث 2026</string>
+    <string name="car_vw_tharu_xr">Volkswagen Tharu XR 2025–2026</string>
+    <string name="car_vw_tiguan_l_pro">Volkswagen Tiguan L Pro / Teramont Pro</string>
+    <string name="car_field">السيارة</string>
+    <string name="car_pick_hint">اختر سيارتك</string>
+    <string name="car_will_apply">سيُطبَّق</string>
+    <string name="car_label_mode">وضع الفيديو</string>
+    <string name="car_auto">تلقائي</string>
+    <string name="car_value_keep">دون تغيير</string>
+    <string name="car_apply">تطبيق</string>
+
+    <!-- Bridge mode: Android Auto / Headswap Desktop (SettingsSection.MODE) -->
+    <string name="bm_title">الوضع</string>
+    <string name="bm_aa_note">تعرض شاشة السيارة Android Auto من هاتفك.</string>
+    <string name="bm_own_launcher">مشغّل خاص</string>
+    <string name="bm_launcher_title">المشغّل</string>
+    <string name="bm_need_13">يتطلب Android 13+</string>
+    <string name="bm_sum_state">%1$s · %2$s</string>
+    <string name="bm_act_on">مفعّل</string>
+    <string name="bm_act_off">غير مفعّل</string>
+    <string name="bm_act_lost">فُقد الوصول، فعّله مرة أخرى</string>
+    <string name="about_title">حول التطبيق</string>
+    <string name="about_note">المؤلفون والتراخيص</string>
+    <string name="about_authors">المؤلفون</string>
+    <string name="about_opensource">مفتوح المصدر</string>
+    <string name="about_author_yegor">Yegor</string>
+    <string name="about_author_ildar">Ildar Sadykov</string>
+    <string name="about_open_project">صفحة المشروع</string>
+    <string name="about_license_unavailable">نص الترخيص غير متاح. راجع صفحة المشروع.</string>
+</resources>

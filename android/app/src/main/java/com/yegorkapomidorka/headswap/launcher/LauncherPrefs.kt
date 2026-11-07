@@ -32,7 +32,7 @@ enum class RailSize {
 }
 
 /** Настройки лаунчера - SharedPreferences, как остальной проект (DexPrefs/AaSettings). */
-class LauncherPrefs(context: Context) {
+class LauncherPrefs(private val context: Context) {
     private val prefs = context.getSharedPreferences("headswap_launcher", Context.MODE_PRIVATE)
 
     var apps: List<AppRef>
@@ -47,9 +47,13 @@ class LauncherPrefs(context: Context) {
         get() = RailSize.restore(prefs.getString("rail_size", null))
         set(value) { prefs.edit().putString("rail_size", value.name).apply() }
 
-    /** «Карта на главном» слева: ряды главного зеркальные, рейка остаётся слева. Новый ключ: старый right_hand двигал рейку. */
+    /**
+     * «Карта на главном» слева, физически. Новый ключ: старый right_hand двигал рейку.
+     * По умолчанию на арабском (RTL) карта слева: весь главный - зеркало LTR, рейка справа, как в макете.
+     */
     var mapLeft: Boolean
-        get() = prefs.getBoolean("map_left", false)
+        get() = prefs.getBoolean("map_left", com.yegorkapomidorka.headswap.AppLocale.wrap(context).resources
+            .configuration.layoutDirection == android.view.View.LAYOUT_DIRECTION_RTL)
         set(value) { prefs.edit().putBoolean("map_left", value).apply() }
 
     /** «Анимации кнопок» рейки. */

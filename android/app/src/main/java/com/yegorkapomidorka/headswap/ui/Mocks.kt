@@ -123,7 +123,7 @@ object Mocks {
             lpDp(MATCH, if (compact) 52 else 72),
         )
         return FrameLayout(this).apply {
-            addView(win, FrameLayout.LayoutParams(MATCH, WRAP).apply { rightMargin = dp(34) })
+            addView(win, FrameLayout.LayoutParams(MATCH, WRAP).apply { marginEnd = dp(34) })
             addView(scrollArrow(), FrameLayout.LayoutParams(dp(24), MATCH, Gravity.END))
         }
     }
@@ -139,7 +139,7 @@ object Mocks {
                         setColors(intArrayOf(acc and 0x00FFFFFF, acc, acc), floatArrayOf(0f, 0.7f, 1f))
                     }
                 },
-                FrameLayout.LayoutParams(dp(4), MATCH).apply { leftMargin = dp(10); bottomMargin = dp(15) },
+                FrameLayout.LayoutParams(dp(4), MATCH).apply { marginStart = dp(10); bottomMargin = dp(15) },
             )
             addView(icon(R.drawable.ic_scroll_arrow, 24, acc), FrameLayout.LayoutParams(dp(24), dp(16), Gravity.BOTTOM))
         }
@@ -175,7 +175,7 @@ object Mocks {
             )
         }
         fun item(s: String, h: Int, hi: Boolean = false) = hbox(4).apply {
-            setPadding(dp(12), 0, dp(if (hi) 6 else 12), 0)
+            setPaddingRelative(dp(12), 0, dp(if (hi) 6 else 12), 0)
             if (hi) setBackgroundColor(clr(R.color.pric))
             val t = text(s, if (hi) 11f else 12f, if (hi) 700 else 400, clr(if (hi) R.color.onpric else R.color.on2)).apply { maxLines = 1 }
             if (hi) t.letterSpacing = -0.01f
@@ -196,7 +196,7 @@ object Mocks {
             background = shape(clr(R.color.surf), 20)
             clipToOutline = true
             addView(back, FrameLayout.LayoutParams(MATCH, MATCH))
-            addView(popup, FrameLayout.LayoutParams(dp(228), WRAP, Gravity.END or Gravity.TOP).apply { topMargin = dp(44); rightMargin = dp(6) })
+            addView(popup, FrameLayout.LayoutParams(dp(228), WRAP, Gravity.END or Gravity.TOP).apply { topMargin = dp(44); marginEnd = dp(6) })
         }
     }
 
@@ -550,7 +550,7 @@ object Mocks {
         background = shape(SYS_BLUE, 14)
         addView(
             View(this@sysSwitch).apply { background = oval(WHITE) },
-            FrameLayout.LayoutParams(dp(22), dp(22), Gravity.END or Gravity.CENTER_VERTICAL).apply { rightMargin = dp(3) },
+            FrameLayout.LayoutParams(dp(22), dp(22), Gravity.END or Gravity.CENTER_VERTICAL).apply { marginEnd = dp(3) },
         )
         layoutParams = LinearLayout.LayoutParams(dp(48), dp(28))
     }

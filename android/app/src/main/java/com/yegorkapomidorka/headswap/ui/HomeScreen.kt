@@ -58,6 +58,8 @@ class HomeScreen(host: MainActivity) : Screen(host) {
     init {
         val c = ctx
         val header = c.hbox().apply {
+            // логотип, «Headswap» и шестерёнка не зеркалятся в RTL (Егор 07.11, по макету арабской версии)
+            layoutDirection = View.LAYOUT_DIRECTION_LTR
             pad(c, 20, 8, 8, 0)
             val chip = FrameLayout(c).apply {
                 background = c.shape(c.clr(R.color.pri), 10)

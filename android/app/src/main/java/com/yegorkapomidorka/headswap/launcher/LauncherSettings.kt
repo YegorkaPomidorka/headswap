@@ -339,8 +339,8 @@ private fun RailSizeCard(d: SettingsDims, modifier: Modifier) {
 }
 
 /**
- * Миниатюра главного для варианта панели: слева рейка (кнопки точками, золотой блок навигации внизу, часы чертами),
- * справа музыка с картой и нижний ряд. В «Маленькой» и «Обрезанной» время - чертой сверху слева в правой части.
+ * Миниатюра главного для варианта панели: у начала строки (слева, в RTL справа) рейка (кнопки точками, золотой блок
+ * навигации внизу, часы чертами), за ней музыка с картой и нижний ряд. В «Маленькой» и «Обрезанной» время - чертой сверху слева в правой части.
  */
 @Composable
 private fun RailMiniature(size: RailSize, modifier: Modifier) {
@@ -378,13 +378,16 @@ private fun RailMiniature(size: RailSize, modifier: Modifier) {
         }
         Column(Modifier.weight(1f - frac).fillMaxHeight().padding(gap), verticalArrangement = Arrangement.spacedBy(gap)) {
             if (inStatus) Box(Modifier.fillMaxWidth(0.25f).height(m.dp(r(2))).background(mark))
-            Row(Modifier.weight(2f).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(gap)) {
-                Box(Modifier.weight(0.33f).fillMaxHeight().clip(small).background(Color(0xFF6B5520)))
-                Box(Modifier.weight(0.67f).fillMaxHeight().clip(small).background(accent))
-            }
-            Row(Modifier.weight(1f).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(gap)) {
-                Box(Modifier.weight(0.67f).fillMaxHeight().clip(small).background(pal.btn2))
-                Box(Modifier.weight(0.33f).fillMaxHeight().clip(small).background(pal.btn2))
+            // рейка стоит у начала строки (в RTL справа), плашки за ней - физически, карта справа, как в главном по умолчанию
+            Ltr {
+                Row(Modifier.weight(2f).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(gap)) {
+                    Box(Modifier.weight(0.33f).fillMaxHeight().clip(small).background(Color(0xFF6B5520)))
+                    Box(Modifier.weight(0.67f).fillMaxHeight().clip(small).background(accent))
+                }
+                Row(Modifier.weight(1f).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(gap)) {
+                    Box(Modifier.weight(0.67f).fillMaxHeight().clip(small).background(pal.btn2))
+                    Box(Modifier.weight(0.33f).fillMaxHeight().clip(small).background(pal.btn2))
+                }
             }
         }
     }
@@ -596,8 +599,11 @@ private fun MapSideCard(d: SettingsDims, modifier: Modifier) {
                         unselected = Color.Transparent, onTap = { model.chooseHomeLayout(opt.layout, opt.left) }) {
                         Column(Modifier.fillMaxSize().padding(m.dp(r(10))), horizontalAlignment = Alignment.CenterHorizontally,
                             verticalArrangement = Arrangement.spacedBy(m.dp(r(8)))) {
-                            if (opt.layout == HomeLayout.QUAD) HomeMiniature(opt.left, r(6), Modifier.weight(1f).fillMaxWidth())
-                            else TwoMiniature(opt.layout == HomeLayout.WIDE_LEFT, r(6), Modifier.weight(1f).fillMaxWidth())
+                            // миниатюры показывают физическую сторону карты, как сам главный: рисуем их слева направо при любом языке
+                            Ltr {
+                                if (opt.layout == HomeLayout.QUAD) HomeMiniature(opt.left, r(6), Modifier.weight(1f).fillMaxWidth())
+                                else TwoMiniature(opt.layout == HomeLayout.WIDE_LEFT, r(6), Modifier.weight(1f).fillMaxWidth())
+                            }
                             Txt(opt.label, s.f2, weight = FontWeight.SemiBold, ellipsis = false)
                         }
                     }
@@ -632,7 +638,7 @@ private fun RowScope.MusicMiniCell(weight: Float, shape: RoundedCornerShape) {
     }
 }
 
-/** Миниатюра двух плашек: большая (2) и музыка (1); при [bigLeft] большая слева. Рейку не рисуем (Егор 05.11). */
+/** Миниатюра двух плашек: большая (2) и музыка (1); при [bigLeft] большая физически слева (звать внутри [Ltr]). Рейку не рисуем (Егор 05.11). */
 @Composable
 private fun TwoMiniature(bigLeft: Boolean, gapPx: Int, modifier: Modifier) {
     val m = LocalMetrics.current
@@ -644,7 +650,7 @@ private fun TwoMiniature(bigLeft: Boolean, gapPx: Int, modifier: Modifier) {
     }
 }
 
-/** Миниатюра четырёх плашек: музыка, большая плашка, приложения и телефон; при [left] ряды зеркальные. Без рейки. */
+/** Миниатюра четырёх плашек: музыка, большая плашка, приложения и телефон; при [left] ряды зеркальные (звать внутри [Ltr]). Без рейки. */
 @Composable
 private fun HomeMiniature(left: Boolean, gapPx: Int, modifier: Modifier) {
     val m = LocalMetrics.current
@@ -752,7 +758,7 @@ private fun AboutLinkCard(d: SettingsDims, modifier: Modifier) {
             Txt(label, s.f2, ellipsis = false)
             Txt(value, s.f2, Modifier.weight(1f), color = Pal.SEC, weight = FontWeight.SemiBold, mono = true,
                 align = androidx.compose.ui.text.style.TextAlign.End)
-            SvgIcon(Ico.CHEV_R, d.catIcon, Pal.SEC, stroke = 2.6f)
+            SvgIcon(Ico.CHEV_R, d.catIcon, Pal.SEC, Modifier.mirrorRtl(), stroke = 2.6f)
         }
     }
 }

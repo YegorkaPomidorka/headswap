@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- ui/Actions.kt -->
+    <string name="act_open_aa_failed">تعذّر فتح إعدادات Android Auto: %1$s</string>
+    <string name="act_open">فتح</string>
+    <string name="act_cancel">إلغاء</string>
+
+    <!-- ui/LogShare.kt -->
+    <string name="share_failed">تعذّر فتح المشاركة: %1$s</string>
+    <string name="share_no_log">لا يوجد ملف سجل بعد</string>
+    <string name="share_subject_log">Headswap: السجل %1$s</string>
+    <string name="share_report_failed">تعذّر إنشاء التقرير: %1$s</string>
+    <string name="share_subject_report">Headswap: تقرير عن مشكلة</string>
+    <string name="share_zip_failed">تعذّر إنشاء الأرشيف: %1$s</string>
+    <string name="share_saved">تم الحفظ في التنزيلات: %1$s</string>
+    <string name="share_subject_archive">Headswap: أرشيف السجلات</string>
+    <string name="share_size_mib">%1$s ميغابايت</string>
+    <string name="share_size_kib">%1$d كيلوبايت</string>
+
+    <!-- BridgeService.kt -->
+    <string name="svc_bridge_failed">تعذّر تشغيل الجسر: %1$s</string>
+</resources>
