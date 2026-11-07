@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="action_stop">إيقاف</string>
+    <string name="action_open_aa">فتح Android Auto</string>
+
+    <string name="lang_title">اللغة</string>
+    <string name="lang_system">النظام</string>
+</resources>

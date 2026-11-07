@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- One-time window after updating to 4.0: the “Own launcher” mode -->
+<resources>
+    <string name="u40_title">مشغّل خاص على شاشة السيارة</string>
+    <string name="u40_lead">وضع جديد: شاشة رئيسية خاصة بك على شاشة السيارة بدلًا من Android Auto. يبقى Android Auto الوضع الافتراضي ولم يتغيّر شيء بالنسبة إليك.</string>
+    <string name="u40_pros">ما يمكنك فعله</string>
+    <string name="u40_pro_1">الشاشة الرئيسية لـ Headswap: الموسيقى والملاحة وتطبيقاتك</string>
+    <string name="u40_pro_2">أي مشغّل سيارة من هاتفك، مثل CarDash</string>
+    <string name="u40_pro_3">تشغيل تطبيقات الهاتف مباشرة على شاشة السيارة</string>
+    <string name="u40_needs">ما تحتاجه</string>
+    <string name="u40_need_1">خيارات المطوّر و«تصحيح الأخطاء اللاسلكي». هذه إعدادات محفوفة بالمخاطر، وتفعيلها على مسؤوليتك</string>
+    <string name="u40_need_2">بعد إعادة تشغيل الهاتف، فعّل مجددًا: يستغرق نصف دقيقة</string>
+    <string name="u40_need_3">الصوت حاليًا عبر Bluetooth شاشة السيارة فقط</string>
+    <string name="u40_where">الإعدادات ← الوضع</string>
+    <string name="u40_ok">حسنًا</string>
+    <string name="u40_try">جرّب المشغّل الخاص</string>
+</resources>

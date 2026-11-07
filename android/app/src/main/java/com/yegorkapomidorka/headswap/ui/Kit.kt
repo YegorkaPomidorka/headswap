@@ -101,12 +101,26 @@ fun lp(w: Int, h: Int, weight: Float = 0f) = LinearLayout.LayoutParams(w, h, wei
 
 fun Context.lpDp(w: Int, hDp: Number, weight: Float = 0f) = LinearLayout.LayoutParams(w, dp(hDp), weight)
 
+/** Отступы относительные: [l] - начало (start), [r] - конец (end); в RTL стороны меняются местами. */
 fun View.pad(ctx: Context, l: Number = 0, t: Number = 0, r: Number = 0, b: Number = 0) =
-    setPadding(ctx.dp(l), ctx.dp(t), ctx.dp(r), ctx.dp(b))
+    setPaddingRelative(ctx.dp(l), ctx.dp(t), ctx.dp(r), ctx.dp(b))
 
+/** Поля относительные: [l] - начало (start), [r] - конец (end). */
 fun LinearLayout.LayoutParams.margins(ctx: Context, l: Number = 0, t: Number = 0, r: Number = 0, b: Number = 0) = apply {
-    setMargins(ctx.dp(l), ctx.dp(t), ctx.dp(r), ctx.dp(b))
+    marginStart = ctx.dp(l)
+    topMargin = ctx.dp(t)
+    marginEnd = ctx.dp(r)
+    bottomMargin = ctx.dp(b)
 }
+
+/** Приложение сейчас в RTL-локали (арабский); для поворотов и позиций, которые считаются в коде. */
+fun Context.isRtl(): Boolean = resources.configuration.layoutDirection == View.LAYOUT_DIRECTION_RTL
+
+/**
+ * Поворот шеврона (ic_chevron, autoMirrored) на 90° «вниз» / -90° «вверх». В RTL вектор зеркален по X,
+ * поэтому знак угла обратный - иначе шеврон смотрит наоборот.
+ */
+fun Context.chevronRotation(open: Boolean): Float = (if (open) -90f else 90f) * (if (isRtl()) -1f else 1f)
 
 fun Context.divider(): View = View(this).apply {
     setBackgroundColor(clr(R.color.surf2))

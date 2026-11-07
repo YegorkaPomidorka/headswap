@@ -65,6 +65,7 @@ import com.yegorkapomidorka.headswap.link.diag.NetProbe
 import com.yegorkapomidorka.headswap.update.UpdatePrefs
 import com.yegorkapomidorka.headswap.update.Updater
 import java.text.NumberFormat
+import java.util.Locale
 
 /** Шапка «назад + заголовок» и прокручиваемое тело. */
 fun scaffold(ctx: Context, title: String, onBack: () -> Unit, body: View): LinearLayout = ctx.vbox().apply {
@@ -117,6 +118,7 @@ private val LANGS = listOf(
     AppLocale.SYSTEM to R.string.lang_system,
     "en" to R.string.lang_en,
     "ru" to R.string.lang_ru,
+    "ar" to R.string.lang_ar,
 )
 
 private val THEMES = listOf(
@@ -1031,7 +1033,7 @@ class SettingsSectionScreen(host: MainActivity, val section: SettingsSection) : 
     private fun setResFieldOpen(open: Boolean) {
         val c = ctx
         resField?.background = c.rippleBg(c.shape(c.clr(R.color.surf), 20, if (open) c.clr(R.color.pri) else 0, 1.5f), 20)
-        resChevron?.rotation = if (open) -90f else 90f
+        resChevron?.rotation = c.chevronRotation(open)
     }
 
     /** Выпадающий список разрешений под полем, шириной поля; не влезает по высоте - прокрутка. */
@@ -1161,13 +1163,17 @@ class SettingsSectionScreen(host: MainActivity, val section: SettingsSection) : 
             background = c.shape(c.clr(R.color.surf), 20)
             pad(c, 12, 10, 12, 10)
             addView(auto, c.lpDp(WRAP, 44))
-            addView(minus, c.lpDp(c.dp(48), 48))
-            addView(c.vbox(2).apply {
-                gravity = Gravity.CENTER_HORIZONTAL
-                addView(value, lp(MATCH, WRAP))
-                addView(sub, lp(MATCH, WRAP))
+            // «− значение +» - числовая ось, физически слева направо и в RTL
+            addView(c.hbox(10).apply {
+                layoutDirection = View.LAYOUT_DIRECTION_LTR
+                addView(minus, c.lpDp(c.dp(48), 48))
+                addView(c.vbox(2).apply {
+                    gravity = Gravity.CENTER_HORIZONTAL
+                    addView(value, lp(MATCH, WRAP))
+                    addView(sub, lp(MATCH, WRAP))
+                }, lp(0, WRAP, 1f))
+                addView(plus, c.lpDp(c.dp(48), 48))
             }, lp(0, WRAP, 1f))
-            addView(plus, c.lpDp(c.dp(48), 48))
         }
         refreshDensity()
         return row
@@ -1408,6 +1414,7 @@ class SettingsSectionScreen(host: MainActivity, val section: SettingsSection) : 
             })
         }
         val row = c.hbox(4).apply {
+            layoutDirection = View.LAYOUT_DIRECTION_LTR      // частоты и ползунок физически слева направо
             pad(c, 16, 0, 16, 0)
             if (label.isNotEmpty()) addView(c.text(label, 14f, 500).apply { maxLines = 1 }, c.lpDp(c.dp(64), 44))
             addView(bar, c.lpDp(0, 44, 1f))
@@ -1418,11 +1425,14 @@ class SettingsSectionScreen(host: MainActivity, val section: SettingsSection) : 
 
     private fun freqLabel(f: Int): String {
         if (f < 1000) return ctx.getString(R.string.eq_hz, f.toString())
-        val nf = NumberFormat.getInstance(ctx.resources.configuration.locales[0]).apply { maximumFractionDigits = 1 }
+        val loc = Locale.Builder().setLocale(ctx.resources.configuration.locales[0]).setUnicodeLocaleKeyword("nu", "latn").build()
+        val nf = NumberFormat.getInstance(loc).apply { maximumFractionDigits = 1 }
         return ctx.getString(R.string.eq_khz, nf.format(f / 1000.0))
     }
 
-    private fun dbLabel(v: Int): String = ctx.getString(R.string.eq_db, if (v > 0) "+$v" else if (v < 0) "−${-v}" else "0")
+    /** Знак и число в изоляции LTR (U+2066..U+2069): в RTL строке знак не уезжает на другую сторону числа. */
+    private fun dbLabel(v: Int): String =
+        ctx.getString(R.string.eq_db, "\u2066" + (if (v > 0) "+$v" else if (v < 0) "−${-v}" else "0") + "\u2069")
 
     /** Любое движение слайдера = «Свой»; его значения запоминаются отдельно. */
     private fun applyCustomEq(s: EqSettings) {

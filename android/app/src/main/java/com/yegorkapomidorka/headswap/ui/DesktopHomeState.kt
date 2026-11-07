@@ -159,7 +159,7 @@ object DesktopHomeStatus {
     fun current(ctx: Context): DesktopHomeState = DesktopHomeLogic.compute(inputs(ctx))
 
     private fun recoveringTexts(ctx: Context): Set<String> = recoveringTexts ?: buildSet {
-        val locales = listOf(Locale.forLanguageTag("ru"), Locale.ENGLISH, ctx.resources.configuration.locales[0])
+        val locales = listOf(Locale.forLanguageTag("ru"), Locale.ENGLISH, Locale.forLanguageTag("ar"), ctx.resources.configuration.locales[0])
         for (loc in locales) {
             val lctx = ctx.createConfigurationContext(Configuration(ctx.resources.configuration).apply { setLocale(loc) })
             for (n in 1..2) add(lctx.getString(R.string.desk_recovering, n))

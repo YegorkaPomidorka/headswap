@@ -7,9 +7,11 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -115,10 +117,14 @@ fun EmbedLayers() {
         }
     }
 
-    // панель Алисы: слева за рейкой, на всю высоту, шириной 0,8 высоты; справа затемнение, тап по нему закрывает
+    // панель Алисы: у рейки (слева; в RTL справа), на всю высоту, шириной 0,8 высоты; с другой стороны затемнение, тап по нему закрывает
     val assistOpen = model.assistantOpen
     val aliceKey = remember(assistOpen) { if (assistOpen) LauncherActions.aliceKey() else null }
-    val aliceRect = areaRect?.let { Rect(it.left, it.top, it.left + (it.height * 0.8f).roundToInt(), it.bottom) }
+    val rtl = localeRtl()
+    val aliceRect = areaRect?.let {
+        val w = (it.height * 0.8f).roundToInt()
+        if (rtl) Rect(it.right - w, it.top, it.right, it.bottom) else Rect(it.left, it.top, it.left + w, it.bottom)
+    }
     LaunchedEffect(aliceKey, aliceRect?.width, aliceRect?.height) {
         if (aliceKey != null && aliceRect != null) {
             val w = aliceRect.width.roundToInt()
@@ -128,8 +134,15 @@ fun EmbedLayers() {
         } else EmbedHost.want(EmbedHost.alice, null, 0, 0)
     }
     if (assistOpen && aliceRect != null) {
-        val startDp = with(LocalDensity.current) { aliceRect.right.roundToInt().toDp() }
-        Pressable(Modifier.fillMaxSize().padding(start = startDp).background(Color(0xAA000000)),
+        // слой лежит в Ltr-корне: padding(start) и width - от левого края экрана
+        val scrim = if (rtl) {
+            val widthDp = with(LocalDensity.current) { aliceRect.left.roundToInt().toDp() }
+            Modifier.fillMaxHeight().width(widthDp)
+        } else {
+            val startDp = with(LocalDensity.current) { aliceRect.right.roundToInt().toDp() }
+            Modifier.fillMaxSize().padding(start = startDp)
+        }
+        Pressable(scrim.background(Color(0xAA000000)),
             onTap = { LauncherActions.closeAssistant("тап по затемнению") }) {}
     }
     // слой живёт и после закрытия (как у приложения): TextureView должен пережить панель

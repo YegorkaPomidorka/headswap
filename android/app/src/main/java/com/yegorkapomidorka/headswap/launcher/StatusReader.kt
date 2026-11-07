@@ -7,6 +7,7 @@ import android.content.pm.PackageManager
 import android.media.AudioManager
 import android.net.wifi.WifiManager
 import android.telephony.TelephonyManager
+import com.yegorkapomidorka.headswap.AppLocale
 import java.time.DayOfWeek
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
@@ -22,12 +23,13 @@ data class StatusInfo(
 )
 
 internal object StatusReader {
-    private val timeFormat = DateTimeFormatter.ofPattern("HH:mm")
-    private val dateFormat = DateTimeFormatter.ofPattern("dd.MM")
+    // цифры всегда латинские (и при арабском языке): Locale.ROOT, названия дней - в языке приложения
+    private val timeFormat = DateTimeFormatter.ofPattern("HH:mm", Locale.ROOT)
+    private val dateFormat = DateTimeFormatter.ofPattern("dd.MM", Locale.ROOT)
 
     fun read(ctx: Context, now: LocalDateTime = LocalDateTime.now()): StatusInfo = StatusInfo(
         time = now.format(timeFormat),
-        date = weekday(now.dayOfWeek) + " " + now.format(dateFormat),
+        date = weekday(now.dayOfWeek, appLocale(ctx)) + " " + now.format(dateFormat),
         net = network(ctx),
         signal = signal(ctx),
         bluetooth = runCatching { ctx.getSystemService(BluetoothManager::class.java)?.adapter?.isEnabled == true }
@@ -37,8 +39,11 @@ internal object StatusReader {
             .getOrDefault(0),
     )
 
-    private fun weekday(d: DayOfWeek): String =
-        d.getDisplayName(TextStyle.SHORT, Locale.getDefault()).replaceFirstChar { it.uppercase() }
+    /** Язык приложения: ctx здесь applicationContext, на Android 10-12 выбранный язык он знает только через [AppLocale.wrap]. */
+    private fun appLocale(ctx: Context): Locale = AppLocale.wrap(ctx).resources.configuration.locales[0]
+
+    private fun weekday(d: DayOfWeek, locale: Locale): String =
+        d.getDisplayName(TextStyle.SHORT, locale).replaceFirstChar { it.uppercase() }
 
     /** Мобильная сеть в статусе (у Wi-Fi свой значок): тип сети даже при активном Wi-Fi, как на магнитолах. */
     private fun network(ctx: Context): String = NetLabel.cellular(cellularType(ctx))

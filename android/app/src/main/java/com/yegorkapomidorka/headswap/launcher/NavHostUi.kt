@@ -155,11 +155,13 @@ fun NavHostOverlay() {
         // ряд действий сверху справа: 2ГИС ставит лимит скорости в правый верхний угол видимой области
         CarAppHost.setAreas(left, d.gap + d.btn + d.gap, if (hasActions) d.gap + d.btn else 0)
     }
-    Box(
-        Modifier.absoluteOffset { IntOffset(r.left.roundToInt(), r.top.roundToInt()) }
-            .size(with(density) { w.toDp() }, with(density) { h.toDp() }),
-    ) {
-        Ltr {
+    // окно навигатора и его карточки физические при любом языке (CarAppHost.setAreas выше считает левый отступ слева):
+    // Box со всем содержимым создан внутри Ltr, иначе TopStart/absoluteOffset в RTL считались бы от правого края
+    Ltr {
+        Box(
+            Modifier.absoluteOffset { IntOffset(r.left.roundToInt(), r.top.roundToInt()) }
+                .size(with(density) { w.toDp() }, with(density) { h.toDp() }),
+        ) {
             when (current) {
                 is CarUi.Nav -> NavScreen(current, look, d)
                 is CarUi.Panel -> PanelScreen(current, look, d)

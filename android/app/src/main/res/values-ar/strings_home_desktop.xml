@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Home screen in the “Own launcher” mode -->
+<resources>
+    <string name="home_desk_stage_activation">التفعيل</string>
+    <string name="home_desk_stage_headunit">شاشة السيارة</string>
+    <string name="home_desk_stage_desktop">سطح المكتب</string>
+    <string name="home_desk_stage_video">الفيديو</string>
+    <string name="home_desk_stage_audio">الصوت</string>
+
+    <string name="home_desk_st_active">مفعّل</string>
+    <string name="home_desk_st_needed">مطلوب</string>
+    <string name="home_desk_st_needed_again">مطلوب مرة أخرى</string>
+    <string name="home_desk_st_error">خطأ</string>
+
+    <string name="home_desk_title_activate">تفعيل Headswap</string>
+    <string name="home_desk_title_error">لم يبدأ سطح المكتب</string>
+
+    <string name="home_desk_sub_activate">يلزم تفعيل لمرة واحدة عبر «تصحيح الأخطاء اللاسلكي».</string>
+    <string name="home_desk_sub_activate_paired">يُفقد التفعيل بعد إعادة تشغيل الهاتف. كرّره عبر «تصحيح الأخطاء اللاسلكي»: نصف دقيقة.</string>
+    <string name="home_desk_sub_ok">%1$s على شاشة السيارة. يمكنك وضع الهاتف جانبًا.</string>
+    <string name="home_desk_sub_starting">جارٍ تشغيل سطح المكتب.</string>
+
+    <string name="home_desk_btn_activate">تفعيل</string>
+    <string name="home_desk_btn_stop">إيقاف</string>
+</resources>

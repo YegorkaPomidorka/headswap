@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- One-time window after updating to 3.0: direct video passthrough and frame rate Auto are the defaults -->
+<resources>
+    <string name="u30_title">التمرير المباشر للفيديو</string>
+    <string name="u30_lead">هذا الوضع مفعّل افتراضيًا.</string>
+    <string name="u30_pros">ما تحصل عليه</string>
+    <string name="u30_pro_1">تأخير أقل في الصورة</string>
+    <string name="u30_pro_2">يبقى الهاتف أبرد ويوفّر البطارية</string>
+    <string name="u30_pro_3">شاشات السيارة العريضة تقصّ الصورة بنفسها</string>
+    <string name="u30_changed">ما الذي تغيّر</string>
+    <string name="u30_chg_1">معدل الإطارات <b>تلقائي</b>: يحدده Android Auto</string>
+    <string name="u30_chg_2">إعدادات الفيديو السابقة محفوظة وهي تخص إعادة الترميز</string>
+    <string name="u30_warn">إذا حدث خطأ ما</string>
+    <string name="u30_warn_text">شاشة سوداء أو تقطّع أو تشوّهات أو صورة لا تملأ الشاشة: فعّل <b>إعادة الترميز</b> كما كان سابقًا.</string>
+    <string name="u30_where">الإعدادات ← الفيديو ← الوضع</string>
+    <string name="u30_ok">حسنًا</string>
+    <string name="u30_open">فتح إعدادات الفيديو</string>
+</resources>

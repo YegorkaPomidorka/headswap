@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="diag_title">التشخيص الذاتي</string>
+    <string name="diag_analyzing">جارٍ تحليل السجل…</string>
+    <string name="diag_failed">تعذّر تحليل السجل.</string>
+    <string name="diag_send">إرسال السجل إلى المطوّرين</string>
+    <string name="diag_privacy">يجري التحليل على الهاتف ولا يُرسل السجل إلى أي جهة</string>
+    <string name="diag_home_btn">التشخيص الذاتي</string>
+    <string name="diag_settings_item">تشخيص الاتصال</string>
+
+    <string name="diag_lead_one">وجدنا سببًا محتملًا.</string>
+    <plurals name="diag_lead_many">
+        <item quantity="zero">وجدنا %d سبب محتمل. ابدأ بالأول — فهو الأرجح.</item>
+        <item quantity="one">وجدنا %d سبب محتمل. ابدأ بالأول — فهو الأرجح.</item>
+        <item quantity="two">وجدنا %d سببين محتملين. ابدأ بالأول — فهو الأرجح.</item>
+        <item quantity="few">وجدنا %d أسباب محتملة. ابدأ بالأول — فهو الأرجح.</item>
+        <item quantity="many">وجدنا %d سببًا محتملًا. ابدأ بالأول — فهو الأرجح.</item>
+        <item quantity="other">وجدنا %d سبب محتمل. ابدأ بالأول — فهو الأرجح.</item>
+    </plurals>
+    <string name="diag_lead_next">ثم جرّب التالي.</string>
+    <string name="diag_lead_all_failed">لم يُفد أي من الأسباب التي وجدناها — أرسل السجل وسنراجعه.</string>
+
+    <string name="diag_chip_likely">الأرجح</string>
+    <string name="diag_chip_maybe">محتمل</string>
+    <string name="diag_chip_not_helped">لم يفد</string>
+    <string name="diag_how_to_fix">طريقة الإصلاح</string>
+    <string name="diag_show_log">ما في السجل ⌄</string>
+    <string name="diag_hide_log">ما في السجل ⌃</string>
+    <string name="diag_show_solution">عرض الحل ⌄</string>
+    <string name="diag_helped">أفاد</string>
+    <string name="diag_not_helped">لم يفد</string>
+
+    <string name="diag_done_title">رائع، يعمل</string>
+    <string name="diag_done_sub">أفادت النصيحة «%1$s»</string>
+    <string name="diag_done">تم</string>
+
+    <string name="diag_works_title">لا توجد أعطال واضحة</string>
+    <string name="diag_none_title">لم يُعثر على السبب</string>
+    <string name="diag_none_text">لم يُظهر السجل السبب. أرسل السجل إلى المطوّرين — سنراجعه ونضيف تلميحًا.</string>
+
+    <string name="diag_old_version">يُستحسن تحديث Headswap: تم إصلاح الكثير بالفعل.</string>
+    <string name="diag_old_update">تحديث</string>
+
+    <string name="diag_act_open_aa">فتح Android Auto</string>
+    <string name="diag_act_video">إعدادات الفيديو</string>
+    <string name="diag_act_audio">إعدادات الصوت</string>
+    <string name="diag_act_battery">إعدادات البطارية</string>
+    <string name="diag_act_autostart">التشغيل التلقائي</string>
+    <string name="diag_act_app_settings">الأذونات</string>
+    <string name="diag_act_wifi">إعدادات Wi-Fi</string>
+    <string name="diag_act_hotspot">نقطة الاتصال</string>
+    <string name="diag_act_bluetooth">Bluetooth</string>
+    <string name="diag_act_onboarding">إعادة الإعداد</string>
+    <string name="diag_act_update">البحث عن تحديث</string>
+    <string name="diag_act_share_log">إرسال السجل</string>
+</resources>

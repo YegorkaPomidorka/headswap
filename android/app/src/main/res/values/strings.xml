@@ -11,4 +11,5 @@
     <!-- Language names are written in their own language and are not translated. -->
     <string name="lang_en" translatable="false">English</string>
     <string name="lang_ru" translatable="false">Русский</string>
+    <string name="lang_ar" translatable="false">العربية</string>
 </resources>

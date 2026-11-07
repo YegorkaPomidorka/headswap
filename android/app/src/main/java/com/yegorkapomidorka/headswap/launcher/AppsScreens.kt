@@ -59,11 +59,10 @@ fun PagerHeader(page: Int, pages: Int, onPage: (Int) -> Unit, leading: @Composab
         horizontalArrangement = Arrangement.spacedBy(m.dp(s.g))) {
         Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(m.dp(s.g))) { leading() }
-        Ltr {
-            Txt("${page + 1} / $pages", s.f2, color = Pal.SEC, weight = FontWeight.SemiBold, mono = true)
-            PageArrow(Ico.CHEV_L, stringResource(R.string.l_prev_page), enabled = page > 0) { onPage(page - 1) }
-            PageArrow(Ico.CHEV_R, stringResource(R.string.l_next_page), enabled = page < pages - 1) { onPage(page + 1) }
-        }
+        // в RTL «назад» справа и шевроны зеркальны (PageArrow); счётчик остаётся «1 / 3» ([Txt] читает его слева направо)
+        Txt("${page + 1} / $pages", s.f2, color = Pal.SEC, weight = FontWeight.SemiBold, mono = true)
+        PageArrow(Ico.CHEV_L, stringResource(R.string.l_prev_page), enabled = page > 0) { onPage(page - 1) }
+        PageArrow(Ico.CHEV_R, stringResource(R.string.l_next_page), enabled = page < pages - 1) { onPage(page + 1) }
     }
 }
 
@@ -73,7 +72,7 @@ private fun PageArrow(icon: List<String>, description: String, enabled: Boolean,
     val s = m.spec
     RoundButton(s.t, description, onTap, enabled = enabled,
         background = if (enabled) Pal.SURFACE_HI else Pal.SURFACE) {
-        SvgIcon(icon, s.ic, if (enabled) Pal.TEXT else LocalPalette.current.backOff, stroke = 2.6f)
+        SvgIcon(icon, s.ic, if (enabled) Pal.TEXT else LocalPalette.current.backOff, Modifier.mirrorRtl(), stroke = 2.6f)
     }
 }
 
@@ -167,16 +166,14 @@ fun RemoveConfirm() {
             ) {
                 Column(Modifier.padding(m.dp(s.g * 2)), horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.spacedBy(m.dp(s.g))) {
-                    Ltr {
-                        Txt(stringResource(R.string.l_remove_q), s.f1, weight = FontWeight.Bold)
-                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(m.dp(s.g))) {
-                            AppCircle(ref, s.appIc)
-                            Txt(label, s.f1, color = Pal.SEC2)
-                        }
-                        Row(horizontalArrangement = Arrangement.spacedBy(m.dp(s.g))) {
-                            PillButton(stringResource(R.string.l_yes), { LauncherActions.confirmRemove() })
-                            PillButton(stringResource(R.string.l_no), { LauncherModel.confirmRemove = null }, filled = false)
-                        }
+                    Txt(stringResource(R.string.l_remove_q), s.f1, weight = FontWeight.Bold)
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(m.dp(s.g))) {
+                        AppCircle(ref, s.appIc)
+                        Txt(label, s.f1, color = Pal.SEC2)
+                    }
+                    Row(horizontalArrangement = Arrangement.spacedBy(m.dp(s.g))) {
+                        PillButton(stringResource(R.string.l_yes), { LauncherActions.confirmRemove() })
+                        PillButton(stringResource(R.string.l_no), { LauncherModel.confirmRemove = null }, filled = false)
                     }
                 }
             }

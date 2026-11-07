@@ -1,0 +1,112 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Home screen: hero titles -->
+    <string name="home_title_no_bridge">الجسر غير مشغّل</string>
+    <string name="home_title_reconnecting">جارٍ استعادة الاتصال</string>
+    <string name="home_title_ok">كل شيء يعمل</string>
+    <string name="home_title_off">شغّل خادم شاشة السيارة</string>
+    <string name="home_title_connecting">جارٍ الاتصال</string>
+    <string name="home_title_parked">السيارة غير متصلة</string>
+    <string name="home_title_server_down">خادم شاشة السيارة لا يستجيب</string>
+    <string name="home_title_ready">جاهز للرحلة</string>
+    <string name="home_title_unknown">تحقق من خادم شاشة السيارة</string>
+    <string name="home_title_checking">جارٍ فحص خادم شاشة السيارة</string>
+
+    <!-- Home screen: hero subtitles -->
+    <string name="home_err_no_cert">لا توجد شهادة شاشة السيارة في نسخة التطبيق.</string>
+    <string name="home_sub_start_chain">فعّله مرة واحدة: بعدها يستمر الخادم بالعمل في الخلفية، ولا حاجة لفتح قفل الهاتف للاتصال.</string>
+    <string name="home_sub_reconnecting">انقطع اتصال USB. تنتظر جلسة Android Auto حتى %1$d ث.</string>
+    <string name="home_sub_ok">Android Auto على شاشة السيارة. يمكنك وضع الهاتف جانبًا.</string>
+    <string name="home_sub_ok_wifi">Android Auto على شاشة السيارة عبر Wi-Fi، بلا كابل. يمكنك وضع الهاتف جانبًا.</string>
+    <string name="home_sub_refused">كابل USB متصل، لكن خادم شاشة السيارة لا يردّ. %1$s</string>
+    <string name="home_sub_aa_dropped">انقطع اتصال Android Auto. شغّل خادم شاشة السيارة مرة أخرى.</string>
+    <string name="home_sub_cable_ok">كابل USB متصل. بانتظار Android Auto.</string>
+    <string name="home_sub_parked">بقي خادم شاشة السيارة يعمل في الخلفية. في الرحلة القادمة، يكفي توصيل الكابل.</string>
+    <string name="home_sub_server_down">أغلق Android خادم شاشة السيارة. شغّله مرة أخرى: Android Auto ← ⋮ ← «بدء تشغيل خادم الوحدة الرئيسية».</string>
+    <string name="home_sub_ready">وصّل الهاتف بشاشة السيارة بكابل USB.</string>
+    <string name="home_sub_unknown">تعذّر على Headswap فحص الخادم. في Android Auto ← ⋮: إذا ظهر «إيقاف خادم الوحدة الرئيسية» فهو يعمل، وإذا ظهر «بدء تشغيل خادم الوحدة الرئيسية» فشغّله.</string>
+    <string name="home_sub_checking">ثوانٍ قليلة: يتصل Headswap بـ Android Auto لفترة وجيزة.</string>
+    <string name="home_sub_parked_unknown">في الرحلة القادمة: وصّل الكابل. إذا لم يظهر Android Auto، تحقق من خادم شاشة السيارة: Android Auto ← ⋮.</string>
+
+    <!-- Home screen: how to start the head unit server (bold = what to tap) -->
+    <string name="home_chain_label">كيف تشغّل خادم شاشة السيارة</string>
+    <string name="home_chain_1">اضغط <b>«فتح Android Auto»</b></string>
+    <string name="home_chain_2">النقاط الثلاث <b>⋮</b> أعلى اليسار</string>
+    <string name="home_chain_3"><b>«بدء تشغيل خادم الوحدة الرئيسية»</b></string>
+
+    <!-- Home screen: stage labels -->
+    <string name="home_stage_server">خادم شاشة السيارة</string>
+    <string name="home_stage_headunit">شاشة السيارة</string>
+    <string name="home_stage_video">الفيديو</string>
+    <string name="home_stage_audio">الصوت</string>
+
+    <!-- Home screen: stage details -->
+    <string name="home_stage_no_cert">لا توجد شهادة</string>
+    <string name="home_stage_holds">يحتفظ بالجلسة</string>
+    <string name="home_stage_reconnecting">إعادة الاتصال</string>
+    <string name="home_stage_paused">متوقف مؤقتًا</string>
+    <string name="home_stage_working">يعمل</string>
+    <string name="home_stage_connected">متصل</string>
+    <string name="home_stage_off">متوقف</string>
+    <string name="home_stage_not_started">شغّله</string>
+    <string name="home_stage_connecting">جارٍ الاتصال</string>
+    <string name="home_stage_handshake">المصافحة</string>
+    <string name="home_stage_hu_parked">غير متصلة</string>
+    <string name="home_stage_no_answer">لا يستجيب</string>
+    <string name="home_stage_started">قيد التشغيل</string>
+    <string name="home_stage_wait_cable">بانتظار الكابل</string>
+    <string name="home_stage_unknown">لم يُفحص</string>
+    <string name="home_stage_checking">جارٍ الفحص</string>
+
+    <!-- Home screen: widgets -->
+    <string name="home_settings">الإعدادات</string>
+    <string name="home_btn_open_aa">فتح إعدادات Android Auto</string>
+    <string name="home_grace_waiting">بانتظار إعادة الاتصال</string>
+    <string name="home_grace_left">متبقي %1$d ث</string>
+
+    <!-- Notification -->
+    <string name="notif_reconnecting">انقطع اتصال USB · متبقي %1$d ث</string>
+    <string name="notif_video_usb">الفيديو · الصوت عبر USB</string>
+    <string name="notif_video_wifi">الفيديو · الصوت عبر Wi-Fi</string>
+    <string name="notif_video">الفيديو</string>
+    <string name="notif_server_off">خادم شاشة السيارة غير مشغّل</string>
+    <string name="notif_cable_waiting">كابل USB متصل · بانتظار Android Auto</string>
+    <string name="notif_parked">خادم شاشة السيارة يعمل في الخلفية</string>
+    <string name="notif_server_down">أغلق Android خادم شاشة السيارة · شغّله مرة أخرى</string>
+    <string name="notif_server_started">تم تشغيل خادم شاشة السيارة</string>
+    <string name="notif_parked_unknown">السيارة غير متصلة</string>
+    <string name="notif_server_unknown">تأكد من أن خادم شاشة السيارة يعمل</string>
+
+    <!-- Onboarding mock screens (drawn illustrations of system UI) -->
+    <string name="mock_aa_version">الإصدار</string>
+    <string name="mock_aadev_title">إعدادات المطوّر</string>
+    <string name="mock_aadev_unknown">مصادر غير معروفة</string>
+    <string name="mock_menu_help">المساعدة والملاحظات</string>
+    <string name="mock_menu_start">بدء تشغيل خادم الوحدة الرئيسية</string>
+    <string name="mock_menu_exit">الخروج من وضع المطوّر</string>
+    <string name="mock_notif_now">Headswap · الآن</string>
+    <string name="mock_bg_activity">توفير البطارية</string>
+    <string name="mock_bg_no_limits">بلا قيود</string>
+    <string name="mock_bg_no_limits_sub">لن يقيّد توفير البطارية عمل التطبيق في الخلفية</string>
+    <string name="mock_bg_autostart">التشغيل التلقائي</string>
+    <string name="mock_mic_question">هل تسمح لتطبيق Headswap بتسجيل الصوت؟</string>
+    <string name="mock_mic_while_using">أثناء استخدام التطبيق</string>
+    <string name="mock_mic_once">هذه المرة فقط</string>
+    <string name="mock_mic_deny">عدم السماح</string>
+    <string name="mock_bt_headunit">شاشة السيارة</string>
+    <string name="mock_bt_connected">متصل</string>
+    <string name="mock_loc_use">استخدام الموقع</string>
+    <string name="mock_loc_use_sub">يمكن للتطبيقات التي لديها هذا الإذن الوصول إلى موقعك.</string>
+    <string name="mock_usb_question">هل تريد فتح Headswap للتعامل مع ملحق USB؟</string>
+    <string name="mock_usb_default">استخدامه افتراضيًا لملحق USB هذا</string>
+    <string name="mock_dev_title">خيارات المطوّر</string>
+    <string name="mock_dev_wifi">تصحيح الأخطاء اللاسلكي</string>
+    <string name="mock_dev_pair">إقران الجهاز برمز الإقران</string>
+    <string name="mock_about_title">حول الهاتف</string>
+    <string name="mock_about_build">رقم الإصدار</string>
+    <string name="mock_about_build_sub">في Xiaomi: «OS version»</string>
+    <string name="mock_cancel">إلغاء</string>
+    <string name="mock_ok">حسنًا</string>
+
+    <string name="home_wireless">لاسلكي: %1$s</string>
+</resources>

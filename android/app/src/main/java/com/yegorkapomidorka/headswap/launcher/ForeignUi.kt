@@ -60,8 +60,13 @@ internal fun ForeignRoot() {
         }
         if (appKey != null) {
             // пока открыты «Недавние», касания в дочернее окно не идут
-            EmbedLayer(EmbedHost.app, rect, shown = true, interactive = !model.recentsOpen, rounded = false, background = solid,
-                starting = stringResource(R.string.l_starting, model.starting ?: ""), onCardTap = null)
+            // окно ставится пиксельным rect-ом (absoluteOffset): Box-родитель физический, иначе в RTL сдвиг уедет от правого края
+            Ltr {
+                Box(Modifier.fillMaxSize()) {
+                    EmbedLayer(EmbedHost.app, rect, shown = true, interactive = !model.recentsOpen, rounded = false, background = solid,
+                        starting = stringResource(R.string.l_starting, model.starting ?: ""), onCardTap = null)
+                }
+            }
         }
         if (model.recentsOpen) Box(Modifier.fillMaxSize().padding(bottom = m.dp(s.barH))) { RecentsOverlay() }
     }
@@ -73,6 +78,7 @@ private fun ForeignBar() {
     val m = LocalMetrics.current
     val s = m.spec
     val model = LauncherModel
+    // три кнопки Android (назад, домой, недавние) стоят физически слева направо при любом языке; Row создан внутри Ltr
     Ltr {
         Row(
             Modifier.fillMaxWidth().height(m.dp(s.barH)).background(BAR_BG),
