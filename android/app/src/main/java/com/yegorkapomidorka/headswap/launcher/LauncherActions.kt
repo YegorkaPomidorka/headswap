@@ -108,7 +108,51 @@ object LauncherActions {
     }
 
     /** Кнопка голоса: панель Алисы слева за рейкой; повторное нажатие закрывает. Главный поток. */
-    fun toggleAssistant() { if (model.assistantOpen) closeAssistant("повторная кнопка голоса") else openAssistant() }
+    fun toggleAssistant() {
+        if (VOICE_ONLY) { voiceOnly(); return }
+        if (model.assistantOpen) closeAssistant("повторная кнопка голоса") else openAssistant()
+    }
+
+    /** «Алиса только голосом» (ADR 0034): скрытый дисплей и плашка вместо панели слева. */
+    private val VOICE_ONLY get() = model.aliceVoiceOnly
+
+    /**
+     * Алиса на скрытом дочернем дисплее: он ALWAYS_UNLOCKED, и Яндекс, которого сессия помощника перезапускает полным
+     * приложением, не упирается в блокировку телефона (на экране телефона упирался, стенд 07.11). Слой за экраном,
+     * на ГУ ничего не видно; голос идёт захватом звука.
+     * Повторное нажатие - панель заново: задачи Яндекса закрываем и запускаем как в первый раз. ASSIST поверх живой задачи
+     * утаскивал её (singleTask) на заблокированный экран телефона, прослушивание сбрасывалось, а перенос обратно
+     * посреди перехода MIUI оставлял на телефоне призрак окна, глотавший жесты (стенд 07.11).
+     */
+    private fun voiceOnly() {
+        if (model.assistantOpen) {
+            AppLog.i("ASSIST скрытая Алиса: повторное нажатие, панель заново", false)
+            // closeAssistant чистит дисплей в потоке, потом видит, что панель снова открыта, и перезапускает слот
+            closeAssistant("скрытая Алиса: повторное нажатие")
+        }
+        model.assistantHidden = true
+        openAssistant()
+        AliceVoice.start(model.context)
+        val main = hiddenHandler
+        main.removeCallbacks(hiddenClose)
+        main.postDelayed(hiddenClose, HIDDEN_MS)
+        // значок голоса на ГУ - на время вопроса, не на всё время жизни дисплея
+        main.postDelayed({ if (model.assistantHidden) com.yegorkapomidorka.headswap.dex.DesktopKeys.voiceStatus?.invoke(false) }, 10_000L)
+    }
+
+    /** Скрытая Алиса держит дисплей столько после последнего нажатия, потом отпускает. */
+    private const val HIDDEN_MS = 120_000L
+    /** Один Handler: removeCallbacks снимает только свои сообщения, с новым Handler таймер не сбрасывался (стенд 07.11). */
+    private val hiddenHandler = android.os.Handler(android.os.Looper.getMainLooper())
+    private val hiddenClose = Runnable { closeAssistant("скрытая Алиса: время вышло") }
+
+    /** Алиса на телефоне (кнопкой голоса или сама): её маршрут из экрана телефона - в плитку навигатора, «Поехали» жмёт водитель. */
+    fun startRouteCatcher(ctx: android.content.Context) {
+        val main = android.os.Handler(android.os.Looper.getMainLooper())
+        com.yegorkapomidorka.headswap.dex.PhoneAssistant.watchPhone(ctx, com.yegorkapomidorka.headswap.carapp.RouteIntent::geoFor) { t, geo ->
+            main.post { if (VOICE_ONLY) routeFromAlice(t, geo) }
+        }
+    }
 
     fun openAssistant() {
         if (model.assistantOpen) return
@@ -122,6 +166,9 @@ object LauncherActions {
         if (!model.assistantOpen) return
         AppLog.i("ASSIST панель закрыта: $why", false)
         model.assistantOpen = false
+        model.assistantHidden = false
+        AliceVoice.stop()
+        hiddenHandler.removeCallbacks(hiddenClose)
         com.yegorkapomidorka.headswap.dex.DesktopKeys.voiceStatus?.invoke(false)
         com.yegorkapomidorka.headswap.dex.PhoneAssistant.stopWatch()
         val ctx = model.context.applicationContext
@@ -145,7 +192,20 @@ object LauncherActions {
         val pkg = t.topActivity?.packageName ?: return
         val data = t.baseIntent.dataString
         val geo = com.yegorkapomidorka.headswap.carapp.RouteIntent.geoFor(data)
+        if (geo == null && model.assistantHidden && pkg == model.navigatorPkg) {
+            // «Открой навигатор» поднимает пустую задачу Навигатора; следующий build_route_on_map ушёл бы в неё же
+            // (base MAIN, ловец маршрут не видит, стенд 07.11). Закрываем - маршрут создаст новую задачу.
+            AppLog.i("ASSIST скрытая Алиса открыла $pkg без маршрута: задачу закрываем", false)
+            val id = t.taskId
+            Thread({ com.yegorkapomidorka.headswap.dex.PhoneAssistant.removeTask(id) }, "assist-navi").start()
+            return
+        }
         if (geo == null) { AppLog.i("ASSIST $pkg не маршрут ($data), остаётся в панели", false); return }
+        routeFromAlice(t, geo)
+    }
+
+    private fun routeFromAlice(t: android.app.ActivityManager.RunningTaskInfo, geo: String) {
+        val pkg = t.topActivity?.packageName ?: t.baseIntent.component?.packageName ?: return
         val navigate = android.content.Intent(com.yegorkapomidorka.headswap.carapp.RouteIntent.ACTION_NAVIGATE, android.net.Uri.parse(geo))
         val nav = model.navigatorPkg
         val car = com.yegorkapomidorka.headswap.carapp.CarAppHost.pkg?.takeIf { it == nav }
@@ -161,6 +221,7 @@ object LauncherActions {
             if (car != null || nav != pkg) assist.closePhoneTasks(ctx, pkg)
         }, "assist-route").start()
         closeAssistant("маршрут -> навигатор")
+        if (VOICE_ONLY) AliceVoice.route()
         if (model.navigatorPkg != null && model.area != Area.Navigator) model.go(Area.Navigator)
         if (car != null) com.yegorkapomidorka.headswap.carapp.CarAppHost.newIntent(navigate)
     }
@@ -221,7 +282,7 @@ object LauncherActions {
     fun embeddedBack() {
         AppLog.i("LAUNCHER Назад на рейке: экран=${model.area}", false)
         // панель Алисы закрывается сама, Back в Яндекс не шлём
-        if (model.assistantOpen) { closeAssistant("Назад"); return }
+        if (model.assistantOpen && !model.assistantHidden) { closeAssistant("Назад"); return }
         when (model.area) {
             is Area.App -> {
                 val now = android.os.SystemClock.uptimeMillis()

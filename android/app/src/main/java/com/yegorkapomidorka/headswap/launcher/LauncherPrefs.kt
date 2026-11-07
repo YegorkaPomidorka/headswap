@@ -62,6 +62,11 @@ class LauncherPrefs(context: Context) {
         get() = prefs.getBoolean("autoplay", true)
         set(value) { prefs.edit().putBoolean("autoplay", value).apply() }
 
+    /** «Алиса только голосом»: Алиса на скрытом дисплее и плашка снизу; выкл - панель Алисы слева (ADR 0026). */
+    var aliceVoiceOnly: Boolean
+        get() = prefs.getBoolean("alice_voice_only", true)
+        set(value) { prefs.edit().putBoolean("alice_voice_only", value).apply() }
+
     /** «Уведомления» телефона на экране ГУ. */
     var notifications: Boolean
         get() = prefs.getBoolean("notifications", true)

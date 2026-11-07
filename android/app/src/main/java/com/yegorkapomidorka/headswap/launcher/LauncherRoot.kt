@@ -108,6 +108,7 @@ fun LauncherRoot(connected: Boolean) {
                         HomeTileButtons() // ⇄ и «Слои» ленты - над живыми окнами плашек
                         NavHostOverlay() // шаблоны навигатора на своём хосте Car App - над его картой, в границах области
                         NotificationsOverlay() // язычок и шторка уведомлений телефона из-под строки статуса; касания берёт только сам
+                        AliceVoicePill() // скрытая Алиса: слушаю / думаю / говорю / маршрут - снизу по центру
                         // входящий звонок поверх чужого приложения или экрана без карточки «Телефон»
                         if (PhoneController.callState == CallState.RINGING && (model.area != Area.Home || spec.strip || model.homeLayout.two)) {
                             // как нижняя полоса главного: прибита к низу, скругления только сверху

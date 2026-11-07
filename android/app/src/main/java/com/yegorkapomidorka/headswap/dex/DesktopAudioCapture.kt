@@ -26,6 +26,8 @@ object DesktopAudioState {
     @Volatile var error: String? = null
     @Volatile var pcmBytes = 0L
     @Volatile var nonSilentBuffers = 0L
+    /** Пик последнего буфера захвата, 0..1: волны плашки «Говорю» по голосу Алисы. */
+    @Volatile var level = 0f
 }
 
 /** Main-process owner. PCM exists only in memory; the existing CarLife queue enforces backpressure. */
@@ -138,6 +140,19 @@ class DesktopAudioCapture(context: Context) {
         }
     }
 
+    /** Пик PCM 16 бит little-endian (каждый 4-й сэмпл - хватает для волн), 0..1. */
+    private fun peak(pcm: ByteArray): Float {
+        var max = 0
+        var i = 0
+        while (i + 1 < pcm.size) {
+            val s = (pcm[i].toInt() and 0xFF) or (pcm[i + 1].toInt() shl 8)
+            val a = if (s < 0) -s else s
+            if (a > max) max = a
+            i += 8
+        }
+        return max / 32768f
+    }
+
     private fun runCapture(capture: Capture) {
         var record: AudioRecord? = null
         var loopback: DesktopAudioLoopback? = null
@@ -188,6 +203,7 @@ class DesktopAudioCapture(context: Context) {
                 if (pcm.isEmpty() || capture.cancelled.get()) continue
                 DesktopAudioState.pcmBytes += pcm.size
                 if (pcm.any { it != 0.toByte() }) DesktopAudioState.nonSilentBuffers++
+                DesktopAudioState.level = peak(pcm)
                 sessions.runIfCurrent(capture.generation) {
                     if (!capture.cancelled.get()) capture.core.onAudioData(DesktopAudioPolicy.MEDIA_CHANNEL, pcm,
                         SystemClock.elapsedRealtimeNanos() / 1000)

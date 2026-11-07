@@ -59,6 +59,8 @@ internal object LauncherModel {
     var autoplay by mutableStateOf(true)
     /** «Уведомления» телефона на экране ГУ (слушатель - [NotificationsRepo]). */
     var notifications by mutableStateOf(true)
+    /** «Алиса только голосом» ([LauncherPrefs.aliceVoiceOnly]). */
+    var aliceVoiceOnly by mutableStateOf(true)
     var localPlayer by mutableStateOf<String?>(null)
     var onlinePlayer by mutableStateOf<String?>(null)
     /** Режим темы ГУ (CHANGE_MD_THEME, 0 день, 1 ночь, 2 авто); null - ГУ ещё не присылала. Обновляет [LauncherRoot]. */
@@ -115,6 +117,8 @@ internal object LauncherModel {
     var foreign by mutableStateOf<AppRef?>(null)
     /** Панель Алисы (кнопка голоса) поверх рабочего стола: слева за рейкой, под ней затемнение. */
     var assistantOpen by mutableStateOf(false)
+    /** Панель Алисы скрыта (только голос): дочерний дисплей живёт, слой за экраном, затемнения нет. */
+    var assistantHidden by mutableStateOf(false)
     /** Оверлей «Недавние» на экране. */
     var recentsOpen by mutableStateOf(false)
     /** Приложения оверлея; null - список ещё запрашивается. */
@@ -163,6 +167,7 @@ internal object LauncherModel {
         autoplay = prefs.autoplay
         notifications = prefs.notifications
         NotificationsRepo.setEnabled(notifications)
+        aliceVoiceOnly = prefs.aliceVoiceOnly
         hideStatusBar = prefs.hideStatusBar
         localPlayer = prefs.localPlayer
         onlinePlayer = prefs.onlinePlayer
@@ -181,6 +186,7 @@ internal object LauncherModel {
         EmbedHost.onAssistantOpened = { LauncherActions.assistantOpened(it) }
         CarAppHost.scaleFor = { pkg -> CarConfigMath.step(prefs.mapScale(pkg)) }
         CarAppHost.allowFor = { pkg -> prefs.navHints(pkg) }
+        LauncherActions.startRouteCatcher(context.applicationContext)
         ready = true
         reloadCatalog()
     }
@@ -236,6 +242,10 @@ internal object LauncherModel {
     fun chooseAutoplay(on: Boolean) { autoplay = on; prefs.autoplay = on }
     /** Из «Для разработчиков» на телефоне: лаунчер мог ещё не стартовать, поэтому префы — своим экземпляром. */
     fun chooseHideStatusBar(ctx: Context, on: Boolean) { hideStatusBar = on; LauncherPrefs(ctx.applicationContext).hideStatusBar = on }
+    fun chooseAliceVoiceOnly(on: Boolean) {
+        if (assistantOpen) LauncherActions.closeAssistant("переключили «Алиса только голосом»")
+        aliceVoiceOnly = on; prefs.aliceVoiceOnly = on
+    }
     fun chooseNotifications(on: Boolean) { notifications = on; prefs.notifications = on; NotificationsRepo.setEnabled(on) }
     fun chooseLocalPlayer(pkg: String?) { localPlayer = pkg; prefs.localPlayer = pkg }
     fun chooseOnlinePlayer(pkg: String?) { onlinePlayer = pkg; prefs.onlinePlayer = pkg }

@@ -21,6 +21,12 @@
     <string name="l_nav_not_installed">No navigator installed</string>
     <string name="l_nav_starting">Starting the navigator…</string>
     <string name="l_alice_starting">Starting Alice…</string>
+    <string name="l_alice_listening">I\'m listening</string>
+    <string name="l_alice_thinking">Thinking...</string>
+    <string name="l_alice_speaking">Speaking</string>
+    <string name="l_alice_route">Route in the navigator</string>
+    <string name="l_alice_route_hint">Pick a route and press Go</string>
+    <string name="l_alice_close">Close Alice</string>
     <string name="l_nav_failed">The window did not open. Tap to retry.</string>
     <string name="l_nav_restart">Restart navigator</string>
     <string name="l_nav_hints">Hints on the cluster</string>
@@ -157,6 +163,9 @@
     <string name="l_nh_search">Search</string>
     <string name="l_nh_loading">Loading…</string>
     <string name="l_s_notifications">Notifications</string>
+    <string name="l_s_alice_voice">Alice by voice only</string>
+    <string name="l_s_alice_voice_on">No window, a pill at the bottom; works on a locked phone</string>
+    <string name="l_s_alice_voice_off">Alice in a panel on the left</string>
     <string name="l_notif_show_all">Notifications: %1$d. Show all</string>
     <string name="l_notif_collapse">Collapse notifications</string>
     <string name="l_notif_clear_all">Clear all</string>
