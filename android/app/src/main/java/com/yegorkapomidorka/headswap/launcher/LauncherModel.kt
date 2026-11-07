@@ -106,6 +106,10 @@ internal object LauncherModel {
     var navCardRect by mutableStateOf<Rect?>(null)
     /** Нижний край сплошной строки статуса в координатах корня; null - на этом экране строки нет (оверлей уведомлений вешается на верх области). */
     var statusBottom by mutableStateOf<Float?>(null)
+    /** «Скрыть строку статуса» (Для разработчиков): полосы нет, уведомления висят чёлкой от верхнего края ([NotificationsOverlay]). */
+    var hideStatusBar by mutableStateOf(false)
+    /** На экране стоит скрытая строка статуса: там, где была бы полоска, висит чёлка уведомлений. */
+    var statusSlot by mutableStateOf(false)
 
     /** Чужой лаунчер из DexPrefs.desktopComponent в окне над панелью навигации; null - наш рабочий стол. Ведёт [ForeignActions]. */
     var foreign by mutableStateOf<AppRef?>(null)
@@ -159,6 +163,7 @@ internal object LauncherModel {
         autoplay = prefs.autoplay
         notifications = prefs.notifications
         NotificationsRepo.setEnabled(notifications)
+        hideStatusBar = prefs.hideStatusBar
         localPlayer = prefs.localPlayer
         onlinePlayer = prefs.onlinePlayer
         cardView = prefs.cardView
@@ -229,6 +234,8 @@ internal object LauncherModel {
     fun chooseMapLeft(left: Boolean) { mapLeft = left; prefs.mapLeft = left }
     fun chooseAnimations(on: Boolean) { animations = on; prefs.animations = on }
     fun chooseAutoplay(on: Boolean) { autoplay = on; prefs.autoplay = on }
+    /** Из «Для разработчиков» на телефоне: лаунчер мог ещё не стартовать, поэтому префы — своим экземпляром. */
+    fun chooseHideStatusBar(ctx: Context, on: Boolean) { hideStatusBar = on; LauncherPrefs(ctx.applicationContext).hideStatusBar = on }
     fun chooseNotifications(on: Boolean) { notifications = on; prefs.notifications = on; NotificationsRepo.setEnabled(on) }
     fun chooseLocalPlayer(pkg: String?) { localPlayer = pkg; prefs.localPlayer = pkg }
     fun chooseOnlinePlayer(pkg: String?) { onlinePlayer = pkg; prefs.onlinePlayer = pkg }

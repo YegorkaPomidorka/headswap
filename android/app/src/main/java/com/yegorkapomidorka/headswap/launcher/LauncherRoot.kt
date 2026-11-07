@@ -246,6 +246,14 @@ fun StatusBar(title: String? = null, showNet: Boolean = true) {
     val st = LauncherModel.status
     val model = LauncherModel
     val bar = LocalPalette.current.bar
+    if (model.hideStatusBar) {
+        // строка скрыта (Для разработчиков): полосы и значков нет, остаётся только заголовок экрана; чёлка уведомлений - от верха экрана
+        DisposableEffect(Unit) { model.statusBottom = null; model.statusSlot = true; onDispose { model.statusSlot = false } }
+        if (title != null) Row(Modifier.fillMaxWidth().height(m.dp(s.statusH)), verticalAlignment = Alignment.CenterVertically) {
+            Txt(title, s.fs, Modifier.weight(1f), color = Pal.TEXT, weight = FontWeight.SemiBold)
+        }
+        return
+    }
     DisposableEffect(Unit) { onDispose { model.statusBottom = null } }
     Row(
         Modifier.fillMaxWidth().height(m.dp(s.statusH))

@@ -67,6 +67,11 @@ class LauncherPrefs(context: Context) {
         get() = prefs.getBoolean("notifications", true)
         set(value) { prefs.edit().putBoolean("notifications", value).apply() }
 
+    /** «Скрыть строку статуса» (Для разработчиков): на части VW ГУ она дублирует свою строку машины. */
+    var hideStatusBar: Boolean
+        get() = prefs.getBoolean("hide_status_bar", false)
+        set(value) { prefs.edit().putBoolean("hide_status_bar", value).apply() }
+
     /** Первый слот чипа плееров: свой плеер на телефоне; null - первый найденный. */
     var localPlayer: String?
         get() = prefs.getString("local_player", null)
