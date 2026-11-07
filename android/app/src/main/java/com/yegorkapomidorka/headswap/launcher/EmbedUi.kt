@@ -117,7 +117,8 @@ fun EmbedLayers() {
 
     // панель Алисы: слева за рейкой, на всю высоту, шириной 0,8 высоты; справа затемнение, тап по нему закрывает
     val assistOpen = model.assistantOpen
-    val aliceKey = remember(assistOpen) { if (assistOpen) LauncherActions.aliceKey() else null }
+    // Gemini окна не занимает: открывается клавишей помощника на экране телефона (LauncherActions.voiceOnly)
+    val aliceKey = remember(assistOpen) { if (assistOpen && !LauncherActions.gemini()) LauncherActions.aliceKey() else null }
     val aliceRect = areaRect?.let { Rect(it.left, it.top, it.left + (it.height * 0.8f).roundToInt(), it.bottom) }
     LaunchedEffect(aliceKey, aliceRect?.width, aliceRect?.height) {
         if (aliceKey != null && aliceRect != null) {

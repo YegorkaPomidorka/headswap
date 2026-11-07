@@ -32,6 +32,17 @@ class EmbeddedDisplayPolicyTest {
         assertFalse(EmbeddedDisplayPolicy.assistLaunch("com.yandex.maps", "ru.yandex.searchplugin.AssistantActivityAlias"))
     }
 
+    @Test fun geminiLaunchesHandsFreeAndAliceAssist() {
+        val g = "com.google.android.googlequicksearchbox"
+        val hf = "com.google.android.voicesearch.handsfree.HandsFreeActivity"
+        assertTrue(EmbeddedDisplayPolicy.assistLaunch(g, hf))
+        assertFalse(EmbeddedDisplayPolicy.assistLaunch(g, "com.google.android.googlequicksearchbox.SearchActivity"))
+        assertFalse(EmbeddedDisplayPolicy.assistLaunch("com.example.app", hf))
+        assertEquals("android.speech.action.VOICE_SEARCH_HANDS_FREE", EmbeddedDisplayPolicy.assistAction(g, hf))
+        assertEquals("android.intent.action.ASSIST",
+            EmbeddedDisplayPolicy.assistAction("com.yandex.searchapp", "ru.yandex.searchplugin.AssistantActivityAlias"))
+    }
+
     @Test fun validatesWidgetGeometryBeforeAllocation() {
         EmbeddedDisplayPolicy.requireSize(800, 850, 160)
         EmbeddedDisplayPolicy.requireSize(128, 128, 120)

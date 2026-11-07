@@ -100,10 +100,19 @@ object LauncherActions {
     private val ALICE_PACKAGES = listOf("com.yandex.searchapp", "ru.yandex.searchplugin")
     private const val ALICE_CLASS = "ru.yandex.searchplugin.AssistantActivityAlias"
 
-    /** Ключ «пакет/класс» Алисы для дочернего окна: установленный пакет из списка, не нашли - первый (окно покажет ошибку). */
+    private fun installed(pkg: String) = runCatching { model.context.packageManager.getApplicationInfo(pkg, 0) }.isSuccess
+
+    /**
+     * Помощник кнопки голоса: Яндекс с Алисой; нет его - Gemini из Google app (только голосом, ADR 0035).
+     * Ни того ни другого - Алиса (окно покажет ошибку).
+     */
+    internal fun gemini(): Boolean = ALICE_PACKAGES.none(::installed) &&
+        installed(com.yegorkapomidorka.headswap.dex.EmbeddedDisplayPolicy.GEMINI_PACKAGE)
+
+    /** Ключ «пакет/класс» помощника для дочернего окна. */
     internal fun aliceKey(): String {
-        val pm = model.context.packageManager
-        val pkg = ALICE_PACKAGES.firstOrNull { runCatching { pm.getApplicationInfo(it, 0) }.isSuccess } ?: ALICE_PACKAGES[0]
+        if (gemini()) return com.yegorkapomidorka.headswap.dex.EmbeddedDisplayPolicy.run { "$GEMINI_PACKAGE/$GEMINI_CLASS" }
+        val pkg = ALICE_PACKAGES.firstOrNull(::installed) ?: ALICE_PACKAGES[0]
         return "$pkg/$ALICE_CLASS"
     }
 
@@ -113,8 +122,8 @@ object LauncherActions {
         if (model.assistantOpen) closeAssistant("повторная кнопка голоса") else openAssistant()
     }
 
-    /** «Алиса только голосом» (ADR 0034): скрытый дисплей и плашка вместо панели слева. */
-    private val VOICE_ONLY get() = model.aliceVoiceOnly
+    /** «Алиса только голосом» (ADR 0034): скрытый дисплей и плашка вместо панели слева. Gemini - всегда голосом. */
+    private val VOICE_ONLY get() = model.aliceVoiceOnly || gemini()
 
     /**
      * Алиса на скрытом дочернем дисплее: он ALWAYS_UNLOCKED, и Яндекс, которого сессия помощника перезапускает полным
@@ -132,7 +141,18 @@ object LauncherActions {
         }
         model.assistantHidden = true
         openAssistant()
-        AliceVoice.start(model.context)
+        val gemini = gemini()
+        AliceVoice.start(model.context, gemini)
+        if (gemini) {
+            // Gemini отвечает только при включённом экране телефона и только штатной сессии помощника: запуск
+            // интентом на скрытом дисплее он блокирует («Main display is OFF», «Interaction blocked», стенд 07.11)
+            val ctx = model.context.applicationContext
+            Thread({ com.yegorkapomidorka.headswap.dex.PhoneAssistant.closePhonePackage(ctx, "com.google.android.apps.maps") },
+                "assist-maps").start()
+            val inject = com.yegorkapomidorka.headswap.dex.DesktopKeys.injectKey
+            AppLog.i("ASSIST Gemini: клавиша помощника${if (inject == null) " - нет шлюза ввода" else ""}", false)
+            inject?.invoke(android.view.KeyEvent.KEYCODE_VOICE_ASSIST)
+        }
         val main = hiddenHandler
         main.removeCallbacks(hiddenClose)
         main.postDelayed(hiddenClose, HIDDEN_MS)
