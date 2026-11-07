@@ -119,7 +119,14 @@ internal class DelegatedInputGateway(context: Context) : IDelegatedInputGateway.
         if (DisplayWakeLocks.shouldHold(display.flags, group)) wakeLocks.hold(displayId)
     }
 
-    @Synchronized override fun createDeviceDisplay(surface: android.view.Surface, name: String, width: Int, height: Int,
+    override fun createDeviceDisplay(surface: android.view.Surface, name: String, width: Int, height: Int,
+        density: Int, flags: Int, owner: IBinder): Int {
+        // Хост мог умереть при подключении ГУ (Samsung перезапускает adbd): ждём перезапуск вне монитора шлюза.
+        VdmHostLink.awaitHost(VdmHostRestart.WAIT_MS)
+        return createDeviceDisplayLocked(surface, name, width, height, density, flags, owner)
+    }
+
+    @Synchronized private fun createDeviceDisplayLocked(surface: android.view.Surface, name: String, width: Int, height: Int,
         density: Int, flags: Int, owner: IBinder): Int {
         requireActive()
         return VdmHostLink.create(surface, name, width, height, density, flags, owner)

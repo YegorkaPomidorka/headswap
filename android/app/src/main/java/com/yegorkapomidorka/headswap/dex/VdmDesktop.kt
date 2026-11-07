@@ -78,7 +78,24 @@ internal object VdmHostLink {
 
     private fun onHostDied(dead: IVdmHost) {
         synchronized(this) { if (host === dead) { host = null; owned.clear() } }
-        AppLog.i("VDM хост завершился: новые экраны пойдут обычным путём; ${debugState()}", false)
+        AppLog.i("VDM хост завершился; ${debugState()}", false)
+        VdmHostRestart.onHostDied(appContext)
+    }
+
+    /**
+     * Ждёт хост, пока идёт [VdmHostRestart] (до [timeoutMs]); вызывать вне мониторов: [accept] берёт монитор этого
+     * объекта. true - хост на месте.
+     */
+    fun awaitHost(timeoutMs: Long): Boolean {
+        if (connected || !VdmDesktop.supported) return connected
+        if (!VdmHostRestart.pending) return false
+        val started = android.os.SystemClock.elapsedRealtime()
+        while (VdmHostRestart.pending && android.os.SystemClock.elapsedRealtime() - started < timeoutMs) {
+            if (connected) break
+            Thread.sleep(100)
+        }
+        AppLog.i("VDM ждала хост ${android.os.SystemClock.elapsedRealtime() - started} мс: ${if (connected) "подключён" else "нет"}", false)
+        return connected
     }
 
     @Volatile private var appContext: android.content.Context? = null
