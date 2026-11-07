@@ -142,6 +142,13 @@
         </activity>
 
         <!-- раздача логов и отчётов через «Поделиться» (только чтение, без AndroidX FileProvider) -->
+        <!-- Этап B (Android 17): shell-хост VirtualDevice отдаёт сюда свой binder. Право есть у shell, не у приложений;
+             в call() ещё и проверка uid 2000. -->
+        <provider
+            android:name=".dex.VdmHostProvider"
+            android:authorities="${applicationId}.vdmhost"
+            android:exported="true"
+            android:permission="android.permission.INTERACT_ACROSS_USERS_FULL" />
         <provider
             android:name=".ui.LogProvider"
             android:authorities="${applicationId}.logs"

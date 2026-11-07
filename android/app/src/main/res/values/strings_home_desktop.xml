@@ -22,4 +22,5 @@
 
     <string name="home_desk_btn_activate">Activate</string>
     <string name="home_desk_btn_stop">Stop</string>
+    <string name="home_desk_sub_usb_debug">Turn on USB debugging in Developer options: on Android 17 the car screen goes dark together with the phone without it.</string>
 </resources>

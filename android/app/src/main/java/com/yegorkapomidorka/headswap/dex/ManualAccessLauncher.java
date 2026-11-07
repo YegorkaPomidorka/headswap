@@ -137,6 +137,7 @@ public final class ManualAccessLauncher {
                 catch (IOException | RuntimeException gone) { same = false; }
                 check(same, "Процесс HeadSwap завершился после выхода из ADB-запуска. Доступ не сохранился.");
             }
+            startVdmHost(options, app.pid);
         } finally {
             if (!launcherStopped && output.pid != null && launcher.isAlive()) {
                 try { stopOwnedLauncher(output.pid, options); }
@@ -146,6 +147,23 @@ public final class ManualAccessLauncher {
             }
             // Never force-stop the app, kill by process name, or destroy an unverified launcher PID.
             try { launcher.getInputStream().close(); } catch (IOException ignored) { }
+        }
+    }
+
+    /**
+     * Этап B (Android 17): отдельный shell-процесс держит VirtualDevice для дисплея рабочего стола. Отвязан от этого
+     * запуска (setsid/nohup), живёт, пока жив проверенный выше процесс приложения. Не вышло - рабочий стол на обычном дисплее.
+     */
+    private static void startVdmHost(ManualAccessPolicy.Options options, int appPid) {
+        if (Build.VERSION.SDK_INT < VdmHostPolicy.MIN_SDK) return;
+        try {
+            String apk = System.getProperty("java.class.path");
+            String command = VdmHostPolicy.startCommand(apk, options.packageName, appPid);
+            java.lang.Process process = new ProcessBuilder("/system/bin/sh", "-c", command).redirectErrorStream(true).start();
+            process.getOutputStream().close();
+            if (!process.waitFor(5, TimeUnit.SECONDS)) process.destroyForcibly();
+        } catch (Exception error) {
+            System.out.println("Хост виртуального устройства не запущен: " + safe(error.getMessage()));
         }
     }
 
