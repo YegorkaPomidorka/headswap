@@ -56,9 +56,15 @@ internal object EmbeddedDisplayPolicy {
     /**
      * Telegram в полноэкранном режиме берёт высоту строки состояния телефона (152 px при 520 dpi), если уже открывался
      * на телефоне, и игнорирует нулевой инсет плитки: сверху пустая полоса. В многооконном режиме он верит инсету (ADR 0031).
+     * Портретные по манифесту (Звук и т.п.) в полноэкранном режиме система рисует узким столбиком с полями
+     * (letterbox); в многооконном она игнорирует запрос ориентации и растягивает окно на плитку.
      * Остальным не включаем: YouTube в многооконном режиме не уходит на весь экран.
      */
-    fun multiWindowLaunch(packageName: String): Boolean = packageName in multiWindowPackages
+    fun multiWindowLaunch(packageName: String, screenOrientation: Int = -1): Boolean =
+        packageName in multiWindowPackages || screenOrientation in portraitOrientations
+
+    /** ActivityInfo.SCREEN_ORIENTATION_PORTRAIT, SENSOR_PORTRAIT, REVERSE_PORTRAIT, USER_PORTRAIT. */
+    private val portraitOrientations = setOf(1, 7, 9, 12)
 
     fun requireChildId(id: Int, parentId: Int) {
         check(parentId > 0 && id > 0 && id != parentId) { "Виджет не получил собственный дополнительный экран" }
