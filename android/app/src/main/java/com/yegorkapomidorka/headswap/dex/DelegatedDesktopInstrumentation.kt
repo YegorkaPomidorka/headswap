@@ -67,6 +67,7 @@ class DelegatedDesktopInstrumentation : Instrumentation() {
         var adoptedHere = false
         var ready = false
         var failureReason: String? = null
+        var sleepDiag: SleepDiagProbe? = null
         try {
             check(Application.getProcessName() == context.packageName) { "Activation requires the main app process" }
             automation = checkNotNull(getUiAutomation(UiAutomation.FLAG_DONT_USE_ACCESSIBILITY or
@@ -82,6 +83,7 @@ class DelegatedDesktopInstrumentation : Instrumentation() {
             permissions.add(DelegatedDesktopAccess.ADD_ALWAYS_UNLOCKED_DISPLAY)
             permissions.add(DisplayIme.PERMISSION) // клавиатура на экране ГУ, без него - на телефоне
             if (requestAudio) permissions.add(DesktopAudioPolicy.ROUTING_PERMISSION)
+            permissions.add(SleepDiagProbe.PERMISSION) // диагностика sleep: дампы сервисов без живого shell
             automation.adoptShellPermissionIdentity(*permissions.toTypedArray())
             adoptedHere = true
             check(DelegatedDesktopAccess.hasPermissions(context)) { "Android не предоставил все права рабочего стола и управления музыкой. Повторите явную активацию HeadSwap." }
@@ -97,6 +99,9 @@ class DelegatedDesktopInstrumentation : Instrumentation() {
                     PackageManager.PERMISSION_GRANTED).toString())
                 putString("headswap_playback_audio", (requestAudio && DesktopAudioAccess.hasPermission(context)).toString())
             }) }
+            val shell = checkNotNull(automation)
+            sleepDiag = runCatching { SleepDiagProbe(context, shell).also { it.start() } }
+                .onFailure { Log.w(DelegatedDesktopAccess.LOG_TAG, "SLEEPDIAG not started", it) }.getOrNull()
             // USB detach and producer/service shutdown must never count this latch down.
             while (!stop.await(5, TimeUnit.SECONDS)) {
                 check(DelegatedDesktopAccess.hasPermissions(context)) { "Desktop permissions were revoked" }
@@ -107,6 +112,7 @@ class DelegatedDesktopInstrumentation : Instrumentation() {
             failureReason = ManualAccessPolicy.conciseFailure(error)
             Log.e(DelegatedDesktopAccess.LOG_TAG, "FAILED protocol=1 ${error.javaClass.simpleName}", error)
         } finally {
+            sleepDiag?.stop()
             lease?.let(DelegatedDesktopAccess::end)
             DesktopMusicPlayback.cancel("activation ended")
             // A failed adoption must not drop another package's active delegation.
