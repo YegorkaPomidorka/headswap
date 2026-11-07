@@ -24,12 +24,13 @@ internal object VdmHostRestart {
     private const val DISCOVERY_WAIT_MS = 12_000L
     private const val CONNECT_WAIT_MS = 10_000L
     private const val WINDOW_MS = 10 * 60_000L
-    private const val MAX_IN_WINDOW = 5
+    /** Считаем только неудачные перезапуски: удачный бывает на каждое переподключение USB (adbd перезапускается). */
+    private const val MAX_FAILED_IN_WINDOW = 3
     private val RETRY_DELAYS_MS = longArrayOf(1_000, 3_000, 6_000)
 
     private val busy = AtomicBoolean(false)
     @Volatile private var pendingUntil = 0L
-    private val recent = ArrayDeque<Long>()
+    private val failed = ArrayDeque<Long>()
 
     /** Перезапуск идёт: новые экраны стоит подождать, а не сразу уводить в группу 0. */
     val pending: Boolean get() = busy.get() && SystemClock.elapsedRealtime() < pendingUntil
@@ -38,10 +39,9 @@ internal object VdmHostRestart {
         val ctx = context?.applicationContext ?: return log("перезапуск хоста: нет контекста")
         blocker(ctx)?.let { return log("перезапуск хоста не делаю: $it") }
         val now = SystemClock.elapsedRealtime()
-        synchronized(recent) {
-            while (recent.isNotEmpty() && now - recent.first() > WINDOW_MS) recent.removeFirst()
-            if (recent.size >= MAX_IN_WINDOW) return log("перезапуск хоста не делаю: уже ${recent.size} за 10 мин")
-            recent.addLast(now)
+        synchronized(failed) {
+            while (failed.isNotEmpty() && now - failed.first() > WINDOW_MS) failed.removeFirst()
+            if (failed.size >= MAX_FAILED_IN_WINDOW) return log("перезапуск хоста не делаю: ${failed.size} неудачных за 10 мин")
         }
         if (!busy.compareAndSet(false, true)) return
         pendingUntil = now + PENDING_MS
@@ -52,7 +52,7 @@ internal object VdmHostRestart {
 
     /** null - можно перезапускать; иначе причина для лога. */
     private fun blocker(ctx: Context): String? = when {
-        !VdmDesktop.supported -> "Android ниже 16"
+        !VdmDesktop.supported -> "Android ниже 17"
         !DelegatedDesktopAccess.isReady(ctx) -> "активация закончилась"
         !PhoneActivationState(ctx).paired || !PhoneAdb.hasIdentity(ctx) -> "активация не с телефона (нет пары adb)"
         Settings.Global.getInt(ctx.contentResolver, "adb_wifi_enabled", 0) != 1 -> "отладка по Wi-Fi выключена"
@@ -74,6 +74,7 @@ internal object VdmHostRestart {
                 return log("хост перезапущен за ${SystemClock.elapsedRealtime() - started} мс (попытка ${attempt + 1})")
             }
         }
+        synchronized(failed) { failed.addLast(SystemClock.elapsedRealtime()) }
         log("перезапуск хоста не удался: новые экраны пойдут обычным путём")
     }
 

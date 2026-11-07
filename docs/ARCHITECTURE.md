@@ -169,8 +169,8 @@ CONTROL0, SENSOR1, VIDEO2, INPUT3, SPEECH4, SYSTEM5, MEDIA6, MIC7, BT8, MEDIA_PL
 - **Хосту нужен свой `android.car.permission.TEMPLATE_RENDERER`** в манифесте (объявить и запросить), иначе навигаторы
   со списком хостов (Яндекс) отвечают «Unknown host» на рукопожатии. ADR 0022.
 - **Android 17: экран рабочего стола создаёт shell-хост VirtualDevice** (`dex/VdmHostMain`, uid 2000) через
-  `VdmHostLink`; без хоста экран уходит в группу 0 и гаснет с телефоном. Хост живёт в группе adbd, поэтому на 17
-  нужна «Отладка по USB». ADR 0033.
+  `VdmHostLink`; без хоста экран уходит в группу 0 и гаснет с телефоном. Хост живёт в группе adbd и гибнет при каждой смене
+  USB-режима; `VdmHostRestart` поднимает его через свою беспроводную отладку, для этого на 17 нужна «Отладка по USB». ADR 0033.
 - Пароли, SSID, ключи в лог не пишутся.
 - Рубильники экспериментов в companion `AaBridgeCore`: `PAUSE_KEEPALIVE_ENABLED`, `NAVI_STATUS_ENABLED`,
   `MODULE_MUSIC_ENABLED`, `ROUTE_NAVI_STATUS_ENABLED`, `AIR_WARM_RESUME_ENABLED`.
