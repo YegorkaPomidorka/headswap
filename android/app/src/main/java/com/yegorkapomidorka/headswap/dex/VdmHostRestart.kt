@@ -77,10 +77,25 @@ internal object VdmHostRestart {
         log("перезапуск хоста не удался: новые экраны пойдут обычным путём")
     }
 
-    /** Порт беспроводной отладки после перезапуска adbd новый: свойство adbd, иначе mDNS. */
+    /**
+     * Порт: сначала порт активации (если adbd не перезапускался, он жив), потом свойство adbd, потом mDNS.
+     * vdm4 у h821 и SM-S942B: свойство не прочиталось, mDNS за 12 с ничего не нашёл - всё пишем в лог.
+     */
     private fun launch(ctx: Context) {
-        val endpoint = propertyEndpoint() ?: discover(ctx)
+        val saved = PhoneActivationState(ctx).connectPort
+        if (saved in 1..65535) {
+            try { return start(ctx, AdbEndpoint(LocalAddressPolicy.LOOPBACK, saved)) }
+            catch (e: AdbAccessException) { log("порт активации $saved: ${e.reason}") }
+        }
+        val property = propertyEndpoint()
+        log("порт из свойства: ${property?.port ?: "нет"}; wifi=${PhoneAdb.wifiAvailable(ctx)} adb_wifi=${Settings.Global.getInt(ctx.contentResolver, "adb_wifi_enabled", 0)}")
+        val endpoint = property?.takeIf { it.port != saved } ?: discover(ctx)
             ?: throw IllegalStateException("порт отладки по Wi-Fi не найден")
+        start(ctx, endpoint)
+        PhoneActivationState(ctx).connectPort = endpoint.port
+    }
+
+    private fun start(ctx: Context, endpoint: AdbEndpoint) {
         val hosts = listOf(LocalAddressPolicy.LOOPBACK, endpoint.host).distinct()
         var last: Exception? = null
         for (host in hosts) {
@@ -120,6 +135,7 @@ internal object VdmHostRestart {
         } finally {
             main.post { discovery?.close() }
         }
+        log("mDNS: ${found.get()?.let { "порт ${it.port}" } ?: "порт connect не найден за $DISCOVERY_WAIT_MS мс"}")
         return found.get()
     }
 
