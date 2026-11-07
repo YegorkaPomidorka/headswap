@@ -119,28 +119,24 @@ object LauncherActions {
     /**
      * Алиса на скрытом дочернем дисплее: он ALWAYS_UNLOCKED, и Яндекс, которого сессия помощника перезапускает полным
      * приложением, не упирается в блокировку телефона (на экране телефона упирался, стенд 07.11). Слой за экраном,
-     * на ГУ ничего не видно; голос идёт захватом звука. Повторное нажатие - новый вопрос, не закрытие.
+     * на ГУ ничего не видно; голос идёт захватом звука.
+     * Повторное нажатие - панель заново: задачи Яндекса закрываем и запускаем как в первый раз. ASSIST поверх живой задачи
+     * утаскивал её (singleTask) на заблокированный экран телефона, прослушивание сбрасывалось, а перенос обратно
+     * посреди перехода MIUI оставлял на телефоне призрак окна, глотавший жесты (стенд 07.11).
      */
     private fun voiceOnly() {
+        if (model.assistantOpen) {
+            AppLog.i("ASSIST скрытая Алиса: повторное нажатие, панель заново", false)
+            // closeAssistant чистит дисплей в потоке, потом видит, что панель снова открыта, и перезапускает слот
+            closeAssistant("скрытая Алиса: повторное нажатие")
+        }
+        model.assistantHidden = true
+        openAssistant()
         val main = hiddenHandler
         main.removeCallbacks(hiddenClose)
         main.postDelayed(hiddenClose, HIDDEN_MS)
         // значок голоса на ГУ - на время вопроса, не на всё время жизни дисплея
         main.postDelayed({ if (model.assistantHidden) com.yegorkapomidorka.headswap.dex.DesktopKeys.voiceStatus?.invoke(false) }, 10_000L)
-        if (model.assistantOpen) {
-            val ctx = model.context.applicationContext
-            val id = EmbedHost.aliceDisplayId()
-            AppLog.i("ASSIST скрытая Алиса: повторный вопрос, дисплей $id", false)
-            com.yegorkapomidorka.headswap.dex.DesktopKeys.voiceStatus?.invoke(true)
-            val assist = com.yegorkapomidorka.headswap.dex.PhoneAssistant
-            // Яндекс снова поднимает MainActivity (singleTask) на экране телефона и утаскивает туда задачу со скрытого
-            // дисплея (стенд 07.11, d=790->0): тянем обратно, как при первом запуске
-            if (id > 0) assist.watch(ctx, id, aliceKey().substringBefore('/')) { t -> main.post { assistantOpened(t) } }
-            Thread({ if (id > 0) assist.launch(ctx, id) else assist.launchPhone(ctx) }, "assist-again").start()
-            return
-        }
-        model.assistantHidden = true
-        openAssistant()
     }
 
     /** Скрытая Алиса держит дисплей столько после последнего нажатия, потом отпускает. */
@@ -195,6 +191,14 @@ object LauncherActions {
         val pkg = t.topActivity?.packageName ?: return
         val data = t.baseIntent.dataString
         val geo = com.yegorkapomidorka.headswap.carapp.RouteIntent.geoFor(data)
+        if (geo == null && model.assistantHidden && pkg == model.navigatorPkg) {
+            // «Открой навигатор» поднимает пустую задачу Навигатора; следующий build_route_on_map ушёл бы в неё же
+            // (base MAIN, ловец маршрут не видит, стенд 07.11). Закрываем - маршрут создаст новую задачу.
+            AppLog.i("ASSIST скрытая Алиса открыла $pkg без маршрута: задачу закрываем", false)
+            val id = t.taskId
+            Thread({ com.yegorkapomidorka.headswap.dex.PhoneAssistant.removeTask(id) }, "assist-navi").start()
+            return
+        }
         if (geo == null) { AppLog.i("ASSIST $pkg не маршрут ($data), остаётся в панели", false); return }
         routeFromAlice(t, geo)
     }
