@@ -186,6 +186,11 @@
     <string name="tdec_off">Выкл</string>
     <string name="tdec_x2">×2</string>
 
+    <!-- Двойное касание от ГУ (DupDownFilter) -->
+    <string name="dup_down_auto">Авто (повтор до 150 мс)</string>
+    <string name="dup_down_on">Фильтровать всегда</string>
+    <string name="dup_down_off">Не фильтровать</string>
+
     <!-- Frame rate (FpsSetting) -->
     <string name="fps_auto_title">Авто</string>
     <string name="fps_auto_sub">Как просит ГУ</string>

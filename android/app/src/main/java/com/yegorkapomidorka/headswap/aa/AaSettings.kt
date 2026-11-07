@@ -46,6 +46,11 @@ class AaPrefs(ctx: Context) {
         get() = TouchDecimation.parse(sp.getString("touchDecimation", TouchDecimation.DEFAULT.name))
         set(v) = sp.edit().putString("touchDecimation", v.name).apply()
 
+    /** Фильтр повторного DOWN без UP (имя DupDownFilter, по умолчанию Авто = только Honda). Сессия читает на каждое касание. */
+    var dupDownFilter: DupDownFilter
+        get() = DupDownFilter.parse(sp.getString("dupDownFilter", DupDownFilter.DEFAULT.name))
+        set(v) = sp.edit().putString("dupDownFilter", v.name).apply()
+
     /**
      * Режим моста (ключ BridgeMode, по умолчанию Android Auto): сырое сохранённое значение, на Android ниже 13 оно
      * может быть DESKTOP - применяемый режим даёт [BridgeMode.effective]. Читается один раз на подключение.
