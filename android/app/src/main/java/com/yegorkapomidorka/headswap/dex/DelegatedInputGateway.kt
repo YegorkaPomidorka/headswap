@@ -27,7 +27,6 @@ internal class DelegatedInputGateway(context: Context) : IDelegatedInputGateway.
     private val displayEvents = DisplayEventAccess()
     private val wakeLocks = DisplayWakeLocks(context)
     private val imeRoutes = DelegatedImeRoutes()
-    private val deviceDisplays = VdmDisplays(this.context)
     private val setActionButton by lazy { MotionEvent::class.java.getMethod("setActionButton", Int::class.javaPrimitiveType) }
 
     fun preflight() {
@@ -44,7 +43,7 @@ internal class DelegatedInputGateway(context: Context) : IDelegatedInputGateway.
         activeGateway.set(this)
     }
     @Synchronized fun deactivate() {
-        deviceDisplays.releaseAll()
+        VdmHostLink.releaseAll()
         wakeLocks.releaseAll()
         imeRoutes.clear()
         liveDisplayIds = emptySet()
@@ -123,17 +122,17 @@ internal class DelegatedInputGateway(context: Context) : IDelegatedInputGateway.
     @Synchronized override fun createDeviceDisplay(surface: android.view.Surface, name: String, width: Int, height: Int,
         density: Int, flags: Int, owner: IBinder): Int {
         requireActive()
-        return deviceDisplays.create(surface, name, width, height, density, flags, owner)
+        return VdmHostLink.create(surface, name, width, height, density, flags, owner)
     }
 
     @Synchronized override fun resizeDeviceDisplay(displayId: Int, width: Int, height: Int, density: Int) {
         requireActive()
-        deviceDisplays.resize(displayId, width, height, density)
+        VdmHostLink.resize(displayId, width, height, density)
     }
 
     @Synchronized override fun releaseDeviceDisplay(displayId: Int) {
         requireCaller() // освобождение и после конца активации
-        deviceDisplays.release(displayId)
+        VdmHostLink.release(displayId)
     }
 
     @Synchronized override fun injectInput(displayId: Int, token: IBinder, event: InputEvent, actionButton: Int) {
