@@ -99,7 +99,7 @@ object DesktopHomeLogic {
                 StageState.DONE to ACTIVE,
                 StageState.DONE to (if (i.wireless) CARLIFE_WIFI else CARLIFE),
                 StageState.DONE to UiText.raw(i.desktopName),
-                StageState.DONE to UiText.raw(i.videoRes),
+                StageState.DONE to UiText.raw("⁦${i.videoRes}⁩"), // LTR-изоляция: в RTL не «720×1280»
                 StageState.DONE to UiText.raw(if (!i.usbAudio) "Bluetooth" else if (i.wireless) "Wi-Fi" else "USB"),
             ),
             listOf(DesktopButton.STOP),
