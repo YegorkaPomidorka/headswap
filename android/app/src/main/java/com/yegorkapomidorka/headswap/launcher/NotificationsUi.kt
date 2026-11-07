@@ -148,10 +148,11 @@ fun NotificationsOverlay() {
     // Строка статуса скрыта (Для разработчиков, Егор 07.11): полоски на строке нет, вместо неё от верха экрана висит чёлка -
     // та же панель, свёрнутая до 168x30 с полоской на нижнем крае. Язычок и шторка растут из неё (animateContentSize), а не
     // выезжают сверху; свернулись - снова чёлка. Непрочитанных нет - нет и чёлки.
-    // Полоска здесь всегда по центру тела: строки, к которой её привязывать, нет (Егор 07.11: в шторке «улетела» вбок).
+    // Полоска не двигается по X (Егор 07.11): чёлка висит над стыком плиток, и на язычке и шторке полоска стоит ровно там же,
+    // даже если сами они упёрлись в рейку и съехали.
     val notchMode = model.hideStatusBar && model.statusSlot && model.statusBottom == null
-    fun lineX(): Float = if (notchMode) shown.panelCx else if (atSeam) centerX else shown.lineX ?: fallbackX
-    val lineDx: () -> Int = { if (notchMode) 0 else Math.round(lineX() - shown.panelCx) }
+    fun lineX(): Float = if (notchMode || atSeam) centerX else shown.lineX ?: fallbackX
+    val lineDx: () -> Int = { Math.round(lineX() - shown.panelCx) }
     val idle = notchMode && liveItems.isNotEmpty()
     // содержимое язычка/шторки - только когда панель уже поехала (p > 0): первый кадр - чёлка, от неё и растёт
     val grown = !notchMode || (show && p.value > 0f)
