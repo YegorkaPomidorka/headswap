@@ -66,7 +66,12 @@ internal class AdbDiscovery(
                     executor.execute { AppLog.i("PHONE discovery stop failed code=$code") }
                 }
                 override fun onServiceFound(info: NsdServiceInfo) {
-                    executor.execute { if (current(session)) resolver.track(kind, info, session) }
+                    executor.execute {
+                        if (current(session)) {
+                            AppLog.i("PHONE discovery found ${kind.name.lowercase()} ${info.serviceName}")
+                            resolver.track(kind, info, session)
+                        }
+                    }
                 }
                 override fun onServiceLost(info: NsdServiceInfo) {
                     executor.execute {

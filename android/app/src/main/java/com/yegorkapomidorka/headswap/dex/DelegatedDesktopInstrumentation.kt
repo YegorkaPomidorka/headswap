@@ -67,6 +67,7 @@ class DelegatedDesktopInstrumentation : Instrumentation() {
         var adoptedHere = false
         var ready = false
         var failureReason: String? = null
+        var sleepDiag: SleepDiagProbe? = null
         try {
             check(Application.getProcessName() == context.packageName) { "Activation requires the main app process" }
             automation = checkNotNull(getUiAutomation(UiAutomation.FLAG_DONT_USE_ACCESSIBILITY or
@@ -84,6 +85,9 @@ class DelegatedDesktopInstrumentation : Instrumentation() {
             permissions.add(PhoneAssistant.MANAGE_ACTIVITY_TASKS) // задача Алисы с телефона в панель рабочего стола
             permissions.add(PhoneAssistant.REMOVE_TASKS) // Навигатор, открытый Алисой в панели, закрываем: маршрут уходит в плитку
             if (requestAudio) permissions.add(DesktopAudioPolicy.ROUTING_PERMISSION)
+            permissions.add(SleepDiagProbe.PERMISSION) // диагностика sleep: дампы сервисов без живого shell
+            // Этап B: дисплей принадлежит shell-хосту, запуск лаунчера на нём Android 17 считает фоновым (BAL).
+            if (VdmDesktop.supported) permissions.add(VdmDesktop.START_FROM_BACKGROUND)
             automation.adoptShellPermissionIdentity(*permissions.toTypedArray())
             adoptedHere = true
             check(DelegatedDesktopAccess.hasPermissions(context)) { "Android не предоставил все права рабочего стола и управления музыкой. Повторите явную активацию HeadSwap." }
@@ -99,16 +103,23 @@ class DelegatedDesktopInstrumentation : Instrumentation() {
                     PackageManager.PERMISSION_GRANTED).toString())
                 putString("headswap_playback_audio", (requestAudio && DesktopAudioAccess.hasPermission(context)).toString())
             }) }
+            val shell = checkNotNull(automation)
+            sleepDiag = runCatching { SleepDiagProbe(context, shell).also { it.start() } }
+                .onFailure { Log.w(DelegatedDesktopAccess.LOG_TAG, "SLEEPDIAG not started", it) }.getOrNull()
             // USB detach and producer/service shutdown must never count this latch down.
+            var ticks = 0
             while (!stop.await(5, TimeUnit.SECONDS)) {
                 check(DelegatedDesktopAccess.hasPermissions(context)) { "Desktop permissions were revoked" }
                 runCatching { DelegatedInputGateway.refreshImeRoutes() }
+                // Журнал shell-хоста через его binder: файл в /data/local/tmp юзер не пришлёт.
+                if (++ticks == 6 && VdmDesktop.supported) runCatching { VdmHostLink.logStatus() }
             }
         } catch (error: Throwable) {
             if (error is InterruptedException) Thread.currentThread().interrupt()
             failureReason = ManualAccessPolicy.conciseFailure(error)
             Log.e(DelegatedDesktopAccess.LOG_TAG, "FAILED protocol=1 ${error.javaClass.simpleName}", error)
         } finally {
+            sleepDiag?.stop()
             lease?.let(DelegatedDesktopAccess::end)
             DesktopMusicPlayback.cancel("activation ended")
             // A failed adoption must not drop another package's active delegation.

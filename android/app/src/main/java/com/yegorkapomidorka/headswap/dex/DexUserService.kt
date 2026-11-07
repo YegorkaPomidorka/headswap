@@ -46,7 +46,7 @@ class DexUserService private constructor(private val context: Context,
 
     private class Session(val epoch: Long, val surface: Surface, val token: IBinder, val death: IBinder.DeathRecipient,
         val density: Int, val desktopMode: Int, val width: Int, val height: Int) {
-        var display: VirtualDisplay? = null
+        var display: OwnedDisplay? = null
         var linked = false
         val children = LinkedHashMap<IBinder, ChildSession>()
         val contacts = DesktopTouchState()
@@ -55,7 +55,7 @@ class DexUserService private constructor(private val context: Context,
 
     private class ChildSession(val parentEpoch: Long, val surface: Surface, val token: IBinder,
         val death: IBinder.DeathRecipient, var width: Int, var height: Int, var density: Int) {
-        var display: VirtualDisplay? = null
+        var display: OwnedDisplay? = null
         var linked = false
         var touch = EmbeddedTouchState(width, height)
         val contacts = DesktopTouchState()

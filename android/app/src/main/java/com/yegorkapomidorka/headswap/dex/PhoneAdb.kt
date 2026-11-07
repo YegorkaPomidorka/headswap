@@ -128,6 +128,7 @@ internal object PhoneAdb {
                 nonce = PhoneActivationPolicy.newNonce()
                 val options = ActivationToken(context).options(audio)
                 val command = PhoneActivationPolicy.dispatchCommand(apk, options, nonce)
+                state.connectPort = port
                 state.begin(nonce) // on disk before the app is restarted
                 submitted = true
                 val result = adb.shell(command)

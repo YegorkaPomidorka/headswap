@@ -2,6 +2,7 @@
 package com.yegorkapomidorka.headswap.dex;
 
 import android.view.InputEvent;
+import android.view.Surface;
 
 /** Private capability passed only to HeadSwap's non-exported producer service. */
 interface IDelegatedInputGateway {
@@ -13,4 +14,8 @@ interface IDelegatedInputGateway {
     int childTaskState(int displayId, IBinder token, String packageName);
     String[] childTaskPackages(int displayId, IBinder token);
     int childFullscreen(int displayId, IBinder token, String packageName);
+    /** Prototype vdm1: display inside a VirtualDevice owned by the main process; -1 = use the ordinary path. */
+    int createDeviceDisplay(in Surface surface, String name, int width, int height, int density, int flags, IBinder owner);
+    void resizeDeviceDisplay(int displayId, int width, int height, int density);
+    void releaseDeviceDisplay(int displayId);
 }

@@ -25,6 +25,8 @@
     <string name="dev_tts_preroll_note">Нули после начала подсказки, ГУ успевает открыть звук. Авто: 400 мс на VW</string>
     <string name="dev_section_touch_decimation">Прореживание тача (эксперимент)</string>
     <string name="dev_touch_decimation_note">Пропускать каждый второй MOVE: ГУ шлёт до ~70 событий в секунду, видео до 30 к/с. Последняя точка перед отпусканием пальца не теряется.</string>
+    <string name="dev_section_dup_down">Двойное касание от ГУ</string>
+    <string name="dev_dup_down_note">Некоторые ГУ (Honda) шлют каждое касание дважды: кнопки лаунчера срабатывают два раза, «Настройки» открываются и тут же закрываются. Фильтр отбрасывает второй DOWN в той же точке без UP.</string>
 
 
     <string name="dev_section_video">Видео (с переподключения)</string>

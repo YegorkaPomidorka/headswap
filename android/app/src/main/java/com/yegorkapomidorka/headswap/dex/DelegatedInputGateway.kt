@@ -43,6 +43,7 @@ internal class DelegatedInputGateway(context: Context) : IDelegatedInputGateway.
         activeGateway.set(this)
     }
     @Synchronized fun deactivate() {
+        VdmHostLink.releaseAll()
         wakeLocks.releaseAll()
         imeRoutes.clear()
         liveDisplayIds = emptySet()
@@ -112,9 +113,33 @@ internal class DelegatedInputGateway(context: Context) : IDelegatedInputGateway.
      * гаснуть по таймауту экрана, кнопка питания его не усыпляет (goToSleep трогает только общую группу).
      */
     private fun holdAwake(displayId: Int) {
-        val flags = displays.getDisplay(displayId)?.flags ?: return
-        AppLog.i("WAKE экран $displayId: ${DisplayWakeLocks.describe(flags)}", false)
-        if (DisplayWakeLocks.shouldHold(flags)) wakeLocks.hold(displayId)
+        val display = displays.getDisplay(displayId) ?: return
+        val group = VdmDesktop.groupId(display)
+        AppLog.i("WAKE экран $displayId: ${DisplayWakeLocks.describe(display.flags)} группа=$group", false)
+        if (DisplayWakeLocks.shouldHold(display.flags, group)) wakeLocks.hold(displayId)
+    }
+
+    override fun createDeviceDisplay(surface: android.view.Surface, name: String, width: Int, height: Int,
+        density: Int, flags: Int, owner: IBinder): Int {
+        // Хост мог умереть при подключении ГУ (Samsung перезапускает adbd): ждём перезапуск вне монитора шлюза.
+        VdmHostLink.awaitHost(VdmHostRestart.WAIT_MS)
+        return createDeviceDisplayLocked(surface, name, width, height, density, flags, owner)
+    }
+
+    @Synchronized private fun createDeviceDisplayLocked(surface: android.view.Surface, name: String, width: Int, height: Int,
+        density: Int, flags: Int, owner: IBinder): Int {
+        requireActive()
+        return VdmHostLink.create(surface, name, width, height, density, flags, owner)
+    }
+
+    @Synchronized override fun resizeDeviceDisplay(displayId: Int, width: Int, height: Int, density: Int) {
+        requireActive()
+        VdmHostLink.resize(displayId, width, height, density)
+    }
+
+    @Synchronized override fun releaseDeviceDisplay(displayId: Int) {
+        requireCaller() // освобождение и после конца активации
+        VdmHostLink.release(displayId)
     }
 
     @Synchronized override fun injectInput(displayId: Int, token: IBinder, event: InputEvent, actionButton: Int) {

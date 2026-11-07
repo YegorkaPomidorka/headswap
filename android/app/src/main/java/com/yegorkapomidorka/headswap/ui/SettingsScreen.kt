@@ -1654,7 +1654,7 @@ class SettingsSectionScreen(host: MainActivity, val section: SettingsSection) : 
 
     // --- обновления ---
 
-    /** Переключатель проверки + строка состояния с кнопкой «Проверить» / «Обновить» (как карточка автозапуска). */
+    /** Переключатель проверки + строка состояния с кнопкой «Проверить и обновить» / «Обновить сейчас» (как карточка автозапуска). */
     private fun updateCard(): View {
         val c = ctx
         val prefs = UpdatePrefs(c)
@@ -1674,7 +1674,7 @@ class SettingsSectionScreen(host: MainActivity, val section: SettingsSection) : 
             pad(c, 14, 0, 14, 0)
             background = c.rippleBg(null, 20)
             isClickable = true
-            setOnClickListener { if (Updater.available(c) != null) Updater.start(host, confirm = false) else Updater.check(c, manual = true) }
+            setOnClickListener { Updater.checkAndUpdate(host) }
         }
         updStatus = status
         updButton = button
