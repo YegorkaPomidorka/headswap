@@ -39,7 +39,10 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -75,8 +78,12 @@ private class Shown {
     var head: NotifItem? = null
     var shade = false
     var items: List<NotifItem> = emptyList()
-    /** центр панели (язычок или шторка) по X в координатах корня, пишется при раскладке */
-    var panelCx = 0f
+    /**
+     * центр панели (язычок или шторка) по X в координатах корня, пишется при раскладке. Состояние, а не поле: по нему
+     * сдвигается полоска ([lineDx]), и без чтения состояния Compose не переставит её, когда панель выросла и упёрлась в рейку
+     * (Егор 07.11: полоска стояла мимо центра чёлки и мимо стыка в шторке).
+     */
+    var panelCx by mutableFloatStateOf(0f)
     /** где стоит золотая полоска (X корня) в режиме «за язычком»: центр последнего показанного язычка */
     var lineX: Float? = null
 }
