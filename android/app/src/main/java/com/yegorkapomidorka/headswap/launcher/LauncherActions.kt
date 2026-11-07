@@ -146,9 +146,13 @@ object LauncherActions {
         if (gemini) {
             // Gemini отвечает только при включённом экране телефона и только штатной сессии помощника: запуск
             // интентом на скрытом дисплее он блокирует («Main display is OFF», «Interaction blocked», стенд 07.11)
+            geminiAt = android.os.SystemClock.uptimeMillis()
             val ctx = model.context.applicationContext
-            Thread({ com.yegorkapomidorka.headswap.dex.PhoneAssistant.closePhonePackage(ctx, "com.google.android.apps.maps") },
-                "assist-maps").start()
+            Thread({
+                val assist = com.yegorkapomidorka.headswap.dex.PhoneAssistant
+                assist.closePhonePackage(ctx, "com.google.android.apps.maps")
+                assist.closePhonePackage(ctx, assist.YOUTUBE_MUSIC)
+            }, "assist-maps").start()
             val inject = com.yegorkapomidorka.headswap.dex.DesktopKeys.injectKey
             AppLog.i("ASSIST Gemini: клавиша помощника${if (inject == null) " - нет шлюза ввода" else ""}", false)
             inject?.invoke(android.view.KeyEvent.KEYCODE_VOICE_ASSIST)
@@ -169,9 +173,36 @@ object LauncherActions {
     /** Алиса на телефоне (кнопкой голоса или сама): её маршрут из экрана телефона - в плитку навигатора, «Поехали» жмёт водитель. */
     fun startRouteCatcher(ctx: android.content.Context) {
         val main = android.os.Handler(android.os.Looper.getMainLooper())
-        com.yegorkapomidorka.headswap.dex.PhoneAssistant.watchPhone(ctx, com.yegorkapomidorka.headswap.carapp.RouteIntent::geoFor) { t, geo ->
-            main.post { if (VOICE_ONLY) routeFromAlice(t, geo) }
+        com.yegorkapomidorka.headswap.dex.PhoneAssistant.watchPhone(ctx, com.yegorkapomidorka.headswap.carapp.RouteIntent::geoFor,
+            onRoute = { t, geo -> main.post { if (VOICE_ONLY) routeFromAlice(t, geo) } },
+            onMusic = { t -> main.post { musicFromGemini(t) } })
+    }
+
+    /** Когда последний раз звали Gemini: YouTube Music перехватываем только сразу после вопроса. */
+    private var geminiAt = 0L
+    private const val GEMINI_MUSIC_MS = 60_000L
+    private const val YANDEX_MUSIC = "ru.yandex.music"
+
+    /**
+     * Gemini на «включи музыку» открывает YouTube Music: Яндекс Музыку он не знает (стенд 07.11). Задачу закрываем,
+     * её сессию ставим на паузу и играем выбранный плеер Headswap. Запрос (трек, артист) не переносим - продолжаем плеер.
+     */
+    private fun musicFromGemini(t: android.app.ActivityManager.RunningTaskInfo) {
+        val ytm = com.yegorkapomidorka.headswap.dex.PhoneAssistant.YOUTUBE_MUSIC
+        // плеер не выбран («Плеер телефона») - Яндекс Музыка, если стоит: ради неё перехват и затеян
+        val player = model.musicPlayer ?: model.localPlayer ?: YANDEX_MUSIC.takeIf(::installed)
+        if (android.os.SystemClock.uptimeMillis() - geminiAt > GEMINI_MUSIC_MS || player == null || player == ytm) {
+            AppLog.i("ASSIST YouTube Music не трогаем (Gemini не звали или плеер ${player ?: "не выбран"})", false)
+            return
         }
+        AppLog.i("ASSIST музыка от Gemini: YouTube Music -> $player", false)
+        val ctx = model.context.applicationContext
+        val taskId = t.taskId
+        Thread({ com.yegorkapomidorka.headswap.dex.PhoneAssistant.removeTask(taskId) }, "assist-music").start()
+        MusicController.pausePackage(ctx, ytm)
+        MusicController.playPackage(ctx, player)
+        // YouTube Music после закрытия задачи ещё может запустить воспроизведение: добиваем паузой
+        for (ms in longArrayOf(1500L, 4000L)) hiddenHandler.postDelayed({ MusicController.pausePackage(ctx, ytm) }, ms)
     }
 
     fun openAssistant() {

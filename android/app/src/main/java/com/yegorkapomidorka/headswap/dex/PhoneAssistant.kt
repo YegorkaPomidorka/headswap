@@ -211,7 +211,8 @@ object PhoneAssistant {
      * маршрут ([geoFor] не null, например yandexnavi://build_route_on_map от Алисы на телефоне) - в [onRoute], один раз
      * на задачу. Задачи, что были до старта, не трогаем. Следующий вызов заменяет прежний ловец. Поточный поток.
      */
-    fun watchPhone(ctx: Context, geoFor: (String?) -> String?, onRoute: (android.app.ActivityManager.RunningTaskInfo, String) -> Unit) {
+    fun watchPhone(ctx: Context, geoFor: (String?) -> String?, onRoute: (android.app.ActivityManager.RunningTaskInfo, String) -> Unit,
+        onMusic: ((android.app.ActivityManager.RunningTaskInfo) -> Unit)? = null) {
         val gen = ++phoneGen
         val known = HashSet<Int>()
         Thread({
@@ -225,6 +226,11 @@ object PhoneAssistant {
                 for (t in tasks) {
                     if (!known.add(t.taskId)) continue
                     if (FrameworkTaskIdentityReader.read(t)?.displayId != 0) continue
+                    if (onMusic != null && youtubeMusicLink(t)) {
+                        AppLog.i("ASSIST YouTube Music на телефоне: задача ${t.taskId} ${t.baseIntent.dataString}")
+                        runCatching { onMusic(t) }.onFailure { AppLog.i("ASSIST музыка: ${it.javaClass.simpleName}: ${it.message}") }
+                        continue
+                    }
                     val geo = geoFor(t.baseIntent.dataString)
                     if (geo == null) {
                         // разбор маршрутов Gemini: что Карты получили на самом деле
@@ -242,6 +248,14 @@ object PhoneAssistant {
     }
 
     fun stopPhoneWatch() { phoneGen++ }
+
+    const val YOUTUBE_MUSIC = "com.google.android.apps.youtube.music"
+
+    /** Gemini на «включи музыку» открывает YouTube Music ссылкой music.youtube.com (стенд 07.11). */
+    private fun youtubeMusicLink(t: android.app.ActivityManager.RunningTaskInfo): Boolean {
+        val pkg = t.baseIntent.component?.packageName ?: t.topActivity?.packageName
+        return pkg == YOUTUBE_MUSIC && t.baseIntent.dataString?.startsWith("https://music.youtube.com") == true
+    }
 
     fun launch(ctx: Context, displayId: Int) {
         if (displayId <= 0) { AppLog.i("ASSIST дисплей рабочего стола не готов"); return }
