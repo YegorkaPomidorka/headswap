@@ -26,6 +26,8 @@ import com.yegorkapomidorka.headswap.AppLog
 import com.yegorkapomidorka.headswap.CarLifeState
 import com.yegorkapomidorka.headswap.R
 import com.yegorkapomidorka.headswap.aa.AaPrefs
+import com.yegorkapomidorka.headswap.launcher.LauncherModel
+import com.yegorkapomidorka.headswap.launcher.LauncherPrefs
 import com.yegorkapomidorka.headswap.aa.AaState
 import com.yegorkapomidorka.headswap.aa.CustomResError
 import com.yegorkapomidorka.headswap.aa.CustomVideoMode
@@ -150,6 +152,12 @@ class DevScreen(host: MainActivity) : Screen(host) {
             group(listOf(row(c.getString(R.string.dev_own_idr_title), c.getString(R.string.dev_own_idr_sub), aa.ownIdr) { aa.ownIdr = it })),
         )
         body.addView(customResCard())
+
+        body.addView(c.sectionTitle(c.getString(R.string.dev_section_desktop)))
+        body.addView(
+            group(listOf(row(c.getString(R.string.dev_hide_status_title), c.getString(R.string.dev_hide_status_sub),
+                LauncherPrefs(c).hideStatusBar) { LauncherModel.chooseHideStatusBar(c, it) })),
+        )
 
         body.addView(c.sectionTitle(c.getString(R.string.dev_section_actions)))
         val actions = listOf(

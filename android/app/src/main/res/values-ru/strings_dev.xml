@@ -32,6 +32,9 @@
     <string name="dev_own_idr_sub">Раз в 2 с телефон шлёт ГУ свой ключевой кадр: картинка возвращается после камеры заднего хода и меню машины. Выключите, если ГУ справляется само (например, VW): меньше трафика и нагрузки на телефон</string>
     <string name="dev_custom_res_title">Своё разрешение</string>
     <string name="dev_custom_res_sub">Вместо режима из настроек видео</string>
+    <string name="dev_section_desktop">Рабочий стол на ГУ</string>
+    <string name="dev_hide_status_title">Скрыть строку статуса</string>
+    <string name="dev_hide_status_sub">Для ГУ, у которых сверху своя строка с часами и значками (часть VW). Уведомления висят чёлкой с золотой полоской: потяните вниз — шторка</string>
     <string name="dev_custom_w">Ширина</string>
     <string name="dev_custom_h">Высота</string>
     <string name="dev_custom_hint">Ширина 640–2240, высота 640–1080 (вертикальный — наоборот), чётные</string>

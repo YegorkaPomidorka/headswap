@@ -31,6 +31,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -146,15 +147,25 @@ fun NotificationsOverlay() {
     val fallbackX = max(centerX, area.left + (NotifGeom.tongueWidth(s.t, Math.round(area.width), ear0, s.g).first + 2 * ear0) / 2f)
     fun lineX(): Float = if (atSeam) centerX else shown.lineX ?: fallbackX
     val lineDx: () -> Int = { Math.round(lineX() - shown.panelCx) }
+    // Строка статуса скрыта (Для разработчиков, Егор 07.11): полоски на строке нет, вместо неё от верха экрана висит чёлка -
+    // та же панель, свёрнутая до 168x30 с полоской на нижнем крае. Язычок и шторка растут из неё (animateContentSize), а не
+    // выезжают сверху; свернулись - снова чёлка. Непрочитанных нет - нет и чёлки.
+    val notchMode = model.hideStatusBar && model.statusSlot && model.statusBottom == null
+    val idle = notchMode && liveItems.isNotEmpty()
+    // содержимое язычка/шторки - только когда панель уже поехала (p > 0): первый кадр - чёлка, от неё и растёт
+    val grown = !notchMode || (show && p.value > 0f)
+    val earNow = if (notchMode) Math.round(px(16f) + (ear - px(16f)) * p.value) else ear
+    val bottomNow = if (notchMode) Math.round(px(15f) + (px(44f) - px(15f)) * p.value) else px(44f)
 
     Ltr {
-        // полоска на строке статуса: только если строка есть и есть что показать
-        if (liveItems.isNotEmpty() && model.statusBottom != null) {
+        // полоска на строке статуса (или тач-зона чёлки): только если есть что показать
+        if (liveItems.isNotEmpty() && (model.statusBottom != null || idle)) {
             val hitW = 2 * s.t
+            val hitY = if (notchMode) Math.round(topY) else Math.round(barCy) - s.t / 2
             // смещение - на обёртке: рамку шайбы Pressable рисует до своего modifier и offset внутри её не сдвинул бы
             Box(
-                Modifier.absoluteOffset { IntOffset(Math.round(lineX()) - hitW / 2, Math.round(barCy) - s.t / 2) }
-                    .graphicsLayer { alpha = 1f - p.value },
+                Modifier.absoluteOffset { IntOffset(Math.round(lineX()) - hitW / 2, hitY) }
+                    .graphicsLayer { alpha = if (notchMode) 1f else 1f - p.value },
             ) {
                 Pressable(
                     Modifier.size(m.dp(hitW), m.dp(s.t)),
@@ -164,11 +175,12 @@ fun NotificationsOverlay() {
                     onSwipe = { _, dy -> if (dy > dragThr) { repo.openShade(); true } else false },
                     onTap = { repo.openShade() },
                 ) {
-                    Box(Modifier.matchParentSize(), contentAlignment = Alignment.Center) { GoldHandle() }
+                    // в режиме чёлки полоску рисует сама чёлка, здесь только тач-зона
+                    if (!notchMode) Box(Modifier.matchParentSize(), contentAlignment = Alignment.Center) { GoldHandle() }
                 }
             }
         }
-        if (show || p.value > 0f) {
+        if (show || p.value > 0f || idle) {
             if (open) {
                 // тап мимо шторки - свернуть; чуть затемняет остальное
                 Box(
@@ -183,32 +195,38 @@ fun NotificationsOverlay() {
                     Modifier.absoluteOffset { IntOffset(Math.round(area.left), Math.round(topY)) }
                         .size(m.dp(Math.round(area.width)), m.dp(Math.round(panelAreaH))).clipToBounds(),
                 ) {
-                    val shape = remember(ear) { NotchShape(ear.toFloat(), px(44f).toFloat()) }
+                    val shape = remember(earNow, bottomNow) { NotchShape(earNow.toFloat(), bottomNow.toFloat()) }
                     val (minW, maxW) = NotifGeom.tongueWidth(s.t, Math.round(area.width), ear, s.g)
-                    val inShade = open || (shown.shade && !show)
+                    val inShade = grown && (open || (shown.shade && !show))
+                    // чёлка стоит там, где лежит полоска (центр последнего язычка), чтобы полоска не прыгала при раскрытии
+                    val panelX = if (grown) centerX else lineX()
                     Column(
                         // по центру над стыком плиток, но не вылезая за область справа от рейки
                         Modifier.layout { measurable, constraints ->
                             val pl = measurable.measure(constraints.copy(minWidth = 0))
-                            val x = Math.round(centerX - area.left - pl.width / 2f).coerceIn(0, max(0, constraints.maxWidth - pl.width))
+                            val x = Math.round(panelX - area.left - pl.width / 2f).coerceIn(0, max(0, constraints.maxWidth - pl.width))
                             shown.panelCx = area.left + x + pl.width / 2f
                             if (!inShade && !atSeam) shown.lineX = shown.panelCx
                             layout(constraints.maxWidth, pl.height) { pl.place(x, 0) }
                         }
-                            .graphicsLayer { translationY = -size.height * (1f - p.value) }
+                            .graphicsLayer { translationY = if (idle) 0f else -size.height * (1f - p.value) }
                             .shadow(m.dp(px(12f)), shape, clip = false)
                             .clip(shape).background(pal.bar, shape)
-                            .animateContentSize(tween(260, easing = EASE_OUT))
+                            .animateContentSize(tween(if (notchMode) 420 else 260, easing = EASE_OUT))
                             // тап по пустому месту самой шторки не должен падать на подложку и сворачивать её (кнопки забирают свои касания раньше)
                             .then(if (inShade) Modifier.pointerInput(Unit) { detectTapGestures { } } else Modifier)
-                            .padding(horizontal = m.dp(ear)),
+                            .padding(horizontal = m.dp(earNow)),
                     ) {
+                        // в режиме чёлки содержимое проявляется, пока панель растёт
+                        val fade = Modifier.graphicsLayer { alpha = if (notchMode) p.value else 1f }
                         if (inShade) {
                             val items = liveItems.ifEmpty { shown.items }
                             val listMax = NotifGeom.listMaxHeight(Math.round(area.bottom), Math.round(topY), s.t, px(8f))
-                            ShadeBody(items, maxW, listMax, dragThr, lineDx)
+                            Box(fade) { ShadeBody(items, maxW, listMax, dragThr, lineDx) }
+                        } else if (grown) {
+                            shown.head?.let { Box(fade) { TongueBody(it, minW, maxW, dragThr, lineDx) } }
                         } else {
-                            shown.head?.let { TongueBody(it, minW, maxW, dragThr, lineDx) }
+                            NotchBody(lineDx)
                         }
                     }
                 }
@@ -254,6 +272,27 @@ private fun TongueBody(item: NotifItem, minW: Int, maxW: Int, dragThr: Float, li
                 Box(Modifier.matchParentSize().padding(bottom = m.dp(px(14f))), contentAlignment = Alignment.BottomCenter) { GoldHandle() }
             }
         }
+    }
+}
+
+/**
+ * Чёлка (строка статуса скрыта): тело 168x30 при T 96 со скруглением снизу, золотая полоска на нижнем крае. Касания не берёт:
+ * тач-зона T x 2T от верха экрана стоит отдельно в [NotificationsOverlay], здесь только рисунок.
+ */
+@Composable
+private fun NotchBody(lineDx: () -> Int) {
+    val m = LocalMetrics.current
+    val t = m.spec.t
+    val k = t / 96f
+    fun px(v: Float) = Math.round(v * k)
+    // GoldHandle рисуется с полями под свечение: опускаем холст так, чтобы сама полоска стояла в 8 px над нижним краем
+    val lineH = max(4, Math.round(t / 12f))
+    val dy = Math.round(lineH * 1.6f) - px(8f)
+    Box(Modifier.size(m.dp(px(168f)), m.dp(px(30f)))) {
+        Box(
+            Modifier.align(Alignment.BottomCenter).wrapContentSize(Alignment.BottomCenter, unbounded = true)
+                .offset { IntOffset(lineDx(), dy) },
+        ) { GoldHandle() }
     }
 }
 
