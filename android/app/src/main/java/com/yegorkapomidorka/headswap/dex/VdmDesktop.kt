@@ -24,6 +24,7 @@ internal object VdmDesktop {
     const val EXTRA_STATUS = "status"
     const val EXTRA_ACCEPTED = "accepted"
     const val SHELL_UID = 2000
+    const val START_FROM_BACKGROUND = "android.permission.START_ACTIVITIES_FROM_BACKGROUND"
     /** DisplayManager.VIRTUAL_DISPLAY_FLAG_OWN_DISPLAY_GROUP / FLAG_ALWAYS_UNLOCKED / FLAG_DEVICE_DISPLAY_GROUP (@hide). */
     const val FLAG_OWN_DISPLAY_GROUP = 1 shl 11
     const val FLAG_ALWAYS_UNLOCKED = 1 shl 12
@@ -110,6 +111,14 @@ internal object VdmHostLink {
         runCatching { owner.unlinkToDeath(death, 0) }
         runCatching { host?.releaseDisplay(id) }
         AppLog.i("VDM дисплей $id закрыт", false)
+    }
+
+    /** Журнал хоста в лог приложения; хоста нет - так и пишем (не запустился или умер). */
+    fun logStatus() {
+        val h = host?.takeIf { it.asBinder().isBinderAlive }
+        if (h == null) { AppLog.i("VDMHOST| не подключён: хост не запустился или завершился", false); return }
+        val text = runCatching { h.status() }.getOrElse { "${it.javaClass.simpleName}: ${it.message}" }
+        for (line in text.split("; ").take(40)) AppLog.i("VDMHOST| ${line.take(300)}", false)
     }
 
     @Synchronized fun releaseAll() { for (id in owned.keys.toList()) release(id) }

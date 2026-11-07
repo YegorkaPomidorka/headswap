@@ -38,7 +38,7 @@ class VdmHostMain private constructor(private val args: VdmHostPolicy.Args) {
     private val displays = HashMap<Int, VirtualDisplay>()
     @Volatile private var lastError = ""
 
-    private fun note(text: String) { notes += text; println("VDMHOST $text") }
+    @Synchronized private fun note(text: String) { if (notes.size < 60) notes += text; println("VDMHOST $text") }
 
     private fun run() {
         check(Process.myUid() == VdmDesktop.SHELL_UID) { "нужен uid 2000, а не ${Process.myUid()}" }
@@ -133,7 +133,7 @@ class VdmHostMain private constructor(private val args: VdmHostPolicy.Args) {
             .getMethod("asInterface", IBinder::class.java).invoke(null, service("virtualdevice"))
         val vdm = vdmClass.getConstructor(iface, Context::class.java).newInstance(service, context)
         val dev = vdmClass.getMethod("createVirtualDevice", Int::class.javaPrimitiveType, params.javaClass).invoke(vdm, associationId, params)
-        println("VDMHOST устройство создано")
+        note("устройство создано")
         return checkNotNull(dev)
     }
 
@@ -141,7 +141,7 @@ class VdmHostMain private constructor(private val args: VdmHostPolicy.Args) {
         val dev = device ?: return
         device = null
         runCatching { dev.javaClass.getMethod("close").invoke(dev) }
-        println("VDMHOST устройство закрыто")
+        note("устройство закрыто")
     }
 
     private fun groupOf(display: Display): Int = runCatching {
@@ -154,7 +154,7 @@ class VdmHostMain private constructor(private val args: VdmHostPolicy.Args) {
     private val binder = object : IVdmHost.Stub() {
         private fun requireApp() { if (getCallingUid() != appUid) throw SecurityException("Только HeadSwap") }
 
-        override fun status(): String { requireApp(); return notes.joinToString("; ") }
+        override fun status(): String { requireApp(); return synchronized(this@VdmHostMain) { notes.joinToString("; ") } }
 
         override fun lastError(): String { requireApp(); return lastError }
 
@@ -169,11 +169,11 @@ class VdmHostMain private constructor(private val args: VdmHostPolicy.Args) {
                     checkNotNull(display) { "VirtualDevice вернул null" }
                     val id = display.display.displayId
                     displays[id] = display
-                    println("VDMHOST дисплей $id группа=${groupOf(display.display)} flags=0x${Integer.toHexString(display.display.flags)}")
+                    note("дисплей $id группа=${groupOf(display.display)} flags=0x${Integer.toHexString(display.display.flags)}")
                     id
                 } catch (e: Throwable) {
                     lastError = e.describe()
-                    println("VDMHOST дисплей не создан: $lastError")
+                    note("дисплей не создан: $lastError")
                     if (displays.isEmpty()) closeDevice()
                     -1
                 }
@@ -223,16 +223,16 @@ class VdmHostMain private constructor(private val args: VdmHostPolicy.Args) {
             val reply = call.invoke(provider, AttributionSource.Builder(Process.myUid()).setPackageName(SHELL_PACKAGE).build(),
                 authority, VdmDesktop.METHOD, null, extras) as Bundle?
             val client = reply?.getBinder(VdmDesktop.EXTRA_CLIENT)
-            if (reply?.getBoolean(VdmDesktop.EXTRA_ACCEPTED) != true || client == null) { println("VDMHOST приложение отказало"); return false }
+            if (reply?.getBoolean(VdmDesktop.EXTRA_ACCEPTED) != true || client == null) { note("приложение отказало"); return false }
             client.linkToDeath({
-                println("VDMHOST приложение завершилось, выхожу")
+                note("приложение завершилось, выхожу")
                 synchronized(this) { displays.values.forEach { runCatching { it.release() } }; displays.clear(); closeDevice() }
                 exitProcess(0)
             }, 0)
-            println("VDMHOST binder отдан приложению uid=$appUid")
+            note("binder отдан приложению uid=$appUid")
             true
         } catch (e: Throwable) {
-            println("VDMHOST передача не удалась: ${e.describe()}")
+            note("передача не удалась: ${e.describe()}")
             false
         } finally {
             runCatching {
@@ -263,7 +263,7 @@ class VdmHostMain private constructor(private val args: VdmHostPolicy.Args) {
 
         @Keep @JvmStatic fun main(argv: Array<String>) {
             try { VdmHostMain(VdmHostPolicy.Args.parse(argv)).run() }
-            catch (e: Throwable) { println("VDMHOST ошибка: ${e.javaClass.simpleName}: ${e.message}"); exitProcess(1) }
+            catch (e: Throwable) { println("VDMHOST ошибка:${e.javaClass.simpleName}: ${e.message}"); exitProcess(1) }
         }
     }
 }

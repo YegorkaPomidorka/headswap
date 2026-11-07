@@ -84,6 +84,8 @@ class DelegatedDesktopInstrumentation : Instrumentation() {
             permissions.add(DisplayIme.PERMISSION) // клавиатура на экране ГУ, без него - на телефоне
             if (requestAudio) permissions.add(DesktopAudioPolicy.ROUTING_PERMISSION)
             permissions.add(SleepDiagProbe.PERMISSION) // диагностика sleep: дампы сервисов без живого shell
+            // Этап B: дисплей принадлежит shell-хосту, запуск лаунчера на нём Android 17 считает фоновым (BAL).
+            if (VdmDesktop.supported) permissions.add(VdmDesktop.START_FROM_BACKGROUND)
             automation.adoptShellPermissionIdentity(*permissions.toTypedArray())
             adoptedHere = true
             check(DelegatedDesktopAccess.hasPermissions(context)) { "Android не предоставил все права рабочего стола и управления музыкой. Повторите явную активацию HeadSwap." }
@@ -103,9 +105,12 @@ class DelegatedDesktopInstrumentation : Instrumentation() {
             sleepDiag = runCatching { SleepDiagProbe(context, shell).also { it.start() } }
                 .onFailure { Log.w(DelegatedDesktopAccess.LOG_TAG, "SLEEPDIAG not started", it) }.getOrNull()
             // USB detach and producer/service shutdown must never count this latch down.
+            var ticks = 0
             while (!stop.await(5, TimeUnit.SECONDS)) {
                 check(DelegatedDesktopAccess.hasPermissions(context)) { "Desktop permissions were revoked" }
                 runCatching { DelegatedInputGateway.refreshImeRoutes() }
+                // Журнал shell-хоста через его binder: файл в /data/local/tmp юзер не пришлёт.
+                if (++ticks == 6 && VdmDesktop.supported) runCatching { VdmHostLink.logStatus() }
             }
         } catch (error: Throwable) {
             if (error is InterruptedException) Thread.currentThread().interrupt()

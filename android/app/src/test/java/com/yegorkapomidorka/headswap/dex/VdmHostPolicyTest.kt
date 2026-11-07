@@ -10,7 +10,7 @@ class VdmHostPolicyTest {
 
     @Test fun startCommandIsDetachedAndCarriesPackageAndPid() {
         val cmd = VdmHostPolicy.startCommand(apk, "com.yegorkapomidorka.headswap", 1234)
-        assertTrue(cmd.startsWith("CLASSPATH='$apk' /system/bin/setsid /system/bin/nohup /system/bin/app_process / "))
+        assertTrue(cmd.startsWith("rm -f ${VdmHostPolicy.LOG}; CLASSPATH='$apk' /system/bin/setsid /system/bin/nohup /system/bin/app_process / "))
         assertTrue(cmd.contains(VdmHostPolicy.ENTRY + " --package com.yegorkapomidorka.headswap --pid 1234 "))
         assertTrue(cmd.endsWith(" 2>&1 &"))
     }
