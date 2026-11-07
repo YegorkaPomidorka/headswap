@@ -71,8 +71,8 @@ class UpdatePrefs(ctx: Context) {
  * Состояние для экранов - поля [step], [progress], [error] (экраны опрашивают их в tick).
  */
 object Updater {
-    /** Ветка 4.0: тестовые сборки ставятся руками, публичные релизы 3.x им не предлагаем. */
-    const val ENABLED = false
+    /** Выключатель на случай тестовых веток, которым публичные релизы предлагать нельзя (так было в бетах 4.0). */
+    const val ENABLED = true
 
     enum class Step { IDLE, CHECKING, DOWNLOADING, INSTALLING }
 
@@ -133,8 +133,11 @@ object Updater {
         if (UpdateLogic.shouldCheck(p.enabled, p.lastCheck, System.currentTimeMillis())) check(ctx, manual = false)
     }
 
-    /** Запросить последний релиз в фоне. manual: ошибку показать тостом. */
-    fun check(ctx: Context, manual: Boolean) {
+    /**
+     * Запросить последний релиз в фоне. manual: ошибку и «последняя версия» показать тостом.
+     * onNewer: вызвать на главном потоке, если на GitHub нашлась версия новее (кнопка «Проверить и обновить»).
+     */
+    fun check(ctx: Context, manual: Boolean, onNewer: (() -> Unit)? = null) {
         if (!ENABLED) return
         synchronized(this) {
             if (step != Step.IDLE) return
@@ -150,8 +153,11 @@ object Updater {
                 p.lastCheck = now
                 p.save(rel)
                 val cur = installedVersion(app)
-                AppLog.i("обновления: на GitHub ${rel.version} (${rel.tag}), установлена $cur" + if (UpdateLogic.isNewer(rel.version, cur)) ", есть новее" else "")
+                val newer = UpdateLogic.isNewer(rel.version, cur)
+                AppLog.i("обновления: на GitHub ${rel.version} (${rel.tag}), установлена $cur" + if (newer) ", есть новее" else "")
                 step = Step.IDLE
+                if (newer) onNewer?.let { main.post(it) }
+                else if (manual) toast(app, UiText.res(R.string.upd_status_latest))
             } catch (e: Exception) {
                 AppLog.e("обновления: проверка не удалась", e)
                 p.lastCheck = now - UpdateLogic.CHECK_INTERVAL_MS + UpdateLogic.RETRY_MS
@@ -161,6 +167,18 @@ object Updater {
                 if (manual) toast(app, text)
             }
         }, "update-check").start()
+    }
+
+    /**
+     * Кнопка «Проверить и обновить» в настройках: не ждать автопроверки раз в 6 часов. Известна версия новее - сразу ставим;
+     * нет - спрашиваем GitHub и, если нашлась новее, ставим без диалога. Экран успели закрыть - только проверка.
+     */
+    fun checkAndUpdate(act: Activity) {
+        if (available(act) != null) {
+            start(act, confirm = false)
+            return
+        }
+        check(act, manual = true) { if (!act.isFinishing && !act.isDestroyed) start(act, confirm = false) }
     }
 
     /**
