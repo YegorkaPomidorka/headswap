@@ -131,10 +131,31 @@ object CarAppHost {
     fun back() { h.post { session?.back() } }
 
     /** Intent навигатору хоста (маршрут от Алисы); хост не поднят - false, и intent не ушёл. */
-    fun newIntent(i: android.content.Intent): Boolean {
+    fun newIntent(i: android.content.Intent, autoGo: Boolean = false): Boolean {
         if (pkg == null) return false
+        if (autoGo) autoGoUntil = android.os.SystemClock.elapsedRealtime() + AUTO_GO_MS
         h.post { session?.newIntent(i) ?: log("onNewIntent: сессии нет") }
         return true
+    }
+
+    /** Маршрут от Алисы: до этого момента первый обзор маршрута с вариантами сами жмём «Поехали» (navigateAction). */
+    @Volatile private var autoGoUntil = 0L
+    private const val AUTO_GO_MS = 15_000L
+
+    /** Обзор маршрута (Яндекс шлёт сначала пустой, с isLoading, потом с вариантами): «Поехали» за водителя. */
+    private fun autoGo(t: androidx.car.app.model.Template?) {
+        if (autoGoUntil == 0L) return
+        if (android.os.SystemClock.elapsedRealtime() > autoGoUntil) { autoGoUntil = 0L; log("автостарт: обзор маршрута не пришёл"); return }
+        val p = t as? androidx.car.app.navigation.model.RoutePreviewNavigationTemplate ?: return
+        if (p.isLoading || p.itemList?.items.isNullOrEmpty()) return
+        val d = p.navigateAction?.onClickDelegate ?: return
+        autoGoUntil = 0L
+        runCatching {
+            d.sendClick(object : androidx.car.app.OnDoneCallback {
+                override fun onSuccess(response: androidx.car.app.serialization.Bundleable?) { log("автостарт: «Поехали» нажато") }
+                override fun onFailure(response: androidx.car.app.serialization.Bundleable) { log("автостарт: отказ") }
+            })
+        }.onFailure { log("автостарт упал: ${it.javaClass.simpleName}: ${it.message}") }
     }
 
     /** cmd car_click --ei i N: нажать N-й кликабельный элемент текущего шаблона. */
@@ -181,6 +202,7 @@ object CarAppHost {
             ui = runCatching { mapper?.map(t?.template) }.onFailure { log("шаблон не разобран: ${it.javaClass.simpleName}: ${it.message}") }.getOrNull()
             // рефлексия по всему дереву - только для разбора на стенде, NavigationTemplate приходит каждую секунду
             if (dumpTemplates) CarTemplateDump.collect(t, ::log)
+            autoGo(t?.template)
             onChange?.invoke()
         }
 

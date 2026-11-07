@@ -108,7 +108,31 @@ object LauncherActions {
     }
 
     /** Кнопка голоса: панель Алисы слева за рейкой; повторное нажатие закрывает. Главный поток. */
-    fun toggleAssistant() { if (model.assistantOpen) closeAssistant("повторная кнопка голоса") else openAssistant() }
+    fun toggleAssistant() {
+        if (VOICE_ONLY) { voiceOnly(); return }
+        if (model.assistantOpen) closeAssistant("повторная кнопка голоса") else openAssistant()
+    }
+
+    /** Эксперимент 07.11: Алиса без панели на ГУ, на телефоне, говорит голосом через ГУ; маршрут ловим с экрана телефона. */
+    private const val VOICE_ONLY = true
+
+    private fun voiceOnly() {
+        val ctx = model.context.applicationContext
+        val status = com.yegorkapomidorka.headswap.dex.DesktopKeys.voiceStatus
+        status?.invoke(true)
+        val main = android.os.Handler(android.os.Looper.getMainLooper())
+        main.postDelayed({ status?.invoke(false) }, 10_000L)
+        com.yegorkapomidorka.headswap.dex.PhoneAssistant.launchPhone(ctx)
+    }
+
+    /** Алиса на телефоне (кнопкой голоса или сама): её маршрут из экрана телефона - в плитку навигатора с автостартом. */
+    fun startRouteCatcher(ctx: android.content.Context) {
+        if (!VOICE_ONLY) return
+        val main = android.os.Handler(android.os.Looper.getMainLooper())
+        com.yegorkapomidorka.headswap.dex.PhoneAssistant.watchPhone(ctx, com.yegorkapomidorka.headswap.carapp.RouteIntent::geoFor) { t, geo ->
+            main.post { routeFromAlice(t, geo) }
+        }
+    }
 
     fun openAssistant() {
         if (model.assistantOpen) return
@@ -146,6 +170,11 @@ object LauncherActions {
         val data = t.baseIntent.dataString
         val geo = com.yegorkapomidorka.headswap.carapp.RouteIntent.geoFor(data)
         if (geo == null) { AppLog.i("ASSIST $pkg не маршрут ($data), остаётся в панели", false); return }
+        routeFromAlice(t, geo)
+    }
+
+    private fun routeFromAlice(t: android.app.ActivityManager.RunningTaskInfo, geo: String) {
+        val pkg = t.topActivity?.packageName ?: t.baseIntent.component?.packageName ?: return
         val navigate = android.content.Intent(com.yegorkapomidorka.headswap.carapp.RouteIntent.ACTION_NAVIGATE, android.net.Uri.parse(geo))
         val nav = model.navigatorPkg
         val car = com.yegorkapomidorka.headswap.carapp.CarAppHost.pkg?.takeIf { it == nav }
@@ -162,7 +191,7 @@ object LauncherActions {
         }, "assist-route").start()
         closeAssistant("маршрут -> навигатор")
         if (model.navigatorPkg != null && model.area != Area.Navigator) model.go(Area.Navigator)
-        if (car != null) com.yegorkapomidorka.headswap.carapp.CarAppHost.newIntent(navigate)
+        if (car != null) com.yegorkapomidorka.headswap.carapp.CarAppHost.newIntent(navigate, autoGo = true)
     }
 
     /** Кнопка MEDIA ГУ: плеер на весь экран; плеер не выбран или не установлен - выбор плеера. */

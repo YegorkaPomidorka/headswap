@@ -154,6 +154,58 @@ object PhoneAssistant {
             .onFailure { AppLog.i("ASSIST маршрут $uri -> $pkg: ${it.javaClass.simpleName}: ${it.message}") }
     }
 
+    /**
+     * Алиса только голосом: ASSIST на экране телефона. Яндекс, выбранный помощником, показывает оверлей
+     * VoiceInteractionSession; голос (USAGE_MEDIA, CONTENT_TYPE_SPEECH) уходит в ГУ захватом звука рабочего стола (стенд 07.11).
+     */
+    fun launchPhone(ctx: Context) {
+        for (pkg in ALICE_PACKAGES) {
+            val intent = Intent(Intent.ACTION_ASSIST).setPackage(pkg).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            try {
+                ctx.startActivity(intent)
+                AppLog.i("ASSIST Алиса ($pkg) -> экран телефона, только голос")
+                return
+            } catch (e: ActivityNotFoundException) {
+                AppLog.i("ASSIST $pkg не установлен")
+            } catch (e: SecurityException) {
+                AppLog.i("ASSIST $pkg на телефоне: ${e.message}")
+            }
+        }
+        AppLog.i("ASSIST Алиса не запущена: нужно приложение «Яндекс — с Алисой»")
+    }
+
+    @Volatile private var phoneGen = 0
+
+    /**
+     * Ловец маршрутов, пока жив лаунчер рабочего стола: новая задача на экране телефона (дисплей 0), в чьём baseIntent
+     * маршрут ([geoFor] не null, например yandexnavi://build_route_on_map от Алисы на телефоне) - в [onRoute], один раз
+     * на задачу. Задачи, что были до старта, не трогаем. Следующий вызов заменяет прежний ловец. Поточный поток.
+     */
+    fun watchPhone(ctx: Context, geoFor: (String?) -> String?, onRoute: (android.app.ActivityManager.RunningTaskInfo, String) -> Unit) {
+        val gen = ++phoneGen
+        val known = HashSet<Int>()
+        Thread({
+            val am = ctx.getSystemService(android.app.ActivityManager::class.java)
+            @Suppress("DEPRECATION")
+            runCatching { am.getRunningTasks(30) }.getOrDefault(emptyList()).forEach { known.add(it.taskId) }
+            AppLog.i("ASSIST ловец маршрутов с телефона запущен")
+            while (gen == phoneGen) {
+                @Suppress("DEPRECATION")
+                val tasks = runCatching { am.getRunningTasks(30) }.getOrDefault(emptyList())
+                for (t in tasks) {
+                    if (!known.add(t.taskId)) continue
+                    if (FrameworkTaskIdentityReader.read(t)?.displayId != 0) continue
+                    val geo = geoFor(t.baseIntent.dataString) ?: continue
+                    AppLog.i("ASSIST маршрут на телефоне: ${t.topActivity?.packageName} задача ${t.taskId} ${t.baseIntent.dataString}")
+                    runCatching { onRoute(t, geo) }.onFailure { AppLog.i("ASSIST маршрут: ${it.javaClass.simpleName}: ${it.message}") }
+                }
+                android.os.SystemClock.sleep(100)
+            }
+        }, "assist-phone").apply { isDaemon = true; start() }
+    }
+
+    fun stopPhoneWatch() { phoneGen++ }
+
     fun launch(ctx: Context, displayId: Int) {
         if (displayId <= 0) { AppLog.i("ASSIST дисплей рабочего стола не готов"); return }
         val opts = ActivityOptions.makeBasic().setLaunchDisplayId(displayId).toBundle()
