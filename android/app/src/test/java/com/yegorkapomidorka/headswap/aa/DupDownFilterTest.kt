@@ -6,16 +6,22 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class DupDownFilterTest {
-    @Test fun autoFollowsHonda() {
-        assertTrue(DupDownFilter.active(DupDownFilter.AUTO, true))
-        assertFalse(DupDownFilter.active(DupDownFilter.AUTO, false))
+    @Test fun autoDropsOnlyQuickRepeat() {
+        assertTrue(DupDownFilter.drop(DupDownFilter.AUTO, true, 3))
+        assertTrue(DupDownFilter.drop(DupDownFilter.AUTO, true, 70))
+        assertTrue(DupDownFilter.drop(DupDownFilter.AUTO, true, DupDownFilter.AUTO_WINDOW_MS))
+        assertFalse(DupDownFilter.drop(DupDownFilter.AUTO, true, DupDownFilter.AUTO_WINDOW_MS + 1))
+        assertFalse(DupDownFilter.drop(DupDownFilter.AUTO, true, 2_000))
+        assertFalse(DupDownFilter.drop(DupDownFilter.AUTO, true, -1))
     }
 
-    @Test fun onAndOffIgnoreHonda() {
-        assertTrue(DupDownFilter.active(DupDownFilter.ON, true))
-        assertTrue(DupDownFilter.active(DupDownFilter.ON, false))
-        assertFalse(DupDownFilter.active(DupDownFilter.OFF, true))
-        assertFalse(DupDownFilter.active(DupDownFilter.OFF, false))
+    @Test fun onIgnoresTimeOffNeverDrops() {
+        assertTrue(DupDownFilter.drop(DupDownFilter.ON, true, 2_000))
+        assertFalse(DupDownFilter.drop(DupDownFilter.OFF, true, 3))
+    }
+
+    @Test fun differentOrReleasedPointNeverDropped() {
+        for (m in DupDownFilter.values()) assertFalse(DupDownFilter.drop(m, false, 3))
     }
 
     @Test fun parseByNameFallsBackToDefault() {

@@ -436,9 +436,9 @@ class AaBridgeCore(
     private val touchDecimator = TouchDecimator { a, x, y, px, py -> routeTouch(a, x, y, px, py) }
     @Volatile private var touchDecimationLogged = 1
 
-    /** Фильтр повторного DOWN без UP ([DupDownFilter]); Авто включает его только на Honda. */
+    /** Режим фильтра повторного DOWN без UP ([DupDownFilter]), читается на каждое касание. */
     @Volatile var dupDownFilterProvider: () -> DupDownFilter = { DupDownFilter.DEFAULT }
-    fun dupDownFilterActive() = DupDownFilter.active(dupDownFilterProvider(), huHonda)
+    fun dupDownFilter() = dupDownFilterProvider()
     private val mediaReleaseTimer = AudioTimer()
     private val voiceExitTimer = AudioTimer()
     private var carlifePaused = false          // VIDEO_ENCODER_PAUSE после последнего START

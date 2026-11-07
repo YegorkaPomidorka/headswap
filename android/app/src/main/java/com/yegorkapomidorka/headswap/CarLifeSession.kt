@@ -9,6 +9,7 @@ import com.yegorkapomidorka.headswap.aa.AaTranscoder
 import com.yegorkapomidorka.headswap.aa.BitratePolicy
 import com.yegorkapomidorka.headswap.aa.BitrateProfile
 import com.yegorkapomidorka.headswap.aa.DesktopVideoQuality
+import com.yegorkapomidorka.headswap.aa.DupDownFilter
 import com.yegorkapomidorka.headswap.aa.DesktopVideoSelection
 import com.yegorkapomidorka.headswap.aa.DesktopVideoGeometry
 import com.yegorkapomidorka.headswap.aa.CallStateSource
@@ -162,6 +163,7 @@ class CarLifeSession(
     private var singleDownHeld = false
     private var singleDownX = -1
     private var singleDownY = -1
+    private var singleDownMs = 0L
     private var dupDownCount = 0
     private val rxByType = java.util.TreeMap<Int, Int>()
     private var huInfo: String? = null
@@ -1229,18 +1231,22 @@ class CarLifeSession(
         }
         // Honda (h725 Civic 20772104, h864 XR-V 20772122) шлёт каждое касание как DOWN, DOWN, UP с теми же x,y.
         // Повтор DOWN без UP лаунчер считает вторым нажатием: «Настройки» мигают, «Назад» двойное.
-        // По умолчанию фильтр только у Honda, переопределяется в «Для разработчиков» (DupDownFilter).
-        // Для всех ГУ не включаем: ГУ, теряющую UP, повтор DOWN сейчас «лечит».
-        if (!bridge.dupDownFilterActive()) {
+        // Авто = любая ГУ, но только повтор в окне DupDownFilter.AUTO_WINDOW_MS: у ГУ, теряющей UP, следующий
+        // тап в ту же точку приходит позже и проходит. Переопределяется в «Для разработчиков» (DupDownFilter).
+        val dupMode = bridge.dupDownFilter()
+        if (dupMode == DupDownFilter.OFF) {
             singleDownHeld = false
         } else if (n == 1 && t.masked == 0) {
-            if (singleDownHeld && t.x == singleDownX && t.y == singleDownY) {
-                if (dupDownCount++ == 0) AppLog.i("TOUCH повторный DOWN без UP (x=${t.x} y=${t.y}) — отбрасываю, дальше молча")
+            val now = SystemClock.elapsedRealtime()
+            val same = singleDownHeld && t.x == singleDownX && t.y == singleDownY
+            if (DupDownFilter.drop(dupMode, same, now - singleDownMs)) {
+                if (dupDownCount++ == 0) AppLog.i("TOUCH повторный DOWN без UP через ${now - singleDownMs} мс (x=${t.x} y=${t.y}) — отбрасываю, дальше молча")
                 return
             }
             singleDownHeld = true
             singleDownX = t.x
             singleDownY = t.y
+            singleDownMs = now
         } else if (n > 1 || t.masked == 1 || t.masked == 3) {
             singleDownHeld = false
         }

@@ -187,7 +187,7 @@
     <string name="tdec_x2">×2</string>
 
     <!-- Двойное касание от ГУ (DupDownFilter) -->
-    <string name="dup_down_auto">Авто (только Honda)</string>
+    <string name="dup_down_auto">Авто (повтор до 150 мс)</string>
     <string name="dup_down_on">Фильтровать всегда</string>
     <string name="dup_down_off">Не фильтровать</string>
 

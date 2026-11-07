@@ -187,7 +187,7 @@
     <string name="tdec_x2">×2</string>
 
     <!-- Double touch from head unit (DupDownFilter) -->
-    <string name="dup_down_auto">Auto (Honda only)</string>
+    <string name="dup_down_auto">Auto (repeat within 150 ms)</string>
     <string name="dup_down_on">Always filter</string>
     <string name="dup_down_off">Don\'t filter</string>
 
