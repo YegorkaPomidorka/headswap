@@ -15,8 +15,9 @@ class VdmHostProvider : ContentProvider() {
     override fun onCreate() = true
 
     override fun call(method: String, arg: String?, extras: Bundle?): Bundle? {
-        if (method != VdmDesktop.METHOD) return null
+        if (method != VdmDesktop.METHOD && method != VdmDesktop.METHOD_REPORT) return null
         if (Binder.getCallingUid() != VdmDesktop.SHELL_UID) throw SecurityException("Только shell-хост HeadSwap")
+        if (method == VdmDesktop.METHOD_REPORT) { VdmHostLink.report(extras); return Bundle() }
         val context = checkNotNull(context)
         return VdmHostLink.accept(context, extras)
     }

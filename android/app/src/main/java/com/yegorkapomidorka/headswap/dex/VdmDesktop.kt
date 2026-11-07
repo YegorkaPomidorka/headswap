@@ -19,6 +19,7 @@ internal object VdmDesktop {
     /** Android 16 тоже: на Samsung с 16 тот же симптом (MAA-Meow), у остальных и старый путь работает. */
     const val MIN_SDK = 36
     const val METHOD = "vdm_host"
+    const val METHOD_REPORT = "vdm_report"
     const val EXTRA_HOST = "host"
     const val EXTRA_CLIENT = "client"
     const val EXTRA_STATUS = "status"
@@ -60,6 +61,7 @@ internal object VdmHostLink {
         val binder = extras?.getBinder(VdmDesktop.EXTRA_HOST)
         val status = extras?.getString(VdmDesktop.EXTRA_STATUS) ?: "?"
         if (binder == null || !DelegatedDesktopAccess.isReady(context)) return refused(status)
+        appContext = context.applicationContext
         val next = IVdmHost.Stub.asInterface(binder)
         synchronized(this) {
             host = next
@@ -76,7 +78,22 @@ internal object VdmHostLink {
 
     private fun onHostDied(dead: IVdmHost) {
         synchronized(this) { if (host === dead) { host = null; owned.clear() } }
-        AppLog.i("VDM хост завершился: новые экраны пойдут обычным путём", false)
+        AppLog.i("VDM хост завершился: новые экраны пойдут обычным путём; ${debugState()}", false)
+    }
+
+    @Volatile private var appContext: android.content.Context? = null
+
+    /** Отчёт хоста перед смертью (vdm3, h768): сигнал, падение, смена adbd. */
+    fun report(extras: Bundle?) {
+        AppLog.i("VDMHOST| отчёт: ${extras?.getString(VdmDesktop.EXTRA_STATUS)?.take(300)}; ${debugState()}", false)
+    }
+
+    /** Отладка по USB / беспроводная и экран: хост - потомок adbd, его судьба может зависеть от отладки. */
+    private fun debugState(): String {
+        val ctx = appContext ?: return "состояние отладки неизвестно"
+        fun global(name: String) = runCatching { android.provider.Settings.Global.getString(ctx.contentResolver, name) }.getOrNull()
+        val interactive = runCatching { ctx.getSystemService(android.os.PowerManager::class.java).isInteractive }.getOrNull()
+        return "adb_enabled=${global("adb_enabled")} adb_wifi_enabled=${global("adb_wifi_enabled")} экран=${if (interactive == true) "вкл" else "выкл"}"
     }
 
     /** id дисплея VirtualDevice или -1 (хоста нет / отказ - причина в логе, рабочий стол идёт обычным путём). */

@@ -48,7 +48,9 @@ class VdmHostMain private constructor(private val args: VdmHostPolicy.Args) {
             .onFailure { note("контекст: ${it.describe()}") }.getOrThrow()
         runCatching { associationId = ensureAssociation() }.onFailure { note("привязка: ${it.describe()}") }
         note("привязка id=${if (associationId > 0) associationId else "нет"}")
+        runCatching { note("ppid=${ppidOf(Process.myPid())} adbd=${adbdPid() ?: "нет"} cgroup=${File("/proc/self/cgroup").readText().trim().replace('\n', '|').take(200)}") }
         if (!deliver()) exitProcess(2)
+        watchForDeath()
         Looper.loop()
     }
 
@@ -203,25 +205,11 @@ class VdmHostMain private constructor(private val args: VdmHostPolicy.Args) {
 
     private fun deliver(): Boolean {
         if (!appAlive()) { note("процесс приложения ${args.appPid} уже завершён"); return false }
-        val authority = args.packageName + ".vdmhost"
-        val am = Class.forName("android.app.IActivityManager\$Stub").getMethod("asInterface", IBinder::class.java)
-            .invoke(null, service("activity"))!!
         return try {
-            val holder = am.javaClass.getMethod("getContentProviderExternal", String::class.java, Int::class.javaPrimitiveType,
-                IBinder::class.java, String::class.java).invoke(am, authority, user, null, "headswap-vdm")
-                ?: error("провайдер $authority не найден")
-            val info = holder.javaClass.getField("info").get(holder) as android.content.pm.ProviderInfo
-            check(info.packageName == args.packageName) { "провайдер чужого пакета ${info.packageName}" }
-            appUid = info.applicationInfo.uid
-            val provider = checkNotNull(holder.javaClass.getField("provider").get(holder)) { "провайдер не ответил" }
-            val extras = Bundle().apply {
+            val reply = providerCall(VdmDesktop.METHOD, Bundle().apply {
                 putBinder(VdmDesktop.EXTRA_HOST, binder)
                 putString(VdmDesktop.EXTRA_STATUS, notes.joinToString("; "))
-            }
-            val call = Class.forName("android.content.IContentProvider").getMethod("call", AttributionSource::class.java,
-                String::class.java, String::class.java, String::class.java, Bundle::class.java)
-            val reply = call.invoke(provider, AttributionSource.Builder(Process.myUid()).setPackageName(SHELL_PACKAGE).build(),
-                authority, VdmDesktop.METHOD, null, extras) as Bundle?
+            })
             val client = reply?.getBinder(VdmDesktop.EXTRA_CLIENT)
             if (reply?.getBoolean(VdmDesktop.EXTRA_ACCEPTED) != true || client == null) { note("приложение отказало"); return false }
             client.linkToDeath({
@@ -234,6 +222,27 @@ class VdmHostMain private constructor(private val args: VdmHostPolicy.Args) {
         } catch (e: Throwable) {
             note("передача не удалась: ${e.describe()}")
             false
+        }
+    }
+
+    /** Вызов нашего провайдера только у живого проверенного процесса (иначе AMS поднял бы приложение без активации). */
+    private fun providerCall(method: String, extras: Bundle): Bundle? {
+        check(appAlive()) { "процесс приложения ${args.appPid} завершён" }
+        val authority = args.packageName + ".vdmhost"
+        val am = Class.forName("android.app.IActivityManager\$Stub").getMethod("asInterface", IBinder::class.java)
+            .invoke(null, service("activity"))!!
+        try {
+            val holder = am.javaClass.getMethod("getContentProviderExternal", String::class.java, Int::class.javaPrimitiveType,
+                IBinder::class.java, String::class.java).invoke(am, authority, user, null, "headswap-vdm")
+                ?: error("провайдер $authority не найден")
+            val info = holder.javaClass.getField("info").get(holder) as android.content.pm.ProviderInfo
+            check(info.packageName == args.packageName) { "провайдер чужого пакета ${info.packageName}" }
+            appUid = info.applicationInfo.uid
+            val provider = checkNotNull(holder.javaClass.getField("provider").get(holder)) { "провайдер не ответил" }
+            val call = Class.forName("android.content.IContentProvider").getMethod("call", AttributionSource::class.java,
+                String::class.java, String::class.java, String::class.java, Bundle::class.java)
+            return call.invoke(provider, AttributionSource.Builder(Process.myUid()).setPackageName(SHELL_PACKAGE).build(),
+                authority, method, null, extras) as Bundle?
         } finally {
             runCatching {
                 am.javaClass.getMethod("removeContentProviderExternalAsUser", String::class.java, IBinder::class.java,
@@ -241,6 +250,36 @@ class VdmHostMain private constructor(private val args: VdmHostPolicy.Args) {
             }
         }
     }
+
+    // --- vdm3: почему хост умирает на Samsung (h768) - отчёт в лог приложения до смерти, где это возможно ---
+
+    private fun report(text: String) {
+        println("VDMHOST отчёт: $text")
+        runCatching { providerCall(VdmDesktop.METHOD_REPORT, Bundle().apply { putString(VdmDesktop.EXTRA_STATUS, text) }) }
+    }
+
+    private fun watchForDeath() {
+        Thread.setDefaultUncaughtExceptionHandler { t, e -> report("падение в ${t.name}: ${e.describe()}"); exitProcess(3) }
+        // Хук только на exit: от сигналов (init убивает cgroup adbd) отчёта не будет, их ловит слежка за adbd ниже.
+        Runtime.getRuntime().addShutdownHook(Thread { report("выход по сигналу/exit, adbd=${adbdPid() ?: "нет"}") })
+        val adbd = adbdPid()
+        Thread({
+            var last = adbd
+            while (true) {
+                Thread.sleep(500)
+                val now = adbdPid()
+                if (now != last) { report("adbd: было ${last ?: "нет"}, стало ${now ?: "нет"}"); last = now }
+            }
+        }, "vdm-watch").apply { isDaemon = true }.start()
+    }
+
+    private fun adbdPid(): Int? = File("/proc").listFiles()?.firstNotNullOfOrNull { dir ->
+        dir.name.toIntOrNull()?.takeIf { runCatching { File(dir, "comm").readText().trim() == "adbd" }.getOrDefault(false) }
+    }
+
+    private fun ppidOf(pid: Int): Int? = runCatching {
+        File("/proc/$pid/stat").readText().substringAfterLast(')').trim().split(' ')[1].toInt()
+    }.getOrNull()
 
     /** Провайдер ищем только у живого проверенного процесса: иначе AMS поднял бы приложение без активации. */
     private fun appAlive(): Boolean = runCatching {
