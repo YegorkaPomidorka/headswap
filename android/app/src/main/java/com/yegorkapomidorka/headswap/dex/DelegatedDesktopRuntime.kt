@@ -10,6 +10,7 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.hardware.display.DisplayManager
 import android.hardware.display.VirtualDisplay
+import android.os.Binder
 import android.os.Build
 import android.os.IBinder
 import android.view.InputEvent
@@ -24,23 +25,44 @@ internal class DelegatedDesktopRuntime(private val context: Context, private val
 
     // TRUSTED / DESTROY_CONTENT / SUPPORTS_TOUCH are permission-gated platform flags omitted by the public SDK IntDef.
     @SuppressLint("WrongConstant")
-    override fun createDisplay(surface: Surface, width: Int, height: Int, density: Int, mode: Int): VirtualDisplay {
+    override fun createDisplay(surface: Surface, width: Int, height: Int, density: Int, mode: Int): OwnedDisplay {
         DelegatedDesktopPolicy.requireMode(mode)
-        return checkNotNull(displays.createVirtualDisplay("HeadSwap ${DesktopModePolicy.label(mode)}",
-            width, height, density, surface,
+        val name = "HeadSwap ${DesktopModePolicy.label(mode)}"
+        if (mode == DesktopModePolicy.ANDROID_DESKTOP) deviceDisplay(surface, name, width, height, density,
+            DesktopModePolicy.displayFlags(mode, Build.VERSION.SDK_INT, alwaysUnlocked = false))?.let { return it }
+        return LocalDisplay(checkNotNull(displays.createVirtualDisplay(name, width, height, density, surface,
             DesktopModePolicy.displayFlags(mode, Build.VERSION.SDK_INT, DelegatedDesktopAccess.canKeepUnlocked(context)))) {
             "Android отклонил доверенный виртуальный экран"
+        })
+    }
+
+    /**
+     * Этап B: дисплей внутри VirtualDevice shell-хоста (своя группа на Android 17). Блокировку снимает
+     * LOCK_STATE_ALWAYS_UNLOCKED устройства, OWN_DISPLAY_GROUP / ALWAYS_UNLOCKED хост снимает сам. null - обычный путь.
+     */
+    private fun deviceDisplay(surface: Surface, name: String, width: Int, height: Int, density: Int, flags: Int): OwnedDisplay? {
+        if (!VdmDesktop.supported) return null
+        val owner = Binder()
+        val id = runCatching { inputGateway.createDeviceDisplay(surface, name, width, height, density, flags, owner) }.getOrDefault(-1)
+        if (id <= 0) return null
+        return runCatching { GatewayDisplay(inputGateway, id, owner, displays) }.getOrElse {
+            android.util.Log.w("HeadSwap", "VDM display $id not visible in :delegated", it)
+            runCatching { inputGateway.releaseDeviceDisplay(id) }
+            null
         }
     }
 
     // TRUSTED / DESTROY_CONTENT / SUPPORTS_TOUCH are permission-gated platform flags
     // omitted by the public SDK IntDef. The shared engine verifies the returned display.
     @SuppressLint("WrongConstant")
-    override fun createChildDisplay(surface: Surface, width: Int, height: Int, density: Int): VirtualDisplay =
-        checkNotNull(displays.createVirtualDisplay("HeadSwap navigator widget", width, height, density,
+    override fun createChildDisplay(surface: Surface, width: Int, height: Int, density: Int): OwnedDisplay {
+        val name = "HeadSwap navigator widget"
+        deviceDisplay(surface, name, width, height, density, EmbeddedDisplayPolicy.displayFlags(Build.VERSION.SDK_INT, false))?.let { return it }
+        return LocalDisplay(checkNotNull(displays.createVirtualDisplay(name, width, height, density,
             surface, EmbeddedDisplayPolicy.displayFlags(Build.VERSION.SDK_INT, DelegatedDesktopAccess.canKeepUnlocked(context)))) {
             "Android отклонил экран виджета"
-        }
+        })
+    }
 
     override fun inject(event: InputEvent, id: Int, actionButton: Int) {
         check(id > 0) { "Ввод на основной экран запрещён" }
@@ -109,7 +131,12 @@ internal class DelegatedDesktopRuntime(private val context: Context, private val
         check(context.getSystemService(ActivityManager::class.java).isActivityStartAllowedOnDisplay(context, id, intent)) {
             "Android не разрешил запуск приложения на собственном экране"
         }
-        context.startActivity(intent, fullscreenOptions(id).toBundle())
+        val options = if (!ownActivity && EmbeddedDisplayPolicy.multiWindowLaunch(component.packageName)) {
+            // Без границ запуска: в многооконном режиме система держит их буквально, и окно не следует за размером плитки.
+            ActivityOptions.makeBasic().setLaunchDisplayId(id).toBundle()
+                .apply { putInt(EmbeddedDisplayPolicy.KEY_LAUNCH_WINDOWING_MODE, EmbeddedDisplayPolicy.WINDOWING_MULTI_WINDOW) }
+        } else fullscreenOptions(id).toBundle()
+        context.startActivity(intent, options)
     }
 
     /**

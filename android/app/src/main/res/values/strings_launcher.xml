@@ -156,4 +156,10 @@
     <string name="l_nh_end">End route</string>
     <string name="l_nh_search">Search</string>
     <string name="l_nh_loading">Loading…</string>
+    <string name="l_s_notifications">Notifications</string>
+    <string name="l_notif_show_all">Notifications: %1$d. Show all</string>
+    <string name="l_notif_collapse">Collapse notifications</string>
+    <string name="l_notif_clear_all">Clear all</string>
+    <string name="l_notif_dismiss">Dismiss</string>
+    <string name="l_notif_open_in">Open in %1$s</string>
 </resources>

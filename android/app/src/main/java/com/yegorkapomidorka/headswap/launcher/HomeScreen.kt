@@ -64,7 +64,8 @@ fun HomeScreen() {
     Column(Modifier.fillMaxSize().padding(start = m.dp(s.g), top = m.dp(s.g8), end = m.dp(s.m),
         bottom = m.dp(if (s.strip || layout.two) s.m else 0))) {
         StatusBar()
-        Spacer(Modifier.height(m.dp(s.g8)))
+        // без строки статуса (Для разработчиков) плитки поднимаются к верхнему полю
+        if (!model.hideStatusBar) Spacer(Modifier.height(m.dp(s.g8)))
         val bigMod = Modifier.onGloballyPositioned { model.bigTileRect = it.boundsInRoot() }
         if (layout.two) {
             Row(Modifier.weight(1f).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(m.dp(s.g))) {

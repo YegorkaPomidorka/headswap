@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -25,6 +26,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
@@ -104,6 +107,7 @@ fun LauncherRoot(connected: Boolean) {
                         EmbedLayers()
                         HomeTileButtons() // ⇄ и «Слои» ленты - над живыми окнами плашек
                         NavHostOverlay() // шаблоны навигатора на своём хосте Car App - над его картой, в границах области
+                        NotificationsOverlay() // язычок и шторка уведомлений телефона из-под строки статуса; касания берёт только сам
                         // входящий звонок поверх чужого приложения или экрана без карточки «Телефон»
                         if (PhoneController.callState == CallState.RINGING && (model.area != Area.Home || spec.strip || model.homeLayout.two)) {
                             // как нижняя полоса главного: прибита к низу, скругления только сверху
@@ -229,14 +233,35 @@ fun CardViewButton(sizePx: Int, iconPx: Int, background: Color, color: Color, mo
     }
 }
 
-/** Строка статуса справа сверху: дата, Bluetooth, Wi-Fi, сеть, громкость медиа. Ничего не нажимается, погоды нет. */
+/**
+ * Строка статуса справа сверху: дата, Bluetooth, Wi-Fi, сеть, громкость медиа. Ничего не нажимается, погоды нет.
+ * Стоит на сплошной полосе цвета панелей темы от рейки до края экрана и от верха: фон рисуется за отступами родителя
+ * (все три экрана со строкой - start g, top g8, end m). Нижний край полосы уходит в модель: к нему крепится язычок
+ * уведомлений ([NotificationsOverlay]); золотая полоска живёт там же, по центру области.
+ */
 @Composable
 fun StatusBar(title: String? = null, showNet: Boolean = true) {
     val m = LocalMetrics.current
     val s = m.spec
     val st = LauncherModel.status
+    val model = LauncherModel
+    val bar = LocalPalette.current.bar
+    if (model.hideStatusBar) {
+        // строка скрыта (Для разработчиков): полосы и значков нет, остаётся только заголовок экрана; чёлка уведомлений - от верха экрана
+        DisposableEffect(Unit) { model.statusBottom = null; model.statusSlot = true; onDispose { model.statusSlot = false } }
+        if (title != null) Row(Modifier.fillMaxWidth().height(m.dp(s.statusH)), verticalAlignment = Alignment.CenterVertically) {
+            Txt(title, s.fs, Modifier.weight(1f), color = Pal.TEXT, weight = FontWeight.SemiBold)
+        }
+        return
+    }
+    DisposableEffect(Unit) { onDispose { model.statusBottom = null } }
     Row(
-        Modifier.fillMaxWidth().height(m.dp(s.statusH)), verticalAlignment = Alignment.CenterVertically,
+        Modifier.fillMaxWidth().height(m.dp(s.statusH))
+            .onGloballyPositioned { model.statusBottom = it.boundsInRoot().top - s.g8 + s.statusBandH }
+            .drawBehind { drawRect(bar, Offset(-s.g.toFloat(), -s.g8.toFloat()), Size(size.width + s.g + s.m, s.statusBandH.toFloat())) }
+            // строка по центру полосы: родитель опускает её на g8, полоса ниже строки на 3/4 g8
+            .offset(y = -m.dp(s.g8 / 4)),
+        verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(m.dp(s.g), Alignment.End),
     ) {
         // в узкой рейке часов нет: время слева, прижато к краю (перед заголовком, если он есть)

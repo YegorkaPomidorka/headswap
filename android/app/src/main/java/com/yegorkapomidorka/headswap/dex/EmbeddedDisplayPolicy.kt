@@ -47,6 +47,19 @@ internal object EmbeddedDisplayPolicy {
         (packageName == "com.yandex.searchapp" || packageName == "ru.yandex.searchplugin") &&
             className == "ru.yandex.searchplugin.AssistantActivityAlias"
 
+    /** WindowConfiguration.WINDOWING_MODE_MULTI_WINDOW. */
+    const val WINDOWING_MULTI_WINDOW = 6
+    /** ActivityOptions.KEY_LAUNCH_WINDOWING_MODE (скрытая константа; Bundle читает system_server, не hidden API). */
+    const val KEY_LAUNCH_WINDOWING_MODE = "android.activity.windowingMode"
+    private val multiWindowPackages = setOf("org.telegram.messenger", "org.telegram.messenger.web", "org.telegram.messenger.beta")
+
+    /**
+     * Telegram в полноэкранном режиме берёт высоту строки состояния телефона (152 px при 520 dpi), если уже открывался
+     * на телефоне, и игнорирует нулевой инсет плитки: сверху пустая полоса. В многооконном режиме он верит инсету (ADR 0031).
+     * Остальным не включаем: YouTube в многооконном режиме не уходит на весь экран.
+     */
+    fun multiWindowLaunch(packageName: String): Boolean = packageName in multiWindowPackages
+
     fun requireChildId(id: Int, parentId: Int) {
         check(parentId > 0 && id > 0 && id != parentId) { "Виджет не получил собственный дополнительный экран" }
     }
