@@ -115,6 +115,8 @@ internal object LauncherModel {
     var foreign by mutableStateOf<AppRef?>(null)
     /** Панель Алисы (кнопка голоса) поверх рабочего стола: слева за рейкой, под ней затемнение. */
     var assistantOpen by mutableStateOf(false)
+    /** Панель Алисы скрыта (только голос): дочерний дисплей живёт, слой за экраном, затемнения нет. */
+    var assistantHidden by mutableStateOf(false)
     /** Оверлей «Недавние» на экране. */
     var recentsOpen by mutableStateOf(false)
     /** Приложения оверлея; null - список ещё запрашивается. */
