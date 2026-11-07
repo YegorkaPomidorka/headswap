@@ -145,12 +145,13 @@ fun NotificationsOverlay() {
     val atSeam = notifLineAtSeam(s.w, s.h)
     // до первого язычка — там, где встал бы самый узкий язычок
     val fallbackX = max(centerX, area.left + (NotifGeom.tongueWidth(s.t, Math.round(area.width), ear0, s.g).first + 2 * ear0) / 2f)
-    fun lineX(): Float = if (atSeam) centerX else shown.lineX ?: fallbackX
-    val lineDx: () -> Int = { Math.round(lineX() - shown.panelCx) }
     // Строка статуса скрыта (Для разработчиков, Егор 07.11): полоски на строке нет, вместо неё от верха экрана висит чёлка -
     // та же панель, свёрнутая до 168x30 с полоской на нижнем крае. Язычок и шторка растут из неё (animateContentSize), а не
     // выезжают сверху; свернулись - снова чёлка. Непрочитанных нет - нет и чёлки.
+    // Полоска здесь всегда по центру тела: строки, к которой её привязывать, нет (Егор 07.11: в шторке «улетела» вбок).
     val notchMode = model.hideStatusBar && model.statusSlot && model.statusBottom == null
+    fun lineX(): Float = if (notchMode) shown.panelCx else if (atSeam) centerX else shown.lineX ?: fallbackX
+    val lineDx: () -> Int = { if (notchMode) 0 else Math.round(lineX() - shown.panelCx) }
     val idle = notchMode && liveItems.isNotEmpty()
     // содержимое язычка/шторки - только когда панель уже поехала (p > 0): первый кадр - чёлка, от неё и растёт
     val grown = !notchMode || (show && p.value > 0f)
@@ -198,13 +199,11 @@ fun NotificationsOverlay() {
                     val shape = remember(earNow, bottomNow) { NotchShape(earNow.toFloat(), bottomNow.toFloat()) }
                     val (minW, maxW) = NotifGeom.tongueWidth(s.t, Math.round(area.width), ear, s.g)
                     val inShade = grown && (open || (shown.shade && !show))
-                    // чёлка стоит там, где лежит полоска (центр последнего язычка), чтобы полоска не прыгала при раскрытии
-                    val panelX = if (grown) centerX else lineX()
                     Column(
                         // по центру над стыком плиток, но не вылезая за область справа от рейки
                         Modifier.layout { measurable, constraints ->
                             val pl = measurable.measure(constraints.copy(minWidth = 0))
-                            val x = Math.round(panelX - area.left - pl.width / 2f).coerceIn(0, max(0, constraints.maxWidth - pl.width))
+                            val x = Math.round(centerX - area.left - pl.width / 2f).coerceIn(0, max(0, constraints.maxWidth - pl.width))
                             shown.panelCx = area.left + x + pl.width / 2f
                             if (!inShade && !atSeam) shown.lineX = shown.panelCx
                             layout(constraints.maxWidth, pl.height) { pl.place(x, 0) }
