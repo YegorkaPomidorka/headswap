@@ -125,7 +125,7 @@ object LauncherActions {
         com.yegorkapomidorka.headswap.dex.PhoneAssistant.launchPhone(ctx)
     }
 
-    /** Алиса на телефоне (кнопкой голоса или сама): её маршрут из экрана телефона - в плитку навигатора с автостартом. */
+    /** Алиса на телефоне (кнопкой голоса или сама): её маршрут из экрана телефона - в плитку навигатора, «Поехали» жмёт водитель. */
     fun startRouteCatcher(ctx: android.content.Context) {
         if (!VOICE_ONLY) return
         val main = android.os.Handler(android.os.Looper.getMainLooper())
@@ -191,7 +191,7 @@ object LauncherActions {
         }, "assist-route").start()
         closeAssistant("маршрут -> навигатор")
         if (model.navigatorPkg != null && model.area != Area.Navigator) model.go(Area.Navigator)
-        if (car != null) com.yegorkapomidorka.headswap.carapp.CarAppHost.newIntent(navigate, autoGo = true)
+        if (car != null) com.yegorkapomidorka.headswap.carapp.CarAppHost.newIntent(navigate)
     }
 
     /** Кнопка MEDIA ГУ: плеер на весь экран; плеер не выбран или не установлен - выбор плеера. */
