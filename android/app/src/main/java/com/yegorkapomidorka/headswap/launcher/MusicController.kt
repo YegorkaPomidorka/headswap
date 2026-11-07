@@ -117,24 +117,48 @@ internal object MusicController {
         return (fromSessions + fromServices).filter { it != ctx.packageName }.distinct()
     }
 
+    private fun sessionsOf(ctx: Context, pkg: String): List<MediaController> = runCatching {
+        ctx.getSystemService(MediaSessionManager::class.java).getActiveSessions(null).filter { it.packageName == pkg }
+    }.getOrDefault(emptyList())
+
+    /** Поставить на паузу все сессии [pkg] (YouTube Music, которую включил Gemini). */
+    fun pausePackage(ctx: Context, pkg: String) {
+        sessionsOf(ctx, pkg).forEach { runCatching { it.transportControls.pause() } }
+    }
+
+    /** Играть [pkg]: его сессия, если есть, иначе [startPlayer]. Главный поток. */
+    fun playPackage(ctx: Context, pkg: String) {
+        val s = sessionsOf(ctx, pkg).firstOrNull()
+        if (s != null) runCatching { s.transportControls.play() } else startPlayer(ctx, pkg)
+    }
+
     /** Сделать плеер текущим: если сессия уже есть - играть, иначе разбудить его MediaBrowserService и нажать play. */
     fun startPlayer(ctx: Context, pkg: String) {
         // Только главный поток (у MediaBrowser Handler); любое исключение здесь убило бы весь процесс моста.
         try {
             controller?.takeIf { it.packageName == pkg }?.let { it.transportControls.play(); return }
-            val svc = ctx.packageManager.queryIntentServices(Intent(MediaBrowserService.SERVICE_INTERFACE), 0)
-                .firstOrNull { it.serviceInfo.packageName == pkg }?.serviceInfo ?: return
-            lateinit var browser: MediaBrowser
-            browser = MediaBrowser(ctx, ComponentName(pkg, svc.name), object : MediaBrowser.ConnectionCallback() {
-                override fun onConnected() {
-                    runCatching { MediaController(ctx, browser.sessionToken).transportControls.play() }
-                    runCatching { browser.disconnect() }
-                }
-                override fun onConnectionFailed() { Log.w(TAG, "player $pkg refused the browser connection") }
-            }, null)
-            browser.connect()
+            // у Яндекс Музыки два сервиса, Media3LibraryService чужих не пускает (стенд 07.11): пробуем по очереди
+            val services = ctx.packageManager.queryIntentServices(Intent(MediaBrowserService.SERVICE_INTERFACE), 0)
+                .filter { it.serviceInfo.packageName == pkg }.map { it.serviceInfo.name }
+            connectPlay(ctx, pkg, services, 0)
         } catch (e: Exception) {
             Log.w(TAG, "startPlayer $pkg: ${e.javaClass.simpleName}")
         }
+    }
+
+    private fun connectPlay(ctx: Context, pkg: String, services: List<String>, i: Int) {
+        val name = services.getOrNull(i) ?: return
+        lateinit var browser: MediaBrowser
+        browser = MediaBrowser(ctx, ComponentName(pkg, name), object : MediaBrowser.ConnectionCallback() {
+            override fun onConnected() {
+                runCatching { MediaController(ctx, browser.sessionToken).transportControls.play() }
+                runCatching { browser.disconnect() }
+            }
+            override fun onConnectionFailed() {
+                Log.w(TAG, "player $pkg/$name refused the browser connection")
+                runCatching { connectPlay(ctx, pkg, services, i + 1) }
+            }
+        }, null)
+        browser.connect()
     }
 }

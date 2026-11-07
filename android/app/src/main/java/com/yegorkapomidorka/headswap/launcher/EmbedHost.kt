@@ -604,7 +604,10 @@ internal object EmbedHost {
             val pkg = key.substringBefore('/')
             val cls = key.substringAfter('/')
             AppLog.i("EMBED ${slot.name}: запуск $key handle=${slot.handle} (state=${slot.lastState} stale=${slot.stale})", false)
-            if (slot === alice) AppLog.i("ASSIST Алиса -> дочерний дисплей, окно ${slot.geomW}x${slot.geomH}", false)
+            if (slot === alice) AppLog.i("ASSIST помощник -> дочерний дисплей, окно ${slot.geomW}x${slot.geomH}", false)
+            if (slot === alice && pkg == com.yegorkapomidorka.headswap.dex.EmbeddedDisplayPolicy.GEMINI_PACKAGE) {
+                appContext?.let { com.yegorkapomidorka.headswap.dex.PhoneAssistant.clearPackage(it, pkg) }
+            }
             timed(slot, "launch") { EmbeddedSessionRegistry.launch(uid, slot.handle, pkg, cls) }
             // Яндекс-помощник по умолчанию перезапускает себя через MainActivity на экране телефона: ловим и переносим
             // другое приложение в панели (Алиса открыла Навигатор с маршрутом) - в лаунчер

@@ -125,7 +125,8 @@ internal class DelegatedDesktopRuntime(private val context: Context, private val
                     candidate.exported && candidate.enabled && candidate.applicationInfo.enabled
             } == true }) { "Виджет принимает только доступное приложение из списка запуска" }
         }
-        val intent = Intent(if (assist) Intent.ACTION_ASSIST else Intent.ACTION_MAIN).setComponent(component)
+        val action = if (assist) EmbeddedDisplayPolicy.assistAction(component.packageName, component.className) else Intent.ACTION_MAIN
+        val intent = Intent(action).setComponent(component)
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
         if (requireLauncher) intent.addCategory(Intent.CATEGORY_LAUNCHER)
         check(context.getSystemService(ActivityManager::class.java).isActivityStartAllowedOnDisplay(context, id, intent)) {

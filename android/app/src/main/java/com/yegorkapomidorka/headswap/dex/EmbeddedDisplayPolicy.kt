@@ -42,10 +42,24 @@ internal object EmbeddedDisplayPolicy {
         check(existing in 0 until MAX_CHILDREN) { "Одновременно доступны не более трёх виджетов" }
     }
 
-    /** Алиса Яндекса открывается по ASSIST, а не из списка запуска: только этот компонент идёт без CATEGORY_LAUNCHER. */
+    const val GEMINI_PACKAGE = "com.google.android.googlequicksearchbox"
+    const val GEMINI_CLASS = "com.google.android.voicesearch.handsfree.HandsFreeActivity"
+    /** RecognizerIntent.ACTION_VOICE_SEARCH_HANDS_FREE: Google app открывает плашку Gemini сразу с микрофоном (стенд 07.11). */
+    const val ACTION_HANDS_FREE = "android.speech.action.VOICE_SEARCH_HANDS_FREE"
+
+    fun gemini(packageName: String, className: String): Boolean = packageName == GEMINI_PACKAGE && className == GEMINI_CLASS
+
+    /**
+     * Помощник, а не список запуска: Алиса Яндекса по ASSIST, Gemini по [ACTION_HANDS_FREE] (ASSIST у Google app открывает
+     * старый голосовой поиск). Только эти компоненты идут без CATEGORY_LAUNCHER.
+     */
     fun assistLaunch(packageName: String, className: String): Boolean =
         (packageName == "com.yandex.searchapp" || packageName == "ru.yandex.searchplugin") &&
-            className == "ru.yandex.searchplugin.AssistantActivityAlias"
+            className == "ru.yandex.searchplugin.AssistantActivityAlias" || gemini(packageName, className)
+
+    /** Действие запуска помощника из [assistLaunch]. */
+    fun assistAction(packageName: String, className: String): String =
+        if (gemini(packageName, className)) ACTION_HANDS_FREE else "android.intent.action.ASSIST"
 
     /** WindowConfiguration.WINDOWING_MODE_MULTI_WINDOW. */
     const val WINDOWING_MULTI_WINDOW = 6

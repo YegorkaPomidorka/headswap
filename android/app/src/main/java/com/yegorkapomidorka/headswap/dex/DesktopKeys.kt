@@ -17,6 +17,12 @@ object DesktopKeys {
 
     @Volatile var sink: Sink? = null
 
+    /**
+     * Нажатие клавиши в дисплей рабочего стола процессом активации (у shell на Xiaomi INJECT_EVENTS нет). Нужен Gemini:
+     * KEYCODE_VOICE_ASSIST открывает помощника по умолчанию штатно, как долгое нажатие питания. null - сессии нет.
+     */
+    @Volatile var injectKey: ((Int) -> Unit)? = null
+
     /** Панель Алисы открылась (true) / закрылась: мост шлёт ГУ MODULE_STATUS VR. null - сессии нет. Любой поток. */
     @Volatile var voiceStatus: ((Boolean) -> Unit)? = null
 }

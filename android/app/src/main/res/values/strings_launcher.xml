@@ -27,6 +27,7 @@
     <string name="l_alice_route">Route in the navigator</string>
     <string name="l_alice_route_hint">Pick a route and press Go</string>
     <string name="l_alice_close">Close Alice</string>
+    <string name="l_gemini_close">Close Gemini</string>
     <string name="l_nav_failed">The window did not open. Tap to retry.</string>
     <string name="l_nav_restart">Restart navigator</string>
     <string name="l_nav_hints">Hints on the cluster</string>

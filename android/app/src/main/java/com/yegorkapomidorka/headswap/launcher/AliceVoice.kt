@@ -67,8 +67,13 @@ object AliceVoice {
     private val MIC_SOURCES = setOf(MediaRecorder.AudioSource.MIC, MediaRecorder.AudioSource.VOICE_RECOGNITION,
         MediaRecorder.AudioSource.VOICE_COMMUNICATION, MediaRecorder.AudioSource.UNPROCESSED, MediaRecorder.AudioSource.DEFAULT)
 
-    /** Кнопка голоса: Алиса запущена на скрытом дисплее. */
-    fun start(ctx: Context) {
+    /** Помощник плашки - Gemini (значок и цвета Gemini), иначе Алиса. */
+    var gemini by mutableStateOf(false)
+        private set
+
+    /** Кнопка голоса: Алиса или Gemini ([isGemini]) запущены на скрытом дисплее. */
+    fun start(ctx: Context, isGemini: Boolean = false) {
+        gemini = isGemini
         audio = ctx.applicationContext.getSystemService(AudioManager::class.java)
         startedAt = SystemClock.uptimeMillis()
         micSeen = false
