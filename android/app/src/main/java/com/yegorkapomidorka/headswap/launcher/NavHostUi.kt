@@ -154,6 +154,7 @@ fun NavHostOverlay() {
         }
         // ряд действий сверху справа: 2ГИС ставит лимит скорости в правый верхний угол видимой области
         CarAppHost.setAreas(left, d.gap + d.btn + d.gap, if (hasActions) d.gap + d.btn else 0)
+        AliceVoice.navLeftPx = left
     }
     Box(
         Modifier.absoluteOffset { IntOffset(r.left.roundToInt(), r.top.roundToInt()) }

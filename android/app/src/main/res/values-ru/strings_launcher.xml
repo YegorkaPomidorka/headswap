@@ -21,6 +21,12 @@
     <string name="l_nav_not_installed">Навигатор не установлен</string>
     <string name="l_nav_starting">Запускаем навигатор…</string>
     <string name="l_alice_starting">Запускаем Алису…</string>
+    <string name="l_alice_listening">Я вас слушаю</string>
+    <string name="l_alice_thinking">Думаю...</string>
+    <string name="l_alice_speaking">Говорю</string>
+    <string name="l_alice_route">Маршрут в навигаторе</string>
+    <string name="l_alice_route_hint">Выберите вариант и нажмите «Поехали»</string>
+    <string name="l_alice_close">Закрыть Алису</string>
     <string name="l_nav_failed">Окно не открылось. Нажмите, чтобы повторить.</string>
     <string name="l_nav_restart">Перезапустить навигатор</string>
     <string name="l_nav_hints">Подсказки на приборке</string>

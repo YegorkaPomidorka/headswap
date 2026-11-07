@@ -132,6 +132,7 @@ object LauncherActions {
         }
         model.assistantHidden = true
         openAssistant()
+        AliceVoice.start(model.context)
         val main = hiddenHandler
         main.removeCallbacks(hiddenClose)
         main.postDelayed(hiddenClose, HIDDEN_MS)
@@ -167,6 +168,7 @@ object LauncherActions {
         AppLog.i("ASSIST панель закрыта: $why", false)
         model.assistantOpen = false
         model.assistantHidden = false
+        AliceVoice.stop()
         hiddenHandler.removeCallbacks(hiddenClose)
         com.yegorkapomidorka.headswap.dex.DesktopKeys.voiceStatus?.invoke(false)
         com.yegorkapomidorka.headswap.dex.PhoneAssistant.stopWatch()
@@ -220,6 +222,7 @@ object LauncherActions {
             if (car != null || nav != pkg) assist.closePhoneTasks(ctx, pkg)
         }, "assist-route").start()
         closeAssistant("маршрут -> навигатор")
+        if (VOICE_ONLY) AliceVoice.route()
         if (model.navigatorPkg != null && model.area != Area.Navigator) model.go(Area.Navigator)
         if (car != null) com.yegorkapomidorka.headswap.carapp.CarAppHost.newIntent(navigate)
     }
