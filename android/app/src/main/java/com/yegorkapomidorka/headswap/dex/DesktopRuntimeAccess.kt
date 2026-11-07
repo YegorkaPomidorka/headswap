@@ -8,7 +8,7 @@ import android.view.Surface
 
 /** The lease owner is shared; platform access stays behind this interface (the :delegated app process implements it). */
 internal interface DesktopRuntimeAccess {
-    fun createDisplay(surface: Surface, width: Int, height: Int, density: Int, mode: Int): VirtualDisplay
+    fun createDisplay(surface: Surface, width: Int, height: Int, density: Int, mode: Int): OwnedDisplay
     fun createChildDisplay(surface: Surface, width: Int, height: Int, density: Int): VirtualDisplay
     fun inject(event: InputEvent, id: Int, actionButton: Int = 0)
     fun childTaskState(id: Int, packageName: String): Int

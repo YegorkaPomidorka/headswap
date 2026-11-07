@@ -84,8 +84,13 @@ class DelegatedDesktopInstrumentation : Instrumentation() {
             permissions.add(DisplayIme.PERMISSION) // клавиатура на экране ГУ, без него - на телефоне
             if (requestAudio) permissions.add(DesktopAudioPolicy.ROUTING_PERMISSION)
             permissions.add(SleepDiagProbe.PERMISSION) // диагностика sleep: дампы сервисов без живого shell
+            if (VdmDesktop.supported) permissions.add(VdmDesktop.CREATE_VIRTUAL_DEVICE) // vdm1: дисплей в VirtualDevice
             automation.adoptShellPermissionIdentity(*permissions.toTypedArray())
             adoptedHere = true
+            // Пока shell жив (сразу после запуска am instrument): снимок флагов и CDM-привязка для vdm1.
+            val vdmShell = checkNotNull(automation)
+            runCatching { com.yegorkapomidorka.headswap.AppLog.init(context); VdmDesktop.prepare(context, vdmShell) }
+                .onFailure { Log.w(DelegatedDesktopAccess.LOG_TAG, "VDM prepare failed", it) }
             check(DelegatedDesktopAccess.hasPermissions(context)) { "Android не предоставил все права рабочего стола и управления музыкой. Повторите явную активацию HeadSwap." }
             check(!requestAudio || DesktopAudioAccess.hasPermission(context)) { "Android не разрешил захват звука приложений" }
             lease = DelegatedDesktopAccess.begin { stop.countDown() }

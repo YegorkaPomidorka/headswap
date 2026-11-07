@@ -35,8 +35,13 @@ internal class DisplayWakeLocks(context: Context) {
         const val FLAG_OWN_DISPLAY_GROUP = 1 shl 8
         const val FLAG_ALWAYS_UNLOCKED = 1 shl 9
 
-        /** Замок по дисплею держим только у дисплея в своей группе: в общей он держал бы включённым экран самого телефона. */
-        fun shouldHold(displayFlags: Int): Boolean = displayFlags and FLAG_OWN_DISPLAY_GROUP != 0
+        /**
+         * Замок по дисплею держим только у дисплея в своей группе: в общей он держал бы включённым экран самого телефона.
+         * Смотрим на настоящую группу: Android 17 кладёт дисплей с OWN_DISPLAY_GROUP в группу 0 (h782), а дисплей
+         * VirtualDevice в своей группе флага не несёт. Группа не прочиталась - по флагу, как раньше.
+         */
+        fun shouldHold(displayFlags: Int, groupId: Int? = null): Boolean =
+            if (groupId != null) groupId != 0 else displayFlags and FLAG_OWN_DISPLAY_GROUP != 0
 
         fun describe(displayFlags: Int): String =
             "flags=0x${Integer.toHexString(displayFlags)} ownGroup=${displayFlags and FLAG_OWN_DISPLAY_GROUP != 0} " +

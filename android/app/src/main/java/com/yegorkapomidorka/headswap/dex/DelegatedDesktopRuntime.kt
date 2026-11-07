@@ -10,6 +10,7 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.hardware.display.DisplayManager
 import android.hardware.display.VirtualDisplay
+import android.os.Binder
 import android.os.Build
 import android.os.IBinder
 import android.view.InputEvent
@@ -24,13 +25,21 @@ internal class DelegatedDesktopRuntime(private val context: Context, private val
 
     // TRUSTED / DESTROY_CONTENT / SUPPORTS_TOUCH are permission-gated platform flags omitted by the public SDK IntDef.
     @SuppressLint("WrongConstant")
-    override fun createDisplay(surface: Surface, width: Int, height: Int, density: Int, mode: Int): VirtualDisplay {
+    override fun createDisplay(surface: Surface, width: Int, height: Int, density: Int, mode: Int): OwnedDisplay {
         DelegatedDesktopPolicy.requireMode(mode)
-        return checkNotNull(displays.createVirtualDisplay("HeadSwap ${DesktopModePolicy.label(mode)}",
-            width, height, density, surface,
+        val name = "HeadSwap ${DesktopModePolicy.label(mode)}"
+        // vdm1: дисплей внутри VirtualDevice (своя группа на Android 17), без OWN_DISPLAY_GROUP / ALWAYS_UNLOCKED во флагах:
+        // блокировку снимает LOCK_STATE_ALWAYS_UNLOCKED устройства. Отказ (-1) - обычный путь ниже.
+        if (VdmDesktop.supported && mode == DesktopModePolicy.ANDROID_DESKTOP) {
+            val owner = Binder()
+            val id = runCatching { inputGateway.createDeviceDisplay(surface, name, width, height, density,
+                DesktopModePolicy.displayFlags(mode, Build.VERSION.SDK_INT, alwaysUnlocked = false), owner) }.getOrDefault(-1)
+            if (id > 0) return GatewayDisplay(inputGateway, id, owner, displays)
+        }
+        return LocalDisplay(checkNotNull(displays.createVirtualDisplay(name, width, height, density, surface,
             DesktopModePolicy.displayFlags(mode, Build.VERSION.SDK_INT, DelegatedDesktopAccess.canKeepUnlocked(context)))) {
             "Android отклонил доверенный виртуальный экран"
-        }
+        })
     }
 
     // TRUSTED / DESTROY_CONTENT / SUPPORTS_TOUCH are permission-gated platform flags
