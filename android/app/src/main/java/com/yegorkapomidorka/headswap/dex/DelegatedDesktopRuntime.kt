@@ -104,10 +104,12 @@ internal class DelegatedDesktopRuntime(private val context: Context, private val
         // Reuse explicit component validation without executing the resulting shell arguments.
         EmbeddedDisplayPolicy.launchCommand(id, parentId, context.applicationInfo.uid / 100000, packageName, className)
         val fullClassName = if (className.startsWith('.')) packageName + className else className
-        launch(id, ComponentName(packageName, fullClassName), ownActivity = false, requireLauncher = true)
+        // Алиса - не LAUNCHER-activity: открывается по ASSIST, список запуска её не знает
+        val assist = EmbeddedDisplayPolicy.assistLaunch(packageName, fullClassName)
+        launch(id, ComponentName(packageName, fullClassName), ownActivity = false, requireLauncher = !assist, assist = assist)
     }
 
-    private fun launch(id: Int, component: ComponentName, ownActivity: Boolean, requireLauncher: Boolean) {
+    private fun launch(id: Int, component: ComponentName, ownActivity: Boolean, requireLauncher: Boolean, assist: Boolean = false) {
         require(id > 0) { "Запуск на основном экране запрещён" }
         val pm = context.packageManager
         val info = pm.getActivityInfo(component, 0)
@@ -123,13 +125,18 @@ internal class DelegatedDesktopRuntime(private val context: Context, private val
                     candidate.exported && candidate.enabled && candidate.applicationInfo.enabled
             } == true }) { "Виджет принимает только доступное приложение из списка запуска" }
         }
-        val intent = Intent(Intent.ACTION_MAIN).setComponent(component)
+        val intent = Intent(if (assist) Intent.ACTION_ASSIST else Intent.ACTION_MAIN).setComponent(component)
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
         if (requireLauncher) intent.addCategory(Intent.CATEGORY_LAUNCHER)
         check(context.getSystemService(ActivityManager::class.java).isActivityStartAllowedOnDisplay(context, id, intent)) {
             "Android не разрешил запуск приложения на собственном экране"
         }
-        context.startActivity(intent, fullscreenOptions(id).toBundle())
+        val options = if (!ownActivity && EmbeddedDisplayPolicy.multiWindowLaunch(component.packageName)) {
+            // Без границ запуска: в многооконном режиме система держит их буквально, и окно не следует за размером плитки.
+            ActivityOptions.makeBasic().setLaunchDisplayId(id).toBundle()
+                .apply { putInt(EmbeddedDisplayPolicy.KEY_LAUNCH_WINDOWING_MODE, EmbeddedDisplayPolicy.WINDOWING_MULTI_WINDOW) }
+        } else fullscreenOptions(id).toBundle()
+        context.startActivity(intent, options)
     }
 
     /**

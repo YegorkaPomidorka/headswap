@@ -82,6 +82,8 @@ class DelegatedDesktopInstrumentation : Instrumentation() {
             // Optional (not part of hasPermissions): shells that lack it simply do not pass it on.
             permissions.add(DelegatedDesktopAccess.ADD_ALWAYS_UNLOCKED_DISPLAY)
             permissions.add(DisplayIme.PERMISSION) // клавиатура на экране ГУ, без него - на телефоне
+            permissions.add(PhoneAssistant.MANAGE_ACTIVITY_TASKS) // задача Алисы с телефона в панель рабочего стола
+            permissions.add(PhoneAssistant.REMOVE_TASKS) // Навигатор, открытый Алисой в панели, закрываем: маршрут уходит в плитку
             if (requestAudio) permissions.add(DesktopAudioPolicy.ROUTING_PERMISSION)
             permissions.add(SleepDiagProbe.PERMISSION) // диагностика sleep: дампы сервисов без живого shell
             // Этап B: дисплей принадлежит shell-хосту, запуск лаунчера на нём Android 17 считает фоновым (BAL).

@@ -13,6 +13,14 @@ public final class ManualAccessLauncherEntryTest {
         assertEquals(installed + "/" + DelegatedDesktopInstrumentation.class.getName(), ManualAccessPolicy.component(installed));
         assertEquals(ManualAccessLauncher.class.getName(), ManualAccessPolicy.ENTRY);
     }
+    @Test public void notificationListenerComponentUsesTheInstalledIdAndTheActualClass() {
+        String installed = com.yegorkapomidorka.headswap.BuildConfig.APPLICATION_ID;
+        String listener = com.yegorkapomidorka.headswap.notify.HeadswapNotificationListener.class.getName();
+        assertEquals(installed + "/" + listener, ManualAccessPolicy.notificationListener(installed));
+        // the smoke build (applicationId suffix) must still point at the namespace class
+        assertEquals("com.yegorkapomidorka.headswap.smoke/" + listener,
+            ManualAccessPolicy.notificationListener("com.yegorkapomidorka.headswap.smoke"));
+    }
     @Test public void helpReturnsZeroWithoutExitingTheCaller() throws Exception {
         PrintStream previous = System.out;
         ByteArrayOutputStream output = new ByteArrayOutputStream();

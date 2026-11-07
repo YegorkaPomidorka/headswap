@@ -1,9 +1,9 @@
 // Ported from SadykovIV/headswap_desk (GPL-3.0), author Ildar Sadykov.
 package com.yegorkapomidorka.headswap.dex
 
-/** Limits for the two navigator tiles. Independent of phone display settings and parent geometry. */
+/** Limits for the navigator, app and assistant tiles. Independent of phone display settings and parent geometry. */
 internal object EmbeddedDisplayPolicy {
-    const val MAX_CHILDREN = 2
+    const val MAX_CHILDREN = 3
     fun displayFlags(sdkInt: Int, alwaysUnlocked: Boolean = false): Int =
         DesktopModePolicy.displayFlags(DesktopModePolicy.ANDROID_DESKTOP, sdkInt, alwaysUnlocked)
     const val MAX_WIDTH = 3840
@@ -39,8 +39,26 @@ internal object EmbeddedDisplayPolicy {
     }
 
     fun requireCapacity(existing: Int) {
-        check(existing in 0 until MAX_CHILDREN) { "Одновременно доступны не более двух виджетов" }
+        check(existing in 0 until MAX_CHILDREN) { "Одновременно доступны не более трёх виджетов" }
     }
+
+    /** Алиса Яндекса открывается по ASSIST, а не из списка запуска: только этот компонент идёт без CATEGORY_LAUNCHER. */
+    fun assistLaunch(packageName: String, className: String): Boolean =
+        (packageName == "com.yandex.searchapp" || packageName == "ru.yandex.searchplugin") &&
+            className == "ru.yandex.searchplugin.AssistantActivityAlias"
+
+    /** WindowConfiguration.WINDOWING_MODE_MULTI_WINDOW. */
+    const val WINDOWING_MULTI_WINDOW = 6
+    /** ActivityOptions.KEY_LAUNCH_WINDOWING_MODE (скрытая константа; Bundle читает system_server, не hidden API). */
+    const val KEY_LAUNCH_WINDOWING_MODE = "android.activity.windowingMode"
+    private val multiWindowPackages = setOf("org.telegram.messenger", "org.telegram.messenger.web", "org.telegram.messenger.beta")
+
+    /**
+     * Telegram в полноэкранном режиме берёт высоту строки состояния телефона (152 px при 520 dpi), если уже открывался
+     * на телефоне, и игнорирует нулевой инсет плитки: сверху пустая полоса. В многооконном режиме он верит инсету (ADR 0031).
+     * Остальным не включаем: YouTube в многооконном режиме не уходит на весь экран.
+     */
+    fun multiWindowLaunch(packageName: String): Boolean = packageName in multiWindowPackages
 
     fun requireChildId(id: Int, parentId: Int) {
         check(parentId > 0 && id > 0 && id != parentId) { "Виджет не получил собственный дополнительный экран" }

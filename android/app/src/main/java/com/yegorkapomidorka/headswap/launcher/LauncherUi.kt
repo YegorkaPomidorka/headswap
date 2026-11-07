@@ -105,6 +105,10 @@ class LauncherPalette(
     val bgSolid: Color,
     /** Подложка миниатюр «Карта на главном». */
     val mini: Color,
+    /** Сплошная полоса строки статуса и язычок/шторка уведомлений под ней (в обеих должен быть непрозрачный цвет). */
+    val bar: Color,
+    /** Разделитель строк шторки уведомлений. */
+    val sep: Color,
 )
 
 object Palettes {
@@ -117,6 +121,7 @@ object Palettes {
         btnSet = Color(1f, 1f, 1f, 0.10f), railFg = Color(0xFFF2F5F7),
         missed = Color(0xFFFFB4A9), backOff = Color(0xFF5F6A80), tagBg = Color(14, 20, 26, 153), mapBg = Color(0xFF172026),
         bgSolid = Color(0xFF1A232B), mini = Color(0xFF0E151B),
+        bar = Color(0xFF1B2329), sep = Color(1f, 1f, 1f, 0.08f),
     )
     private val BROWN = Color(90, 70, 20)
     val LIGHT = LauncherPalette(
@@ -129,6 +134,7 @@ object Palettes {
         btnSet = BROWN.copy(alpha = 0.12f), railFg = Color(0xFF5C5340),
         missed = Color(0xFFB3361F), backOff = Color(0xFFA89F88), tagBg = Color(1f, 1f, 1f, 0.88f), mapBg = Color(0xFFEEE9DC),
         bgSolid = Color(0xFFF4EDDB), mini = Color(0xFFFBF7EC),
+        bar = Color(0xFFE9E0C8), sep = BROWN.copy(alpha = 0.14f),
     )
 }
 
@@ -218,6 +224,13 @@ object Ico {
     val MUSIC = listOf("M9 18V5l12-2v13", circle(6, 18, 3), circle(18, 16, 3))
     val HOME = listOf("m3 11 9-8 9 8", "M5 10v10h14V10")
     val CHECK = listOf("m5 12 5 5 9-10")
+    /** ⇄ на стыке двух плашек главного. */
+    val SWAP = listOf("M7 4 3 8l4 4", "M3 8h14", "m17 20 4-4-4-4", "M21 16H7")
+    /** «Развернуть» плашку YouTube на весь экран. */
+    val EXPAND = listOf("M14 4h6v6", "M20 4l-7 7", "M10 20H4v-6", "M4 20l7-7")
+    /** Миниатюры «Раскладки»: YouTube (рамка с треугольником) и часы. */
+    val VIDEO = listOf(roundRectPath(2f, 5.5f, 20f, 13f, 4f), "M10 9v6l5.2-3z")
+    val CLOCK = listOf(circle(12, 12, 9), "M12 7v5l3 2")
     /** Разделы настроек: «Главный экран» (раскладка) и «Система» (экран ГУ). */
     val LAYOUT = listOf(roundRectPath(3f, 4f, 18f, 16f, 2f), "M8 4v16", "M8 14h13")
     val SCREEN = listOf(roundRectPath(2f, 5f, 20f, 13f, 2f), "M8 21h8")
@@ -305,6 +318,10 @@ fun SvgIcon(paths: List<String>, sizePx: Int, color: Color, modifier: Modifier =
  * между DOWN и UP ([PressLogic]), сдвиг пальца отмену не вызывает (clickable с touch slop тут не подходит).
  * Кнопка же - остановка фокуса шайбы ([LauncherKnob]): рамка [focusShape] (по умолчанию скругление карточек)
  * цветом [ringColor] (по умолчанию акцент), OK - то же, что тап.
+ *
+ * [onSwipe] получает на UP смещение пальца за весь жест (dx, dy в px); true - жест съеден как смахивание, тапа нет
+ * (уведомления: потянуть полоску, смахнуть строку). [cooperative] - не забирать сдвиги пальца, чтобы родитель мог
+ * прокручивать список; сдвиг дальше touch slop отменяет тап (строки шторки уведомлений).
  */
 @Composable
 fun Pressable(
@@ -315,6 +332,8 @@ fun Pressable(
     onPress: (() -> Unit)? = null,
     focusShape: Shape? = null,
     ringColor: Color? = null,
+    onSwipe: ((dx: Float, dy: Float) -> Boolean)? = null,
+    cooperative: Boolean = false,
     onTap: () -> Unit,
     content: @Composable BoxScope.(pressed: Boolean) -> Unit,
 ) {
@@ -323,6 +342,8 @@ fun Pressable(
     val tap = rememberUpdatedState(onTap)
     val long = rememberUpdatedState(onLong)
     val press = rememberUpdatedState(onPress)
+    val swipe = rememberUpdatedState(onSwipe)
+    val shareMoves = rememberUpdatedState(cooperative)
     val on = rememberUpdatedState(enabled)
     val knob = remember { LauncherKnob.Target().apply { this.tap = { if (on.value) { press.value?.invoke(); tap.value() } } } }
     knob.description = description
@@ -350,13 +371,20 @@ fun Pressable(
                     // анимация нажатия стартует по DOWN: UP с ГУ приходит на 200-500 мс позже
                     press.value?.invoke()
                     var up: PointerInputChange? = null
+                    var scrolled = false
                     while (true) {
                         val change = awaitPointerEvent().changes.firstOrNull { it.id == down.id } ?: break
-                        change.consume()
+                        if (!shareMoves.value) change.consume()
+                        else if (!scrolled && (change.position - down.position).getDistance() > viewConfiguration.touchSlop) {
+                            scrolled = true
+                            pressed = false
+                        }
                         if (!change.pressed) { up = change; break }
                     }
                     pressed = false
                     up?.let {
+                        val d = it.position - down.position
+                        if (swipe.value?.invoke(d.x, d.y) == true || scrolled) return@let
                         val kind = PressLogic.classify(down.uptimeMillis, it.uptimeMillis, long.value != null)
                         if (kind == Press.LONG) long.value?.invoke() else tap.value()
                     }

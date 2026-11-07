@@ -164,7 +164,8 @@ CONTROL0, SENSOR1, VIDEO2, INPUT3, SPEECH4, SYSTEM5, MEDIA6, MIC7, BT8, MEDIA_PL
 - **Состояние `BridgeService` трогает только главная нить**, колбэки с других нитей — через `main.post`.
 - Кроп-режимы в пробросе работают только через SPS-кроп (`spsCropable`), иначе откат на R720.
 - **Свой хост Car App: visible ≠ stable** (иначе 2ГИС прячет лимит, камеры, мини-карту), одна полноэкранная поверхность
-  с вырезкой, сначала onSurfaceDestroyed, потом отвязка. ADR 0021.
+  с вырезкой, сначала onSurfaceDestroyed, потом отвязка. ADR 0021. В хост идёт только навигатор с включёнными
+  «Подсказками на приборке», иначе окном; теневая AA - тоже только при них. ADR 0028.
 - **Хосту нужен свой `android.car.permission.TEMPLATE_RENDERER`** в манифесте (объявить и запросить), иначе навигаторы
   со списком хостов (Яндекс) отвечают «Unknown host» на рукопожатии. ADR 0022.
 - **Android 17: экран рабочего стола создаёт shell-хост VirtualDevice** (`dex/VdmHostMain`, uid 2000) через
@@ -180,6 +181,8 @@ CONTROL0, SENSOR1, VIDEO2, INPUT3, SPEECH4, SYSTEM5, MEDIA6, MIC7, BT8, MEDIA_PL
 |---|---|
 | EIO через секунды после PAUSE | heartbeat на PAUSE: `CarLifeSession.pauseHeartbeat`, флаг `huVw20082120`; ADR 0007 |
 | EIO сразу после крупного IDR | `IdrBitrateCeiling`, потолки по каналу; ADR 0008 |
+| Рабочий стол: кнопка голоса молчит / Алиса не в панели | `AaBridgeCore.phoneAssistant` → `DesktopKeys.voice` → `LauncherActions.toggleAssistant`, слот `EmbedHost.alice`; запасной `dex/PhoneAssistant`; в логе `ASSIST`, `EMBED alice`; ADR 0026 |
+| Маршрут от Алисы не в плитке / висит на телефоне | `LauncherActions.assistantOpened`, `carapp/RouteIntent`, `CarAppSession.newIntent` (повторный getTemplate), `PhoneAssistant.closePhoneTasks`; в логе `ASSIST маршрут`, `CARAPP onNewIntent`; ADR 0026 |
 | USB встаёт после большого пакета | нарезка `Wire.CHUNK`, `huMazda20622111`; ADR 0009 |
 | Чёрный экран после камеры заднего хода | свой IDR (`IdrSplice`); ADR 0005 |
 | Поля, растянуто, не тот размер | `VideoMode`, `SpsCrop`, VIDEO_ENCODER_INIT в логе |
@@ -188,9 +191,11 @@ CONTROL0, SENSOR1, VIDEO2, INPUT3, SPEECH4, SYSTEM5, MEDIA6, MIC7, BT8, MEDIA_PL
 | Звук молчит / приглушён | `AaAudio`, AUDIO_TRANSMISSION_MODE, TTS_STOP; источник на ГУ |
 | Нет подсказок на приборке | подписка ГУ, `MetaRelay.sendNaviTurn`, `HondaClusterRoad` |
 | Клавиатура на ГУ разделена пополам | плотность рабочего стола `DesktopGeometryPolicy.density` (короткая сторона < 600 dp), ADR 0023 |
+| Главный: не та раскладка, плашка не листается «Слоями», ⇄ не там | prefs `home_layout`/`card_view`/`small_view` → `LauncherModel.tiles`, что листают «Слои» - prefs `layer_list` (`Layer`/`LayerList` в `HomeTilesLogic.kt`, настройки «Экран» → `LayersCard` и выбор по «+» `LayerPickerScreen` в `LayersUi.kt`; приложение плашки - prefs `tile_app`, окно по `appCardRect`, ADR 0030), правила в `HomeTilesLogic`, окна плашек в `EmbedUi.EmbedLayers` (плашка-приложение - слот app по `appCardRect`), ⇄ и «Слои» ленты - `HomeTileButtons`, ADR 0027 |
 | Шайба/кнопки ГУ не действуют в своём лаунчере | `DelegatedDexConnector.sendRotary/sendKey` → `DesktopKeys.sink` → `launcher/LauncherKnob` (фокус в `Pressable`), коды в `KnobLogic`, ADR 0024 |
 | 2ГИС на рабочем столе: нет лимита/камер, заставка висит, «Перезапустите 2ГИС» | `carapp/CarAppSession` (области, порядок stop), кнопка «Перезапустить навигатор»; ADR 0021 |
 | Навигатор окном вместо хоста, в логе `handshake: отказ ... Unknown host` | TEMPLATE_RENDERER в манифесте; ADR 0022 |
+| Я.Карты/Навигатор просят Плюс, или навигатор окном без подсказок | настройка «Подсказки на приборке» (prefs `nav_hints:<pkg>`, по умолчанию выкл у всех) → `CarAppHost.allowFor` в `EmbedHost.carTargetFor`; теневая AA - `NavigatorPick.shadowWanted`; ADR 0028 |
 | Android 17: экран ГУ гаснет с телефоном, в логе `группа=0`, `VDM хост завершился` | отладка по USB (`adb_enabled=0`), `VdmHostLink`/`VdmHostRestart`, строки `VDM` и `VDMHOST`; ADR 0033 |
 | Навигатор в хосте: голая карта, нет кнопок/списка | шаблон не разобран (`CarUi.Unknown`): `carapp/CarUiMapper.map`, `cmd car_dump` |
 | Тач мимо / рывками | `VideoGeometry.mapTouch`, `TouchDecimator`, `TouchPacer` |
