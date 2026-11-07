@@ -54,3 +54,4 @@
 | 0021 | [Навигатор на рабочем столе — через свой хост Car App Library](0021-own-car-app-host.md) | принято |
 | 0022 | [Хост Car App объявляет и берёт себе TEMPLATE_RENDERER (Яндекс Навигатор)](0022-car-host-template-renderer.md) | принято |
 | 0023 | [Плотность рабочего стола по высоте экрана, чтобы Gboard не делилась пополам](0023-desktop-density-by-height.md) | принято |
+| 0033 | [На Android 17 экран рабочего стола держит shell-хост VirtualDevice; требуется отладка по USB](0033-android17-vdm-shell-host.md) | принято |

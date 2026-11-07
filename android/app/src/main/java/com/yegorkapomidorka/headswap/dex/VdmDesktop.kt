@@ -16,8 +16,8 @@ import com.yegorkapomidorka.headswap.AppLog
  * отдельный shell-процесс [VdmHostMain], а сюда он отдаёт свой binder через [VdmHostProvider].
  */
 internal object VdmDesktop {
-    /** Android 16 тоже: на Samsung с 16 тот же симптом (MAA-Meow), у остальных и старый путь работает. */
-    const val MIN_SDK = 36
+    /** Только Android 17 (separate_timeouts); на 16 старый путь с OWN_DISPLAY_GROUP пока работает (Егор, 07.11). */
+    const val MIN_SDK = 37
     const val METHOD = "vdm_host"
     const val METHOD_REPORT = "vdm_report"
     const val EXTRA_HOST = "host"
@@ -32,6 +32,13 @@ internal object VdmDesktop {
     const val FLAG_DEVICE_DISPLAY_GROUP = 1 shl 15
 
     val supported: Boolean get() = Build.VERSION.SDK_INT >= MIN_SDK
+
+    /**
+     * Отладка по USB выключена: без неё Samsung при подключении ГУ кабелем останавливает adbd, а с ним shell-хост
+     * (h768, h821, SM-S942B; с галочкой SM-S942B не гаснет). Активация и главный экран на 17 её требуют.
+     */
+    fun usbDebugMissing(context: android.content.Context): Boolean = supported &&
+        android.provider.Settings.Global.getInt(context.contentResolver, android.provider.Settings.Global.ADB_ENABLED, 0) == 0
 
     /** Флаги для дисплея VirtualDevice: своя группа устройства вместо OWN_DISPLAY_GROUP, блокировку снимает устройство. */
     fun hostFlags(flags: Int): Int = flags and (FLAG_OWN_DISPLAY_GROUP or FLAG_ALWAYS_UNLOCKED).inv() or FLAG_DEVICE_DISPLAY_GROUP

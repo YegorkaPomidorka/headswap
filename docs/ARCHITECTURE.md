@@ -167,6 +167,9 @@ CONTROL0, SENSOR1, VIDEO2, INPUT3, SPEECH4, SYSTEM5, MEDIA6, MIC7, BT8, MEDIA_PL
   с вырезкой, сначала onSurfaceDestroyed, потом отвязка. ADR 0021.
 - **Хосту нужен свой `android.car.permission.TEMPLATE_RENDERER`** в манифесте (объявить и запросить), иначе навигаторы
   со списком хостов (Яндекс) отвечают «Unknown host» на рукопожатии. ADR 0022.
+- **Android 17: экран рабочего стола создаёт shell-хост VirtualDevice** (`dex/VdmHostMain`, uid 2000) через
+  `VdmHostLink`; без хоста экран уходит в группу 0 и гаснет с телефоном. Хост живёт в группе adbd, поэтому на 17
+  нужна «Отладка по USB». ADR 0033.
 - Пароли, SSID, ключи в лог не пишутся.
 - Рубильники экспериментов в companion `AaBridgeCore`: `PAUSE_KEEPALIVE_ENABLED`, `NAVI_STATUS_ENABLED`,
   `MODULE_MUSIC_ENABLED`, `ROUTE_NAVI_STATUS_ENABLED`, `AIR_WARM_RESUME_ENABLED`.
@@ -188,6 +191,7 @@ CONTROL0, SENSOR1, VIDEO2, INPUT3, SPEECH4, SYSTEM5, MEDIA6, MIC7, BT8, MEDIA_PL
 | Шайба/кнопки ГУ не действуют в своём лаунчере | `DelegatedDexConnector.sendRotary/sendKey` → `DesktopKeys.sink` → `launcher/LauncherKnob` (фокус в `Pressable`), коды в `KnobLogic`, ADR 0024 |
 | 2ГИС на рабочем столе: нет лимита/камер, заставка висит, «Перезапустите 2ГИС» | `carapp/CarAppSession` (области, порядок stop), кнопка «Перезапустить навигатор»; ADR 0021 |
 | Навигатор окном вместо хоста, в логе `handshake: отказ ... Unknown host` | TEMPLATE_RENDERER в манифесте; ADR 0022 |
+| Android 17: экран ГУ гаснет с телефоном, в логе `группа=0`, `VDM хост завершился` | отладка по USB (`adb_enabled=0`), `VdmHostLink`/`VdmHostRestart`, строки `VDM` и `VDMHOST`; ADR 0033 |
 | Навигатор в хосте: голая карта, нет кнопок/списка | шаблон не разобран (`CarUi.Unknown`): `carapp/CarUiMapper.map`, `cmd car_dump` |
 | Тач мимо / рывками | `VideoGeometry.mapTouch`, `TouchDecimator`, `TouchPacer` |
 

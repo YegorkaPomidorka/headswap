@@ -2,7 +2,7 @@ package com.yegorkapomidorka.headswap.dex;
 
 /** Чистые правила запуска shell-хоста VirtualDevice (этап B): команда и разбор аргументов, без shell-ввода извне. */
 public final class VdmHostPolicy {
-    public static final int MIN_SDK = 36;
+    public static final int MIN_SDK = 37;
     public static final String ENTRY = ManualAccessPolicy.DEX_CLASS_PACKAGE + ".VdmHostMain";
     public static final String LOG = "/data/local/tmp/headswap-vdm-host.log";
 
