@@ -163,6 +163,9 @@
     <string name="l_nh_search">Поиск</string>
     <string name="l_nh_loading">Загрузка…</string>
     <string name="l_s_notifications">Уведомления</string>
+    <string name="l_s_alice_voice">Алиса только голосом</string>
+    <string name="l_s_alice_voice_on">Окна нет, снизу плашка; работает и на заблокированном телефоне</string>
+    <string name="l_s_alice_voice_off">Алиса в панели слева на экране</string>
     <string name="l_notif_show_all">Уведомления: %1$d. Показать все</string>
     <string name="l_notif_collapse">Свернуть уведомления</string>
     <string name="l_notif_clear_all">Очистить всё</string>

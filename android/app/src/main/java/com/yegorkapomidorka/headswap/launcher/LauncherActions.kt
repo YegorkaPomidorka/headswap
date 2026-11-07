@@ -113,8 +113,8 @@ object LauncherActions {
         if (model.assistantOpen) closeAssistant("повторная кнопка голоса") else openAssistant()
     }
 
-    /** Эксперимент 07.11: Алиса без панели на ГУ, на телефоне, говорит голосом через ГУ; маршрут ловим с экрана телефона. */
-    private const val VOICE_ONLY = true
+    /** «Алиса только голосом» (ADR 0034): скрытый дисплей и плашка вместо панели слева. */
+    private val VOICE_ONLY get() = model.aliceVoiceOnly
 
     /**
      * Алиса на скрытом дочернем дисплее: он ALWAYS_UNLOCKED, и Яндекс, которого сессия помощника перезапускает полным
@@ -148,10 +148,9 @@ object LauncherActions {
 
     /** Алиса на телефоне (кнопкой голоса или сама): её маршрут из экрана телефона - в плитку навигатора, «Поехали» жмёт водитель. */
     fun startRouteCatcher(ctx: android.content.Context) {
-        if (!VOICE_ONLY) return
         val main = android.os.Handler(android.os.Looper.getMainLooper())
         com.yegorkapomidorka.headswap.dex.PhoneAssistant.watchPhone(ctx, com.yegorkapomidorka.headswap.carapp.RouteIntent::geoFor) { t, geo ->
-            main.post { routeFromAlice(t, geo) }
+            main.post { if (VOICE_ONLY) routeFromAlice(t, geo) }
         }
     }
 

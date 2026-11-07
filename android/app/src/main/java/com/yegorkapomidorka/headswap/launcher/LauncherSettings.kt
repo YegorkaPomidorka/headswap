@@ -207,7 +207,11 @@ fun LauncherSettingsScreen() {
                             SwitchCard(stringResource(R.string.l_s_notifications), model.notifications, d, cell(info.size).fillMaxWidth()) {
                                 model.chooseNotifications(it)
                             }
-                            Placed(info.size + 1) { AboutLinkCard(d, Modifier) }
+                            SwitchCard(stringResource(R.string.l_s_alice_voice), model.aliceVoiceOnly, d, cell(info.size + 1).fillMaxWidth(),
+                                sub = stringResource(if (model.aliceVoiceOnly) R.string.l_s_alice_voice_on else R.string.l_s_alice_voice_off)) {
+                                model.chooseAliceVoiceOnly(it)
+                            }
+                            Placed(info.size + 2) { AboutLinkCard(d, Modifier) }
                         }
                         SettingsPage.ABOUT -> AboutPanel(d, rowH)
                     }
