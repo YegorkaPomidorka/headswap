@@ -106,7 +106,7 @@ object DesktopHomeLogic {
                 StageState.DONE to ACTIVE,
                 StageState.DONE to (if (i.wireless) CARLIFE_WIFI else CARLIFE),
                 StageState.DONE to UiText.raw(i.desktopName),
-                StageState.DONE to UiText.raw(i.videoRes),
+                StageState.DONE to UiText.raw("⁦${i.videoRes}⁩"), // LTR-изоляция: в RTL не «720×1280»
                 StageState.DONE to UiText.raw(if (!i.usbAudio) "Bluetooth" else if (i.wireless) "Wi-Fi" else "USB"),
             ),
             listOf(DesktopButton.STOP),
@@ -168,7 +168,7 @@ object DesktopHomeStatus {
     fun current(ctx: Context): DesktopHomeState = DesktopHomeLogic.compute(inputs(ctx))
 
     private fun recoveringTexts(ctx: Context): Set<String> = recoveringTexts ?: buildSet {
-        val locales = listOf(Locale.forLanguageTag("ru"), Locale.ENGLISH, ctx.resources.configuration.locales[0])
+        val locales = listOf(Locale.forLanguageTag("ru"), Locale.ENGLISH, Locale.forLanguageTag("ar"), ctx.resources.configuration.locales[0])
         for (loc in locales) {
             val lctx = ctx.createConfigurationContext(Configuration(ctx.resources.configuration).apply { setLocale(loc) })
             for (n in 1..2) add(lctx.getString(R.string.desk_recovering, n))

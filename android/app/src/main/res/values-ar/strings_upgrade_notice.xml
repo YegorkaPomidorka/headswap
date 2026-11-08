@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- One-time window after updating to 2.6.0: accessibility service removed, head unit server is started by hand -->
+<resources>
+    <string name="upg_title">وداعًا لخدمة تسهيل الاستخدام!!!</string>
+    <string name="upg_lead">لم يعد Headswap يطلب تسهيل الاستخدام ولم يعد يعيد تشغيل خادم شاشة السيارة تلقائيًا.</string>
+    <string name="upg_pros">المزايا</string>
+    <string name="upg_pro_1">لا حاجة لفتح قفل الهاتف للاتصال</string>
+    <string name="upg_pro_2">لا حاجة للسماح بإعدادات تسهيل الاستخدام الخطرة</string>
+    <string name="upg_pro_3">خادم AA يستهلك البطارية بالكاد في الخلفية</string>
+    <string name="upg_cons">العيوب</string>
+    <string name="upg_con_1">تشغّل خادم شاشة السيارة يدويًا، مرة واحدة</string>
+    <string name="upg_con_2">إذا أغلقه Android، مثلًا مرة في الأسبوع، فشغّله مجددًا</string>
+    <string name="upg_con_3">يبقى الإشعار في لوحة الإشعارات، ويمكنك <b>ببساطة</b> إزالته بالسحب</string>
+    <string name="upg_notif_when">27 د</string>
+    <string name="upg_notif_text">خادم الوحدة الرئيسية قيد التشغيل</string>
+    <string name="upg_ok">حسنًا</string>
+</resources>

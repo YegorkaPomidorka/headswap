@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Беспровод (бета, ветка B): состояние ожидания машины, пишет BridgeService в CarLifeState.wireless -->
+<resources>
+    <string name="wl_state_waiting">بانتظار السيارة عبر Wi-Fi (%1$s)</string>
+    <string name="wl_state_no_hotspot">لا توجد نقطة اتصال: فعّل نقطة اتصال Wi-Fi في الهاتف</string>
+    <string name="wl_state_p2p_busy">Wi-Fi Direct مشغول: أوقف نقطة الاتصال في الهاتف</string>
+    <string name="wl_state_connected">السيارة متصلة عبر Wi-Fi</string>
+    <string name="wl_state_lost">انقطع الاتصال، بانتظار السيارة من جديد</string>
+    <string name="wl_state_auto">السيارة قريبة عبر Bluetooth، بانتظارها عبر Wi-Fi (%1$s)</string>
+    <string name="wl_hint_title">السيارة قريبة لكنها لم تتصل عبر Wi-Fi</string>
+    <string name="wl_hint_text">صِل الهاتف بشبكة Wi-Fi الخاصة بالسيارة أو فعّل نقطة الاتصال. اضغط لفتح Wi-Fi.</string>
+    <string name="wl_bt_hint_title">أعد توصيل Bluetooth السيارة</string>
+    <string name="wl_bt_hint_text">السيارة متصلة عبر Bluetooth لكنها لم تفتح CarLife اللاسلكي. أوقف Bluetooth في الهاتف ثم شغّله.</string>
+    <string name="wl_state_wifi_off">فعّل Wi-Fi في الهاتف (لا حاجة للاتصال بشبكة) وأوقف نقطة الاتصال</string>
+    <string name="wl_wifi_off_title">فعّل Wi-Fi في الهاتف</string>
+    <string name="wl_wifi_off_text">تتصل السيارة عبر Wi-Fi Direct: فعّل Wi-Fi (لا حاجة للاتصال بشبكة) وأوقف نقطة الاتصال. اضغط لفتح Wi-Fi.</string>
+    <string name="wl_usb_to_air_title">تم فصل الكابل</string>
+    <string name="wl_usb_to_air_text">السيارة قريبة عبر Bluetooth، جارٍ الاتصال لاسلكيًا.</string>
+    <string name="wl_state_gave_up">لم تتصل السيارة خلال %1$d د</string>
+</resources>

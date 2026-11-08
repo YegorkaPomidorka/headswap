@@ -3,6 +3,7 @@ package com.yegorkapomidorka.headswap.launcher
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+import java.util.Locale
 
 enum class CallType {
     INCOMING, OUTGOING, MISSED, OTHER;
@@ -79,22 +80,22 @@ object PhoneLogic {
         val now = Instant.ofEpochMilli(nowMs).atZone(zone).toLocalDate()
         val then = Instant.ofEpochMilli(thenMs).atZone(zone)
         return when (then.toLocalDate()) {
-            now -> then.format(DateTimeFormatter.ofPattern("HH:mm"))
+            now -> then.format(DateTimeFormatter.ofPattern("HH:mm", Locale.ROOT))
             now.minusDays(1) -> yesterday
-            else -> then.format(DateTimeFormatter.ofPattern("dd.MM"))
+            else -> then.format(DateTimeFormatter.ofPattern("dd.MM", Locale.ROOT))
         }
     }
 
-    fun timer(sec: Int): String = "%02d:%02d".format(sec / 60, sec % 60)
+    fun timer(sec: Int): String = "%02d:%02d".format(Locale.ROOT, sec / 60, sec % 60)
 }
 
 /** Лайк в MediaSession: custom action с именем или иконкой «нравится» (Яндекс Музыка, Spotify, YT Music). */
 object MusicLogic {
     data class Action(val id: String, val name: String)
 
-    private val LIKE = listOf("like", "love", "heart", "favorite", "favourite", "thumb", "нрав", "люб", "избран")
-    private val UNLIKE = listOf("unlike", "unfavorite", "unfavourite", "remove", "убрать", "удалить")
-    private val DISLIKE = listOf("dislike", "дизлайк", "не нрав")
+    private val LIKE = listOf("like", "love", "heart", "favorite", "favourite", "thumb", "нрав", "люб", "избран", "أعجبني", "مفضلة")
+    private val UNLIKE = listOf("unlike", "unfavorite", "unfavourite", "remove", "убрать", "удалить", "إزالة", "حذف")
+    private val DISLIKE = listOf("dislike", "дизлайк", "не нрав", "لم يعجبني")
 
     /** Действие «нравится» среди custom actions, если плеер его отдаёт. */
     fun findLike(actions: List<Action>): Action? = actions.firstOrNull { isLike(it) }

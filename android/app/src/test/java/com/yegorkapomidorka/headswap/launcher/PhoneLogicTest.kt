@@ -90,6 +90,14 @@ class PhoneLogicTest {
         assertNull(MusicLogic.findLike(listOf(MusicLogic.Action("repeat", "Повтор"))))
     }
 
+    @Test fun arabicLikeActions() {
+        assertEquals("a", MusicLogic.findLike(listOf(MusicLogic.Action("a", "أعجبني")))?.id)
+        assertEquals("b", MusicLogic.findLike(listOf(MusicLogic.Action("b", "إضافة إلى المفضلة")))?.id)
+        assertNull(MusicLogic.findLike(listOf(MusicLogic.Action("c", "لم يعجبني"))))
+        assertTrue(MusicLogic.isLiked(MusicLogic.Action("d", "إزالة من المفضلة")))
+        assertTrue(!MusicLogic.isLiked(MusicLogic.Action("e", "أعجبني")))
+    }
+
     @Test fun likedStateFromUnlikeName() {
         assertTrue(MusicLogic.isLiked(MusicLogic.Action("unlike", "Unlike")))
         assertTrue(!MusicLogic.isLiked(MusicLogic.Action("like", "Like")))

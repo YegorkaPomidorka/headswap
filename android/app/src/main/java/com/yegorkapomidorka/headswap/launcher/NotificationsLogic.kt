@@ -3,6 +3,7 @@ package com.yegorkapomidorka.headswap.launcher
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+import java.util.Locale
 import kotlin.math.max
 import kotlin.math.min
 
@@ -111,7 +112,7 @@ object NotificationsLogic {
         sorted(list.filter { it.key != item.key } + item).take(MAX_ITEMS)
 
     fun time(ms: Long, zone: ZoneId = ZoneId.systemDefault()): String =
-        DateTimeFormatter.ofPattern("HH:mm").format(Instant.ofEpochMilli(ms).atZone(zone))
+        DateTimeFormatter.ofPattern("HH:mm", Locale.ROOT).format(Instant.ofEpochMilli(ms).atZone(zone))
 }
 
 /** Размеры язычка и шторки. Макет нарисован на 1280x720 (T 96); остальное пропорционально T. */

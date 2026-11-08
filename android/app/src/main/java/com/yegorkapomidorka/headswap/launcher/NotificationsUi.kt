@@ -229,14 +229,17 @@ fun NotificationsOverlay() {
                     ) {
                         // в режиме чёлки содержимое проявляется, пока панель растёт
                         val fade = Modifier.graphicsLayer { alpha = if (notchMode) p.value else 1f }
-                        if (inShade) {
-                            val items = liveItems.ifEmpty { shown.items }
-                            val listMax = NotifGeom.listMaxHeight(Math.round(area.bottom), Math.round(topY), s.t, px(8f))
-                            Box(fade) { ShadeBody(items, maxW, listMax, dragThr, lineDx, showLine = !notchMode) }
-                        } else if (grown) {
-                            shown.head?.let { Box(fade) { TongueBody(it, minW, maxW, dragThr, lineDx, showLine = !notchMode) } }
-                        } else {
-                            NotchBody()
+                        // панель стоит физически (Ltr), а тексты и аватары в ней идут по языку: в RTL аватар справа
+                        LocaleDir {
+                            if (inShade) {
+                                val items = liveItems.ifEmpty { shown.items }
+                                val listMax = NotifGeom.listMaxHeight(Math.round(area.bottom), Math.round(topY), s.t, px(8f))
+                                Box(fade) { ShadeBody(items, maxW, listMax, dragThr, lineDx, showLine = !notchMode) }
+                            } else if (grown) {
+                                shown.head?.let { Box(fade) { TongueBody(it, minW, maxW, dragThr, lineDx, showLine = !notchMode) } }
+                            } else {
+                                NotchBody()
+                            }
                         }
                     }
                 }
@@ -291,7 +294,8 @@ private fun TongueBody(item: NotifItem, minW: Int, maxW: Int, dragThr: Float, li
         }
         // полоска лежит на нижнем крае вместе с язычком; тач-зона - T x 2T от нижней кромки вверх
         // сдвиг к месту полоски на строке статуса — на обёртке (рамку шайбы Pressable рисует до своего modifier)
-        Box(Modifier.align(Alignment.BottomCenter).offset { IntOffset(lineDx(), 0) }) {
+        // lineDx - сдвиг в px корня, физический: absoluteOffset, не зеркалящийся offset
+        Box(Modifier.align(Alignment.BottomCenter).absoluteOffset { IntOffset(lineDx(), 0) }) {
             Pressable(
                 Modifier.size(m.dp(2 * s.t), m.dp(s.t)),
                 description = stringResource(R.string.l_notif_show_all, repo.items.size),
@@ -330,7 +334,7 @@ private fun ShadeBody(items: List<NotifItem>, width: Int, listMax: Int, dragThr:
             for (item in items) NotifRow(item, repo.expandedKey == item.key)
         }
         Box(Modifier.fillMaxWidth().height(m.dp(s.t))) {
-            Box(Modifier.align(Alignment.Center).offset { IntOffset(lineDx(), 0) }) {
+            Box(Modifier.align(Alignment.Center).absoluteOffset { IntOffset(lineDx(), 0) }) {
                 Pressable(
                     Modifier.size(m.dp(2 * s.t), m.dp(s.t)),
                     description = stringResource(R.string.l_notif_collapse),
