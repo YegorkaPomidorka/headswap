@@ -7,6 +7,7 @@
     <string name="desk_waiting_frame">سطح المكتب: بانتظار إطار…</string>
     <string name="desk_disconnected">انقطع اتصال سطح المكتب. أوقف التشغيل ثم اتصل مرة أخرى.</string>
     <string name="desk_recovering">جارٍ استعادة سطح المكتب (%1$d/2)…</string>
+    <string name="desk_recovering_host">جارٍ استعادة سطح المكتب بعد تغيّر شاشة الهاتف…</string>
     <string name="desk_recovery_stopped">توقفت الاستعادة. تحقق من USB والوصول إلى سطح المكتب وافتح قفل الهاتف</string>
     <string name="desk_recovery_screen_busy">لم يتم تحرير الشاشة السابقة بعد؛ أُلغيت الاستعادة التلقائية</string>
 

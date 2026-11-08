@@ -21,5 +21,7 @@
   {"log": "p2p_busy_no_hotspot.log", "version": "2.6.0", "not": ["p2p_hotspot_busy"],
    "facts": {"m.p2p_busy_reason": 3, "m.hotspot_iface": 0}},
   {"log": "miui_screen_off_kill.log", "version": "2.6.0", "has": ["process_killed"],
-   "facts": {"m.low_memory": 1}}
+   "facts": {"m.low_memory": 1}},
+  {"log": "vdm_host_lost.log", "version": "4.1.0", "top": "vdm_host_lost_screen_off", "not": ["aa_server_off"],
+   "facts": {"m.vdm_display_lost": 1, "m.aa_refused": 0}}
 ]

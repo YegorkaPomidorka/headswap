@@ -8,6 +8,7 @@
     <string name="desk_waiting_frame">Desktop: waiting for a frame…</string>
     <string name="desk_disconnected">The desktop disconnected. Stop and connect again.</string>
     <string name="desk_recovering">Restoring the desktop (%1$d/2)…</string>
+    <string name="desk_recovering_host">Restoring the desktop after the phone screen changed…</string>
     <string name="desk_recovery_stopped">Restore stopped. Check USB, desktop access and unlock the phone</string>
     <string name="desk_recovery_screen_busy">The previous screen is not released yet; automatic restore cancelled</string>
 

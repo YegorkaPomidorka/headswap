@@ -9,7 +9,7 @@
     "hu_silent": "ГУ не прислало ни одного байта",
     "auth_v2": "HU_AUTHEN_REQUEST randomValue=2\\.0;",
     "auth_result": "HU_AUTHEN_RESULT",
-    "aa_refused": "AA сервер \\S+:5277 недоступен",
+    "aa_refused": "^(?!.*SHADOWNAV).*AA сервер \\S+:5277 недоступен",
     "aa_tcp": "AA TCP подключено",
     "aa_no_version": "AA нет VERSION_RESPONSE",
     "aa_established": "AA сессия установлена",
@@ -32,7 +32,8 @@
     "iface_down": "WL net iface-down",
     "stream_desync": "РАССИНХРОН потока",
     "pause": "VIDEO_ENCODER_PAUSE",
-    "eio": "EIO \\(I/O error\\)|ENODEV"
+    "eio": "EIO \\(I/O error\\)|ENODEV",
+    "vdm_display_lost": "VDM хост завершился;.*потеряны дисплеи|DESKTOP delegated: .*Экран уже закрыт"
   },
   "rules": [
     {
@@ -136,6 +137,26 @@
       ],
       "ask": "Работал ли раньше на этой машине Baidu CarLife или другой телефон?",
       "ask_en": "Did Baidu CarLife or another phone ever work on this car before?"
+    },
+    {
+      "id": "vdm_host_lost_screen_off",
+      "title": "Рабочий стол пропал при гашении экрана телефона",
+      "title_en": "The desktop disappeared when the phone screen turned off or on",
+      "phase": "drops",
+      "category": "our_bug",
+      "score": 80,
+      "all": [["m.vdm_display_lost", ">=", 1]],
+      "evidence": ["vdm_display_lost"],
+      "advice": "На Android 17 рабочий стол живёт в служебном процессе отладки. Samsung перезапускает его, когда экран телефона гаснет или включается без кабеля, и экран рабочего стола пропадает. Обновите Headswap: новая версия восстанавливает рабочий стол сама. До обновления не гасите экран телефона кнопкой во время поездки по воздуху.",
+      "advice_en": "On Android 17 the desktop lives in a debugging helper process. Samsung restarts it when the phone screen turns off or on without a cable, and the desktop screen disappears. Update Headswap: the new version restores the desktop by itself. Until then, don't turn the phone screen off with the button while driving wirelessly.",
+      "what": "Экран рабочего стола пропал, когда погас или включился экран телефона.",
+      "what_en": "The desktop screen disappeared when the phone screen turned off or on.",
+      "steps": [
+        {"text": "Обновите Headswap", "text_en": "Update Headswap", "action": "update"},
+        {"text": "До обновления не гасите экран телефона кнопкой в поездке по воздуху", "text_en": "Until you update, don't turn the phone screen off with the button while driving wirelessly"}
+      ],
+      "ask": "Гасили или включали экран телефона перед тем, как пропал рабочий стол?",
+      "ask_en": "Did you turn the phone screen off or on right before the desktop disappeared?"
     },
     {
       "id": "aa_server_off",

@@ -93,10 +93,19 @@ internal object VdmHostLink {
         return Bundle().apply { putBoolean(VdmDesktop.EXTRA_ACCEPTED, false) }
     }
 
+    /**
+     * Активный рабочий стол: зовётся с binder-потока, когда хост умер вместе с его дисплеями (h768). Без этого рабочий
+     * стол узнавал о потере только по следующему касанию («Экран уже закрыт») и не восстанавливался.
+     */
+    @Volatile var displaysLost: ((Set<Int>) -> Unit)? = null
+
     private fun onHostDied(dead: IVdmHost) {
-        synchronized(this) { if (host === dead) { host = null; owned.clear() } }
-        AppLog.i("VDM хост завершился; ${debugState()}", false)
+        val lost = synchronized(this) {
+            if (host !== dead) emptySet() else owned.keys.toSet().also { host = null; owned.clear() }
+        }
+        AppLog.i("VDM хост завершился; ${debugState()}${if (lost.isEmpty()) "" else "; потеряны дисплеи $lost"}", false)
         VdmHostRestart.onHostDied(appContext)
+        if (lost.isNotEmpty()) displaysLost?.let { runCatching { it(lost) } }
     }
 
     /**

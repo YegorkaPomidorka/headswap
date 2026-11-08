@@ -46,6 +46,36 @@ class DesktopRecoveryPolicyTest {
         assertFalse("same scheduled callback may run at most once", policy.consume(current))
     }
 
+    @Test fun hostDeathHasOwnSlidingBudgetAndDoesNotSpendHelperRetries() {
+        val policy = DesktopRecoveryPolicy()
+        policy.newConnection()
+        var now = 1_000_000L
+        repeat(DesktopRecoveryPolicy.HOST_MAX) { i ->
+            val a = checkNotNull(policy.beginAfterHostDeath(eligible = true, nowMs = now))
+            assertEquals(i + 1, a.number)
+            assertEquals(DesktopRecoveryPolicy.HOST_DELAY_MS, a.delayMs)
+            assertNull("one pending attempt at a time", policy.beginAfterHostDeath(eligible = true, nowMs = now))
+            assertTrue(policy.consume(a))
+            now += 10_000
+        }
+        assertNull("limit within the window", policy.beginAfterHostDeath(eligible = true, nowMs = now))
+        // helper-death budget is untouched
+        assertEquals(1, checkNotNull(policy.begin(eligible = true)).number)
+        policy.cancel()
+        // window slides: the oldest death falls out after HOST_WINDOW_MS
+        val later = 1_000_000L + DesktopRecoveryPolicy.HOST_WINDOW_MS + 1
+        assertNotNull(policy.beginAfterHostDeath(eligible = true, nowMs = later))
+    }
+
+    @Test fun hostDeathIneligibleDoesNotSpendBudgetAndNewConnectionResetsIt() {
+        val policy = DesktopRecoveryPolicy()
+        repeat(20) { assertNull(policy.beginAfterHostDeath(eligible = false, nowMs = 0)) }
+        repeat(DesktopRecoveryPolicy.HOST_MAX) { policy.consume(checkNotNull(policy.beginAfterHostDeath(true, 0))) }
+        assertNull(policy.beginAfterHostDeath(true, 0))
+        policy.newConnection()
+        assertEquals(1, checkNotNull(policy.beginAfterHostDeath(true, 0)).number)
+    }
+
     @Test fun UnavailableServerOrNonRecoverableErrorNeverSchedulesOrSpendsRetry() {
         val policy = DesktopRecoveryPolicy()
         repeat(20) { assertNull(policy.begin(eligible = false)) }

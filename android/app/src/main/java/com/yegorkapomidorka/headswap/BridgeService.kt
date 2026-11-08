@@ -57,6 +57,7 @@ import com.yegorkapomidorka.headswap.dex.DexPrefs
 import com.yegorkapomidorka.headswap.dex.DexState
 import com.yegorkapomidorka.headswap.dex.PhoneAssistant
 import com.yegorkapomidorka.headswap.dex.UsbDetachPolicy
+import com.yegorkapomidorka.headswap.dex.VdmDesktop
 import com.yegorkapomidorka.headswap.link.CarTransport
 import com.yegorkapomidorka.headswap.link.LinkSetupException
 import com.yegorkapomidorka.headswap.link.StreamTransport
@@ -113,7 +114,9 @@ class BridgeService : Service() {
     private var lastSessionWasUsb = false
     private var physicalUsbDetached = false
     private val desktopRecovery = DesktopRecoveryPolicy()
-    private data class Recovery(val attempt: DesktopRecoveryPolicy.Attempt, val session: CarLifeSession, val owner: BridgeHost)
+    private data class Recovery(
+        val attempt: DesktopRecoveryPolicy.Attempt, val session: CarLifeSession, val owner: BridgeHost, val hostDeath: Boolean = false,
+    )
     private var pendingDesktopRecovery: Recovery? = null
 
     /** debug tcp6: слушатель ждёт 6/6 (нить debug-tcp6); Стоп его отменяет. */
@@ -1181,6 +1184,14 @@ class BridgeService : Service() {
             }
     }.getOrDefault(false)
 
+    /**
+     * h768: дисплей VirtualDevice потерян со смертью shell-хоста. Экран телефона ему не нужен (своя группа, ALWAYS_UNLOCKED),
+     * а беспроводной сессии нет accessory - поэтому ни транспорт, ни блокировку не проверяем: жива та же сессия и доступ.
+     */
+    private fun canRecoverAfterHostDeath(current: CarLifeSession): Boolean = runCatching {
+        alive && !stopRequested && session === current && VdmDesktop.supported && DesktopAccess.isReady(this)
+    }.getOrDefault(false)
+
     private fun onDesktopSourceFailed(owner: BridgeHost, reason: DesktopFailure) {
         if (host !== owner) {
             // переподключение могло уже заменить завершённый хост: закрываем только защёлку старого, её может ждать преемник
@@ -1188,10 +1199,19 @@ class BridgeService : Service() {
             return
         }
         val current = session
-        val attempt = desktopRecovery.begin(reason == DesktopFailure.HELPER_UNAVAILABLE && current != null && canRecoverDesktop(current))
+        val hostDeath = reason == DesktopFailure.VDM_DISPLAY_LOST
+        val attempt = if (hostDeath) {
+            desktopRecovery.beginAfterHostDeath(current != null && canRecoverAfterHostDeath(current), SystemClock.elapsedRealtime())
+        } else {
+            desktopRecovery.begin(reason == DesktopFailure.HELPER_UNAVAILABLE && current != null && canRecoverDesktop(current))
+        }
         if (attempt != null && current != null) {
-            pendingDesktopRecovery = Recovery(attempt, current, owner)
-            AppLog.i("DESKTOP recovery planned attempt=${attempt.number}/2; server ready, keep CarLife transport", false)
+            pendingDesktopRecovery = Recovery(attempt, current, owner, hostDeath)
+            AppLog.i(if (hostDeath) "DESKTOP recovery planned after VDM host death attempt=${attempt.number}/${DesktopRecoveryPolicy.HOST_MAX}" +
+                " in ${DesktopRecoveryPolicy.HOST_WINDOW_MS / 60_000} min; keep CarLife transport ${current.transportKind}"
+                else "DESKTOP recovery planned attempt=${attempt.number}/2; server ready, keep CarLife transport", false)
+        } else if (hostDeath) {
+            AppLog.i("DESKTOP recovery after VDM host death not planned (session/access gone or limit reached)", false)
         }
         // TerminalSource не даёт переиспользовать хост в grace ещё до этого колбэка
         owner.shutdown("источник рабочего стола завершился")
@@ -1207,7 +1227,8 @@ class BridgeService : Service() {
         if (recovery != null && recovery.owner === owner && desktopRecovery.isCurrent(recovery.attempt)) {
             // колбэк подтверждает закрытие и привилегированного производителя, и энкодера с Surface
             DexState.error = null
-            DexState.status = getString(R.string.desk_recovering, recovery.attempt.number)
+            DexState.status = if (recovery.hostDeath) getString(R.string.desk_recovering_host)
+                else getString(R.string.desk_recovering, recovery.attempt.number)
             main.postDelayed({ recoverDesktop(recovery) }, recovery.attempt.delayMs)
         }
         if (session == null && host == null && !linkWaiting && !wifiBMode && !usbToAirPending) finish()
@@ -1218,7 +1239,8 @@ class BridgeService : Service() {
         pendingDesktopRecovery = null
         if (host != null || session !== recovery.session || !recovery.owner.isTornDown) return
         // после паузы проверяем заново: Стоп, отключение, отозванный доступ, смерть сервера или блокировка отменяют восстановление
-        if (!canRecoverDesktop(recovery.session)) {
+        val eligible = if (recovery.hostDeath) canRecoverAfterHostDeath(recovery.session) else canRecoverDesktop(recovery.session)
+        if (!eligible) {
             DexState.error = getString(R.string.desk_recovery_stopped)
             AppLog.i("DESKTOP recovery cancelled: current session/access no longer eligible", false)
             return

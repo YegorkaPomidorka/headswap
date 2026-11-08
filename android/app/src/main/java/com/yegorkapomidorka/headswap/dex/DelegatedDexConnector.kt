@@ -74,6 +74,12 @@ class DelegatedDexConnector(context: Context, private val core: AaBridgeCore,
         if (retired != 0L) core.desktopSurfaceProducerClosed(retired)
         fail(helperUnavailableMessage(), DesktopFailure.HELPER_UNAVAILABLE)
     }
+    /** h768: дисплей рабочего стола жил в shell-хосте VirtualDevice, хост умер - сразу отдаём сессию на восстановление. */
+    private val vdmLostHook: (Set<Int>) -> Unit = { lost ->
+        if (!stopping.get() && displayId > 0) {
+            fail("Хост виртуального устройства завершился, экраны $lost потеряны", DesktopFailure.VDM_DISPLAY_LOST)
+        }
+    }
     private val connection = object : ServiceConnection {
         override fun onServiceConnected(name: ComponentName, binder: IBinder) {
             try {
@@ -107,6 +113,7 @@ class DelegatedDexConnector(context: Context, private val core: AaBridgeCore,
                 core.onAaConnecting()
                 core.peer = this
                 core.enableDesktopSurface(this)
+                VdmHostLink.displaysLost = vdmLostHook
                 core.desktopMedia = DesktopMediaControl(context)
                 status("Запускаю рабочий стол…")
             } catch (e: Exception) { fail(e.message ?: "Не удалось подготовить рабочий стол"); return }
@@ -330,6 +337,7 @@ class DelegatedDexConnector(context: Context, private val core: AaBridgeCore,
         val firstStop = synchronized(stateLock) {
             stopping.compareAndSet(false, true).also { if (it) {
                 EmbeddedSessionRegistry.deactivate(this)
+                if (VdmHostLink.displaysLost === vdmLostHook) VdmHostLink.displaysLost = null
                 inputGateway.deactivate()
                 if (DesktopKeys.injectKey === keyHook) DesktopKeys.injectKey = null
             } }

@@ -7,6 +7,7 @@
     <string name="desk_waiting_frame">Рабочий стол: жду кадр…</string>
     <string name="desk_disconnected">Рабочий стол отключился. Остановите и подключите заново.</string>
     <string name="desk_recovering">Восстанавливаю рабочий стол (%1$d/2)…</string>
+    <string name="desk_recovering_host">Восстанавливаю рабочий стол после смены экрана телефона…</string>
     <string name="desk_recovery_stopped">Восстановление остановлено. Проверьте USB, доступ к рабочему столу и разблокировку телефона</string>
     <string name="desk_recovery_screen_busy">Предыдущий экран ещё не освобождён; автоматический запуск отменён</string>
 
