@@ -857,12 +857,12 @@ private fun systemInfo(): List<Pair<String, String>> {
     val hu = name?.let { n -> version?.let { "$n · CarLife $it" } ?: n } ?: dash
     val link = if (!CarLifeState.running) dash else if (CarLifeState.wirelessSession) "Wi-Fi" else "USB"
     val fps = DexPrefs(LauncherModel.context).desktopFps.fixed ?: 30
-    val res = CarLifeState.videoMode?.let { stringResource(R.string.l_s_fps, "${it.outW}×${it.outH}", fps) } ?: dash
+    val res = CarLifeState.videoMode?.let { stringResource(R.string.l_s_fps, "${it.outW}×${it.outH}", fps) }
     return listOf(
         stringResource(R.string.l_s_hu) to hu,
-        stringResource(R.string.l_s_link) to link,
-        // строка «Видео: прямой проброс» убрана: в пятирядной сетке место понадобилось переключателю «Уведомления»
-        stringResource(R.string.l_s_res) to res,
+        // «Подключение» и «Разрешение и частота» - одна строка: в пятирядной сетке без прокрутки иначе «О приложении»
+        // уезжала за край после «Алиса только голосом». Раньше так же ушла строка «Видео: прямой проброс».
+        stringResource(R.string.l_s_link) to (if (link == dash || res == null) link else "$link · $res"),
     )
 }
 

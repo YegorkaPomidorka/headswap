@@ -60,10 +60,9 @@ android {
     }
 
     sourceSets {
-        // debug-транспорт для эмулятора ГУ (DebugTransport) и exported BridgeService; в smoke берём debug-набор целиком
+        // debug-транспорт для эмулятора ГУ (DebugTransport); манифест свой: exported BridgeService как в debug и без <permission> TEMPLATE_RENDERER
         getByName("smoke") {
             kotlin.srcDir("src/debug/java")
-            manifest.srcFile("src/debug/AndroidManifest.xml")
         }
     }
 

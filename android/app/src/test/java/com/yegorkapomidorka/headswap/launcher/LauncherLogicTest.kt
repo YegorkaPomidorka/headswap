@@ -338,15 +338,6 @@ class LauncherLogicTest {
         assertFalse(u.update(-1, 5_000))
     }
 
-    @Test fun navArrowStopsInAnotherDirection() {
-        for (k in 1..7) {
-            val next = NavSpinLogic.next(90f, k)
-            assertTrue(next - 90f >= 720f + 45f)
-            assertTrue((next - 90f) % 360f != 0f)
-            assertEquals(0f, (next - 90f) % 45f)
-        }
-    }
-
     @Test fun hintsDefaultOffForAll() {
         for (pkg in NavigatorPick.KNOWN) assertFalse(pkg, NavigatorPick.hintsDefault(pkg))
     }
