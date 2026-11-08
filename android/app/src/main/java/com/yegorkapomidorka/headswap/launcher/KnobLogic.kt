@@ -23,6 +23,19 @@ object KnobLogic {
         else -> null
     }
 
+    /**
+     * Клавиша для чужого приложения в окне на всю область: поворот - стрелки вниз/вверх (телефонные приложения
+     * шайбу не знают), наклоны - стрелки, OK - DPAD_CENTER. null - действие остаётся лаунчеру (HOME/NAVI/MUSIC).
+     */
+    fun windowKey(k: Knob): Int? = when (k) {
+        Knob.NEXT, Knob.DOWN -> 20
+        Knob.PREVIOUS, Knob.UP -> 19
+        Knob.LEFT -> 21
+        Knob.RIGHT -> 22
+        Knob.OK -> 23
+        else -> null
+    }
+
     /** Движение фокуса: первое после касания только показывает рамку, не сдвигая её (как в AA). */
     fun moves(k: Knob) = k in setOf(Knob.NEXT, Knob.PREVIOUS, Knob.UP, Knob.DOWN, Knob.LEFT, Knob.RIGHT)
 }

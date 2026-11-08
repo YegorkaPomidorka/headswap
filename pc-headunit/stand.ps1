@@ -15,13 +15,17 @@
 
 .EXAMPLE
   .\stand.ps1 -Build
+  .\stand.ps1 -Hu mazda
   .\stand.ps1 -Duration 300 -HuArgs '--touch-test'
 #>
 param(
     [switch]$Build,
     [ValidateSet('desktop', 'aa', 'keep')][string]$Mode = 'desktop',
     [int]$Duration = 3600,
-    [string]$Size = '1280x720',
+    [string]$Size = '',  # default: 1280x720, -Hu mazda 1728x648
+    # HU profile (carlife_hu.py --hu): mazda = Desay G6S of Mazda CX-5, Commander knob buttons under the window,
+    # mouse wheel = knob turn, arrows = tilts, Enter = OK
+    [ValidateSet('honda', 'mazda')][string]$Hu = 'honda',
     [string[]]$HuArgs = @(),
     [string]$Out = '',
     [switch]$NoView,
@@ -107,14 +111,15 @@ if (($act -join "`n") -notmatch 'HEADSWAP_READY') { $act | Select-Object -Last 1
 Step "emulator for $Duration s, out: $Out"
 AdbOk reverse tcp:7240 tcp:7240 | Out-Null
 $env:PYTHONIOENCODING = 'utf-8'
-$pyArgs = @('carlife_hu.py', '--duration', $Duration, '--out', "`"$Out`"", '--size', $Size)
+if (-not $Size) { $Size = if ($Hu -eq 'mazda') { '1728x648' } else { '1280x720' } }
+$pyArgs = @('carlife_hu.py', '--duration', $Duration, '--out', "`"$Out`"", '--size', $Size, '--hu', $Hu)
 if (-not $NoView) { $pyArgs += '--view' }   # live window: mouse = touches, BACK/HOME keys (carlife_view.py)
 $pyArgs += $HuArgs
-$hu = Start-Process python -ArgumentList $pyArgs -WorkingDirectory $Here -NoNewWindow -PassThru
+$huProc = Start-Process python -ArgumentList $pyArgs -WorkingDirectory $Here -NoNewWindow -PassThru
 Start-Sleep -Seconds 3
 AdbOk shell am start-foreground-service -n "$Pkg/com.yegorkapomidorka.headswap.BridgeService" --ei debug_tcp 7240 | Out-Null
 Step 'bridge started; close the window or wait -Duration to finish'
-$hu.WaitForExit()
+$huProc.WaitForExit()
 
 # 5. phone log
 $log = ((& adb shell ls -t "/sdcard/Android/data/$Pkg/files/" 2>$null) | Select-Object -First 1)

@@ -95,7 +95,7 @@ CONTROL0, SENSOR1, VIDEO2, INPUT3, SPEECH4, SYSTEM5, MEDIA6, MIC7, BT8, MEDIA_PL
 **8. Тач.** `CarLifeSession.onTouch` → `AaBridgeCore.onCarlifeTouch` → `TouchDecimator` → `dispatchTouch` →
 `VideoGeometry.mapTouch` → `AapSession.sendTouch`. Кнопки руля — `onCarlifeHardKey`.
 На рабочем столе перед прореживателем стоит `VolumeSwipe`: два пальца у правого края двигают громкость медиа
-телефона (`DesktopMedia.adjustVolume`), на Vezel всегда, иначе по `AaPrefs.volumeSwipe` (ADR 0037).
+телефона (`DesktopMedia.adjustVolume`), на Vezel всегда, иначе по `AaPrefs.volumeSwipe` (ADR 0038).
 
 **9. Навигация и приборка.** AA NAVIGATION(10) → `MetaRelay` → `sendNaviTurn` (NAVI_NEXT_TURN_INFO), только после
 подписки ГУ. Honda: `HondaClusterRoad` ужимает название улицы под приборку.
@@ -197,8 +197,8 @@ CONTROL0, SENSOR1, VIDEO2, INPUT3, SPEECH4, SYSTEM5, MEDIA6, MIC7, BT8, MEDIA_PL
 | Клавиатура на ГУ разделена пополам | плотность рабочего стола `DesktopGeometryPolicy.density` (короткая сторона < 600 dp), ADR 0023 |
 | Главный: не та раскладка, плашка не листается «Слоями», ⇄ не там | prefs `home_layout`/`card_view`/`small_view` → `LauncherModel.tiles`, что листают «Слои» - prefs `layer_list` (`Layer`/`LayerList` в `HomeTilesLogic.kt`, настройки «Экран» → `LayersCard` и выбор по «+» `LayerPickerScreen` в `LayersUi.kt`; приложение плашки - prefs `tile_app`, окно по `appCardRect`, ADR 0030), правила в `HomeTilesLogic`, окна плашек в `EmbedUi.EmbedLayers` (плашка-приложение - слот app по `appCardRect`), ⇄ и «Слои» ленты - `HomeTileButtons`, ADR 0027 |
 | Рабочий стол не того цвета / золото там, где должен быть свой акцент | prefs `colors_night`/`colors_day` → `LauncherModel.palette` → `LauncherColors.palette` (набор по умолчанию = `Palettes.DARK/LIGHT`), акцент - `LocalAccent` = `LauncherPalette.accent`; страница `SettingsPage.COLORS`; ADR 0036 |
-| Шайба/кнопки ГУ не действуют в своём лаунчере | `DelegatedDexConnector.sendRotary/sendKey` → `DesktopKeys.sink` → `launcher/LauncherKnob` (фокус в `Pressable`), коды в `KnobLogic`, ADR 0024 |
-| Рабочий стол: громкость двумя пальцами не работает | `VolumeSwipe` (зона 30% справа, шаг 1/12 высоты) в `AaBridgeCore.onCarlifeTouch`, тумблер `AaPrefs.volumeSwipe` / `huHondaVezel`, `DesktopMediaControl.adjustVolume`; в логе `жест громкости`, `BRIDGE громкость`; ADR 0037 |
+| Шайба/кнопки ГУ не действуют в своём лаунчере | `DelegatedDexConnector.sendRotary/sendKey` → `DesktopKeys.sink` → `launcher/LauncherKnob` (фокус в `Pressable`), коды в `KnobLogic`, ADR 0024; в окне на всю область - `LauncherKnob.toWindow` → `EmbedHost.key` → `injectChildKey`, в логе `LAUNCHER шайба: клавиши идут в окно`, ADR 0037 |
+| Рабочий стол: громкость двумя пальцами не работает | `VolumeSwipe` (зона 30% справа, шаг 1/12 высоты) в `AaBridgeCore.onCarlifeTouch`, тумблер `AaPrefs.volumeSwipe` / `huHondaVezel`, `DesktopMediaControl.adjustVolume`; в логе `жест громкости`, `BRIDGE громкость`; ADR 0038 |
 | 2ГИС на рабочем столе: нет лимита/камер, заставка висит, «Перезапустите 2ГИС» | `carapp/CarAppSession` (области, порядок stop), кнопка «Перезапустить навигатор»; ADR 0021 |
 | Навигатор окном вместо хоста, в логе `handshake: отказ ... Unknown host` | TEMPLATE_RENDERER в манифесте; ADR 0022 |
 | Я.Карты/Навигатор просят Плюс, или навигатор окном без подсказок | настройка «Подсказки на приборке» (prefs `nav_hints:<pkg>`, по умолчанию выкл у всех) → `CarAppHost.allowFor` в `EmbedHost.carTargetFor`; теневая AA - `NavigatorPick.shadowWanted`; ADR 0028 |

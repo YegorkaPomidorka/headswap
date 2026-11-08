@@ -123,6 +123,10 @@ internal object EmbeddedSessionRegistry {
         val lease = active(uid, handle)
         activeCall(lease) { it.injectChildBack(lease.token) }
     }
+    fun key(uid: Int, handle: Int, keycode: Int) {
+        val lease = active(uid, handle)
+        activeCall(lease) { it.injectChildKey(lease.token, keycode) }
+    }
     fun producerLifetime(uid: Int, handle: Int): IBinder {
         val lease = active(uid, handle)
         return activeCall(lease) { it.childProducerLifetime(lease.token) }
