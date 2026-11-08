@@ -32,6 +32,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.drawscope.Fill
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.scale
@@ -51,6 +52,7 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
@@ -421,21 +423,57 @@ fun Txt(
     ellipsis: Boolean = true,
 ) {
     val m = LocalMetrics.current
+    // Арабский (RTL): Start/End - по раскладке, а не по абзацу (латиница в RTL-интерфейсе тоже прижата вправо);
+    // текст без RTL-символов ("1 / 3", "2 : 1") читается слева направо, иначе пробелы вокруг "/" переворачивают его.
+    val rtl = LocalLayoutDirection.current == LayoutDirection.Rtl
+    val hasRtl = remember(text, rtl) { rtl && text.any { Character.getDirectionality(it).let { d ->
+        d == Character.DIRECTIONALITY_RIGHT_TO_LEFT || d == Character.DIRECTIONALITY_RIGHT_TO_LEFT_ARABIC } } }
+    val physicalAlign = if (!rtl) align else when (align) {
+        TextAlign.Start -> TextAlign.Right
+        TextAlign.End -> TextAlign.Left
+        else -> align
+    }
     BasicText(
         text, modifier,
         style = TextStyle(
             color = color, fontSize = m.sp(sizePx), fontWeight = weight,
             fontFamily = LauncherFonts.family(LocalContext.current, mono, weight),
-            lineHeight = m.sp((sizePx * 1.15f).toInt()), textAlign = align,
+            lineHeight = m.sp((sizePx * 1.15f).toInt()), textAlign = physicalAlign,
+            textDirection = if (rtl && !hasRtl) TextDirection.ContentOrLtr else TextDirection.Unspecified,
         ),
         maxLines = maxLines, softWrap = maxLines > 1, overflow = if (ellipsis) TextOverflow.Ellipsis else TextOverflow.Clip,
     )
 }
 
-/** Содержимое карточек всегда слева направо, даже при зеркальной раскладке правого руля. */
+/**
+ * Направление языка приложения (русский и английский - Ltr, арабский - Rtl): задаёт [LauncherRoot] до любого [Ltr].
+ * Нужно там, где внутри физического блока ([Ltr]) надо вернуться к раскладке языка ([LocaleDir]).
+ */
+val LocalLocaleDirection = staticCompositionLocalOf { LayoutDirection.Ltr }
+
+/**
+ * Физическая раскладка слева направо при любом языке: окна встроенных приложений, карта и стрелки навигатора, медиа-ряд,
+ * оверлеи с пиксельными rect-ами. Только composable внутри не переупорядочивается: ряд или Box должен создаваться
+ * внутри блока, иначе его детей расставляет направление родителя.
+ */
 @Composable
 fun Ltr(content: @Composable () -> Unit) {
     CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr, content = content)
 }
+
+/** Вернуться из [Ltr] к направлению языка приложения (содержимое карточек, тексты уведомлений). */
+@Composable
+fun LocaleDir(content: @Composable () -> Unit) {
+    CompositionLocalProvider(LocalLayoutDirection provides LocalLocaleDirection.current, content = content)
+}
+
+/** Язык приложения пишется справа налево (арабский). */
+@Composable
+fun localeRtl(): Boolean = LocalLocaleDirection.current == LayoutDirection.Rtl
+
+/** Зеркалит значок с направлением (шеврон «назад», стрелки страниц) в RTL; в [Ltr] ничего не делает. */
+@Composable
+fun Modifier.mirrorRtl(): Modifier =
+    if (LocalLayoutDirection.current == LayoutDirection.Rtl) this.graphicsLayer { scaleX = -1f } else this
 
 fun cardShape(r: Dp): Shape = androidx.compose.foundation.shape.RoundedCornerShape(r)

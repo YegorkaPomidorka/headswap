@@ -1,0 +1,144 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Onboarding step: title, numbered list (string-array), hint, buttons; short is the name in the readiness checklist. -->
+    <string name="step_aa_dev_title">فعّل وضع المطوّر في Android Auto</string>
+    <string-array name="step_aa_dev_list">
+        <item>اضغط «فتح Android Auto»</item>
+        <item>مرّر إلى أسفل الصفحة تمامًا</item>
+        <item>اضغط «الإصدار» 10 مرات ثم أكّد</item>
+    </string-array>
+    <string name="step_aa_dev_primary">فتح Android Auto</string>
+    <string name="step_aa_dev_short">وضع المطوّر في Android Auto</string>
+
+    <string name="step_aa_unknown_title">اسمح بالتثبيت من مصادر غير معروفة</string>
+    <string-array name="step_aa_unknown_list">
+        <item>اضغط «فتح Android Auto»</item>
+        <item>اضغط ⋮ ثم اختر «إعدادات المطوّر»</item>
+        <item>مرّر للأسفل إلى «مصادر غير معروفة»</item>
+        <item>ضع علامة في المربع</item>
+    </string-array>
+    <string name="step_aa_unknown_hint">بدون ذلك لن يعرض Android Auto التطبيقات المثبّتة من خارج Google Play.</string>
+    <string name="step_aa_unknown_primary">فتح Android Auto</string>
+    <string name="step_aa_unknown_short">مصادر غير معروفة</string>
+
+    <string name="step_autostart_title">شغّل خادم شاشة السيارة</string>
+    <string-array name="step_autostart_list">
+        <item>اضغط «فتح Android Auto»</item>
+        <item>اضغط ⋮ أعلى اليسار</item>
+        <item>اختر «بدء تشغيل خادم الوحدة الرئيسية»</item>
+    </string-array>
+    <string name="step_autostart_hint">يكفي تشغيله مرة واحدة: يستمر خادم شاشة السيارة بالعمل في الخلفية ولا يوقفه Headswap. إذا أغلقه Android من تلقاء نفسه، فشغّله مرة أخرى من إعدادات Android Auto. لم يعد هناك تشغيل تلقائي عبر تسهيل الاستخدام، لذا يجب تشغيل خادم شاشة السيارة يدويًا.</string>
+    <string name="step_autostart_primary">فتح Android Auto</string>
+    <string name="step_autostart_short">خادم شاشة السيارة</string>
+
+    <string name="step_notif_title">فعّل الإشعارات</string>
+    <string-array name="step_notif_list">
+        <item>اضغط «سماح» أسفل الشاشة</item>
+        <item>اضغط «سماح» في نافذة Android «هل تسمح لـ Headswap بإرسال إشعارات إليك؟»</item>
+    </string-array>
+    <string name="step_notif_hint">تعرض لوحة الإشعارات سير الاتصال، ولن يُنهي Android تشغيل Headswap أثناء إطفاء الشاشة.</string>
+    <string name="step_notif_hint_launcher">يُدخَل رمز تفعيل Headswap في الإشعار مباشرةً. كما تعرض لوحة الإشعارات سير الاتصال بشاشة السيارة.</string>
+    <string name="step_notif_short">الإشعارات</string>
+
+    <!-- Items 3-4 (autostart) are shown on Xiaomi only -->
+    <string name="step_background_title">أزل قيد البطارية</string>
+    <string-array name="step_background_list">
+        <item>اضغط «إزالة قيد البطارية»</item>
+        <item>اختر «بلا قيود»</item>
+        <item>ارجع واضغط «التشغيل التلقائي»</item>
+        <item>مرّر إلى Headswap وفعّل المفتاح</item>
+    </string-array>
+    <string name="step_background_primary">إزالة قيد البطارية</string>
+    <string name="step_background_extra">التشغيل التلقائي</string>
+    <string name="step_background_short">العمل في الخلفية</string>
+
+    <string name="step_mic_title">اسمح بالوصول إلى الميكروفون</string>
+    <string-array name="step_mic_list">
+        <item>اضغط «سماح» أسفل الشاشة</item>
+        <item>اضغط «أثناء استخدام التطبيق»</item>
+    </string-array>
+    <string name="step_mic_hint">مطلوب لاستدعاء المساعد الصوتي.</string>
+    <string name="step_mic_short">الميكروفون</string>
+
+    <string name="step_bluetooth_title">فعّل Bluetooth</string>
+    <string-array name="step_bluetooth_list">
+        <item>اضغط «فتح Bluetooth»</item>
+        <item>فعّل Bluetooth</item>
+        <item>اتصل بشاشة السيارة</item>
+    </string-array>
+    <string name="step_bluetooth_hint">مطلوب للمكالمات: في Android Auto تتم المكالمات عبر Bluetooth فقط.</string>
+    <string name="step_bluetooth_primary">فتح Bluetooth</string>
+    <string name="step_bluetooth_short">Bluetooth للمكالمات</string>
+
+    <string name="step_location_title">فعّل الموقع</string>
+    <string-array name="step_location_list">
+        <item>اضغط «فتح إعدادات الموقع»</item>
+        <item>فعّل مفتاح «استخدام الموقع»</item>
+    </string-array>
+    <string name="step_location_hint">بدونه تعرض Google Maps وتطبيقات الخرائط الأخرى في Android Auto رسالة «مطلوب الوصول إلى الموقع».</string>
+    <string name="step_location_primary">فتح إعدادات الموقع</string>
+    <string name="step_location_short">الموقع للخرائط</string>
+
+    <string name="step_first_title">عند الاتصال لأول مرة</string>
+    <string-array name="step_first_list">
+        <item>افتح قفل الهاتف ووصّل الكابل بشاشة السيارة</item>
+        <item>حدّد «استخدامه افتراضيًا لملحق USB هذا»</item>
+        <item>اضغط «حسنًا»</item>
+    </string-array>
+    <string name="step_first_hint">إذا ظهرت على شاشة السيارة شاشة «启动CarLife»، فاضغط ذلك الزر.</string>
+    <string name="step_first_primary">حسنًا</string>
+    <string name="step_first_short">الاتصال الأول</string>
+
+    <string name="onb_already_done">تم مسبقًا</string>
+    <string name="onb_skip">تخطي</string>
+    <string name="onb_allow">سماح</string>
+    <string name="onb_later">لاحقًا</string>
+    <string name="onb_back">رجوع</string>
+    <string name="onb_next">التالي</string>
+    <string name="onb_got_it">حسنًا</string>
+    <string name="onb_step_progress">الخطوة %1$d من %2$d</string>
+    <string name="onb_done_chip">مكتمل مسبقًا</string>
+
+    <string name="onb_checklist_title">فحص الجاهزية</string>
+    <string name="onb_all_ready">كل شيء جاهز للرحلة</string>
+    <string name="onb_ready_count">جاهز %1$d من %2$d</string>
+    <string name="onb_checklist_hint">اضغط على عنصر لفتح خطوته.</string>
+    <string name="onb_done">تم</string>
+    <string name="onb_status_marked">محدّد</string>
+    <string name="onb_status_ready">جاهز</string>
+    <string name="onb_status_unmarked">غير محدّد</string>
+    <string name="onb_status_off">غير مفعّل</string>
+    <string name="step_car_title">ما سيارتك؟</string>
+    <string name="step_car_short">السيارة</string>
+    <string name="step_car_body">سنضبط الإعدادات التي تحقق منها المجتمع على هذه السيارة. يمكن للمستخدمين ذوي الخبرة تخطي هذه الخطوة.</string>
+
+    <!-- Mode choice and the “Own launcher” path (OnboardingMode.dc.html) -->
+    <string name="step_mode_title">اختر الوضع</string>
+    <string name="step_mode_subtitle">ما الذي يُعرض على شاشة السيارة. يمكنك تغييره في الإعدادات في أي وقت.</string>
+    <string name="step_mode_aa_body">Android Auto القياسي: الخرائط والموسيقى والمكالمات من Android Auto. يعمل عبر خادم شاشة السيارة الخاص به.</string>
+    <string name="step_mode_own_body">تعرض شاشة السيارة سطح مكتب Headswap أو مشغّل سيارة من الهاتف.</string>
+    <string name="step_mode_warn_title">تنبيه</string>
+    <string name="step_mode_warn_body">يتطلب هذا الوضع وضع المطوّر في Android وتفعيل Headswap عبر «تصحيح الأخطاء اللاسلكي».</string>
+    <string name="step_mode_warn_risk">هذه إعدادات محفوفة بالمخاطر. تفعّلها على مسؤوليتك.</string>
+    <string name="step_mode_primary">التالي</string>
+    <string name="step_mode_short">الوضع</string>
+
+    <string name="step_devmode_title">فعّل وضع المطوّر</string>
+    <string-array name="step_devmode_list">
+        <item>اضغط «فتح الإعدادات»، ستفتح «حول الهاتف»</item>
+        <item>اضغط «رقم الإصدار» 7 مرات حتى تظهر رسالة «أصبحت الآن مطوّرًا»</item>
+        <item>إذا طلب الهاتف ذلك، أدخل رمز PIN الخاص به</item>
+    </string-array>
+    <string name="step_devmode_hint">وضع المطوّر مطلوب فقط من أجل «تصحيح الأخطاء اللاسلكي». إذا كان مفعّلًا بالفعل، فاضغط «تم مسبقًا».</string>
+    <string name="step_devmode_primary">فتح الإعدادات</string>
+    <string name="step_devmode_short">وضع المطوّر</string>
+
+    <!-- Items and hint of the activation step; title, buttons and status come from PhoneActivationBlock -->
+    <string-array name="step_activate_list">
+        <item>اضغط «تفعيل»، ستفتح «خيارات المطوّر» (في Xiaomi: إعدادات إضافية ← خيارات المطوّر)</item>
+        <item>فعّل «تصحيح الأخطاء اللاسلكي» واضغط «إقران الجهاز برمز الإقران»</item>
+        <item>اكتب الرمز الظاهر في إشعار Headswap</item>
+    </string-array>
+    <string name="step_activate_hint">يُفقد التفعيل بعد إعادة تشغيل الهاتف. سيطلب منك Headswap تكراره، ويستغرق نصف دقيقة.</string>
+    <string name="step_activate_short">تفعيل Headswap</string>
+</resources>

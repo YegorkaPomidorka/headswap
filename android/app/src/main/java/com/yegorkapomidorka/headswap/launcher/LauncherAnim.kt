@@ -75,12 +75,12 @@ private fun parse(d: String): Path = PathParser().parsePathString(d).toPath()
 private fun DrawScope.strokePath(p: Path, color: Color, width: Float) =
     drawPath(p, color, style = Stroke(width = width, cap = StrokeCap.Round, join = StrokeJoin.Round))
 
-/** Шеврон «Назад» рейки с анимацией по [progress]. */
+/** Шеврон «Назад» рейки с анимацией по [progress]; в RTL зеркален (смотрит вправо, рейка справа). */
 @Composable
 fun BackIcon(sizePx: Int, color: Color, progress: () -> Float) {
     val m = LocalMetrics.current
     val path = remember { parse(Ico.CHEV_BACK[0]) }
-    Canvas(Modifier.size(m.dp(sizePx))) {
+    Canvas(Modifier.mirrorRtl().size(m.dp(sizePx))) {
         val sc = size.minDimension / 24f
         val (dx, alpha) = BackKeyframes.at(progress())
         scale(sc, sc, pivot = Offset.Zero) {

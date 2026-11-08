@@ -43,11 +43,16 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 
-/** Корень лаунчера: фон по теме, рейка слева (кроме полноэкранного YouTube) и область содержимого. */
+/**
+ * Корень лаунчера: фон по теме, рейка у начала строки (слева; при арабском языке экран зеркален и рейка справа; кроме
+ * полноэкранного YouTube) и область содержимого.
+ */
 @Composable
 fun LauncherRoot(connected: Boolean) {
     val density = LocalDensity.current
     val model = LauncherModel
+    // направление языка: до любого Ltr; по нему «Карта слева», окно Алисы и возврат из Ltr (LocaleDir)
+    val localeDir = LocalLayoutDirection.current
     LaunchedEffect(Unit) {
         while (true) {
             model.status = withContext(Dispatchers.Default) { StatusReader.read(model.context) }
@@ -83,7 +88,8 @@ fun LauncherRoot(connected: Boolean) {
         val spec = remember(w, h, railSize) { LauncherSpecs.forSize(w, h, railSize) }
         val metrics = remember(spec, density) { LauncherMetrics(spec, density) }
         val pal = model.palette
-        CompositionLocalProvider(LocalMetrics provides metrics, LocalAccent provides pal.accent, LocalPalette provides pal) {
+        CompositionLocalProvider(LocalMetrics provides metrics, LocalAccent provides pal.accent, LocalPalette provides pal,
+            LocalLocaleDirection provides localeDir) {
             Box(Modifier.fillMaxSize().launcherBackground(pal)) {
                 if (!connected) {
                     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -93,7 +99,7 @@ fun LauncherRoot(connected: Boolean) {
                     // чужой лаунчер: только его окно и наша панель навигации, без рейки и оверлеев звонка
                     ForeignRoot()
                 } else {
-                    // рейка всегда слева; «Карта слева» переставляет только ряды главного (HomeScreen).
+                    // рейка у начала строки: слева, в RTL справа. «Карта слева» - физическая сторона (HomeScreen).
                     // Полноэкранный YouTube забирает и её место: выход - кнопкой самого YouTube (FullscreenApp)
                     val fullscreen = model.area is Area.App && EmbedHost.app.fullscreen
                     Row(Modifier.fillMaxSize()) {
@@ -103,18 +109,26 @@ fun LauncherRoot(connected: Boolean) {
                         }
                     }
                     run {
-                        EmbedLayers()
-                        HomeTileButtons() // ⇄ и «Слои» ленты - над живыми окнами плашек
-                        NavHostOverlay() // шаблоны навигатора на своём хосте Car App - над его картой, в границах области
-                        NotificationsOverlay() // язычок и шторка уведомлений телефона из-под строки статуса; касания берёт только сам
-                        AliceVoicePill() // скрытая Алиса: слушаю / думаю / говорю / маршрут - снизу по центру
-                        // входящий звонок поверх чужого приложения или экрана без карточки «Телефон»
-                        if (PhoneController.callState == CallState.RINGING && (model.area != Area.Home || spec.strip || model.homeLayout.two)) {
-                            // как нижняя полоса главного: прибита к низу, скругления только сверху
-                            val r = metrics.dp(spec.radius)
-                            Box(Modifier.fillMaxSize().padding(end = metrics.dp(spec.m)), contentAlignment = Alignment.BottomEnd) {
-                                PhoneCard(Modifier.width(metrics.dp(spec.phone)).height(metrics.dp(spec.bottomH)),
-                                    RoundedCornerShape(topStart = r, topEnd = r))
+                        // слои с пиксельными rect-ами (boundsInRoot + absoluteOffset) - физические: Box создаётся внутри Ltr,
+                        // иначе в RTL он ставит детей от правого края и сдвиг уезжает на ширину слоя
+                        Ltr {
+                            Box(Modifier.fillMaxSize()) {
+                                EmbedLayers()
+                                HomeTileButtons() // ⇄ и «Слои» ленты - над живыми окнами плашек
+                                NavHostOverlay() // шаблоны навигатора на своём хосте Car App - над его картой, в границах области
+                                NotificationsOverlay() // язычок и шторка уведомлений телефона из-под строки статуса; касания берёт только сам
+                                AliceVoicePill() // скрытая Алиса: слушаю / думаю / говорю / маршрут - снизу по центру
+                                // входящий звонок поверх чужого приложения или экрана без карточки «Телефон»
+                                if (PhoneController.callState == CallState.RINGING && (model.area != Area.Home || spec.strip || model.homeLayout.two)) {
+                                    // как нижняя полоса главного: прибита к низу справа, скругления только сверху
+                                    val r = metrics.dp(spec.radius)
+                                    Box(Modifier.fillMaxSize().padding(end = metrics.dp(spec.m)), contentAlignment = Alignment.BottomEnd) {
+                                        LocaleDir {
+                                            PhoneCard(Modifier.width(metrics.dp(spec.phone)).height(metrics.dp(spec.bottomH)),
+                                                RoundedCornerShape(topStart = r, topEnd = r))
+                                        }
+                                    }
+                                }
                             }
                         }
                         RemoveConfirm()
@@ -254,7 +268,11 @@ fun StatusBar(title: String? = null, showNet: Boolean = true) {
     Row(
         Modifier.fillMaxWidth().height(m.dp(s.statusH))
             .onGloballyPositioned { model.statusBottom = it.boundsInRoot().top - s.g8 + s.statusBandH }
-            .drawBehind { drawRect(bar, Offset(-s.g.toFloat(), -s.g8.toFloat()), Size(size.width + s.g + s.m, s.statusBandH.toFloat())) }
+            .drawBehind {
+                // отступ start (g) у рейки, end (m) у края экрана; в RTL рейка справа - полоса выходит влево на m
+                val left = if (layoutDirection == LayoutDirection.Rtl) s.m else s.g
+                drawRect(bar, Offset(-left.toFloat(), -s.g8.toFloat()), Size(size.width + s.g + s.m, s.statusBandH.toFloat()))
+            }
             // строка по центру полосы: родитель опускает её на g8, полоса ниже строки на 3/4 g8
             .offset(y = -m.dp(s.g8 / 4)),
         verticalAlignment = Alignment.CenterVertically,
@@ -265,21 +283,29 @@ fun StatusBar(title: String? = null, showNet: Boolean = true) {
             Txt(st.time, s.fs, color = Pal.TEXT, weight = FontWeight.SemiBold, mono = true)
             if (title == null) Spacer(Modifier.weight(1f))
         }
-        // заголовок экрана слева (настройки), статус справа
+        // заголовок экрана у начала (слева; в RTL справа), статус у конца; сам ряд значков всегда слева направо (создан внутри Ltr)
         if (title != null) Txt(title, s.fs, Modifier.weight(1f), color = Pal.TEXT, weight = FontWeight.SemiBold)
-        Ltr {
-            Txt(st.date, s.fs, color = Pal.SEC2)
-            SvgIcon(Ico.BT, s.fs, if (st.bluetooth) Pal.SEC2 else Pal.SEC2.copy(alpha = 0.3f))
-            SvgIcon(Ico.WIFI, s.fs, if (st.wifi) Pal.SEC2 else Pal.SEC2.copy(alpha = 0.3f))
-            // сеть с уровнем сигнала - здесь, рядом с Wi-Fi, а не в рейке
-            if (showNet && st.signal >= 0) Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(m.dp(s.g4))) {
-                VectorIcon(VIco.signal(st.signal), 24f, s.fs, Pal.SEC2)
-                Txt(st.net, s.fs, color = Pal.SEC2)
-            }
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(m.dp(s.g4))) {
-                SvgIcon(Ico.VOLUME, s.fs, Pal.SEC2)
-                Txt(st.volume.toString(), s.fs, color = Pal.SEC2)
-            }
+        Ltr { StatusIcons(st, showNet) }
+    }
+}
+
+/** Дата, Bluetooth, Wi-Fi, сеть и громкость: порядок слева направо при любом языке ([Ltr] снаружи, чтобы ряд создался в нём). */
+@Composable
+private fun StatusIcons(st: StatusInfo, showNet: Boolean) {
+    val m = LocalMetrics.current
+    val s = m.spec
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(m.dp(s.g))) {
+        Txt(st.date, s.fs, color = Pal.SEC2)
+        SvgIcon(Ico.BT, s.fs, if (st.bluetooth) Pal.SEC2 else Pal.SEC2.copy(alpha = 0.3f))
+        SvgIcon(Ico.WIFI, s.fs, if (st.wifi) Pal.SEC2 else Pal.SEC2.copy(alpha = 0.3f))
+        // сеть с уровнем сигнала - здесь, рядом с Wi-Fi, а не в рейке
+        if (showNet && st.signal >= 0) Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(m.dp(s.g4))) {
+            VectorIcon(VIco.signal(st.signal), 24f, s.fs, Pal.SEC2)
+            Txt(st.net, s.fs, color = Pal.SEC2)
+        }
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(m.dp(s.g4))) {
+            SvgIcon(Ico.VOLUME, s.fs, Pal.SEC2)
+            Txt(st.volume.toString(), s.fs, color = Pal.SEC2)
         }
     }
 }

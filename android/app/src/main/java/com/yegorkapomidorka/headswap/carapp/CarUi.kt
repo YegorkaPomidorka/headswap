@@ -1,5 +1,6 @@
 package com.yegorkapomidorka.headswap.carapp
 
+import java.util.Locale
 import kotlin.math.roundToInt
 
 /*
@@ -152,7 +153,7 @@ object CarFormat {
     /** Время прибытия «ЧЧ:ММ» в часовом поясе, который прислало приложение. */
     fun clock(epochMillis: Long, zoneOffsetSeconds: Int): String {
         val local = Math.floorMod(epochMillis / 1000 + zoneOffsetSeconds, 86_400L)
-        return "%02d:%02d".format(local / 3600, local % 3600 / 60)
+        return "%02d:%02d".format(Locale.ROOT, local / 3600, local % 3600 / 60)
     }
 }
 

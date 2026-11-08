@@ -125,7 +125,7 @@ object HomeLogic {
                     StageState.DONE to UiText.res(R.string.home_stage_working),
                     StageState.DONE to if (i.wireless) CARLIFE_WIFI else CARLIFE,
                     StageState.DONE to UiText.res(R.string.home_stage_connected),
-                    StageState.DONE to UiText.raw(i.videoRes),
+                    StageState.DONE to UiText.raw("⁦${i.videoRes}⁩"), // LTR-изоляция: в RTL не «720×1280»
                     // настройка «Звук через Headswap» (бывш. «Звук через USB») - это звук по каналу CarLife; без кабеля он идёт по Wi-Fi
                     if (i.usbAudio) StageState.DONE to UiText.raw(if (i.wireless) "Wi-Fi" else "USB")
                     else StageState.PEND to UiText.res(R.string.home_stage_off),

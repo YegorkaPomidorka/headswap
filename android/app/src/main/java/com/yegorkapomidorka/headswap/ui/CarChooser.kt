@@ -28,7 +28,7 @@ class CarChooser(val ctx: Context, private val withOther: Boolean, private val o
         ellipsize = TextUtils.TruncateAt.END
     }
     private val values = ArrayList<TextView>()
-    private val chevron = ctx.icon(R.drawable.ic_chevron, 20, ctx.clr(R.color.on2)).apply { rotation = 90f }
+    private val chevron = ctx.icon(R.drawable.ic_chevron, 20, ctx.clr(R.color.on2)).apply { rotation = ctx.chevronRotation(false) }
     private val field: LinearLayout
     private val opts: List<CarPreset?> = CarPreset.values().toList() + if (withOther) listOf(null) else emptyList()
 
@@ -98,7 +98,7 @@ class CarChooser(val ctx: Context, private val withOther: Boolean, private val o
     private fun setOpen(open: Boolean) {
         val c = ctx
         field.background = c.rippleBg(c.shape(c.clr(R.color.surf), 16, c.clr(if (open) R.color.acc else R.color.line), 1.5f), 16)
-        chevron.rotation = if (open) -90f else 90f
+        chevron.rotation = c.chevronRotation(open)
     }
 
     /** Список под полем: шириной с поле, до ~6 строк, дальше прокрутка; нажатие мимо закрывает. */
