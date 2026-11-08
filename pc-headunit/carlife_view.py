@@ -269,7 +269,7 @@ class Viewer:
     def __init__(self, ffmpeg: str, size: tuple[int, int], scale: float | None, touch: Callable[[int, int, int], None],
                  key: Callable[[int], None], on_close: Callable[[], None], alive: Callable[[], bool],
                  log: Callable[[str], None], back_code: int, home_code: int, title: str = "CarLife HU",
-                 wheel: list[tuple[str, Callable[[], None]]] | None = None):
+                 wheel: list[tuple[str, Callable[[], None]]] | None = None, knob: dict[str, int] | None = None):
         import tkinter as tk
         self.tk = tk
         self.root = tk.Tk()
@@ -313,6 +313,16 @@ class Viewer:
         for k in ("<Escape>", "<BackSpace>"):
             self.root.bind(k, lambda e: self.key(self.back_code))
         self.root.bind("<Home>", lambda e: self.key(self.home_code))
+        if knob:                                     # шайба: колесо мыши = поворот, клавиши = наклоны/OK
+            def turn(e):
+                up = getattr(e, "delta", 0) > 0 or getattr(e, "num", 0) == 4
+                self.key(knob["wheel_up" if up else "wheel_down"])
+            self.canvas.bind("<MouseWheel>", turn)   # Windows/macOS
+            self.canvas.bind("<Button-4>", turn)     # X11
+            self.canvas.bind("<Button-5>", turn)
+            for ev, code in knob.items():
+                if ev.startswith("<"):
+                    self.root.bind(ev, lambda e, code=code: self.key(code))
         self.canvas.focus_set()
 
     def mouse(self, action: int, e):
