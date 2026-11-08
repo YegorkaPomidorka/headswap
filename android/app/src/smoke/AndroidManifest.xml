@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- smoke: как debug (exported BridgeService для debug-транспорта) плюс без своего объявления TEMPLATE_RENDERER.
+     Разрешение объявляет release (ADR 0022); два пакета с одним <permission> не ставятся
+     (INSTALL_FAILED_DUPLICATE_PERMISSION), а smoke живёт рядом с release. Без release хост Car App в smoke не работает. -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <permission android:name="android.car.permission.TEMPLATE_RENDERER" tools:node="remove" />
+
+    <application>
+        <service
+            android:name=".BridgeService"
+            android:exported="true"
+            tools:replace="android:exported" />
+    </application>
+</manifest>
