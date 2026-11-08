@@ -136,7 +136,6 @@
     <string name="l_s_hu">شاشة السيارة</string>
     <string name="l_s_link">الاتصال</string>
     <string name="l_s_video">الفيديو</string>
-    <string name="l_s_res">الدقة والمعدل</string>
     <string name="l_s_version">الإصدار</string>
     <string name="l_s_hu_channel">القناة %1$s</string>
     <string name="l_s_fps">%1$s · %2$d FPS</string>
