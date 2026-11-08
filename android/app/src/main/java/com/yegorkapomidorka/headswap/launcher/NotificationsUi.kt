@@ -86,16 +86,7 @@ private class Shown {
     var panelCx by mutableFloatStateOf(0f)
     /** нижний край панели (Y корня, без сдвига graphicsLayer): к нему в режиме чёлки прибита полоска отдельным слоем */
     var panelBottom by mutableFloatStateOf(0f)
-    /** где стоит золотая полоска (X корня) в режиме «за язычком»: центр последнего показанного язычка */
-    var lineX: Float? = null
 }
-
-/**
- * Где золотая полоска (Егор 06.11, по кадрам со стенда): на 1280×640 — над стыком плиток, и на язычке/шторке тоже там;
- * на остальных — в центре язычка (он упирается в рейку и съезжает правее стыка), и на строке статуса она остаётся там же.
- * Цель одна: полоска не прыгает между строкой, язычком и шторкой.
- */
-internal fun notifLineAtSeam(w: Int, h: Int) = w == 1280 && h == 640
 
 /**
  * Язычок и шторка: панель цвета строки статуса, растущая из её нижнего края с вогнутыми «ушами» сверху ([NotchShape]).
@@ -150,10 +141,8 @@ fun NotificationsOverlay() {
         if (big.left - area.left > s.g) big.left - s.g / 2f else big.right + s.g / 2f
     } else area.center.x
     val dragThr = px(30f).toFloat()
-    val ear0 = px(32f)
-    val atSeam = notifLineAtSeam(s.w, s.h)
-    // до первого язычка — там, где встал бы самый узкий язычок
-    val fallbackX = max(centerX, area.left + (NotifGeom.tongueWidth(s.t, Math.round(area.width), ear0, s.g).first + 2 * ear0) / 2f)
+    // Полоска на любом разрешении над стыком (Егор 08.11): раньше так было только на 1280×640, на 1280×720 она стояла
+    // в центре язычка/шторки, а те упираются в край и съезжают правее стыка - полоска уезжала вместе с ними.
     // Строка статуса скрыта (Для разработчиков, Егор 07.11): полоски на строке нет, вместо неё от верха экрана висит чёлка -
     // та же панель, свёрнутая до 168x30 с полоской на нижнем крае. Язычок и шторка растут из неё (animateContentSize), а не
     // выезжают сверху; свернулись - снова чёлка. Непрочитанных нет - нет и чёлки.
@@ -163,7 +152,7 @@ fun NotificationsOverlay() {
     // и везде - не на тексте строки статуса (дата, значки, часы): на язычке и шторке полоска стоит там же, где на строке
     val busyX = if (notchMode) emptyList() else model.statusBusyX
     fun lineX(): Float = NotifGeom.lineAvoiding(
-        if (notchMode || atSeam) centerX else shown.lineX ?: fallbackX,
+        centerX,
         s.t / 2f, s.g.toFloat(), busyX, area.left, area.right,
     )
     val lineDx: () -> Int = { Math.round(lineX() - shown.panelCx) }
@@ -221,7 +210,6 @@ fun NotificationsOverlay() {
                             val x = Math.round(centerX - area.left - pl.width / 2f).coerceIn(0, max(0, constraints.maxWidth - pl.width))
                             shown.panelCx = area.left + x + pl.width / 2f
                             shown.panelBottom = topY + pl.height
-                            if (!inShade && !atSeam) shown.lineX = shown.panelCx
                             layout(constraints.maxWidth, pl.height) { pl.place(x, 0) }
                         }
                             .graphicsLayer { translationY = if (idle) 0f else -size.height * (1f - p.value) }
