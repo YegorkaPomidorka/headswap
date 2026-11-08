@@ -42,6 +42,8 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -86,16 +88,9 @@ private class Shown {
     var panelCx by mutableFloatStateOf(0f)
     /** нижний край панели (Y корня, без сдвига graphicsLayer): к нему в режиме чёлки прибита полоска отдельным слоем */
     var panelBottom by mutableFloatStateOf(0f)
-    /** где стоит золотая полоска (X корня) в режиме «за язычком»: центр последнего показанного язычка */
-    var lineX: Float? = null
+    /** X стыка плиток, последний раз виденный на главном: на экранах без стыка полоска стоит там же (Егор 08.11) */
+    var seamX: Float? = null
 }
-
-/**
- * Где золотая полоска (Егор 06.11, по кадрам со стенда): на 1280×640 — над стыком плиток, и на язычке/шторке тоже там;
- * на остальных — в центре язычка (он упирается в рейку и съезжает правее стыка), и на строке статуса она остаётся там же.
- * Цель одна: полоска не прыгает между строкой, язычком и шторкой.
- */
-internal fun notifLineAtSeam(w: Int, h: Int) = w == 1280 && h == 640
 
 /**
  * Язычок и шторка: панель цвета строки статуса, растущая из её нижнего края с вогнутыми «ушами» сверху ([NotchShape]).
@@ -107,6 +102,23 @@ internal fun notifLineAtSeam(w: Int, h: Int) = w == 1280 && h == 640
  */
 @Composable
 fun NotificationsOverlay() {
+    // Язычок и шторка - в своём масштабе: T не больше 2/15 высоты экрана. Низким широким экранам (1280x480, T 92 из таблицы)
+    // T лаунчера велик для панели поверх плиток, язычок занимал треть экрана (Егор 08.11). На 720/640/1080 почти без изменений.
+    val base = LocalMetrics.current
+    val bs = base.spec
+    val nt = min(bs.t, Math.round(bs.h * 2f / 15f))
+    val spec = if (nt >= bs.t) bs else {
+        val q = nt.toFloat() / bs.t
+        fun sc(v: Int) = max(1, Math.round(v * q))
+        LauncherSpec(bs.w, bs.h, nt, sc(bs.g), sc(bs.m), sc(bs.f1), sc(bs.f2), sc(bs.f3), bs.railSize)
+    }
+    val density = LocalDensity.current
+    val metrics = remember(spec, density) { if (spec === bs) base else LauncherMetrics(spec, density) }
+    CompositionLocalProvider(LocalMetrics provides metrics) { NotificationsOverlayBody(bs.statusBandH) }
+}
+
+@Composable
+private fun NotificationsOverlayBody(barBandH: Int) {
     val model = LauncherModel
     val repo = NotificationsRepo
     val area = model.areaRect
@@ -142,25 +154,28 @@ fun NotificationsOverlay() {
 
     val topY = model.statusBottom ?: area.top
     val ear = px(32f)
-    val barCy = (model.statusBottom ?: area.top) - s.statusBandH / 2f
-    // Егор 06.11: полоска и язычок — над стыком плиток верхнего ряда на главном (между музыкой и картой), а не по центру области.
-    // На других экранах со строкой статуса (настройки, вызовы) стыка нет — по центру.
+    val barCy = (model.statusBottom ?: area.top) - barBandH / 2f // полоса строки статуса - в масштабе лаунчера
+    // Полоска и язычок - над стыком плиток главного (между музыкой и картой), и на всех экранах в том же пикселе (Егор 08.11):
+    // в настройках, с картой на весь экран и т.п. X стыка запоминается с главного. Плитка на всю ширину - стыка нет (раньше
+    // за него принимался её правый край, и язычок со шторкой улетали вправо). Главного ещё не было - у левого края области.
     val big = model.bigTileRect
-    val centerX = if (model.area == Area.Home && big != null && big.width > 0f) {
-        if (big.left - area.left > s.g) big.left - s.g / 2f else big.right + s.g / 2f
-    } else area.center.x
+    val seam = if (model.area == Area.Home && big != null && big.width > 0f) {
+        NotifGeom.seamX(big.left, big.right, area.left, area.right, s.g.toFloat())
+    } else null
+    if (seam != null) shown.seamX = seam
+    val centerX = shown.seamX ?: (area.left + ear + NotifGeom.tongueWidth(s.t, Math.round(area.width), ear, s.g).first / 2f)
     val dragThr = px(30f).toFloat()
-    val ear0 = px(32f)
-    val atSeam = notifLineAtSeam(s.w, s.h)
-    // до первого язычка — там, где встал бы самый узкий язычок
-    val fallbackX = max(centerX, area.left + (NotifGeom.tongueWidth(s.t, Math.round(area.width), ear0, s.g).first + 2 * ear0) / 2f)
     // Строка статуса скрыта (Для разработчиков, Егор 07.11): полоски на строке нет, вместо неё от верха экрана висит чёлка -
     // та же панель, свёрнутая до 168x30 с полоской на нижнем крае. Язычок и шторка растут из неё (animateContentSize), а не
     // выезжают сверху; свернулись - снова чёлка. Непрочитанных нет - нет и чёлки.
-    // Полоска не двигается по X (Егор 07.11): чёлка висит над стыком плиток, и на язычке и шторке полоска стоит ровно там же,
-    // даже если сами они упёрлись в рейку и съехали.
+    // Полоска не двигается по X (Егор 07.11): чёлка висит над ней, и на язычке и шторке полоска стоит ровно там же.
     val notchMode = model.hideStatusBar && model.statusSlot && model.statusBottom == null
-    fun lineX(): Float = if (notchMode || atSeam) centerX else shown.lineX ?: fallbackX
+    // и везде - не на тексте строки статуса (дата, значки, часы): на язычке и шторке полоска стоит там же, где на строке
+    val busyX = if (notchMode) emptyList() else model.statusBusyX
+    fun lineX(): Float = NotifGeom.lineAvoiding(
+        centerX,
+        s.t / 2f, s.g.toFloat(), busyX, area.left, area.right,
+    )
     val lineDx: () -> Int = { Math.round(lineX() - shown.panelCx) }
     val idle = notchMode && liveItems.isNotEmpty()
     // содержимое язычка/шторки - только когда панель уже поехала (p > 0): первый кадр - чёлка, от неё и растёт
@@ -210,13 +225,12 @@ fun NotificationsOverlay() {
                     val (minW, maxW) = NotifGeom.tongueWidth(s.t, Math.round(area.width), ear, s.g)
                     val inShade = grown && (open || (shown.shade && !show))
                     Column(
-                        // по центру над стыком плиток, но не вылезая за область справа от рейки
+                        // по центру над полоской (стыком), не вылезая за область: широкая шторка упирается в рейку
                         Modifier.layout { measurable, constraints ->
                             val pl = measurable.measure(constraints.copy(minWidth = 0))
                             val x = Math.round(centerX - area.left - pl.width / 2f).coerceIn(0, max(0, constraints.maxWidth - pl.width))
                             shown.panelCx = area.left + x + pl.width / 2f
                             shown.panelBottom = topY + pl.height
-                            if (!inShade && !atSeam) shown.lineX = shown.panelCx
                             layout(constraints.maxWidth, pl.height) { pl.place(x, 0) }
                         }
                             .graphicsLayer { translationY = if (idle) 0f else -size.height * (1f - p.value) }
@@ -285,7 +299,8 @@ private fun TongueBody(item: NotifItem, minW: Int, maxW: Int, dragThr: Float, li
         onTap = { repo.openShade(item.key) },
     ) {
         Row(
-            Modifier.heightIn(min = m.dp(px(128f))).padding(start = m.dp(px(36f)), end = m.dp(px(44f)), top = m.dp(px(18f)), bottom = m.dp(px(40f))),
+            Modifier.heightIn(min = m.dp(px(128f))).padding(start = m.dp(px(36f)), end = m.dp(px(44f)), top = m.dp(px(18f)), bottom = m.dp(px(58f))),
+            // снизу 58: полоска 14..22 от края и воздух над ней, иначе вторая строка текста ложится прямо на полоску (Егор 08.11)
             verticalAlignment = Alignment.CenterVertically,
         ) {
             NotifAvatar(item, px(72f))

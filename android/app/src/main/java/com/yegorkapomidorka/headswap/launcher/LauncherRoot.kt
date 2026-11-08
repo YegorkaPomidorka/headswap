@@ -22,6 +22,9 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -260,11 +263,18 @@ fun StatusBar(title: String? = null, showNet: Boolean = true) {
         // строка скрыта (Для разработчиков): полосы и значков нет, остаётся только заголовок экрана; чёлка уведомлений - от верха экрана
         DisposableEffect(Unit) { model.statusBottom = null; model.statusSlot = true; onDispose { model.statusSlot = false } }
         if (title != null) Row(Modifier.fillMaxWidth().height(m.dp(s.statusH)), verticalAlignment = Alignment.CenterVertically) {
-            Txt(title, s.fs, Modifier.weight(1f), color = Pal.TEXT, weight = FontWeight.SemiBold)
+            Txt(title, s.statusFs, Modifier.weight(1f), color = Pal.TEXT, weight = FontWeight.SemiBold)
         }
         return
     }
-    DisposableEffect(Unit) { onDispose { model.statusBottom = null } }
+    DisposableEffect(Unit) { onDispose { model.statusBottom = null; model.statusBusyX = emptyList() } }
+    // где на строке текст: полоска уведомлений встаёт над стыком плиток и наезжала на дату (Vezel, 08.11)
+    var timeX by remember { mutableStateOf<ClosedFloatingPointRange<Float>?>(null) }
+    var iconsX by remember { mutableStateOf<ClosedFloatingPointRange<Float>?>(null) }
+    var titleX by remember { mutableStateOf<ClosedFloatingPointRange<Float>?>(null) }
+    LaunchedEffect(timeX, iconsX, titleX) { model.statusBusyX = listOfNotNull(timeX, titleX, iconsX) }
+    fun Modifier.busy(set: (ClosedFloatingPointRange<Float>) -> Unit) =
+        onGloballyPositioned { val b = it.boundsInRoot(); set(b.left..b.right) }
     Row(
         Modifier.fillMaxWidth().height(m.dp(s.statusH))
             .onGloballyPositioned { model.statusBottom = it.boundsInRoot().top - s.g8 + s.statusBandH }
@@ -280,12 +290,15 @@ fun StatusBar(title: String? = null, showNet: Boolean = true) {
     ) {
         // в узкой рейке часов нет: время слева, прижато к краю (перед заголовком, если он есть)
         if (s.clockInStatus) {
-            Txt(st.time, s.fs, color = Pal.TEXT, weight = FontWeight.SemiBold, mono = true)
+            Txt(st.time, s.statusFs, Modifier.busy { timeX = it }, color = Pal.TEXT, weight = FontWeight.SemiBold, mono = true)
             if (title == null) Spacer(Modifier.weight(1f))
         }
         // заголовок экрана у начала (слева; в RTL справа), статус у конца; сам ряд значков всегда слева направо (создан внутри Ltr)
-        if (title != null) Txt(title, s.fs, Modifier.weight(1f), color = Pal.TEXT, weight = FontWeight.SemiBold)
-        Ltr { StatusIcons(st, showNet) }
+        // ширину самого текста заголовка - в занятое: на экранах без стыка (настройки) полоска уведомлений встаёт к левому краю
+        if (title != null) Box(Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
+            Txt(title, s.statusFs, Modifier.busy { titleX = it }, color = Pal.TEXT, weight = FontWeight.SemiBold)
+        }
+        Ltr { Box(Modifier.busy { iconsX = it }) { StatusIcons(st, showNet) } }
     }
 }
 
@@ -295,17 +308,17 @@ private fun StatusIcons(st: StatusInfo, showNet: Boolean) {
     val m = LocalMetrics.current
     val s = m.spec
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(m.dp(s.g))) {
-        Txt(st.date, s.fs, color = Pal.SEC2)
-        SvgIcon(Ico.BT, s.fs, if (st.bluetooth) Pal.SEC2 else Pal.SEC2.copy(alpha = 0.3f))
-        SvgIcon(Ico.WIFI, s.fs, if (st.wifi) Pal.SEC2 else Pal.SEC2.copy(alpha = 0.3f))
+        Txt(st.date, s.statusFs, color = Pal.SEC2)
+        SvgIcon(Ico.BT, s.statusFs, if (st.bluetooth) Pal.SEC2 else Pal.SEC2.copy(alpha = 0.3f))
+        SvgIcon(Ico.WIFI, s.statusFs, if (st.wifi) Pal.SEC2 else Pal.SEC2.copy(alpha = 0.3f))
         // сеть с уровнем сигнала - здесь, рядом с Wi-Fi, а не в рейке
         if (showNet && st.signal >= 0) Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(m.dp(s.g4))) {
-            VectorIcon(VIco.signal(st.signal), 24f, s.fs, Pal.SEC2)
-            Txt(st.net, s.fs, color = Pal.SEC2)
+            VectorIcon(VIco.signal(st.signal), 24f, s.statusFs, Pal.SEC2)
+            Txt(st.net, s.statusFs, color = Pal.SEC2)
         }
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(m.dp(s.g4))) {
-            SvgIcon(Ico.VOLUME, s.fs, Pal.SEC2)
-            Txt(st.volume.toString(), s.fs, color = Pal.SEC2)
+            SvgIcon(Ico.VOLUME, s.statusFs, Pal.SEC2)
+            Txt(st.volume.toString(), s.statusFs, color = Pal.SEC2)
         }
     }
 }

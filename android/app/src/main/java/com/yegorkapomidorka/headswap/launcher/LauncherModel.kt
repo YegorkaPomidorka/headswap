@@ -118,6 +118,8 @@ internal object LauncherModel {
     var navCardRect by mutableStateOf<Rect?>(null)
     /** Нижний край сплошной строки статуса в координатах корня; null - на этом экране строки нет (оверлей уведомлений вешается на верх области). */
     var statusBottom by mutableStateOf<Float?>(null)
+    /** Что занято текстом на строке статуса (дата и значки, часы в узкой рейке) - [left, right] в координатах корня; полоска уведомлений их объезжает. */
+    var statusBusyX by mutableStateOf<List<ClosedFloatingPointRange<Float>>>(emptyList())
     /** «Скрыть строку статуса» (Для разработчиков): полосы нет, уведомления висят чёлкой от верхнего края ([NotificationsOverlay]). */
     var hideStatusBar by mutableStateOf(false)
     /** На экране стоит скрытая строка статуса: там, где была бы полоска, висит чёлка уведомлений. */
