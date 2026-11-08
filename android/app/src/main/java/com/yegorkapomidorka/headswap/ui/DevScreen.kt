@@ -148,6 +148,9 @@ class DevScreen(host: MainActivity) : Screen(host) {
             lp(WRAP, WRAP).margins(c, 8, 2, 8, 0),
         )
         refreshTouchDecimation()
+        body.addView(
+            group(listOf(row(c.getString(R.string.dev_volume_swipe_title), c.getString(R.string.dev_volume_swipe_sub), aa.volumeSwipe) { aa.volumeSwipe = it })),
+        )
 
         body.addView(c.sectionTitle(c.getString(R.string.dev_section_dup_down)))
         for (m in DupDownFilter.values()) {

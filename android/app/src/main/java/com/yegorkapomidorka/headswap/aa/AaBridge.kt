@@ -14,6 +14,8 @@ interface DesktopMedia {
     fun isPlaying(): Boolean
     fun pause()
     fun resume()
+    /** Громкость медиа телефона на steps шагов (+ громче); вернуть новый уровень для лога. */
+    fun adjustVolume(steps: Int): String = "нет"
 }
 
 /** Что мост требует от CarLife-стороны (реализует CarLifeSession). */
@@ -434,6 +436,22 @@ class AaBridgeCore(
     /** Прореживание MOVE ([TouchDecimation]) стоит перед пейсером и прямой отправкой. */
     @Volatile var touchDecimationProvider: () -> TouchDecimation = { TouchDecimation.DEFAULT }
     private val touchDecimator = TouchDecimator { a, x, y, px, py -> routeTouch(a, x, y, px, py) }
+
+    /** Рабочий стол: громкость двумя пальцами у правого края (настройка; на Vezel всегда). */
+    @Volatile var volumeSwipeProvider: () -> Boolean = { false }
+    private val volumeSwipe = VolumeSwipe(
+        onCancel = {
+            log("BRIDGE тач: два пальца у правого края - жест громкости, касание отменяю", true)
+            touchDecimator.reset()
+            touchPacer.reset()
+            dispatchTouch(3, 0, 0, 0, 0)
+        },
+        onStep = { steps ->
+            val media = desktopMedia
+            if (media == null) log("BRIDGE громкость ${if (steps > 0) "+" else ""}$steps: плеера рабочего стола нет", true)
+            else log("BRIDGE громкость ${if (steps > 0) "+" else ""}$steps -> ${media.adjustVolume(steps)}", true)
+        },
+    )
     @Volatile private var touchDecimationLogged = 1
 
     /** Режим фильтра повторного DOWN без UP ([DupDownFilter]), читается на каждое касание. */
@@ -1024,6 +1042,7 @@ class AaBridgeCore(
         if (desktopInputEnabled) {
             touchDecimator.reset()
             touchPacer.reset()
+            volumeSwipe.reset()
         }
         synchronized(touchLock) {
             if (desktopInputEnabled && fingers.isNotEmpty()) peer?.let { sendFingers(it, 3, 0, "CANCEL") }
@@ -1055,6 +1074,10 @@ class AaBridgeCore(
      * [VideoMode.mapTouch] (без margin-ов 1:1). Один палец уходит в AA так же, как до мультитача (id 0, action_index 0).
      */
     fun onCarlifeTouch(action: Int, x: Int, y: Int, px: Int = 0, py: Int = 0) {
+        if (desktopInputEnabled) {
+            val g = videoMode
+            if (volumeSwipe.onTouch(action, x, y, px, py, g.outW, g.outH, huHondaVezel || volumeSwipeProvider())) return
+        }
         if (desktopInputEnabled && action and 0xFF == 3) {
             // Discard delayed MOVE events instead of replaying them into an already cancelled gesture.
             touchDecimator.reset()

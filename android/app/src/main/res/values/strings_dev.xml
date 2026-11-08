@@ -24,6 +24,8 @@
     <string name="dev_voice_chunk_note">Assistant replies and navigation prompts. Auto: 1024 B on VW CNS2 Delphi, otherwise as AA sends it</string>
     <string name="dev_section_tts_preroll">Silence before prompt (experimental)</string>
     <string name="dev_tts_preroll_note">Zeros after the prompt starts, so the head unit can open the audio path. Auto: 400 ms on VW</string>
+    <string name="dev_volume_swipe_title">Two-finger volume</string>
+    <string name="dev_volume_swipe_sub">Desktop: two fingers at the right edge, up is louder, down is quieter. Always on for Honda Vezel.</string>
     <string name="dev_section_touch_decimation">Touch decimation (experimental)</string>
     <string name="dev_touch_decimation_note">Skip every second MOVE: the head unit sends up to ~70 events per second, video runs at up to 30 fps. The last point before the finger lifts is never lost.</string>
     <string name="dev_section_dup_down">Double touch from head unit</string>

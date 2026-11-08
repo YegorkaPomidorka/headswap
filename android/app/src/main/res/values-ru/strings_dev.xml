@@ -23,6 +23,8 @@
     <string name="dev_voice_chunk_note">Речь ассистента и подсказки навигатора. Авто: 1024 Б на VW CNS2 Delphi, иначе как отдаёт AA</string>
     <string name="dev_section_tts_preroll">Тишина перед подсказкой (эксперимент)</string>
     <string name="dev_tts_preroll_note">Нули после начала подсказки, ГУ успевает открыть звук. Авто: 400 мс на VW</string>
+    <string name="dev_volume_swipe_title">Громкость двумя пальцами</string>
+    <string name="dev_volume_swipe_sub">Рабочий стол: два пальца у правого края, вверх — громче, вниз — тише. На Honda Vezel включено всегда.</string>
     <string name="dev_section_touch_decimation">Прореживание тача (эксперимент)</string>
     <string name="dev_touch_decimation_note">Пропускать каждый второй MOVE: ГУ шлёт до ~70 событий в секунду, видео до 30 к/с. Последняя точка перед отпусканием пальца не теряется.</string>
     <string name="dev_section_dup_down">Двойное касание от ГУ</string>
