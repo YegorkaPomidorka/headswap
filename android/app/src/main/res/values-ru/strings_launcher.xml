@@ -78,6 +78,8 @@
     <string name="l_contacts">Контакты</string>
     <string name="l_calls_empty">Вызовов нет</string>
     <string name="l_contacts_empty">Контактов нет</string>
+    <string name="l_favorites">Избранные</string>
+    <string name="l_favorites_empty">Избранных нет. Отметьте контакты звёздочкой в телефонной книге</string>
     <string name="l_calls_no_permission">Разрешите доступ к звонкам и контактам на телефоне</string>
 
     <string name="l_set_theme">Тема</string>
