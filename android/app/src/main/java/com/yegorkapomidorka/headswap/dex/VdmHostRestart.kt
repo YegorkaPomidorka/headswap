@@ -52,7 +52,9 @@ internal object VdmHostRestart {
         if (!busy.compareAndSet(false, true)) return
         pendingUntil = now + PENDING_MS
         thread(name = "vdm-restart", isDaemon = true) {
-            try { restart(ctx) } finally { busy.set(false); pendingUntil = 0 }
+            val ok = try { restart(ctx) } finally { busy.set(false); pendingUntil = 0 }
+            // После busy=false: tcpip перезапускает adbd, хост умрёт ещё раз и должен подняться обычным путём.
+            if (ok) pinViaAdbd(ctx)
         }
     }
 
@@ -65,23 +67,51 @@ internal object VdmHostRestart {
         else -> null
     }
 
-    private fun restart(ctx: Context) {
+    private fun restart(ctx: Context): Boolean {
         val started = SystemClock.elapsedRealtime()
         for ((attempt, delay) in RETRY_DELAYS_MS.withIndex()) {
             Thread.sleep(delay) // adbd поднимается заново после убийства группы
-            blocker(ctx)?.let { return log("перезапуск хоста прерван: $it") }
-            if (VdmHostLink.connected) return
+            blocker(ctx)?.let { log("перезапуск хоста прерван: $it"); return false }
+            if (VdmHostLink.connected) return true
             val outcome = runCatching { launch(ctx) }
             outcome.exceptionOrNull()?.let { e ->
                 val reason = (e as? AdbAccessException)?.reason?.name ?: "${e.javaClass.simpleName}: ${e.message}"
                 log("перезапуск хоста, попытка ${attempt + 1}: $reason")
             }
             if (outcome.isSuccess && waitConnected()) {
-                return log("хост перезапущен за ${SystemClock.elapsedRealtime() - started} мс (попытка ${attempt + 1})")
+                log("хост перезапущен за ${SystemClock.elapsedRealtime() - started} мс (попытка ${attempt + 1})")
+                return true
             }
         }
         synchronized(failed) { failed.addLast(SystemClock.elapsedRealtime()) }
         log("перезапуск хоста не удался: новые экраны пойдут обычным путём")
+        return false
+    }
+
+    private val tcpipTried = AtomicBoolean(false)
+
+    /**
+     * h768test2: setprop service.adb.tcp.port из-под shell на Samsung A17 запрещён, поэтому просим сам adbd -
+     * сервис `tcpip:5555`, как `adb tcpip 5555`. adbd ставит свойство и перезапускается (хост умрёт, поднимется
+     * через Wi-Fi). Делаем только при Wi-Fi и один раз за процесс, чтобы не зациклиться, если свойство не держится.
+     */
+    private fun pinViaAdbd(ctx: Context) {
+        if (tcpPortProperty() == FIXED_TCP_PORT.toString()) return
+        if (!PhoneAdb.wifiAvailable(ctx)) return
+        if (!tcpipTried.compareAndSet(false, true)) return
+        val port = PhoneActivationState(ctx).connectPort
+        if (port !in 1..65535) return log("tcpip: нет порта")
+        val reply = runCatching {
+            PhoneAdb.session(ctx, LocalAddressPolicy.LOOPBACK, port) { adb ->
+                adb.open("tcpip:$FIXED_TCP_PORT").use { stream ->
+                    runCatching { stream.source.readUtf8Line() }.getOrNull()?.trim().orEmpty()
+                }
+            }
+        }
+        log("tcpip:$FIXED_TCP_PORT через порт $port: ${reply.getOrNull()?.ifEmpty { "без ответа" }
+            ?: reply.exceptionOrNull()?.let { (it as? AdbAccessException)?.reason?.name ?: it.javaClass.simpleName }}")
+        Thread.sleep(3_000)
+        log("tcpip: tcp.port=${tcpPortProperty() ?: "нет"}")
     }
 
     /**
