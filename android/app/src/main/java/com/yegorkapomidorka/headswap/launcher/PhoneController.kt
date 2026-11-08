@@ -58,7 +58,10 @@ internal object PhoneController {
     /** Раз в пару секунд из корня лаунчера: подписка на звонки, таймер разговора, перечитывание журнала. */
     fun tick(ctx: Context) {
         logPermitted = has(ctx, Manifest.permission.READ_CALL_LOG)
-        contactsPermitted = has(ctx, Manifest.permission.READ_CONTACTS)
+        val contactsNow = has(ctx, Manifest.permission.READ_CONTACTS)
+        // разрешение дали, пока экран открыт: без перечитывания вкладки остались бы пустыми до следующего входа
+        if (contactsNow && !contactsPermitted) io.execute { reloadContacts(ctx) }
+        contactsPermitted = contactsNow
         if (listener == null && (Build.VERSION.SDK_INT < Build.VERSION_CODES.S || has(ctx, Manifest.permission.READ_PHONE_STATE))) {
             register(ctx)
         }
