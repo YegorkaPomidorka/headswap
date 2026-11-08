@@ -194,7 +194,8 @@ class RadioRow(val ctx: Context, title: String, sub: String, val onPick: () -> U
         isClickable = false
         isFocusable = false
     }
-    private val titleView = ctx.text(title, 17f, 500)
+    /** Край по направлению экрана, не по тексту: иначе «العربية» в русском списке языков уезжает вправо. */
+    private val titleView = ctx.text(title, 17f, 500).apply { textAlignment = View.TEXT_ALIGNMENT_VIEW_START }
     /** Пустой подзаголовок скрыт: иначе пустая строка сдвигает заголовок вверх (выбор языка). */
     private val subView = ctx.text(sub, 14f, 400, ctx.clr(R.color.on2)).apply {
         visibility = if (sub.isBlank()) View.GONE else View.VISIBLE
