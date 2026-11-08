@@ -35,8 +35,6 @@ object PressEasing {
     val DROP = CubicBezierEasing(0.3f, 0f, 0.2f, 1f)
     /** «Назад»: CSS ease-in-out. */
     val IN_OUT = CubicBezierEasing(0.42f, 0f, 0.58f, 1f)
-    /** Стрелка навигации: cubic-bezier(.15,.85,.25,1). */
-    val NAV = CubicBezierEasing(0.15f, 0.85f, 0.25f, 1f)
 }
 
 /**
@@ -59,29 +57,6 @@ class PressAnim(private val scope: CoroutineScope, private val ms: Int) {
 fun rememberPressAnim(ms: Int): PressAnim {
     val scope = rememberCoroutineScope()
     return remember(ms) { PressAnim(scope, ms) }
-}
-
-/** Стрелка навигации: rot += 720 + 45 * (1..7), 1,6 с, cubic-bezier(.15,.85,.25,1); всегда не та сторона, где стояла. */
-class NavSpin(private val scope: CoroutineScope) {
-    private val anim = Animatable(0f)
-    private var target = 0f
-    val degrees: Float get() = anim.value
-    fun play() {
-        if (!LauncherModel.animations) return
-        target = NavSpinLogic.next(target, (1..7).random())
-        scope.launch { anim.animateTo(target, tween(1600, easing = PressEasing.NAV)) }
-    }
-}
-
-@Composable
-fun rememberNavSpin(): NavSpin {
-    val scope = rememberCoroutineScope()
-    return remember { NavSpin(scope) }
-}
-
-internal object NavSpinLogic {
-    /** Следующий угол: два оборота плюс 1..7 шагов по 45 градусов. */
-    fun next(rot: Float, steps: Int): Float = rot + 720f + 45f * steps.coerceIn(1, 7)
 }
 
 /** Значение ключевых кадров «Назад»: шеврон улетает влево и гаснет к 40%, на 41% появляется справа и возвращается. */

@@ -30,7 +30,6 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.platform.LocalDensity
@@ -205,20 +204,16 @@ private fun Rail() {
             // «Вид карточки» в рейке; в ленте с обычной рейкой - стеклянная кнопка в углу большой плашки (HomeTileButtons)
             if (s.cardViewInRail) CardViewButton(s.rb, s.ric, Color.Transparent, Pal.SEC2)
         }
-        // стрелка навигации: 2 оборота и стоп в случайной другой стороне света
-        val spin = rememberNavSpin()
         Pressable(
             Modifier.width(m.dp(s.rail)).height(m.dp(s.navH))
                 .clip(RoundedCornerShape(topEnd = m.dp(s.radius))).background(accent),
             description = stringResource(R.string.l_navigation), onTap = { LauncherActions.openNavigator() },
-            onPress = spin::play,
             // на золоте золотая рамка не видна
             focusShape = RoundedCornerShape(topEnd = m.dp(s.radius)), ringColor = Color.White,
         ) { pressed ->
             if (pressed) Box(Modifier.matchParentSize().background(Color(0x33000000)))
             Box(Modifier.matchParentSize(), contentAlignment = Alignment.Center) {
-                SvgIcon(Ico.NAV, s.icBig, Pal.onAccent(accent), fill = true,
-                    modifier = Modifier.graphicsLayer { rotationZ = spin.degrees })
+                SvgIcon(Ico.NAV, s.icBig, Pal.onAccent(accent), fill = true)
             }
         }
     }
