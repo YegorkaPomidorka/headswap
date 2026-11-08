@@ -69,6 +69,16 @@ internal object LauncherModel {
     var autoplayedDisplay = -1
     /** Светлая ли палитра сейчас: выбор «Тема» и, для «Авто», режим фар машины. */
     val lightTheme: Boolean get() = ThemeChoice.light(theme, huTheme)
+    /** Свои цвета «Вид › Цвета» ([ColorSet]): ночные - для тёмной палитры, дневные - для светлой. */
+    var nightColors by mutableStateOf(ColorSet.NIGHT)
+    var dayColors by mutableStateOf(ColorSet.DAY)
+    /** На экране «Цвета» настраиваются дневные (иначе ночные); пока он открыт, весь стол показывает этот набор. */
+    var colorsEditDay by mutableStateOf(false)
+    private val colorsOpen: Boolean get() = area == Area.Settings && settingsPage == SettingsPage.COLORS
+    /** Светлая ли палитра на экране: на «Цветах» - редактируемый набор, иначе [lightTheme]. */
+    val shownLight: Boolean get() = if (colorsOpen) colorsEditDay else lightTheme
+    val palette: LauncherPalette
+        get() = shownLight.let { LauncherColors.palette(it, if (it) dayColors else nightColors) }
     /** Большая плашка главного; малая - [smallView]; раскладка - [homeLayout]. Действуют через [tiles]. */
     var cardView by mutableStateOf(CardView.NAVIGATOR)
     var smallView by mutableStateOf(CardView.MUSIC)
@@ -161,6 +171,8 @@ internal object LauncherModel {
         appCtx = ctx.applicationContext
         prefs = LauncherPrefs(appCtx)
         theme = prefs.theme
+        nightColors = prefs.nightColors
+        dayColors = prefs.dayColors
         railSize = prefs.railSize
         mapLeft = prefs.mapLeft
         animations = prefs.animations
@@ -236,6 +248,12 @@ internal object LauncherModel {
     fun removeApp(ref: AppRef) { apps = AppList.remove(apps, ref).also { prefs.apps = it } }
 
     fun chooseTheme(value: ThemeChoice) { theme = value; prefs.theme = value }
+    /** Слайдер «Цвета» двигается: только состояние, без записи; запись - [saveColors] по отпусканию. */
+    fun editColors(set: ColorSet) { if (colorsEditDay) dayColors = set else nightColors = set }
+    fun saveColors() { prefs.nightColors = nightColors; prefs.dayColors = dayColors }
+    fun resetColors() { editColors(if (colorsEditDay) ColorSet.DAY else ColorSet.NIGHT); saveColors() }
+    /** Открыть «Цвета»: сначала настраивается тот набор, что сейчас на экране. */
+    fun openColors() { colorsEditDay = lightTheme; settingsPage = SettingsPage.COLORS }
     fun chooseRailSize(value: RailSize) { railSize = value; prefs.railSize = value }
     fun chooseMapLeft(left: Boolean) { mapLeft = left; prefs.mapLeft = left }
     fun chooseAnimations(on: Boolean) { animations = on; prefs.animations = on }

@@ -2,7 +2,7 @@ package com.yegorkapomidorka.headswap.launcher
 
 import android.content.Context
 
-/** Тема лаунчера: тёмное или светлое золото; «Авто» - по режиму фар машины (CHANGE_MD_THEME от ГУ). */
+/** Тема лаунчера: тёмная или светлая палитра (цвета - «Вид › Цвета»); «Авто» - по режиму фар машины (CHANGE_MD_THEME от ГУ). */
 enum class ThemeChoice {
     DARK, LIGHT, AUTO;
 
@@ -42,6 +42,15 @@ class LauncherPrefs(context: Context) {
     var theme: ThemeChoice
         get() = ThemeChoice.restore(prefs.getString("theme", null))
         set(value) { prefs.edit().putString("theme", value.name).apply() }
+
+    /** Свои цвета «Вид › Цвета»: «акцент,оттенок фона,насыщенность фона». */
+    var nightColors: ColorSet
+        get() = ColorSet.decode(prefs.getString("colors_night", null), ColorSet.NIGHT)
+        set(value) { prefs.edit().putString("colors_night", value.encode()).apply() }
+
+    var dayColors: ColorSet
+        get() = ColorSet.decode(prefs.getString("colors_day", null), ColorSet.DAY)
+        set(value) { prefs.edit().putString("colors_day", value.encode()).apply() }
 
     var railSize: RailSize
         get() = RailSize.restore(prefs.getString("rail_size", null))

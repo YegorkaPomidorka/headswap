@@ -83,8 +83,8 @@ fun LauncherRoot(connected: Boolean) {
         val railSize = model.railSize
         val spec = remember(w, h, railSize) { LauncherSpecs.forSize(w, h, railSize) }
         val metrics = remember(spec, density) { LauncherMetrics(spec, density) }
-        val pal = if (model.lightTheme) Palettes.LIGHT else Palettes.DARK
-        CompositionLocalProvider(LocalMetrics provides metrics, LocalAccent provides Pal.GOLD, LocalPalette provides pal) {
+        val pal = model.palette
+        CompositionLocalProvider(LocalMetrics provides metrics, LocalAccent provides pal.accent, LocalPalette provides pal) {
             Box(Modifier.fillMaxSize().launcherBackground(pal)) {
                 if (!connected) {
                     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {

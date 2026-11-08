@@ -3,6 +3,10 @@ package com.yegorkapomidorka.headswap.launcher
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -57,7 +61,8 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /** Раздел настроек (колонка слева). ABOUT - «О приложении», вложен в «Система»: своей кнопки нет, подсвечена «Система». */
-enum class SettingsPage { LOOK, NAVIGATOR, MUSIC, HOME, SYSTEM, ABOUT }
+/** Разделы настроек; [COLORS] и [ABOUT] - вложенные страницы «Вида» и «Системы», своей кнопки слева у них нет. */
+enum class SettingsPage { LOOK, NAVIGATOR, MUSIC, HOME, SYSTEM, ABOUT, COLORS }
 
 /** Навигаторы раздела «Навигатор», плитки 2x2 в порядке макета. */
 private val NAV_TILES = listOf(
@@ -128,18 +133,36 @@ fun LauncherSettingsScreen() {
                 Box(cell(row).fillMaxWidth(), propagateMinConstraints = true) { content() }
             Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(m.dp(s.g))) {
                 Box(Modifier.width(m.dp(d.catW)).fillMaxHeight()) {
-                    for ((i, page) in SettingsPage.entries.filter { it != SettingsPage.ABOUT }.withIndex()) {
-                        val selected = model.settingsPage == page || (page == SettingsPage.SYSTEM && model.settingsPage == SettingsPage.ABOUT)
+                    for ((i, page) in SettingsPage.entries.filter { it != SettingsPage.ABOUT && it != SettingsPage.COLORS }.withIndex()) {
+                        val selected = model.settingsPage == page || (page == SettingsPage.SYSTEM && model.settingsPage == SettingsPage.ABOUT) ||
+                            (page == SettingsPage.LOOK && model.settingsPage == SettingsPage.COLORS)
                         Placed(i) { CategoryButton(page, selected, d, Modifier) }
                     }
                 }
                 Box(Modifier.weight(1f).fillMaxHeight()) {
                     when (model.settingsPage) {
                         SettingsPage.LOOK -> {
-                            ThemeCard(d, cell(0, 2).fillMaxWidth())
+                            ThemeCard(d, cell(0).fillMaxWidth())
+                            Placed(1) { ColorsLinkCard(d, Modifier) }
                             RailSizeCard(d, cell(2, 2).fillMaxWidth())
                             SwitchCard(stringResource(R.string.l_s_anim), model.animations, d, cell(4).fillMaxWidth()) {
                                 model.chooseAnimations(it)
+                            }
+                        }
+                        SettingsPage.COLORS -> {
+                            ColorsModeCard(d, cell(0).fillMaxWidth())
+                            val set = if (model.colorsEditDay) model.dayColors else model.nightColors
+                            val light = model.colorsEditDay
+                            ColorSliderCard(stringResource(R.string.l_s_colors_accent), set.accentHue, 360, d, cell(1).fillMaxWidth(),
+                                hueTrack(light, accent = true)) { model.editColors(set.copy(accentHue = it)) }
+                            ColorSliderCard(stringResource(R.string.l_s_colors_bg_hue), set.bgHue, 360, d, cell(2).fillMaxWidth(),
+                                hueTrack(light, accent = false)) { model.editColors(set.copy(bgHue = it)) }
+                            ColorSliderCard(stringResource(R.string.l_s_colors_bg_sat), set.bgSat, 100, d, cell(3).fillMaxWidth(),
+                                satTrack(light, set.bgHue)) { model.editColors(set.copy(bgSat = it)) }
+                            Card(cell(4).fillMaxWidth()) {
+                                Box(Modifier.fillMaxSize().padding(start = m.dp(d.padStart), end = m.dp(d.padEnd)), contentAlignment = Alignment.CenterStart) {
+                                    Txt(stringResource(R.string.l_s_colors_hint), d.sub, color = Pal.SEC, maxLines = 2, ellipsis = false)
+                                }
                             }
                         }
                         SettingsPage.NAVIGATOR -> {
@@ -227,7 +250,7 @@ private fun CategoryButton(page: SettingsPage, selected: Boolean, d: SettingsDim
     val m = LocalMetrics.current
     val s = m.spec
     val label = stringResource(when (page) {
-        SettingsPage.LOOK -> R.string.l_sec_look
+        SettingsPage.LOOK, SettingsPage.COLORS -> R.string.l_sec_look
         SettingsPage.NAVIGATOR -> R.string.l_sec_nav
         SettingsPage.MUSIC -> R.string.l_sec_music
         SettingsPage.HOME -> R.string.l_sec_home
@@ -238,7 +261,7 @@ private fun CategoryButton(page: SettingsPage, selected: Boolean, d: SettingsDim
         Row(Modifier.fillMaxSize().padding(horizontal = m.dp(d.padStart)), verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(m.dp(d.catGap))) {
             when (page) {
-                SettingsPage.LOOK -> VectorIcon(VIco.HALF_CIRCLE, 24f, d.catIcon, Pal.TEXT)
+                SettingsPage.LOOK, SettingsPage.COLORS -> VectorIcon(VIco.HALF_CIRCLE, 24f, d.catIcon, Pal.TEXT)
                 SettingsPage.NAVIGATOR -> SvgIcon(Ico.NAV, d.catIcon, Pal.TEXT, fill = true)
                 SettingsPage.MUSIC -> SvgIcon(Ico.MUSIC, d.catIcon, Pal.TEXT, stroke = 2f)
                 SettingsPage.HOME -> SvgIcon(Ico.LAYOUT, d.catIcon, Pal.TEXT, stroke = 2f)
@@ -276,33 +299,157 @@ private fun Card(modifier: Modifier, content: @Composable () -> Unit) {
     Box(modifier.clip(RoundedCornerShape(m.dp(m.spec.radius))).background(Pal.SURFACE)) { content() }
 }
 
-/** «Тема»: три пилюли строкой под названием и подпись одной строкой. 2 ряда. */
+/** «Тема»: название с подписью слева, три пилюли справа. 1 ряд (второй отдан «Цветам»). */
 @Composable
 private fun ThemeCard(d: SettingsDims, modifier: Modifier) {
     val m = LocalMetrics.current
     val s = m.spec
     val model = LauncherModel
     Card(modifier) {
-        Column(
-            Modifier.fillMaxSize().padding(start = m.dp(d.padStart), end = m.dp(d.padEnd), top = m.dp(d.padV), bottom = m.dp(d.padV)),
-            verticalArrangement = Arrangement.spacedBy(m.dp(s.g8), Alignment.CenterVertically),
-        ) {
-            Column(verticalArrangement = Arrangement.spacedBy(m.dp(4))) {
-                Txt(stringResource(R.string.l_s_theme), s.f2)
-                Txt(stringResource(R.string.l_s_theme_sub), d.sub, color = Pal.SEC, ellipsis = false)
+        Row(Modifier.fillMaxSize().padding(start = m.dp(d.padStart), end = m.dp(d.padEnd)), verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(m.dp(s.g))) {
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(m.dp(4))) {
+                Txt(stringResource(R.string.l_s_theme), s.f2, ellipsis = false)
+                Txt(stringResource(R.string.l_s_theme_sub), d.sub, color = Pal.SEC)
             }
-            Row(horizontalArrangement = Arrangement.spacedBy(m.dp(s.g8))) {
-                for ((choice, res) in listOf(ThemeChoice.DARK to R.string.l_s_theme_dark, ThemeChoice.LIGHT to R.string.l_s_theme_light,
-                    ThemeChoice.AUTO to R.string.l_s_theme_auto)) {
-                    val label = stringResource(res)
-                    OptionBox(model.theme == choice, Modifier.height(m.dp(d.ctl)), RoundedCornerShape(m.dp(d.ctl / 2)), label,
-                        unselected = LocalPalette.current.btnSet, onTap = { model.chooseTheme(choice) }) {
-                        Box(Modifier.fillMaxHeight().padding(horizontal = m.dp(d.pillPad)), contentAlignment = Alignment.Center) {
-                            Txt(label, s.f2, weight = FontWeight.SemiBold, ellipsis = false)
-                        }
-                    }
+            for ((choice, res) in listOf(ThemeChoice.DARK to R.string.l_s_theme_dark, ThemeChoice.LIGHT to R.string.l_s_theme_light,
+                ThemeChoice.AUTO to R.string.l_s_theme_auto)) {
+                val label = stringResource(res)
+                Pill(label, model.theme == choice, d) { model.chooseTheme(choice) }
+            }
+        }
+    }
+}
+
+/** Пилюля-вариант высотой с контрол ряда. */
+@Composable
+private fun Pill(label: String, selected: Boolean, d: SettingsDims, onTap: () -> Unit) {
+    val m = LocalMetrics.current
+    OptionBox(selected, Modifier.height(m.dp(d.ctl)), RoundedCornerShape(m.dp(d.ctl / 2)), label,
+        unselected = LocalPalette.current.btnSet, onTap = onTap) {
+        Box(Modifier.fillMaxHeight().padding(horizontal = m.dp(d.pillPad)), contentAlignment = Alignment.Center) {
+            Txt(label, m.spec.f2, weight = FontWeight.SemiBold, ellipsis = false)
+        }
+    }
+}
+
+/** «Цвета» в «Виде»: подпись, миниатюры ночного и дневного набора, шеврон; тап открывает [SettingsPage.COLORS]. */
+@Composable
+private fun ColorsLinkCard(d: SettingsDims, modifier: Modifier) {
+    val m = LocalMetrics.current
+    val s = m.spec
+    val model = LauncherModel
+    val label = stringResource(R.string.l_s_colors)
+    Pressable(modifier.clip(RoundedCornerShape(m.dp(s.radius))).background(Pal.SURFACE), description = label,
+        onTap = { model.openColors() }) { pressed ->
+        if (pressed) Box(Modifier.matchParentSize().background(Pal.SURFACE_PRESSED))
+        Row(Modifier.fillMaxSize().padding(start = m.dp(d.padStart), end = m.dp(d.padEnd)), verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(m.dp(s.g))) {
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(m.dp(4))) {
+                Txt(label, s.f2, ellipsis = false)
+                Txt(stringResource(R.string.l_s_colors_sub), d.sub, color = Pal.SEC)
+            }
+            ColorsSwatch(LauncherColors.palette(false, model.nightColors), d)
+            ColorsSwatch(LauncherColors.palette(true, model.dayColors), d)
+            SvgIcon(Ico.CHEV_R, d.catIcon, Pal.SEC, stroke = 2.6f)
+        }
+    }
+}
+
+/** Миниатюра набора: фон палитры и уголок акцента слева снизу, как кнопка навигации. */
+@Composable
+private fun ColorsSwatch(pal: LauncherPalette, d: SettingsDims) {
+    val m = LocalMetrics.current
+    val h = d.ctl * 6 / 10
+    Box(Modifier.width(m.dp(h * 16 / 9)).height(m.dp(h)).clip(RoundedCornerShape(m.dp(max(2, h / 6))))
+        .background(Brush.linearGradient(pal.bgStops.map { it.second }))
+        .border(m.dp(1), pal.sep, RoundedCornerShape(m.dp(max(2, h / 6))))) {
+        Box(Modifier.align(Alignment.BottomStart).width(m.dp(h * 16 / 9 / 4)).height(m.dp(h * 4 / 10)).background(pal.accent))
+    }
+}
+
+/** Строка «Цветов»: какой набор настраиваем (ночной / дневной) и «Сбросить» его к золоту. */
+@Composable
+private fun ColorsModeCard(d: SettingsDims, modifier: Modifier) {
+    val m = LocalMetrics.current
+    val s = m.spec
+    val model = LauncherModel
+    Card(modifier) {
+        Row(Modifier.fillMaxSize().padding(start = m.dp(d.padStart), end = m.dp(d.padEnd)), verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(m.dp(s.g8))) {
+            Pill(stringResource(R.string.l_s_colors_night), !model.colorsEditDay, d) { model.colorsEditDay = false }
+            Pill(stringResource(R.string.l_s_colors_day), model.colorsEditDay, d) { model.colorsEditDay = true }
+            Spacer(Modifier.weight(1f))
+            val reset = stringResource(R.string.l_s_colors_reset)
+            Pressable(Modifier.height(m.dp(d.ctl)).clip(RoundedCornerShape(m.dp(d.ctl / 2))).background(LocalPalette.current.btnSet),
+                description = reset, onTap = { model.resetColors() }) { pressed ->
+                if (pressed) Box(Modifier.matchParentSize().background(Pal.SURFACE_PRESSED))
+                Box(Modifier.fillMaxHeight().padding(horizontal = m.dp(d.pillPad)), contentAlignment = Alignment.Center) {
+                    Txt(reset, s.f2, weight = FontWeight.SemiBold, ellipsis = false)
                 }
             }
+        }
+    }
+}
+
+/** Радуга оттенков для слайдера: акцент - как он будет на экране, фон - приглушённый. */
+private fun hueTrack(light: Boolean, accent: Boolean): Brush = Brush.horizontalGradient(
+    (0..360 step 60).map { h ->
+        if (accent) LauncherColors.accent(light, h)
+        else Color.hsl((h % 360).toFloat(), if (light) 0.5f else 0.35f, if (light) 0.85f else 0.24f)
+    },
+)
+
+/** Насыщенность фона: от серого до цветного того же оттенка. */
+private fun satTrack(light: Boolean, hue: Int): Brush {
+    val l = if (light) 0.86f else 0.2f
+    return Brush.horizontalGradient(listOf(Color.hsl(hue.toFloat() % 360f, 0f, l), Color.hsl(hue.toFloat() % 360f, if (light) 0.6f else 0.45f, l)))
+}
+
+/**
+ * Карточка-слайдер «Цветов»: название слева, трек с градиентом и белая ручка справа. Тап ставит значение сразу,
+ * перетаскивание двигает; в настройки пишется по отпусканию ([LauncherModel.saveColors]).
+ */
+@Composable
+private fun ColorSliderCard(label: String, value: Int, top: Int, d: SettingsDims, modifier: Modifier, track: Brush, onChange: (Int) -> Unit) {
+    val m = LocalMetrics.current
+    val s = m.spec
+    Card(modifier) {
+        Row(Modifier.fillMaxSize().padding(start = m.dp(d.padStart), end = m.dp(d.padEnd)), verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(m.dp(s.g))) {
+            Txt(label, s.f2, Modifier.weight(0.34f), maxLines = 2, ellipsis = false)
+            ColorSlider(value, top, d, track, Modifier.weight(0.66f).fillMaxHeight(), onChange)
+        }
+    }
+}
+
+@Composable
+private fun ColorSlider(value: Int, top: Int, d: SettingsDims, track: Brush, modifier: Modifier, onChange: (Int) -> Unit) {
+    val m = LocalMetrics.current
+    val density = androidx.compose.ui.platform.LocalDensity.current
+    val knobDp = m.dp(d.knob)
+    val knobPx = with(density) { knobDp.toPx() }
+    val change by androidx.compose.runtime.rememberUpdatedState(onChange)
+    BoxWithConstraints(modifier) {
+        val w = constraints.maxWidth.toFloat()
+        val span = (w - knobPx).coerceAtLeast(1f)
+        fun at(x: Float) = (((x - knobPx / 2) / span).coerceIn(0f, 1f) * top).roundToInt()
+        Box(Modifier.fillMaxSize()
+            .pointerInput(top, span) {
+                detectTapGestures(onTap = { change(at(it.x)); LauncherModel.saveColors() })
+            }
+            .pointerInput(top, span) {
+                detectHorizontalDragGestures(
+                    onDragEnd = { LauncherModel.saveColors() },
+                    onDragCancel = { LauncherModel.saveColors() },
+                ) { c, _ -> c.consume(); change(at(c.position.x)) }
+            },
+        ) {
+            Box(Modifier.align(Alignment.CenterStart).padding(horizontal = knobDp / 2).fillMaxWidth().height(m.dp(d.trackH * 4 / 10))
+                .clip(RoundedCornerShape(m.dp(d.trackH / 5))).background(track))
+            val x = with(density) { (span * value / top.toFloat()).toDp() }
+            Box(Modifier.align(Alignment.CenterStart).offset(x = x).size(knobDp).clip(CircleShape).background(Pal.WHITE)
+                .border(m.dp(max(2, d.knob / 12)), Color(0x8C000000), CircleShape))
         }
     }
 }
@@ -619,12 +766,14 @@ private const val HOME_SHRINK = 0.87
 private fun RowScope.BigMiniCell(weight: Float, shape: RoundedCornerShape) {
     val m = LocalMetrics.current
     val k = m.spec.t / 96.0
-    Row(Modifier.weight(weight).fillMaxHeight().clip(shape).background(LocalAccent.current),
+    val accent = LocalAccent.current
+    val on = Pal.onAccent(accent)
+    Row(Modifier.weight(weight).fillMaxHeight().clip(shape).background(accent),
         horizontalArrangement = Arrangement.spacedBy(m.dp(max(1, (10 * k).roundToInt())), Alignment.CenterHorizontally),
         verticalAlignment = Alignment.CenterVertically) {
-        SvgIcon(Ico.NAV, (24 * k).roundToInt(), Pal.ON_GOLD, fill = true)
-        SvgIcon(Ico.VIDEO, (26 * k).roundToInt(), Pal.ON_GOLD, stroke = 2.4f)
-        SvgIcon(Ico.CLOCK, (24 * k).roundToInt(), Pal.ON_GOLD, stroke = 2.4f)
+        SvgIcon(Ico.NAV, (24 * k).roundToInt(), on, fill = true)
+        SvgIcon(Ico.VIDEO, (26 * k).roundToInt(), on, stroke = 2.4f)
+        SvgIcon(Ico.CLOCK, (24 * k).roundToInt(), on, stroke = 2.4f)
     }
 }
 
