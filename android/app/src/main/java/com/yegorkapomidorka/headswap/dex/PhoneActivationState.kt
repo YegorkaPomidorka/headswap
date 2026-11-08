@@ -14,6 +14,11 @@ class PhoneActivationState(context: Context) {
         get() = prefs.getBoolean("paired", false)
         set(value) { prefs.edit().putBoolean("paired", value).apply() }
 
+    /** Порт беспроводной отладки последней активации: перезапуск хоста пробует его первым (vdm5). */
+    var connectPort: Int
+        get() = prefs.getInt("connect_port", 0)
+        set(value) { prefs.edit().putInt("connect_port", value).commit() }
+
     val nonce: String? get() = prefs.getString("nonce", null)?.takeIf(PhoneActivationPolicy::isValidNonce)
     val startedMs: Long get() = prefs.getLong("started", 0)
 

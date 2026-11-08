@@ -239,6 +239,7 @@ object LogShare {
             appendLine("  размер пакета голоса: ${aa.voiceChunk.name}")
             appendLine("  тишина перед подсказкой: ${aa.ttsPreroll.name}")
             appendLine("  прореживание тача: ${aa.touchDecimation.name}")
+            appendLine("  двойное касание: ${aa.dupDownFilter.name}")
             appendLine("  мой автомобиль: ${aa.carPreset?.let { "${it.name}${if (aa.carSettings == it.settings) "" else ", настройки изменены вручную"}" } ?: "не выбрана"}")
             appendLine("  сертификат: ${aa.certSet}")
             appendLine("  микрофон: ${aa.micMode.label}, MODULE_STATUS VR: ${aa.micVrStatus}")

@@ -2,7 +2,7 @@ package com.yegorkapomidorka.headswap.launcher
 
 import android.content.Context
 
-/** Тема лаунчера: тёмное или светлое золото; «Авто» - по режиму фар машины (CHANGE_MD_THEME от ГУ). */
+/** Тема лаунчера: тёмная или светлая палитра (цвета - «Вид › Цвета»); «Авто» - по режиму фар машины (CHANGE_MD_THEME от ГУ). */
 enum class ThemeChoice {
     DARK, LIGHT, AUTO;
 
@@ -43,6 +43,15 @@ class LauncherPrefs(context: Context) {
         get() = ThemeChoice.restore(prefs.getString("theme", null))
         set(value) { prefs.edit().putString("theme", value.name).apply() }
 
+    /** Свои цвета «Вид › Цвета»: «акцент,оттенок фона,насыщенность фона». */
+    var nightColors: ColorSet
+        get() = ColorSet.decode(prefs.getString("colors_night", null), ColorSet.NIGHT)
+        set(value) { prefs.edit().putString("colors_night", value.encode()).apply() }
+
+    var dayColors: ColorSet
+        get() = ColorSet.decode(prefs.getString("colors_day", null), ColorSet.DAY)
+        set(value) { prefs.edit().putString("colors_day", value.encode()).apply() }
+
     var railSize: RailSize
         get() = RailSize.restore(prefs.getString("rail_size", null))
         set(value) { prefs.edit().putString("rail_size", value.name).apply() }
@@ -61,6 +70,11 @@ class LauncherPrefs(context: Context) {
     var autoplay: Boolean
         get() = prefs.getBoolean("autoplay", true)
         set(value) { prefs.edit().putBoolean("autoplay", value).apply() }
+
+    /** «Алиса только голосом»: Алиса на скрытом дисплее и плашка снизу; выкл - панель Алисы слева (ADR 0026). */
+    var aliceVoiceOnly: Boolean
+        get() = prefs.getBoolean("alice_voice_only", true)
+        set(value) { prefs.edit().putBoolean("alice_voice_only", value).apply() }
 
     /** «Уведомления» телефона на экране ГУ. */
     var notifications: Boolean

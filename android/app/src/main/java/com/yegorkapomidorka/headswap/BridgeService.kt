@@ -1133,6 +1133,7 @@ class BridgeService : Service() {
             if (pick.shadowWanted(aaPrefs.metaNavi, pick.effective(lp.navigator, installed), lp::navHints)) AaShadowNav.start(this)
             else if (aaPrefs.metaNavi) AppLog.i("SHADOWNAV не стартую: у навигатора выключены подсказки на приборке", false)
             core.touchDecimationProvider = { aaPrefs.touchDecimation }
+            core.dupDownFilterProvider = { aaPrefs.dupDownFilter }
             core.transcodeEnabled = true
             core.refDecoderFactory = { sink -> RefDecoder(sink) { AppLog.i(it, false) } }
             core.videoMode = mode
@@ -1273,6 +1274,7 @@ class BridgeService : Service() {
             core.voiceChunkProvider = { aaPrefs.voiceChunk }
             core.ttsPrerollProvider = { aaPrefs.ttsPreroll }
             core.touchDecimationProvider = { aaPrefs.touchDecimation }
+            core.dupDownFilterProvider = { aaPrefs.dupDownFilter }
             core.phoneMic = PhoneMicCapture(applicationContext)
             core.usbAudioEnabled = aaPrefs.usbAudio
             EqLive.settings = aaPrefs.eq

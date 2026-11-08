@@ -21,6 +21,13 @@
     <string name="l_nav_not_installed">No navigator installed</string>
     <string name="l_nav_starting">Starting the navigator…</string>
     <string name="l_alice_starting">Starting Alice…</string>
+    <string name="l_alice_listening">I\'m listening</string>
+    <string name="l_alice_thinking">Thinking...</string>
+    <string name="l_alice_speaking">Speaking</string>
+    <string name="l_alice_route">Route in the navigator</string>
+    <string name="l_alice_route_hint">Pick a route and press Go</string>
+    <string name="l_alice_close">Close Alice</string>
+    <string name="l_gemini_close">Close Gemini</string>
     <string name="l_nav_failed">The window did not open. Tap to retry.</string>
     <string name="l_nav_restart">Restart navigator</string>
     <string name="l_nav_hints">Hints on the cluster</string>
@@ -71,6 +78,8 @@
     <string name="l_contacts">Contacts</string>
     <string name="l_calls_empty">No calls</string>
     <string name="l_contacts_empty">No contacts</string>
+    <string name="l_favorites">Favorites</string>
+    <string name="l_favorites_empty">No favorite contacts. Star them in the phone book</string>
     <string name="l_calls_no_permission">Allow access to calls and contacts on the phone</string>
 
     <string name="l_set_theme">Theme</string>
@@ -103,10 +112,19 @@
     <string name="l_sec_home">Screen</string>
     <string name="l_sec_system">System</string>
     <string name="l_s_theme">Theme</string>
-    <string name="l_s_theme_dark">Dark gold</string>
-    <string name="l_s_theme_light">Light gold</string>
+    <string name="l_s_theme_dark">Dark</string>
+    <string name="l_s_theme_light">Light</string>
     <string name="l_s_theme_auto">Auto</string>
-    <string name="l_s_theme_sub">Auto follows the car headlights</string>
+    <string name="l_s_theme_sub">Auto follows the headlights</string>
+    <string name="l_s_colors">Colors</string>
+    <string name="l_s_colors_sub">Accent and background, night and day apart</string>
+    <string name="l_s_colors_night">Night</string>
+    <string name="l_s_colors_day">Day</string>
+    <string name="l_s_colors_reset">Reset</string>
+    <string name="l_s_colors_accent">Accent</string>
+    <string name="l_s_colors_bg_hue">Background hue</string>
+    <string name="l_s_colors_bg_sat">Background saturation</string>
+    <string name="l_s_colors_hint">While this screen is open, the desktop shows the colors you are editing. Night colors show in the dark theme, day colors in the light one.</string>
     <string name="l_s_rail">Side panel</string>
     <string name="l_s_rail_small">Small</string>
     <string name="l_s_rail_medium">Medium</string>
@@ -157,6 +175,9 @@
     <string name="l_nh_search">Search</string>
     <string name="l_nh_loading">Loading…</string>
     <string name="l_s_notifications">Notifications</string>
+    <string name="l_s_alice_voice">Alice by voice only</string>
+    <string name="l_s_alice_voice_on">No window, a pill at the bottom; works on a locked phone</string>
+    <string name="l_s_alice_voice_off">Alice in a panel on the left</string>
     <string name="l_notif_show_all">Notifications: %1$d. Show all</string>
     <string name="l_notif_collapse">Collapse notifications</string>
     <string name="l_notif_clear_all">Clear all</string>

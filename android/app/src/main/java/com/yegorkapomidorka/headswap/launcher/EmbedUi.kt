@@ -117,7 +117,8 @@ fun EmbedLayers() {
 
     // панель Алисы: слева за рейкой, на всю высоту, шириной 0,8 высоты; справа затемнение, тап по нему закрывает
     val assistOpen = model.assistantOpen
-    val aliceKey = remember(assistOpen) { if (assistOpen) LauncherActions.aliceKey() else null }
+    // Gemini окна не занимает: открывается клавишей помощника на экране телефона (LauncherActions.voiceOnly)
+    val aliceKey = remember(assistOpen) { if (assistOpen && !LauncherActions.gemini()) LauncherActions.aliceKey() else null }
     val aliceRect = areaRect?.let { Rect(it.left, it.top, it.left + (it.height * 0.8f).roundToInt(), it.bottom) }
     LaunchedEffect(aliceKey, aliceRect?.width, aliceRect?.height) {
         if (aliceKey != null && aliceRect != null) {
@@ -127,7 +128,8 @@ fun EmbedLayers() {
             EmbedHost.want(EmbedHost.alice, aliceKey, w, h)
         } else EmbedHost.want(EmbedHost.alice, null, 0, 0)
     }
-    if (assistOpen && aliceRect != null) {
+    val aliceHidden = model.assistantHidden
+    if (assistOpen && !aliceHidden && aliceRect != null) {
         val startDp = with(LocalDensity.current) { aliceRect.right.roundToInt().toDp() }
         Pressable(Modifier.fillMaxSize().padding(start = startDp).background(Color(0xAA000000)),
             onTap = { LauncherActions.closeAssistant("тап по затемнению") }) {}
@@ -136,8 +138,9 @@ fun EmbedLayers() {
     var aliceUsed by remember { mutableStateOf(false) }
     if (assistOpen) aliceUsed = true
     if (aliceUsed) {
-        EmbedLayer(EmbedHost.alice, aliceRect, shown = assistOpen, interactive = true, rounded = false,
-            background = LocalPalette.current.bgSolid, starting = stringResource(R.string.l_alice_starting), onCardTap = null)
+        EmbedLayer(EmbedHost.alice, aliceRect, shown = assistOpen && !aliceHidden, interactive = true, rounded = false,
+            background = LocalPalette.current.bgSolid, starting = stringResource(R.string.l_alice_starting), onCardTap = null,
+            hidden = assistOpen && aliceHidden)
     }
 }
 
@@ -149,6 +152,11 @@ internal fun EmbedLayer(
     starting: String, onCardTap: (() -> Unit)?, tag: String? = null,
     /** Буфер текстуры [buffer] (px) больше окна: показать его часть [crop] 1:1; crop null - буфер на всё окно. */
     crop: CarBox? = null, buffer: Pair<Int, Int>? = null,
+    /**
+     * Дисплей живёт без показа (скрытая Алиса): окно 1x1 px в углу. За экраном TextureView не рисуется и не отдаёт
+     * SurfaceTexture, дочерний дисплей не создаётся (стенд 07.11: слот завис в CONNECTING).
+     */
+    hidden: Boolean = false,
 ) {
     var last by remember(slot) { mutableStateOf<Rect?>(null) }
     if (target != null) last = target
@@ -165,9 +173,10 @@ internal fun EmbedLayer(
     val h = with(density) { rect.height.roundToInt().toDp() }
     // Скрытый слой уводим за экран: AndroidView в Compose забирает касания в своих границах даже с INVISIBLE,
     // и спрятанная карточка навигатора глушила стрелки «Все приложения». Сам TextureView при этом живёт.
+    val onePx = with(density) { 1.toDp() }
     Box(
-        Modifier.absoluteOffset { if (shown) IntOffset(rect.left.roundToInt(), rect.top.roundToInt()) else OFFSCREEN }
-            .size(w, h).clip(shape),
+        Modifier.absoluteOffset { when { shown -> IntOffset(rect.left.roundToInt(), rect.top.roundToInt()); hidden -> IntOffset.Zero; else -> OFFSCREEN } }
+            .size(if (hidden && !shown) onePx else w, if (hidden && !shown) onePx else h).clip(shape),
     ) {
         // textureGen: кнопка перезапуска просит новый TextureView (свежая текстура без старого продюсера)
         androidx.compose.runtime.key(slot.textureGen) { AndroidView(
@@ -189,7 +198,7 @@ internal fun EmbedLayer(
             },
             modifier = Modifier.fillMaxSize(),
             update = { v ->
-                v.visibility = if (shown) android.view.View.VISIBLE else android.view.View.INVISIBLE
+                v.visibility = if (shown || hidden) android.view.View.VISIBLE else android.view.View.INVISIBLE
                 // TextureView растягивает буфер на окно; матрица возвращает масштаб 1:1 и сдвигает на вырезку
                 val b = buffer
                 v.setTransform(if (crop == null || b == null) null else android.graphics.Matrix().apply {

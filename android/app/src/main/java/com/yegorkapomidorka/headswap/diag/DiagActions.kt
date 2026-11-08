@@ -46,7 +46,7 @@ object DiagActions {
                 "hotspot" -> hotspot(host)
                 "bluetooth" -> Readiness.openBluetoothSettings(host)
                 "onboarding" -> host.showOnboarding(rerun = true)
-                "update" -> if (Updater.available(host) != null) Updater.start(host, confirm = false) else Updater.check(host, manual = true)
+                "update" -> Updater.checkAndUpdate(host)
                 "share_log" -> LogShare.shareReport(host)
                 else -> AppLog.e("DIAG: неизвестное действие $action")
             }

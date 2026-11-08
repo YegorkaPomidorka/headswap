@@ -83,8 +83,8 @@ fun LauncherRoot(connected: Boolean) {
         val railSize = model.railSize
         val spec = remember(w, h, railSize) { LauncherSpecs.forSize(w, h, railSize) }
         val metrics = remember(spec, density) { LauncherMetrics(spec, density) }
-        val pal = if (model.lightTheme) Palettes.LIGHT else Palettes.DARK
-        CompositionLocalProvider(LocalMetrics provides metrics, LocalAccent provides Pal.GOLD, LocalPalette provides pal) {
+        val pal = model.palette
+        CompositionLocalProvider(LocalMetrics provides metrics, LocalAccent provides pal.accent, LocalPalette provides pal) {
             Box(Modifier.fillMaxSize().launcherBackground(pal)) {
                 if (!connected) {
                     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -108,6 +108,7 @@ fun LauncherRoot(connected: Boolean) {
                         HomeTileButtons() // ⇄ и «Слои» ленты - над живыми окнами плашек
                         NavHostOverlay() // шаблоны навигатора на своём хосте Car App - над его картой, в границах области
                         NotificationsOverlay() // язычок и шторка уведомлений телефона из-под строки статуса; касания берёт только сам
+                        AliceVoicePill() // скрытая Алиса: слушаю / думаю / говорю / маршрут - снизу по центру
                         // входящий звонок поверх чужого приложения или экрана без карточки «Телефон»
                         if (PhoneController.callState == CallState.RINGING && (model.area != Area.Home || spec.strip || model.homeLayout.two)) {
                             // как нижняя полоса главного: прибита к низу, скругления только сверху

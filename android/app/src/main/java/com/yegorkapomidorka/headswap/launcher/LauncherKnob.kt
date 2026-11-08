@@ -136,7 +136,7 @@ object LauncherKnob : DesktopKeys.Sink {
     }
 
     /** Цвет зазора между рамкой и кнопкой - фон темы, чтобы рамка читалась и на обложке, и на золоте. */
-    fun gapColor(light: Boolean) = if (light) Color(0xFFFBF7EC) else Color(0xFF0A0F14)
+    fun gapColor(pal: LauncherPalette): Color = pal.bgStops.first().second
 }
 
 /** Рамка фокуса внутри границ кнопки: снаружи её срезал бы clip карточки. Кольцо [color] и под ним зазор [gap]. */

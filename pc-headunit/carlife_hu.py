@@ -279,6 +279,13 @@ class Speakers:
             old = self.outs.pop(chan, None)
             if old:
                 old.close()
+            if not self.outs:
+                # PortAudio запоминает устройство по умолчанию при старте: сменили его в Windows - перечитать
+                try:
+                    self.sd._terminate()
+                    self.sd._initialize()
+                except Exception as e:  # noqa: BLE001
+                    self.log(f"speakers: PortAudio reinit failed: {e}")
             try:
                 self.outs[chan] = _PcmOut(self.sd, rate, ch)
                 self.log(f"speakers: {CH_NAMES[chan]} {rate} Hz {ch} ch -> {self.sd.query_devices(kind='output')['name']}")

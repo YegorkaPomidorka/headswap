@@ -59,6 +59,8 @@ internal object LauncherModel {
     var autoplay by mutableStateOf(true)
     /** «Уведомления» телефона на экране ГУ (слушатель - [NotificationsRepo]). */
     var notifications by mutableStateOf(true)
+    /** «Алиса только голосом» ([LauncherPrefs.aliceVoiceOnly]). */
+    var aliceVoiceOnly by mutableStateOf(true)
     var localPlayer by mutableStateOf<String?>(null)
     var onlinePlayer by mutableStateOf<String?>(null)
     /** Режим темы ГУ (CHANGE_MD_THEME, 0 день, 1 ночь, 2 авто); null - ГУ ещё не присылала. Обновляет [LauncherRoot]. */
@@ -67,6 +69,16 @@ internal object LauncherModel {
     var autoplayedDisplay = -1
     /** Светлая ли палитра сейчас: выбор «Тема» и, для «Авто», режим фар машины. */
     val lightTheme: Boolean get() = ThemeChoice.light(theme, huTheme)
+    /** Свои цвета «Вид › Цвета» ([ColorSet]): ночные - для тёмной палитры, дневные - для светлой. */
+    var nightColors by mutableStateOf(ColorSet.NIGHT)
+    var dayColors by mutableStateOf(ColorSet.DAY)
+    /** На экране «Цвета» настраиваются дневные (иначе ночные); пока он открыт, весь стол показывает этот набор. */
+    var colorsEditDay by mutableStateOf(false)
+    private val colorsOpen: Boolean get() = area == Area.Settings && settingsPage == SettingsPage.COLORS
+    /** Светлая ли палитра на экране: на «Цветах» - редактируемый набор, иначе [lightTheme]. */
+    val shownLight: Boolean get() = if (colorsOpen) colorsEditDay else lightTheme
+    val palette: LauncherPalette
+        get() = shownLight.let { LauncherColors.palette(it, if (it) dayColors else nightColors) }
     /** Большая плашка главного; малая - [smallView]; раскладка - [homeLayout]. Действуют через [tiles]. */
     var cardView by mutableStateOf(CardView.NAVIGATOR)
     var smallView by mutableStateOf(CardView.MUSIC)
@@ -115,6 +127,8 @@ internal object LauncherModel {
     var foreign by mutableStateOf<AppRef?>(null)
     /** Панель Алисы (кнопка голоса) поверх рабочего стола: слева за рейкой, под ней затемнение. */
     var assistantOpen by mutableStateOf(false)
+    /** Панель Алисы скрыта (только голос): дочерний дисплей живёт, слой за экраном, затемнения нет. */
+    var assistantHidden by mutableStateOf(false)
     /** Оверлей «Недавние» на экране. */
     var recentsOpen by mutableStateOf(false)
     /** Приложения оверлея; null - список ещё запрашивается. */
@@ -157,12 +171,15 @@ internal object LauncherModel {
         appCtx = ctx.applicationContext
         prefs = LauncherPrefs(appCtx)
         theme = prefs.theme
+        nightColors = prefs.nightColors
+        dayColors = prefs.dayColors
         railSize = prefs.railSize
         mapLeft = prefs.mapLeft
         animations = prefs.animations
         autoplay = prefs.autoplay
         notifications = prefs.notifications
         NotificationsRepo.setEnabled(notifications)
+        aliceVoiceOnly = prefs.aliceVoiceOnly
         hideStatusBar = prefs.hideStatusBar
         localPlayer = prefs.localPlayer
         onlinePlayer = prefs.onlinePlayer
@@ -181,6 +198,7 @@ internal object LauncherModel {
         EmbedHost.onAssistantOpened = { LauncherActions.assistantOpened(it) }
         CarAppHost.scaleFor = { pkg -> CarConfigMath.step(prefs.mapScale(pkg)) }
         CarAppHost.allowFor = { pkg -> prefs.navHints(pkg) }
+        LauncherActions.startRouteCatcher(context.applicationContext)
         ready = true
         reloadCatalog()
     }
@@ -230,12 +248,22 @@ internal object LauncherModel {
     fun removeApp(ref: AppRef) { apps = AppList.remove(apps, ref).also { prefs.apps = it } }
 
     fun chooseTheme(value: ThemeChoice) { theme = value; prefs.theme = value }
+    /** Слайдер «Цвета» двигается: только состояние, без записи; запись - [saveColors] по отпусканию. */
+    fun editColors(set: ColorSet) { if (colorsEditDay) dayColors = set else nightColors = set }
+    fun saveColors() { prefs.nightColors = nightColors; prefs.dayColors = dayColors }
+    fun resetColors() { editColors(if (colorsEditDay) ColorSet.DAY else ColorSet.NIGHT); saveColors() }
+    /** Открыть «Цвета»: сначала настраивается тот набор, что сейчас на экране. */
+    fun openColors() { colorsEditDay = lightTheme; settingsPage = SettingsPage.COLORS }
     fun chooseRailSize(value: RailSize) { railSize = value; prefs.railSize = value }
     fun chooseMapLeft(left: Boolean) { mapLeft = left; prefs.mapLeft = left }
     fun chooseAnimations(on: Boolean) { animations = on; prefs.animations = on }
     fun chooseAutoplay(on: Boolean) { autoplay = on; prefs.autoplay = on }
     /** Из «Для разработчиков» на телефоне: лаунчер мог ещё не стартовать, поэтому префы — своим экземпляром. */
     fun chooseHideStatusBar(ctx: Context, on: Boolean) { hideStatusBar = on; LauncherPrefs(ctx.applicationContext).hideStatusBar = on }
+    fun chooseAliceVoiceOnly(on: Boolean) {
+        if (assistantOpen) LauncherActions.closeAssistant("переключили «Алиса только голосом»")
+        aliceVoiceOnly = on; prefs.aliceVoiceOnly = on
+    }
     fun chooseNotifications(on: Boolean) { notifications = on; prefs.notifications = on; NotificationsRepo.setEnabled(on) }
     fun chooseLocalPlayer(pkg: String?) { localPlayer = pkg; prefs.localPlayer = pkg }
     fun chooseOnlinePlayer(pkg: String?) { onlinePlayer = pkg; prefs.onlinePlayer = pkg }

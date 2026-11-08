@@ -191,6 +191,7 @@ object BackNav {
      * null - шагов внутри настроек нет, «Назад» выходит с экрана настроек.
      */
     fun settingsStep(page: SettingsPage, licenseOpen: Boolean): Pair<SettingsPage, Boolean>? = when {
+        page == SettingsPage.COLORS -> SettingsPage.LOOK to false
         page != SettingsPage.ABOUT -> null
         licenseOpen -> SettingsPage.ABOUT to false
         else -> SettingsPage.SYSTEM to false
