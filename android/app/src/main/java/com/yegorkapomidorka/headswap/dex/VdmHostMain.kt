@@ -50,7 +50,7 @@ class VdmHostMain private constructor(private val args: VdmHostPolicy.Args) {
         note("привязка id=${if (associationId > 0) associationId else "нет"}")
         runCatching { note("ppid=${ppidOf(Process.myPid())} adbd=${adbdPid() ?: "нет"} cgroup=${File("/proc/self/cgroup").readText().trim().replace('\n', '|').take(200)}") }
         if (!deliver()) exitProcess(2)
-        pinTcpPort()
+        reportTcpPort()
         watchForDeath()
         Looper.loop()
     }
@@ -275,21 +275,13 @@ class VdmHostMain private constructor(private val args: VdmHostPolicy.Args) {
     }
 
     /**
-     * h768: закрепить TCP-порт adbd на следующий его перезапуск (Samsung перезапускает adbd при смене USB-режима).
-     * Сейчас adbd не трогаем - иначе init убьёт и нас. Отчёт уходит в лог приложения.
+     * h768: TCP-порт adbd ставит сам adbd по просьбе приложения ([VdmHostRestart] шлёт tcpip:5555);
+     * setprop из-под shell на Samsung A17 запрещён. Здесь только отчёт о состоянии в лог приложения.
      */
-    private fun pinTcpPort() {
-        val want = VdmHostRestart.FIXED_TCP_PORT.toString()
-        val before = getprop("service.adb.tcp.port")
-        if (before != want) runCatching {
-            val p = ProcessBuilder("setprop", "service.adb.tcp.port", want).redirectErrorStream(true).start()
-            val out = p.inputStream.bufferedReader().use { it.readText() }.trim()
-            p.waitFor()
-            if (p.exitValue() != 0 || out.isNotEmpty()) note("setprop tcp.port: exit=${p.exitValue()} ${out.take(160)}")
-        }.onFailure { note("setprop tcp.port: ${it.describe()}") }
-        val after = getprop("service.adb.tcp.port")
-        note("tcp.port: было ${before.ifEmpty { "нет" }}, стало ${after.ifEmpty { "нет" }}")
-        report("tcp.port: было ${before.ifEmpty { "нет" }}, стало ${after.ifEmpty { "нет" }}")
+    private fun reportTcpPort() {
+        val port = getprop("service.adb.tcp.port").ifEmpty { "нет" }
+        note("tcp.port=$port")
+        report("tcp.port=$port")
     }
 
     private fun getprop(name: String): String = runCatching {

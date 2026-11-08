@@ -29,8 +29,8 @@ internal object VdmHostRestart {
     private val RETRY_DELAYS_MS = longArrayOf(1_000, 3_000, 6_000)
     /**
      * h768 (A55 без Wi-Fi в машине): порт беспроводной отладки после перезапуска adbd новый, а mDNS без Wi-Fi пуст.
-     * Хост при старте ставит service.adb.tcp.port (как `adb tcpip`), перезапущенный adbd слушает этот порт и на
-     * loopback - к нему ходим без Wi-Fi. Свойство живёт до перезагрузки телефона.
+     * Пока Wi-Fi есть, [pinViaAdbd] просит adbd tcpip:5555 (как `adb tcpip`); adbd ставит service.adb.tcp.port и
+     * дальше слушает этот порт и на loopback - к нему ходим без Wi-Fi. Свойство живёт до перезагрузки телефона.
      */
     const val FIXED_TCP_PORT = 5555
 
@@ -115,7 +115,8 @@ internal object VdmHostRestart {
     }
 
     /**
-     * Порт: сначала порт активации (если adbd не перезапускался, он жив), потом свойство adbd, потом mDNS.
+     * Порт: сначала порт активации (если adbd не перезапускался, он жив), потом закреплённый 5555, потом свойство
+     * adbd, потом mDNS.
      * vdm4 у h821 и SM-S942B: свойство не прочиталось, mDNS за 12 с ничего не нашёл - всё пишем в лог.
      */
     private fun launch(ctx: Context) {
