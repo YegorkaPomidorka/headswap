@@ -334,6 +334,21 @@ internal object EmbedHost {
         worker.post { drainTouch(slot) }
     }
 
+    /** Шайба ГУ в окно: нажатие навигационной клавиши на дочернем дисплее. false - окна нет, клавиша не ушла. */
+    fun key(slot: EmbedSlot, keycode: Int): Boolean {
+        if (slot.status != EmbedStatus.READY) return false
+        worker.post {
+            if (slot.handle <= 0) return@post
+            try {
+                timed(slot, "key") { EmbeddedSessionRegistry.key(uid, slot.handle, keycode) }
+            } catch (e: Exception) {
+                AppLog.i("EMBED ${slot.name}: клавиша $keycode отклонена: ${e.javaClass.simpleName}: ${e.message}", false)
+                if (leaseGone(e)) lostLease(slot)
+            }
+        }
+        return true
+    }
+
     /**
      * Back в окно; если приложение ушло из корня (его задачи больше нет сверху), onClosed вызовется на главном потоке.
      * Задачу проверяем несколько раз: у закрывающейся активности top ещё держится, а ответ -1 (список задач

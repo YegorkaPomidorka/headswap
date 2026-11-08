@@ -37,6 +37,8 @@ interface IDexUserService {
     String[] childTaskPackages(IBinder childToken) = 20;
     /** 1 the launched package hides the status bar (fullscreen), 0 no, -1 unknown. Observes only this child's launched package. */
     int childFullscreen(IBinder childToken, String packageName) = 21;
+    /** Press (DOWN+UP) of a navigation key (DPAD, Enter, Tab) on this child's own display: head unit knob in a windowed app. */
+    void injectChildKey(IBinder childToken, int keycode) = 22;
     // Terminal shutdown. The delegated backend releases its producers and keeps its process.
     void destroy() = 16777114;
 }

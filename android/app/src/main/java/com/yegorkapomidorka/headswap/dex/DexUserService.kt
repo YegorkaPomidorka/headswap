@@ -342,6 +342,21 @@ class DexUserService private constructor(private val context: Context,
         }
     }
 
+    override fun injectChildKey(childToken: IBinder, keycode: Int) {
+        enforceClient()
+        require(keycode in CHILD_KEYS) { "Недопустимая клавиша окна" }
+        serialized(INPUT_TIMEOUT_MS) {
+            val (parent, child) = requireChild(childToken)
+            val id = checkNotNull(child.display).display.displayId
+            val down = SystemClock.uptimeMillis()
+            for (action in intArrayOf(KeyEvent.ACTION_DOWN, KeyEvent.ACTION_UP)) {
+                ensureChildActive(parent, child)
+                checkNotNull(runtime).inject(KeyEvent(down, SystemClock.uptimeMillis(), action, keycode,
+                    0, 0, KeyCharacterMap.VIRTUAL_KEYBOARD, 0, 0, InputDevice.SOURCE_KEYBOARD), id)
+            }
+        }
+    }
+
     override fun closeChildDisplay(childToken: IBinder) {
         enforceClient(requirePrivileges = false)
         serialized(STOP_TIMEOUT_MS, front = true, cancelOnTimeout = false) {
@@ -607,6 +622,10 @@ class DexUserService private constructor(private val context: Context,
         private const val START_TIMEOUT_MS = 20_000L
         private const val STOP_TIMEOUT_MS = 5_000L
         private const val INPUT_TIMEOUT_MS = 2_000L
+        /** Клавиши шайбы ГУ во встроенное окно: стрелки, центр, Enter, Tab, листание. HOME/BACK/питание сюда не входят. */
+        private val CHILD_KEYS = setOf(KeyEvent.KEYCODE_DPAD_UP, KeyEvent.KEYCODE_DPAD_DOWN, KeyEvent.KEYCODE_DPAD_LEFT,
+            KeyEvent.KEYCODE_DPAD_RIGHT, KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER, KeyEvent.KEYCODE_TAB,
+            KeyEvent.KEYCODE_PAGE_UP, KeyEvent.KEYCODE_PAGE_DOWN)
         private fun unwrap(error: Throwable): Throwable = if (error is InvocationTargetException && error.cause != null) unwrap(error.cause!!) else error
     }
 }

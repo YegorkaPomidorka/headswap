@@ -37,4 +37,14 @@ class KnobLogicTest {
         assertFalse(KnobLogic.moves(Knob.OK))
         assertFalse(KnobLogic.moves(Knob.NAVI))
     }
+
+    @Test fun windowGetsArrowsAndCenterOnly() {
+        assertEquals(20, KnobLogic.windowKey(Knob.NEXT))
+        assertEquals(19, KnobLogic.windowKey(Knob.PREVIOUS))
+        assertEquals(21, KnobLogic.windowKey(Knob.LEFT))
+        assertEquals(23, KnobLogic.windowKey(Knob.OK))
+        assertNull(KnobLogic.windowKey(Knob.HOME))
+        assertNull(KnobLogic.windowKey(Knob.NAVI))
+        assertNull(KnobLogic.windowKey(Knob.MUSIC))
+    }
 }
