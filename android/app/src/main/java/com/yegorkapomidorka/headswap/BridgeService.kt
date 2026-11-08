@@ -1118,6 +1118,7 @@ class BridgeService : Service() {
             core.usbAudioEnabled = false
             core.mapHomeKey = true
             core.desktopInputEnabled = true
+            core.volumeSwipeProvider = { aaPrefs.volumeSwipe }
             DesktopNavHints.target = core   // подсказки навигатора рабочего стола (свой хост Car App, теневая AA) в MetaRelay
             if (aaPrefs.metaNavi) AaShadowNav.start(this)   // в машине adb нет: стартуем вместе с рабочим столом
             core.touchDecimationProvider = { aaPrefs.touchDecimation }

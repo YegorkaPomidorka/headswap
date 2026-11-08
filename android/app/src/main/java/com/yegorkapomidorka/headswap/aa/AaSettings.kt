@@ -165,6 +165,11 @@ class AaPrefs(ctx: Context) {
         get() = sp.getBoolean("micVrStatus", true)
         set(v) = sp.edit().putBoolean("micVrStatus", v).apply()
 
+    /** Рабочий стол: громкость двумя пальцами у правого края. На Honda Vezel 20832125 включена всегда. */
+    var volumeSwipe: Boolean
+        get() = sp.getBoolean("volumeSwipe", false)
+        set(v) = sp.edit().putBoolean("volumeSwipe", v).apply()
+
     /** Сообщать ГУ о звонках (TelephonyManager -> MODULE_STATUS PHONE + TELE_STATE); по умолчанию выкл. Читается на подключение. */
     var callsToHu: Boolean
         get() = sp.getBoolean("callsToHu", false)

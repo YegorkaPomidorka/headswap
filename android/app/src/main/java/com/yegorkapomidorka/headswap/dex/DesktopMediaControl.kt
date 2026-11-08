@@ -50,6 +50,14 @@ internal class DesktopMediaControl(context: Context) : DesktopMedia {
         }
     }
 
+    override fun adjustVolume(steps: Int): String {
+        val dir = if (steps > 0) AudioManager.ADJUST_RAISE else AudioManager.ADJUST_LOWER
+        repeat(kotlin.math.abs(steps)) { runCatching { audio.adjustStreamVolume(AudioManager.STREAM_MUSIC, dir, 0) } }
+        return runCatching {
+            "${audio.getStreamVolume(AudioManager.STREAM_MUSIC)}/${audio.getStreamMaxVolume(AudioManager.STREAM_MUSIC)}"
+        }.getOrDefault("?")
+    }
+
     private fun playing(): List<MediaController> = sessions().filter { it.playbackState?.state == PlaybackState.STATE_PLAYING }
 
     private fun sessions(): List<MediaController> {
