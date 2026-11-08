@@ -134,20 +134,15 @@ fun NotificationsOverlay() {
     val topY = model.statusBottom ?: area.top
     val ear = px(32f)
     val barCy = (model.statusBottom ?: area.top) - s.statusBandH / 2f
-    // Егор 06.11: полоска и язычок — над стыком плиток верхнего ряда на главном (между музыкой и картой), а не по центру области.
-    // На других экранах со строкой статуса (настройки, вызовы) стыка нет — по центру.
-    val big = model.bigTileRect
-    val centerX = if (model.area == Area.Home && big != null && big.width > 0f) {
-        if (big.left - area.left > s.g) big.left - s.g / 2f else big.right + s.g / 2f
-    } else area.center.x
+    // Язычок и шторка прибиты к левому краю области, сразу за рейкой (Егор 08.11). Над стыком плиток не ставим: стык зависит
+    // от раскладки и разрешения, а когда карта на весь экран, его нет вовсе - панель улетала вправо.
+    // centerX - центр самого узкого язычка у левого края: там стоит полоска, широкие язычок и шторка упираются в край области.
+    val centerX = area.left + ear + NotifGeom.tongueWidth(s.t, Math.round(area.width), ear, s.g).first / 2f
     val dragThr = px(30f).toFloat()
-    // Полоска на любом разрешении над стыком (Егор 08.11): раньше так было только на 1280×640, на 1280×720 она стояла
-    // в центре язычка/шторки, а те упираются в край и съезжают правее стыка - полоска уезжала вместе с ними.
     // Строка статуса скрыта (Для разработчиков, Егор 07.11): полоски на строке нет, вместо неё от верха экрана висит чёлка -
     // та же панель, свёрнутая до 168x30 с полоской на нижнем крае. Язычок и шторка растут из неё (animateContentSize), а не
     // выезжают сверху; свернулись - снова чёлка. Непрочитанных нет - нет и чёлки.
-    // Полоска не двигается по X (Егор 07.11): чёлка висит над стыком плиток, и на язычке и шторке полоска стоит ровно там же,
-    // даже если сами они упёрлись в рейку и съехали.
+    // Полоска не двигается по X (Егор 07.11): чёлка висит над ней, и на язычке и шторке полоска стоит ровно там же.
     val notchMode = model.hideStatusBar && model.statusSlot && model.statusBottom == null
     // и везде - не на тексте строки статуса (дата, значки, часы): на язычке и шторке полоска стоит там же, где на строке
     val busyX = if (notchMode) emptyList() else model.statusBusyX
@@ -204,7 +199,7 @@ fun NotificationsOverlay() {
                     val (minW, maxW) = NotifGeom.tongueWidth(s.t, Math.round(area.width), ear, s.g)
                     val inShade = grown && (open || (shown.shade && !show))
                     Column(
-                        // по центру над стыком плиток, но не вылезая за область справа от рейки
+                        // у левого края области: центр на centerX, шире узкого язычка - упирается в край (x = 0)
                         Modifier.layout { measurable, constraints ->
                             val pl = measurable.measure(constraints.copy(minWidth = 0))
                             val x = Math.round(centerX - area.left - pl.width / 2f).coerceIn(0, max(0, constraints.maxWidth - pl.width))
