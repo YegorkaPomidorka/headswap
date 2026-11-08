@@ -14,6 +14,7 @@ import android.os.Looper
 import android.view.KeyEvent
 import android.view.MotionEvent
 import com.yegorkapomidorka.headswap.AppLog
+import com.yegorkapomidorka.headswap.R
 import com.yegorkapomidorka.headswap.embed.EmbeddedSessionRegistry
 import com.yegorkapomidorka.headswap.aa.AaBridgeCore
 import com.yegorkapomidorka.headswap.aa.AaLifecycle
@@ -77,6 +78,8 @@ class DelegatedDexConnector(context: Context, private val core: AaBridgeCore,
     /** h768: дисплей рабочего стола жил в shell-хосте VirtualDevice, хост умер - сразу отдаём сессию на восстановление. */
     private val vdmLostHook: (Set<Int>) -> Unit = { lost ->
         if (!stopping.get() && displayId > 0) {
+            // до fail: onAaEnded из stop() может опередить решение сервиса о восстановлении на главном потоке
+            core.nextEndPlaceholder = context.getString(R.string.desk_recovering_host)
             fail("Хост виртуального устройства завершился, экраны $lost потеряны", DesktopFailure.VDM_DISPLAY_LOST)
         }
     }

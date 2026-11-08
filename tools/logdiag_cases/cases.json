@@ -23,5 +23,7 @@
   {"log": "miui_screen_off_kill.log", "version": "2.6.0", "has": ["process_killed"],
    "facts": {"m.low_memory": 1}},
   {"log": "vdm_host_lost.log", "version": "4.1.0", "top": "vdm_host_lost_screen_off", "not": ["aa_server_off"],
-   "facts": {"m.vdm_display_lost": 1, "m.aa_refused": 0}}
+   "facts": {"m.vdm_display_lost": 1, "m.aa_refused": 0}},
+  {"log": "vdm_host_recovered.log", "version": "4.1.0", "not": ["vdm_host_lost_screen_off"],
+   "facts": {"m.vdm_display_lost": 0}}
 ]

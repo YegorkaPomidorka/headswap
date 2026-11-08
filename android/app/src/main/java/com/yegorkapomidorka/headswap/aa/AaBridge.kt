@@ -1424,6 +1424,21 @@ class AaBridgeCore(
         aaVideoSeen = false
     }
 
+    /**
+     * h768: ближайшее завершение источника - автовосстановление рабочего стола после смерти VDM-хоста. На ГУ вместо
+     * «Остановите и подключите заново» (юзер жал бы Стоп и отменял восстановление) показываем этот текст.
+     */
+    @Volatile var nextEndPlaceholder: String? = null
+
+    /** Восстановление не состоялось: на заглушке снова «отключился». */
+    @Synchronized
+    fun showDisconnectedPlaceholder() {
+        nextEndPlaceholder = null
+        if (active != Source.PLACEHOLDER || placeholderText == disconnectedText) return
+        placeholderText = disconnectedText
+        link.showPlaceholder(placeholderText)
+    }
+
     @Synchronized
     fun onAaEnded(established: Boolean) {
         meta.onAaEnded()
@@ -1434,7 +1449,8 @@ class AaBridgeCore(
         gotIdr = false
         aaConfig = null
         aaVideoSeen = false
-        if (established || wasAa) placeholderText = disconnectedText
+        if (established || wasAa) placeholderText = nextEndPlaceholder ?: disconnectedText
+        nextEndPlaceholder = null
         if (wasAa || established) {
             active = Source.PLACEHOLDER
             log("BRIDGE AA завершился: источник -> заглушка '$placeholderText'", true)

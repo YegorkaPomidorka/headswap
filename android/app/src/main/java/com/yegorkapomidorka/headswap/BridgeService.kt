@@ -1212,6 +1212,7 @@ class BridgeService : Service() {
                 else "DESKTOP recovery planned attempt=${attempt.number}/2; server ready, keep CarLife transport", false)
         } else if (hostDeath) {
             AppLog.i("DESKTOP recovery after VDM host death not planned (session/access gone or limit reached)", false)
+            owner.core.showDisconnectedPlaceholder()
         }
         // TerminalSource не даёт переиспользовать хост в grace ещё до этого колбэка
         owner.shutdown("источник рабочего стола завершился")
@@ -1240,20 +1241,24 @@ class BridgeService : Service() {
         if (host != null || session !== recovery.session || !recovery.owner.isTornDown) return
         // после паузы проверяем заново: Стоп, отключение, отозванный доступ, смерть сервера или блокировка отменяют восстановление
         val eligible = if (recovery.hostDeath) canRecoverAfterHostDeath(recovery.session) else canRecoverDesktop(recovery.session)
+        val core = recovery.owner.core
         if (!eligible) {
             DexState.error = getString(R.string.desk_recovery_stopped)
-            AppLog.i("DESKTOP recovery cancelled: current session/access no longer eligible", false)
+            AppLog.i("DESKTOP recovery cancelled: current session/access no longer eligible${if (recovery.hostDeath) " (after VDM host death)" else ""}", false)
+            core.showDisconnectedPlaceholder()
             return
         }
-        val core = recovery.owner.core
         if (!core.rearmDesktopSurfaceAfterStop()) {
             DexState.error = getString(R.string.desk_recovery_screen_busy)
+            AppLog.i("DESKTOP recovery cancelled: previous screen not released${if (recovery.hostDeath) " (after VDM host death)" else ""}", false)
+            core.showDisconnectedPlaceholder()
             return
         }
         val replacement = createDesktopHost(AaPrefs(this), core.videoMode, core.densityOverride,
-            previous = recovery.owner, recoveredCore = core) ?: return
+            previous = recovery.owner, recoveredCore = core) ?: run { core.showDisconnectedPlaceholder(); return }
         host = replacement
-        AppLog.i("DESKTOP recovery bind attempt=${recovery.attempt.number}/2; fresh producer and encoder generation", false)
+        AppLog.i("DESKTOP recovery bind attempt=${recovery.attempt.number}/" +
+            "${if (recovery.hostDeath) DesktopRecoveryPolicy.HOST_MAX else 2}; fresh producer and encoder generation", false)
         replacement.onUsbSessionStarted()
     }
 

@@ -33,7 +33,7 @@
     "stream_desync": "РАССИНХРОН потока",
     "pause": "VIDEO_ENCODER_PAUSE",
     "eio": "EIO \\(I/O error\\)|ENODEV",
-    "vdm_display_lost": "VDM хост завершился;.*потеряны дисплеи|DESKTOP delegated: .*Экран уже закрыт"
+    "vdm_display_lost": "DESKTOP delegated: .*Экран уже закрыт|recovery after VDM host death not planned|DESKTOP recovery cancelled.*after VDM host death"
   },
   "rules": [
     {
