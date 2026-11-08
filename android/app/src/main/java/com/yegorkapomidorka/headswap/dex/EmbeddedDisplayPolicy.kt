@@ -72,10 +72,25 @@ internal object EmbeddedDisplayPolicy {
      * на телефоне, и игнорирует нулевой инсет плитки: сверху пустая полоса. В многооконном режиме он верит инсету (ADR 0031).
      * Портретные по манифесту (Звук и т.п.) в полноэкранном режиме система рисует узким столбиком с полями
      * (letterbox); в многооконном она игнорирует запрос ориентации и растягивает окно на плитку.
+     * Запуск часто идёт через заставку без ориентации (Звук: SplashAliasDefault), а портрет просят остальные экраны,
+     * поэтому при UNSPECIFIED у запускаемого смотрим на весь пакет: портретных больше половины - тоже портретное.
      * Остальным не включаем: YouTube в многооконном режиме не уходит на весь экран.
      */
-    fun multiWindowLaunch(packageName: String, screenOrientation: Int = -1): Boolean =
-        packageName in multiWindowPackages || screenOrientation in portraitOrientations
+    fun multiWindowLaunch(packageName: String, screenOrientation: Int = -1, packageOrientations: List<Int> = emptyList()): Boolean =
+        packageName in multiWindowPackages || screenOrientation in portraitOrientations ||
+            screenOrientation == -1 && packageOrientations.count { it in portraitOrientations } * 2 > packageOrientations.size
+
+    /** Ориентации всех activity пакета для [multiWindowLaunch]; пусто, если пакет не виден. */
+    fun packageOrientations(pm: android.content.pm.PackageManager, packageName: String): List<Int> = runCatching {
+        @Suppress("DEPRECATION")
+        pm.getPackageInfo(packageName, android.content.pm.PackageManager.GET_ACTIVITIES).activities.orEmpty()
+            .map { it.screenOrientation }
+    }.getOrDefault(emptyList())
+
+    /** Строка для лога: решение и из чего оно. */
+    fun describeLaunch(packageName: String, screenOrientation: Int, packageOrientations: List<Int>): String =
+        "multiWindow=${multiWindowLaunch(packageName, screenOrientation, packageOrientations)} orientation=$screenOrientation " +
+            "portrait=${packageOrientations.count { it in portraitOrientations }}/${packageOrientations.size}"
 
     /** ActivityInfo.SCREEN_ORIENTATION_PORTRAIT, SENSOR_PORTRAIT, REVERSE_PORTRAIT, USER_PORTRAIT. */
     private val portraitOrientations = setOf(1, 7, 9, 12)
