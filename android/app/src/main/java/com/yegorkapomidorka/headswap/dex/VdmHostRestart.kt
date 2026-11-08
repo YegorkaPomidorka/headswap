@@ -1,6 +1,7 @@
 package com.yegorkapomidorka.headswap.dex
 
 import android.content.Context
+import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.os.Process
@@ -33,6 +34,8 @@ internal object VdmHostRestart {
      * дальше слушает этот порт и на loopback - к нему ходим без Wi-Fi. Свойство живёт до перезагрузки телефона.
      */
     const val FIXED_TCP_PORT = 5555
+    /** Закреплённый порт только на Samsung: проверен там (h768); Pixel adbd при смене USB-режима не перезапускает. */
+    private val pinPort = Build.MANUFACTURER.equals("samsung", ignoreCase = true)
 
     private val busy = AtomicBoolean(false)
     @Volatile private var pendingUntil = 0L
@@ -96,6 +99,7 @@ internal object VdmHostRestart {
      * через Wi-Fi). Делаем только при Wi-Fi и один раз за процесс, чтобы не зациклиться, если свойство не держится.
      */
     private fun pinViaAdbd(ctx: Context) {
+        if (!pinPort) return
         if (tcpPortProperty() == FIXED_TCP_PORT.toString()) return
         if (!PhoneAdb.wifiAvailable(ctx)) return
         if (!tcpipTried.compareAndSet(false, true)) return
@@ -125,7 +129,7 @@ internal object VdmHostRestart {
             try { return start(ctx, AdbEndpoint(LocalAddressPolicy.LOOPBACK, saved)) }
             catch (e: AdbAccessException) { log("порт активации $saved: ${e.reason}") }
         }
-        if (saved != FIXED_TCP_PORT) {
+        if (pinPort && saved != FIXED_TCP_PORT) {
             try { return start(ctx, AdbEndpoint(LocalAddressPolicy.LOOPBACK, FIXED_TCP_PORT)) }
             catch (e: AdbAccessException) { log("закреплённый порт $FIXED_TCP_PORT: ${e.reason} (tcp.port=${tcpPortProperty() ?: "нет"})") }
         }
