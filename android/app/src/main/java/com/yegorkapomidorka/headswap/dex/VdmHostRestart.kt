@@ -27,6 +27,12 @@ internal object VdmHostRestart {
     /** Считаем только неудачные перезапуски: удачный бывает на каждое переподключение USB (adbd перезапускается). */
     private const val MAX_FAILED_IN_WINDOW = 3
     private val RETRY_DELAYS_MS = longArrayOf(1_000, 3_000, 6_000)
+    /**
+     * h768 (A55 без Wi-Fi в машине): порт беспроводной отладки после перезапуска adbd новый, а mDNS без Wi-Fi пуст.
+     * Хост при старте ставит service.adb.tcp.port (как `adb tcpip`), перезапущенный adbd слушает этот порт и на
+     * loopback - к нему ходим без Wi-Fi. Свойство живёт до перезагрузки телефона.
+     */
+    const val FIXED_TCP_PORT = 5555
 
     private val busy = AtomicBoolean(false)
     @Volatile private var pendingUntil = 0L
@@ -88,6 +94,10 @@ internal object VdmHostRestart {
             try { return start(ctx, AdbEndpoint(LocalAddressPolicy.LOOPBACK, saved)) }
             catch (e: AdbAccessException) { log("порт активации $saved: ${e.reason}") }
         }
+        if (saved != FIXED_TCP_PORT) {
+            try { return start(ctx, AdbEndpoint(LocalAddressPolicy.LOOPBACK, FIXED_TCP_PORT)) }
+            catch (e: AdbAccessException) { log("закреплённый порт $FIXED_TCP_PORT: ${e.reason} (tcp.port=${tcpPortProperty() ?: "нет"})") }
+        }
         val property = propertyEndpoint()
         log("порт из свойства: ${property?.port ?: "нет"}; wifi=${PhoneAdb.wifiAvailable(ctx)} adb_wifi=${Settings.Global.getInt(ctx.contentResolver, "adb_wifi_enabled", 0)}")
         val endpoint = property?.takeIf { it.port != saved } ?: discover(ctx)
@@ -123,6 +133,11 @@ internal object VdmHostRestart {
         val get = Class.forName("android.os.SystemProperties").getMethod("get", String::class.java)
         val port = (get.invoke(null, "service.adb.tls.port") as? String)?.trim()?.toIntOrNull()
         port?.takeIf { it in 1..65535 }?.let { AdbEndpoint(LocalAddressPolicy.LOOPBACK, it) }
+    }.getOrNull()
+
+    private fun tcpPortProperty(): String? = runCatching {
+        val get = Class.forName("android.os.SystemProperties").getMethod("get", String::class.java)
+        (get.invoke(null, "service.adb.tcp.port") as? String)?.trim()?.takeIf { it.isNotEmpty() }
     }.getOrNull()
 
     private fun discover(ctx: Context): AdbEndpoint? {

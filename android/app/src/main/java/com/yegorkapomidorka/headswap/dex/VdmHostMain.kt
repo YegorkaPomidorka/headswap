@@ -50,6 +50,7 @@ class VdmHostMain private constructor(private val args: VdmHostPolicy.Args) {
         note("привязка id=${if (associationId > 0) associationId else "нет"}")
         runCatching { note("ppid=${ppidOf(Process.myPid())} adbd=${adbdPid() ?: "нет"} cgroup=${File("/proc/self/cgroup").readText().trim().replace('\n', '|').take(200)}") }
         if (!deliver()) exitProcess(2)
+        pinTcpPort()
         watchForDeath()
         Looper.loop()
     }
@@ -272,6 +273,28 @@ class VdmHostMain private constructor(private val args: VdmHostPolicy.Args) {
             }
         }, "vdm-watch").apply { isDaemon = true }.start()
     }
+
+    /**
+     * h768: закрепить TCP-порт adbd на следующий его перезапуск (Samsung перезапускает adbd при смене USB-режима).
+     * Сейчас adbd не трогаем - иначе init убьёт и нас. Отчёт уходит в лог приложения.
+     */
+    private fun pinTcpPort() {
+        val want = VdmHostRestart.FIXED_TCP_PORT.toString()
+        val before = getprop("service.adb.tcp.port")
+        if (before != want) runCatching {
+            val p = ProcessBuilder("setprop", "service.adb.tcp.port", want).redirectErrorStream(true).start()
+            val out = p.inputStream.bufferedReader().use { it.readText() }.trim()
+            p.waitFor()
+            if (p.exitValue() != 0 || out.isNotEmpty()) note("setprop tcp.port: exit=${p.exitValue()} ${out.take(160)}")
+        }.onFailure { note("setprop tcp.port: ${it.describe()}") }
+        val after = getprop("service.adb.tcp.port")
+        note("tcp.port: было ${before.ifEmpty { "нет" }}, стало ${after.ifEmpty { "нет" }}")
+        report("tcp.port: было ${before.ifEmpty { "нет" }}, стало ${after.ifEmpty { "нет" }}")
+    }
+
+    private fun getprop(name: String): String = runCatching {
+        Class.forName("android.os.SystemProperties").getMethod("get", String::class.java).invoke(null, name) as String
+    }.getOrDefault("").trim()
 
     private fun adbdPid(): Int? = File("/proc").listFiles()?.firstNotNullOfOrNull { dir ->
         dir.name.toIntOrNull()?.takeIf { runCatching { File(dir, "comm").readText().trim() == "adbd" }.getOrDefault(false) }
