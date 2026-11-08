@@ -42,6 +42,8 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -86,6 +88,8 @@ private class Shown {
     var panelCx by mutableFloatStateOf(0f)
     /** нижний край панели (Y корня, без сдвига graphicsLayer): к нему в режиме чёлки прибита полоска отдельным слоем */
     var panelBottom by mutableFloatStateOf(0f)
+    /** X стыка плиток, последний раз виденный на главном: на экранах без стыка полоска стоит там же (Егор 08.11) */
+    var seamX: Float? = null
 }
 
 /**
@@ -98,6 +102,23 @@ private class Shown {
  */
 @Composable
 fun NotificationsOverlay() {
+    // Язычок и шторка - в своём масштабе: T не больше 2/15 высоты экрана. Низким широким экранам (1280x480, T 92 из таблицы)
+    // T лаунчера велик для панели поверх плиток, язычок занимал треть экрана (Егор 08.11). На 720/640/1080 почти без изменений.
+    val base = LocalMetrics.current
+    val bs = base.spec
+    val nt = min(bs.t, Math.round(bs.h * 2f / 15f))
+    val spec = if (nt >= bs.t) bs else {
+        val q = nt.toFloat() / bs.t
+        fun sc(v: Int) = max(1, Math.round(v * q))
+        LauncherSpec(bs.w, bs.h, nt, sc(bs.g), sc(bs.m), sc(bs.f1), sc(bs.f2), sc(bs.f3), bs.railSize)
+    }
+    val density = LocalDensity.current
+    val metrics = remember(spec, density) { if (spec === bs) base else LauncherMetrics(spec, density) }
+    CompositionLocalProvider(LocalMetrics provides metrics) { NotificationsOverlayBody(bs.statusBandH) }
+}
+
+@Composable
+private fun NotificationsOverlayBody(barBandH: Int) {
     val model = LauncherModel
     val repo = NotificationsRepo
     val area = model.areaRect
@@ -133,15 +154,16 @@ fun NotificationsOverlay() {
 
     val topY = model.statusBottom ?: area.top
     val ear = px(32f)
-    val barCy = (model.statusBottom ?: area.top) - s.statusBandH / 2f
-    // Полоска и язычок на главном - над стыком плиток (между музыкой и картой). Стыка нет (карта на весь экран, настройки,
-    // плитка на всю ширину) - у левого края области, в центре самого узкого язычка. Раньше без стыка за него принимался
-    // правый край плитки во всю ширину, и язычок со шторкой улетали вправо (Егор 08.11).
+    val barCy = (model.statusBottom ?: area.top) - barBandH / 2f // полоса строки статуса - в масштабе лаунчера
+    // Полоска и язычок - над стыком плиток главного (между музыкой и картой), и на всех экранах в том же пикселе (Егор 08.11):
+    // в настройках, с картой на весь экран и т.п. X стыка запоминается с главного. Плитка на всю ширину - стыка нет (раньше
+    // за него принимался её правый край, и язычок со шторкой улетали вправо). Главного ещё не было - у левого края области.
     val big = model.bigTileRect
     val seam = if (model.area == Area.Home && big != null && big.width > 0f) {
         NotifGeom.seamX(big.left, big.right, area.left, area.right, s.g.toFloat())
     } else null
-    val centerX = seam ?: (area.left + ear + NotifGeom.tongueWidth(s.t, Math.round(area.width), ear, s.g).first / 2f)
+    if (seam != null) shown.seamX = seam
+    val centerX = shown.seamX ?: (area.left + ear + NotifGeom.tongueWidth(s.t, Math.round(area.width), ear, s.g).first / 2f)
     val dragThr = px(30f).toFloat()
     // Строка статуса скрыта (Для разработчиков, Егор 07.11): полоски на строке нет, вместо неё от верха экрана висит чёлка -
     // та же панель, свёрнутая до 168x30 с полоской на нижнем крае. Язычок и шторка растут из неё (animateContentSize), а не
