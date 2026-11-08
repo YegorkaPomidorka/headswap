@@ -128,4 +128,20 @@ object NotifGeom {
     /** Список в шторке: не выше 75% высоты экрана за вычетом верха шторки и нижней кромки с полоской. */
     fun listMaxHeight(screenH: Int, top: Int, footer: Int, pad: Int): Int =
         max(0, Math.round(screenH * 0.75f) - top - footer - pad)
+
+    /**
+     * Полоска на строке статуса не лезет на текст (Vezel 08.11: с большой плиткой часов стык плиток ушёл под дату).
+     * Центр [x] полоски шириной 2*[half]; если она задевает занятый отрезок [busy] (с зазором [gap]), отодвигается
+     * к той его стороне, где больше места в [minX]..[maxX]. Свободное место между отрезками ищется по очереди.
+     */
+    fun lineAvoiding(x: Float, half: Float, gap: Float, busy: List<ClosedFloatingPointRange<Float>>, minX: Float, maxX: Float): Float {
+        var cx = x
+        repeat(busy.size) {
+            val hit = busy.firstOrNull { cx + half + gap > it.start && cx - half - gap < it.endInclusive } ?: return cx
+            val leftRoom = hit.start - minX
+            val rightRoom = maxX - hit.endInclusive
+            cx = if (leftRoom >= rightRoom) hit.start - gap - half else hit.endInclusive + gap + half
+        }
+        return cx
+    }
 }

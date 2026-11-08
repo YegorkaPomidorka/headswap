@@ -160,7 +160,12 @@ fun NotificationsOverlay() {
     // Полоска не двигается по X (Егор 07.11): чёлка висит над стыком плиток, и на язычке и шторке полоска стоит ровно там же,
     // даже если сами они упёрлись в рейку и съехали.
     val notchMode = model.hideStatusBar && model.statusSlot && model.statusBottom == null
-    fun lineX(): Float = if (notchMode || atSeam) centerX else shown.lineX ?: fallbackX
+    // и везде - не на тексте строки статуса (дата, значки, часы): на язычке и шторке полоска стоит там же, где на строке
+    val busyX = if (notchMode) emptyList() else model.statusBusyX
+    fun lineX(): Float = NotifGeom.lineAvoiding(
+        if (notchMode || atSeam) centerX else shown.lineX ?: fallbackX,
+        s.t / 2f, s.g.toFloat(), busyX, area.left, area.right,
+    )
     val lineDx: () -> Int = { Math.round(lineX() - shown.panelCx) }
     val idle = notchMode && liveItems.isNotEmpty()
     // содержимое язычка/шторки - только когда панель уже поехала (p > 0): первый кадр - чёлка, от неё и растёт

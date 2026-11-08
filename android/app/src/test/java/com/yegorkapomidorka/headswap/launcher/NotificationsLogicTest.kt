@@ -39,6 +39,18 @@ class NotificationsLogicTest {
         assertTrue(accept(raw(title = "Звонок пропущен", text = "")))
     }
 
+    @Test fun lineAvoidsStatusText() {
+        val icons = 900f..1260f
+        // стык левее даты - полоска не двигается
+        assertEquals(700f, NotifGeom.lineAvoiding(700f, 48f, 16f, listOf(icons), 120f, 1280f), 0.01f)
+        // стык под датой (большая плитка часов) - встаёт левее даты с зазором
+        assertEquals(836f, NotifGeom.lineAvoiding(950f, 48f, 16f, listOf(icons), 120f, 1280f), 0.01f)
+        // RTL: значки слева - отъезжает вправо
+        assertEquals(484f, NotifGeom.lineAvoiding(400f, 48f, 16f, listOf(60f..420f), 0f, 1160f), 0.01f)
+        // часы слева и значки справа: остаётся между ними
+        assertEquals(836f, NotifGeom.lineAvoiding(950f, 48f, 16f, listOf(130f..220f, icons), 120f, 1280f), 0.01f)
+    }
+
     @Test fun composePlainUsesTitleAndText() {
         assertEquals("Т-Банк" to "Покупка 1 240 ₽", NotificationsLogic.compose("Т-Банк", "Т-Банк", "Покупка 1 240 ₽", null, null, null))
     }

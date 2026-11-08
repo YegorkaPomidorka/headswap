@@ -22,6 +22,9 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -264,7 +267,13 @@ fun StatusBar(title: String? = null, showNet: Boolean = true) {
         }
         return
     }
-    DisposableEffect(Unit) { onDispose { model.statusBottom = null } }
+    DisposableEffect(Unit) { onDispose { model.statusBottom = null; model.statusBusyX = emptyList() } }
+    // где на строке текст: полоска уведомлений встаёт над стыком плиток и наезжала на дату (Vezel, 08.11)
+    var timeX by remember { mutableStateOf<ClosedFloatingPointRange<Float>?>(null) }
+    var iconsX by remember { mutableStateOf<ClosedFloatingPointRange<Float>?>(null) }
+    LaunchedEffect(timeX, iconsX) { model.statusBusyX = listOfNotNull(timeX, iconsX) }
+    fun Modifier.busy(set: (ClosedFloatingPointRange<Float>) -> Unit) =
+        onGloballyPositioned { val b = it.boundsInRoot(); set(b.left..b.right) }
     Row(
         Modifier.fillMaxWidth().height(m.dp(s.statusH))
             .onGloballyPositioned { model.statusBottom = it.boundsInRoot().top - s.g8 + s.statusBandH }
@@ -280,12 +289,12 @@ fun StatusBar(title: String? = null, showNet: Boolean = true) {
     ) {
         // в узкой рейке часов нет: время слева, прижато к краю (перед заголовком, если он есть)
         if (s.clockInStatus) {
-            Txt(st.time, s.fs, color = Pal.TEXT, weight = FontWeight.SemiBold, mono = true)
+            Txt(st.time, s.fs, Modifier.busy { timeX = it }, color = Pal.TEXT, weight = FontWeight.SemiBold, mono = true)
             if (title == null) Spacer(Modifier.weight(1f))
         }
         // заголовок экрана у начала (слева; в RTL справа), статус у конца; сам ряд значков всегда слева направо (создан внутри Ltr)
         if (title != null) Txt(title, s.fs, Modifier.weight(1f), color = Pal.TEXT, weight = FontWeight.SemiBold)
-        Ltr { StatusIcons(st, showNet) }
+        Ltr { Box(Modifier.busy { iconsX = it }) { StatusIcons(st, showNet) } }
     }
 }
 
