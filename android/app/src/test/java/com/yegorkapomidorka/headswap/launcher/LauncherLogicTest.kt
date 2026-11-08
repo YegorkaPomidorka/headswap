@@ -216,7 +216,13 @@ class LauncherLogicTest {
         // открыт текст лицензии -> список лицензий -> «Система» -> шагов внутри настроек больше нет
         assertEquals(SettingsPage.ABOUT to false, BackNav.settingsStep(SettingsPage.ABOUT, licenseOpen = true))
         assertEquals(SettingsPage.SYSTEM to false, BackNav.settingsStep(SettingsPage.ABOUT, licenseOpen = false))
-        for (p in SettingsPage.entries.filter { it != SettingsPage.ABOUT }) assertNull(BackNav.settingsStep(p, licenseOpen = false))
+        for (p in SettingsPage.entries.filter { it != SettingsPage.ABOUT && it != SettingsPage.COLORS }) {
+            assertNull(BackNav.settingsStep(p, licenseOpen = false))
+        }
+    }
+
+    @Test fun backFromColorsReturnsToLook() {
+        assertEquals(SettingsPage.LOOK to false, BackNav.settingsStep(SettingsPage.COLORS, licenseOpen = false))
     }
 
     @Test fun railBackIsGreyOnlyOnHome() {

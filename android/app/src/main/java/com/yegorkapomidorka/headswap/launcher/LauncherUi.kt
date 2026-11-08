@@ -109,6 +109,8 @@ class LauncherPalette(
     val bar: Color,
     /** Разделитель строк шторки уведомлений. */
     val sep: Color,
+    /** Акцент ([LocalAccent]): кнопка навигации, выбранное, свечение фона. Свой - из «Вид › Цвета» ([LauncherColors]). */
+    val accent: Color = Color(0xFFD4AF37),
 )
 
 object Palettes {
@@ -186,10 +188,9 @@ fun Modifier.launcherBackground(pal: LauncherPalette): Modifier = drawBehind {
                 radius = rx, center = Offset.Zero)
         }
     }
-    // два приглушённых свечения по бокам: ellipse 26% 70% at 0% 55% и 22% 70% at 100% 55%
-    val gold = Color(0xFFD4AF37)
-    glowAt(0f, h * 0.55f, w * 0.26f, h * 0.70f, gold.copy(alpha = pal.glowLeft))
-    glowAt(w, h * 0.55f, w * 0.22f, h * 0.70f, gold.copy(alpha = pal.glowRight))
+    // два приглушённых свечения акцентом по бокам: ellipse 26% 70% at 0% 55% и 22% 70% at 100% 55%
+    glowAt(0f, h * 0.55f, w * 0.26f, h * 0.70f, pal.accent.copy(alpha = pal.glowLeft))
+    glowAt(w, h * 0.55f, w * 0.22f, h * 0.70f, pal.accent.copy(alpha = pal.glowRight))
 }
 
 /** Иконки из макета (viewBox 24x24); пути в SVG-синтаксисе, рисуем без библиотеки иконок. */
@@ -352,7 +353,7 @@ fun Pressable(
     Box(
         Modifier
             .knobRing(focused && enabled && LauncherKnob.visible, focusShape ?: RoundedCornerShape(m.dp(m.spec.radius)),
-                ringColor ?: LocalAccent.current, LauncherKnob.gapColor(LauncherModel.lightTheme), m.spec.b4.toFloat())
+                ringColor ?: LocalAccent.current, LauncherKnob.gapColor(LocalPalette.current), m.spec.b4.toFloat())
             .then(modifier)
             .onFocusChanged { focused = it.isFocused; LauncherKnob.focused(knob, it.isFocused) }
             .focusable(enabled)

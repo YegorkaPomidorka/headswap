@@ -102,7 +102,7 @@ internal fun LayerCircle(l: Layer, sizePx: Int, modifier: Modifier = Modifier) {
         }
         is Layer.View -> {
             val (bg, fg) = when (l.view) {
-                CardView.NAVIGATOR -> LocalAccent.current to Pal.ON_GOLD
+                CardView.NAVIGATOR -> LocalAccent.current.let { it to Pal.onAccent(it) }
                 CardView.MUSIC -> Color(0xFF6B5520) to Color(0xFFF2E2B0)
                 else -> pal.btn2 to Pal.TEXT
             }
