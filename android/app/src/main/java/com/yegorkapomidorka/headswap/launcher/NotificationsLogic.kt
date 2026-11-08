@@ -120,7 +120,8 @@ object NotifGeom {
     /** Язычок по ширине текста: от 480 до 900 при T 96, но не шире области за вычетом «ушей» и полей. */
     fun tongueWidth(t: Int, areaW: Int, ear: Int, margin: Int): Pair<Int, Int> {
         val room = max(1, areaW - 2 * ear - 2 * margin)
-        val maxW = min(Math.round(900 * t / 96f), room)
+        // на широких экранах 900T/96 - едва половина области; там не уже 60% области (Егор 08.11, 1920x836)
+        val maxW = min(max(Math.round(900 * t / 96f), Math.round(areaW * 0.6f)), room)
         val minW = min(Math.round(480 * t / 96f), maxW)
         return minW to maxW
     }

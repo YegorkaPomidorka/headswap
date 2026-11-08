@@ -149,6 +149,11 @@ class NotificationsLogicTest {
         assertEquals(581, max)
     }
 
+    @Test fun tongueWidthWiderOnWideArea() {
+        // 1920x836: область ~1700, 900T/96 вышло бы ~880
+        assertEquals(1020, NotifGeom.tongueWidth(94, 1700, 32, 20).second)
+    }
+
     @Test fun tongueWidthNeverExceedsArea() {
         val (min, max) = NotifGeom.tongueWidth(96, 600, 32, 20)
         assertEquals(496, max)
