@@ -619,6 +619,14 @@ internal object EmbedHost {
             val pkg = key.substringBefore('/')
             val cls = key.substringAfter('/')
             AppLog.i("EMBED ${slot.name}: запуск $key handle=${slot.handle} (state=${slot.lastState} stale=${slot.stale})", false)
+            // То же решение о режиме окна, что примет хост (DelegatedDesktopRuntime): его лог в файл не попадает
+            appContext?.packageManager?.let { pm ->
+                val orientation = runCatching {
+                    pm.getActivityInfo(android.content.ComponentName(pkg, if (cls.startsWith('.')) pkg + cls else cls), 0).screenOrientation
+                }.getOrDefault(-1)
+                val all = com.yegorkapomidorka.headswap.dex.EmbeddedDisplayPolicy.packageOrientations(pm, pkg)
+                AppLog.i("EMBED ${slot.name}: окно ${com.yegorkapomidorka.headswap.dex.EmbeddedDisplayPolicy.describeLaunch(pkg, orientation, all)}", false)
+            }
             if (slot === alice) AppLog.i("ASSIST помощник -> дочерний дисплей, окно ${slot.geomW}x${slot.geomH}", false)
             if (slot === alice && pkg == com.yegorkapomidorka.headswap.dex.EmbeddedDisplayPolicy.GEMINI_PACKAGE) {
                 appContext?.let { com.yegorkapomidorka.headswap.dex.PhoneAssistant.clearPackage(it, pkg) }
