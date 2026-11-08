@@ -215,6 +215,8 @@ class PhoneActivationBlock(
 
     private fun begin() {
         val needsCode = !state.paired
+        com.yegorkapomidorka.headswap.AppLog.i("PHONE activate paired=${state.paired} ${VdmDesktop.debugSettingsRaw(c)} " +
+            "usbMissing=${VdmDesktop.usbDebugMissing(c)} notif=${c.getSystemService(NotificationManager::class.java).areNotificationsEnabled()}")
         // Android сам гасит «Отладку по Wi-Fi» при смене сети и перезагрузке: сопряжённый телефон тогда стучится в
         // старый порт и за секунду падает с REFUSED (лог 2026-11-03) - ведём на экран отладки и говорим, что включить
         if (!needsCode && Settings.Global.getInt(c.contentResolver, ADB_WIFI_ENABLED, 1) == 0) {

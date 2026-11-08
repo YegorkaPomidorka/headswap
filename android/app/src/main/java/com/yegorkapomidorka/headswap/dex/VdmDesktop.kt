@@ -35,10 +35,20 @@ internal object VdmDesktop {
 
     /**
      * Отладка по USB выключена: без неё Samsung при подключении ГУ кабелем останавливает adbd, а с ним shell-хост
-     * (h768, h821, SM-S942B; с галочкой SM-S942B не гаснет). Активация и главный экран на 17 её требуют.
+     * (h768, h821, SM-S942B; с галочкой SM-S942B не гаснет). Активация и главный экран на 17 её требуют - только на Samsung:
+     * Pixel 7 Pro (h966) с включённой галочкой получал «выключено», и активация не начиналась вовсе.
      */
     fun usbDebugMissing(context: android.content.Context): Boolean = supported &&
+        Build.MANUFACTURER.equals("samsung", ignoreCase = true) &&
         android.provider.Settings.Global.getInt(context.contentResolver, android.provider.Settings.Global.ADB_ENABLED, 0) == 0
+
+    /** Сырые значения для лога активации: на Pixel проверка ошибалась, видно ли там 0 или null (h966). */
+    fun debugSettingsRaw(context: android.content.Context): String {
+        val cr = context.contentResolver
+        fun raw(key: String) = runCatching { android.provider.Settings.Global.getString(cr, key) }.getOrElse { "err:" + it.javaClass.simpleName }
+        return "adb_enabled=${raw(android.provider.Settings.Global.ADB_ENABLED)} adb_wifi_enabled=${raw("adb_wifi_enabled")} " +
+            "maker=${Build.MANUFACTURER} sdk=${Build.VERSION.SDK_INT}"
+    }
 
     /** Флаги для дисплея VirtualDevice: своя группа устройства вместо OWN_DISPLAY_GROUP, блокировку снимает устройство. */
     fun hostFlags(flags: Int): Int = flags and (FLAG_OWN_DISPLAY_GROUP or FLAG_ALWAYS_UNLOCKED).inv() or FLAG_DEVICE_DISPLAY_GROUP
