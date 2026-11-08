@@ -53,6 +53,11 @@ private val VIOLET = Color(0xFFA98BFF)
 private val VIOLET_LIGHT = Color(0xFFCDBDFF)
 private val GOLD = Color(0xFFF2B33D)
 private val SUB = Color(0xFFB4BCCB)
+/** Gemini: синий акцент и градиент звезды (синий - фиолетовый - розовый), свой рисунок, без файла Google. */
+private val GEM_BLUE = Color(0xFF6FA3F7)
+private val GEM_BLUE_LIGHT = Color(0xFFB8D0FB)
+private val GEM_BG = Color(0xFF1E1F22)
+private val GEM_GRADIENT = listOf(Color(0xFF4796E3), Color(0xFF9177C7), Color(0xFFCA6673))
 
 /**
  * Плашка скрытой Алисы снизу по центру области (макет «Алиса на рабочем столе», 07.11): иконка Алисы и состояние
@@ -72,6 +77,9 @@ fun AliceVoicePill() {
     var pillW by remember { mutableIntStateOf(0) }
     val h = px(88)
     val route = phase == AliceVoice.Phase.ROUTE
+    val gemini = AliceVoice.gemini
+    val accent = if (gemini) GEM_BLUE else VIOLET
+    val accentLight = if (gemini) GEM_BLUE_LIGHT else VIOLET_LIGHT
     Box(
         Modifier
             .absoluteOffset { IntOffset((centerX - pillW / 2f).roundToInt(), (r.bottom - px(28) - h).roundToInt()) }
@@ -83,14 +91,19 @@ fun AliceVoicePill() {
     ) {
         Pressable(
             Modifier.height(m.dp(h)).padding(start = m.dp(px(16)), end = m.dp(px(28))),
-            description = stringResource(R.string.l_alice_close),
-            onTap = { LauncherActions.closeAssistant("тап по плашке Алисы"); AliceVoice.stop() },
+            description = stringResource(if (gemini) R.string.l_gemini_close else R.string.l_alice_close),
+            onTap = { LauncherActions.closeAssistant("тап по плашке помощника"); AliceVoice.stop() },
         ) {
             Row(Modifier.height(m.dp(h)), verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(m.dp(px(16)))) {
                 if (route) {
                     Box(Modifier.size(m.dp(px(56))).clip(CircleShape).background(GOLD), contentAlignment = Alignment.Center) {
                         NavArrow(m.dp(px(26)))
+                    }
+                } else if (gemini) {
+                    Box(Modifier.size(m.dp(px(56))).clip(CircleShape).background(GEM_BG)
+                        .alpha(if (phase == AliceVoice.Phase.THINKING) 0.85f else 1f), contentAlignment = Alignment.Center) {
+                        GeminiSpark(m.dp(px(34)))
                     }
                 } else {
                     Image(painterResource(R.drawable.alice_icon), null, contentScale = ContentScale.Crop,
@@ -108,9 +121,9 @@ fun AliceVoicePill() {
                     if (route) Txt(stringResource(R.string.l_alice_route_hint), px(15), color = SUB)
                 }
                 when (phase) {
-                    AliceVoice.Phase.LISTENING -> ListenBars(::px)
-                    AliceVoice.Phase.THINKING -> ThinkDots(::px)
-                    AliceVoice.Phase.SPEAKING -> SpeakBars(::px)
+                    AliceVoice.Phase.LISTENING -> ListenBars(::px, accent)
+                    AliceVoice.Phase.THINKING -> ThinkDots(::px, accent)
+                    AliceVoice.Phase.SPEAKING -> SpeakBars(::px, accentLight)
                     else -> Unit
                 }
             }
@@ -120,7 +133,7 @@ fun AliceVoicePill() {
 
 /** «Я вас слушаю»: пять полосок ровно пульсируют по очереди - громкость чужого микрофона нам не видна. */
 @Composable
-private fun ListenBars(px: (Int) -> Int) {
+private fun ListenBars(px: (Int) -> Int, color: Color) {
     val m = LocalMetrics.current
     val t = rememberInfiniteTransition(label = "listen")
     val p by t.animateFloat(0f, 1f, infiniteRepeatable(tween(1100), RepeatMode.Restart), label = "p")
@@ -130,14 +143,14 @@ private fun ListenBars(px: (Int) -> Int) {
             val phase = (p - i * 0.14f) * 2f * Math.PI.toFloat()
             val s = 0.35f + 0.65f * (0.5f + 0.5f * sin(phase))
             Box(Modifier.width(m.dp(px(5))).height(m.dp((px(36) * s).roundToInt().coerceAtLeast(1)))
-                .clip(RoundedCornerShape(50)).background(VIOLET))
+                .clip(RoundedCornerShape(50)).background(color))
         }
     }
 }
 
 /** «Думаю...»: три точки прыгают по очереди. */
 @Composable
-private fun ThinkDots(px: (Int) -> Int) {
+private fun ThinkDots(px: (Int) -> Int, color: Color) {
     val m = LocalMetrics.current
     val t = rememberInfiniteTransition(label = "think")
     val p by t.animateFloat(0f, 1f, infiniteRepeatable(tween(1200, easing = FastOutSlowInEasing), RepeatMode.Restart), label = "p")
@@ -147,14 +160,14 @@ private fun ThinkDots(px: (Int) -> Int) {
             val x = ((p - i * 0.17f) % 1f + 1f) % 1f
             val up = if (x < 0.4f) sin(x / 0.4f * Math.PI.toFloat()) else 0f
             Box(Modifier.absoluteOffset { IntOffset(0, -(px(6) * up).roundToInt()) }.size(m.dp(px(9)))
-                .alpha(0.25f + 0.75f * up).clip(CircleShape).background(VIOLET))
+                .alpha(0.25f + 0.75f * up).clip(CircleShape).background(color))
         }
     }
 }
 
 /** «Говорю»: высота полосок от громкости голоса в захвате звука рабочего стола; без захвата - мягкая анимация. */
 @Composable
-private fun SpeakBars(px: (Int) -> Int) {
+private fun SpeakBars(px: (Int) -> Int, light: Color) {
     val m = LocalMetrics.current
     var level by remember { mutableFloatStateOf(0f) }
     var time by remember { mutableFloatStateOf(0f) }
@@ -173,8 +186,27 @@ private fun SpeakBars(px: (Int) -> Int) {
             val wobble = 0.8f + 0.2f * sin(time * (9f + i * 1.7f) + i)
             val s = (level * mult[i] * wobble).coerceIn(0.12f, 1f)
             Box(Modifier.width(m.dp(px(4))).height(m.dp((px(44) * s).roundToInt().coerceAtLeast(1)))
-                .clip(RoundedCornerShape(50)).background(if (i % 2 == 0) Color.White else VIOLET_LIGHT))
+                .clip(RoundedCornerShape(50)).background(if (i % 2 == 0) Color.White else light))
         }
+    }
+}
+
+/** Четырёхлучевая звезда Gemini с вогнутыми гранями и градиентом по диагонали. */
+@Composable
+private fun GeminiSpark(size: androidx.compose.ui.unit.Dp) {
+    Canvas(Modifier.size(size)) {
+        val w = this.size.width
+        val c = w / 2f
+        val path = Path().apply {
+            moveTo(c, 0f)
+            quadraticTo(c * 1.08f, c * 0.92f, w, c)
+            quadraticTo(c * 1.08f, c * 1.08f, c, w)
+            quadraticTo(c * 0.92f, c * 1.08f, 0f, c)
+            quadraticTo(c * 0.92f, c * 0.92f, c, 0f)
+            close()
+        }
+        drawPath(path, androidx.compose.ui.graphics.Brush.linearGradient(GEM_GRADIENT,
+            start = androidx.compose.ui.geometry.Offset(0f, 0f), end = androidx.compose.ui.geometry.Offset(w, w)))
     }
 }
 

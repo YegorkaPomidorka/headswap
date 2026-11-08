@@ -15,8 +15,8 @@ object RouteIntent {
         val point = when (scheme) {
             // Яндекс Навигатор: yandexnavi://build_route_on_map?lat_to=..&lon_to=..
             "yandexnavi" -> pair(q["lat_to"], q["lon_to"])
-            // Яндекс Карты: rtext=from~to, последняя точка "lat,lon"
-            "yandexmaps", "https", "http" -> q["rtext"]?.substringAfterLast('~')?.let(::latLon)
+            // Яндекс Карты: rtext=from~to, последняя точка "lat,lon"; Google Карты от Gemini - googleMapsDir
+            "yandexmaps", "https", "http" -> q["rtext"]?.substringAfterLast('~')?.let(::latLon) ?: googleMapsDir(uri)
             "geo" -> latLon(uri.substringAfter(':').substringBefore('?')) ?: q["q"]?.let(::latLon)
             "google.navigation" -> (q["q"] ?: uri.substringAfter(':').removePrefix("q=")).let(::latLon)
             else -> null
@@ -25,6 +25,20 @@ object RouteIntent {
     }
 
     private fun geo(p: Pair<Double, Double>) = "geo:${p.first},${p.second}"
+
+    private val DIR_POINT = Regex("!1d(-?[0-9.]+)!2d(-?[0-9.]+)")
+
+    /**
+     * Gemini открывает Google Карты ссылкой google.com/maps/dir//<куда>/data=...!1d<долгота>!2d<широта>... (стенд 07.11):
+     * последняя пара !1d!2d - точка назначения. Других путей и ссылок без координат не берём.
+     */
+    private fun googleMapsDir(uri: String): Pair<Double, Double>? {
+        val path = uri.substringAfter("://").substringBefore('?')
+        val host = path.substringBefore('/').lowercase()
+        if (!(host.endsWith("google.com") || host.startsWith("maps.google.")) || !path.contains("/maps/dir/")) return null
+        val m = DIR_POINT.findAll(path).lastOrNull() ?: return null
+        return pair(m.groupValues[2], m.groupValues[1])
+    }
 
     private fun pair(lat: String?, lon: String?): Pair<Double, Double>? {
         val a = lat?.toDoubleOrNull() ?: return null

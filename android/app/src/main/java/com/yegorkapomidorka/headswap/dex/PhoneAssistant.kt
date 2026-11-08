@@ -34,6 +34,11 @@ object PhoneAssistant {
      * Главный процесс: MANAGE_ACTIVITY_TASKS из активации, скрытый API (--no-hidden-api-checks).
      */
     fun watch(ctx: Context, displayId: Int, pkg: String, onForeign: (android.app.ActivityManager.RunningTaskInfo) -> Unit) {
+        // Gemini не переносим: при погашенном экране телефона он ищет встроенный второй экран, наш не считает и
+        // закрывает сессию без ответа (лог Google «Main display is OFF», стенд 07.11). Его плашка остаётся на телефоне.
+        val gemini = pkg == EmbeddedDisplayPolicy.GEMINI_PACKAGE
+        val pullMs = if (gemini) 0L else PULL_MS
+        val maxMoves = 3
         if (displayId <= 0) { AppLog.i("ASSIST дочерний дисплей Алисы неизвестен"); return }
         if (ctx.checkSelfPermission(MANAGE_ACTIVITY_TASKS) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
             AppLog.i("ASSIST нет MANAGE_ACTIVITY_TASKS: если Яндекс уйдёт на телефон, в панель не вернётся (повторите активацию)")
@@ -45,7 +50,8 @@ object PhoneAssistant {
             val moved = HashMap<Int, Int>()
             val reported = HashSet<Int>()
             while (gen == watchGen && android.os.SystemClock.elapsedRealtime() - start < WATCH_MS) {
-                val pulling = android.os.SystemClock.elapsedRealtime() - start < PULL_MS
+                val elapsed = android.os.SystemClock.elapsedRealtime() - start
+                val pulling = elapsed < pullMs
                 @Suppress("DEPRECATION")
                 val tasks = runCatching { am.getRunningTasks(30) }.getOrDefault(emptyList())
                 for (t in tasks) {
@@ -60,7 +66,7 @@ object PhoneAssistant {
                 // рабочего стола, и Алиса уходила в неё (поездка 05.11, wm_task_moved на 491)
                 val found = if (!pulling) emptyList() else tasks.filter { t ->
                     val d = FrameworkTaskIdentityReader.read(t)?.displayId
-                    t.topActivity?.packageName == pkg && (moved[t.taskId] ?: 0) < 3 && d != null && d != displayId
+                    t.topActivity?.packageName == pkg && (moved[t.taskId] ?: 0) < maxMoves && d != null && d != displayId
                 }
                 for (t in found) {
                     moved[t.taskId] = (moved[t.taskId] ?: 0) + 1
@@ -92,6 +98,30 @@ object PhoneAssistant {
             }.getOrDefault(false)
             AppLog.i("ASSIST панель: задача ${t.taskId} ${t.topActivity?.shortClassName} ${if (ok) "закрыта" else "не закрылась"}")
         }
+    }
+
+    /**
+     * Gemini: перед запуском закрыть все задачи Google app. Живое главное окно Gemini (MainActivity) Google считает
+     * открытым, и ответ уходит в него текстом - без плашки, голоса и Карт (стенд 07.11).
+     */
+    fun clearPackage(ctx: Context, pkg: String) {
+        val am = ctx.getSystemService(android.app.ActivityManager::class.java)
+        @Suppress("DEPRECATION")
+        val tasks = runCatching { am.getRunningTasks(30) }.getOrDefault(emptyList())
+            .filter { it.topActivity?.packageName == pkg || it.baseIntent.component?.packageName == pkg }
+        for (t in tasks) removeTask(t.taskId)
+    }
+
+    /**
+     * Gemini: закрыть [pkg] на экране телефона (дисплей 0) до вопроса. Ссылку маршрута Gemini отдаёт Картам в живую
+     * задачу (START_DELIVERED_TO_TOP), а [watchPhone] видит только новые задачи (стенд 07.11).
+     */
+    fun closePhonePackage(ctx: Context, pkg: String) {
+        val am = ctx.getSystemService(android.app.ActivityManager::class.java)
+        @Suppress("DEPRECATION")
+        runCatching { am.getRunningTasks(30) }.getOrDefault(emptyList())
+            .filter { FrameworkTaskIdentityReader.read(it)?.displayId == 0 && it.topActivity?.packageName == pkg }
+            .forEach { removeTask(it.taskId) }
     }
 
     /** Панель Алисы закрыта: слежение [watch] кончается на следующем шаге. */
@@ -181,7 +211,8 @@ object PhoneAssistant {
      * маршрут ([geoFor] не null, например yandexnavi://build_route_on_map от Алисы на телефоне) - в [onRoute], один раз
      * на задачу. Задачи, что были до старта, не трогаем. Следующий вызов заменяет прежний ловец. Поточный поток.
      */
-    fun watchPhone(ctx: Context, geoFor: (String?) -> String?, onRoute: (android.app.ActivityManager.RunningTaskInfo, String) -> Unit) {
+    fun watchPhone(ctx: Context, geoFor: (String?) -> String?, onRoute: (android.app.ActivityManager.RunningTaskInfo, String) -> Unit,
+        onMusic: ((android.app.ActivityManager.RunningTaskInfo) -> Unit)? = null) {
         val gen = ++phoneGen
         val known = HashSet<Int>()
         Thread({
@@ -195,7 +226,19 @@ object PhoneAssistant {
                 for (t in tasks) {
                     if (!known.add(t.taskId)) continue
                     if (FrameworkTaskIdentityReader.read(t)?.displayId != 0) continue
-                    val geo = geoFor(t.baseIntent.dataString) ?: continue
+                    if (onMusic != null && youtubeMusicLink(t)) {
+                        AppLog.i("ASSIST YouTube Music на телефоне: задача ${t.taskId} ${t.baseIntent.dataString}")
+                        runCatching { onMusic(t) }.onFailure { AppLog.i("ASSIST музыка: ${it.javaClass.simpleName}: ${it.message}") }
+                        continue
+                    }
+                    val geo = geoFor(t.baseIntent.dataString)
+                    if (geo == null) {
+                        // разбор маршрутов Gemini: что Карты получили на самом деле
+                        if (t.topActivity?.packageName == "com.google.android.apps.maps") {
+                            AppLog.i("ASSIST Карты на телефоне без маршрута: ${t.baseIntent.action} ${t.baseIntent.dataString}")
+                        }
+                        continue
+                    }
                     AppLog.i("ASSIST маршрут на телефоне: ${t.topActivity?.packageName} задача ${t.taskId} ${t.baseIntent.dataString}")
                     runCatching { onRoute(t, geo) }.onFailure { AppLog.i("ASSIST маршрут: ${it.javaClass.simpleName}: ${it.message}") }
                 }
@@ -205,6 +248,14 @@ object PhoneAssistant {
     }
 
     fun stopPhoneWatch() { phoneGen++ }
+
+    const val YOUTUBE_MUSIC = "com.google.android.apps.youtube.music"
+
+    /** Gemini на «включи музыку» открывает YouTube Music ссылкой music.youtube.com (стенд 07.11). */
+    private fun youtubeMusicLink(t: android.app.ActivityManager.RunningTaskInfo): Boolean {
+        val pkg = t.baseIntent.component?.packageName ?: t.topActivity?.packageName
+        return pkg == YOUTUBE_MUSIC && t.baseIntent.dataString?.startsWith("https://music.youtube.com") == true
+    }
 
     fun launch(ctx: Context, displayId: Int) {
         if (displayId <= 0) { AppLog.i("ASSIST дисплей рабочего стола не готов"); return }

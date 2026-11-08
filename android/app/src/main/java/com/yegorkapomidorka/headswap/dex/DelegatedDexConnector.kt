@@ -276,6 +276,9 @@ class DelegatedDexConnector(context: Context, private val core: AaBridgeCore,
         enqueue { it.injectKey(0, keycode); it.injectKey(1, keycode) }
     }
 
+    private val keyHook: (Int) -> Unit = { inject(it) }
+    init { DesktopKeys.injectKey = keyHook }
+
     override fun requestKeyFrame() { /* CarLife requests its own encoder's IDR directly. */ }
 
     override fun showDesktop(): Boolean {
@@ -328,6 +331,7 @@ class DelegatedDexConnector(context: Context, private val core: AaBridgeCore,
             stopping.compareAndSet(false, true).also { if (it) {
                 EmbeddedSessionRegistry.deactivate(this)
                 inputGateway.deactivate()
+                if (DesktopKeys.injectKey === keyHook) DesktopKeys.injectKey = null
             } }
         }
         if (firstStop) {
