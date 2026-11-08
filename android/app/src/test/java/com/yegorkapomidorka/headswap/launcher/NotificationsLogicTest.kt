@@ -39,6 +39,12 @@ class NotificationsLogicTest {
         assertTrue(accept(raw(title = "Звонок пропущен", text = "")))
     }
 
+    @Test fun seamOfBigTile() {
+        assertEquals(692f, NotifGeom.seamX(700f, 1260f, 120f, 1260f, 16f)!!, 0.01f) // карта справа - стык слева от неё
+        assertEquals(708f, NotifGeom.seamX(120f, 700f, 120f, 1260f, 16f)!!, 0.01f)  // большая слева - справа от неё
+        assertEquals(null, NotifGeom.seamX(120f, 1260f, 120f, 1260f, 16f))           // на всю ширину - стыка нет
+    }
+
     @Test fun lineAvoidsStatusText() {
         val icons = 900f..1260f
         // стык левее даты - полоска не двигается
