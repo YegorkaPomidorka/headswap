@@ -86,8 +86,32 @@ object LauncherKnob : DesktopKeys.Sink {
             AppLog.i("LAUNCHER шайба: ${decline?.let { "не беру ($it), клавиши идут в окно" } ?: "беру сам"}", false)
         }
         if (decline != null) return false
-        main.post { run(k) }
+        main.post { if (!toWindow(k)) run(k) }
         return true
+    }
+
+    @Volatile private var lastWindow: String? = null
+
+    /**
+     * Чужое приложение развёрнуто на всю область (навигатор окном, приложение из списка): шайба и стрелки идут в его
+     * дисплей, HOME/NAVI/MUSIC остаются лаунчеру, BACK лаунчер и так не берёт. Свой хост Car App (2ГИС) - кнопки
+     * шаблона наши, их обходит фокус Compose. Главный поток.
+     */
+    private fun toWindow(k: Knob): Boolean {
+        val code = KnobLogic.windowKey(k) ?: return false
+        val slot = when (LauncherModel.area) {
+            Area.Navigator -> EmbedHost.nav.takeUnless { it.carHost }
+            is Area.App -> EmbedHost.app
+            else -> null
+        }
+        val sent = slot != null && EmbedHost.key(slot, code)
+        val where = if (sent) "окно ${slot?.name} (${slot?.pkg})" else null
+        if (where != lastWindow) {
+            lastWindow = where
+            AppLog.i("LAUNCHER шайба: ${where?.let { "клавиши идут в $it" } ?: "фокус лаунчера"}", false)
+        }
+        if (sent) visible = false
+        return sent
     }
 
     private fun run(k: Knob) {
@@ -136,7 +160,7 @@ object LauncherKnob : DesktopKeys.Sink {
     }
 
     /** Цвет зазора между рамкой и кнопкой - фон темы, чтобы рамка читалась и на обложке, и на золоте. */
-    fun gapColor(light: Boolean) = if (light) Color(0xFFFBF7EC) else Color(0xFF0A0F14)
+    fun gapColor(pal: LauncherPalette): Color = pal.bgStops.first().second
 }
 
 /** Рамка фокуса внутри границ кнопки: снаружи её срезал бы clip карточки. Кольцо [color] и под ним зазор [gap]. */

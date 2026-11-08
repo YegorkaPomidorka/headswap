@@ -279,6 +279,13 @@ class Speakers:
             old = self.outs.pop(chan, None)
             if old:
                 old.close()
+            if not self.outs:
+                # PortAudio запоминает устройство по умолчанию при старте: сменили его в Windows - перечитать
+                try:
+                    self.sd._terminate()
+                    self.sd._initialize()
+                except Exception as e:  # noqa: BLE001
+                    self.log(f"speakers: PortAudio reinit failed: {e}")
             try:
                 self.outs[chan] = _PcmOut(self.sd, rate, ch)
                 self.log(f"speakers: {CH_NAMES[chan]} {rate} Hz {ch} ch -> {self.sd.query_devices(kind='output')['name']}")
@@ -400,8 +407,16 @@ def build_protocol_version() -> bytes:
     return cmd_inner(HU_PROTOCOL_VERSION, pb_int(1, 4) + pb_int(2, 2))
 
 
-def build_statistic_info() -> bytes:
-    body = (pb_str(1, "304AC406514A") + pb_str(2, "v2.3.4") + pb_int(3, 2055) + pb_str(4, "21580005")
+# Профили ГУ (--hu): channel в STATISTIC_INFO, поля 13/14 HU_INFO (производитель/модель), экран по умолчанию.
+# mazda - Desay G6S из Mazda CX-5: мост узнаёт его по каналу 20622116 и паре «Desay SV Automotive»/«G6S» (huDesayG6S).
+HU_PROFILES = {
+    "honda": {"channel": "21580005", "manufacturer": "SEMIDRIVE", "model": "x9 for arm64", "size": (1920, 720)},
+    "mazda": {"channel": "20622116", "manufacturer": "Desay SV Automotive", "model": "G6S", "size": (1728, 648)},
+}
+
+
+def build_statistic_info(channel: str = "21580005") -> bytes:
+    body = (pb_str(1, "304AC406514A") + pb_str(2, "v2.3.4") + pb_int(3, 2055) + pb_str(4, channel)
             + pb_int(5, 0) + pb_int(6, 0) + pb_int(7, 0))
     return cmd_inner(STATISTIC_INFO, body)
 
@@ -416,8 +431,10 @@ HU_INFO_FIELDS = [
 ]
 
 
-def build_hu_info() -> bytes:
-    body = b"".join(pb_str(f, v) for f, v in HU_INFO_FIELDS) + pb_int(21, 31) + pb_str(23, "yyy-zzz-xxx") + pb_str(24, "v2.3.4")
+def build_hu_info(profile: str = "honda") -> bytes:
+    p = HU_PROFILES[profile]
+    fields = dict(HU_INFO_FIELDS) | {13: p["manufacturer"], 14: p["model"]}
+    body = b"".join(pb_str(f, v) for f, v in fields.items()) + pb_int(21, 31) + pb_str(23, "yyy-zzz-xxx") + pb_str(24, "v2.3.4")
     return cmd_inner(HU_INFO, body)
 
 
@@ -477,8 +494,9 @@ class Options:
                  probe_8999=False, probe_port=PROBE_PORT,
                  video_kbps=0, dip_kbps=0, dip_at=20.0, dip_for=5.0,
                  pause_cycles=0, pause_every=10.0, pause_for=3.0,
-                 size: tuple[int, int] = DEFAULT_SIZE):
+                 size: tuple[int, int] = DEFAULT_SIZE, hu: str = "honda"):
         self.host, self.port, self.duration = host, port, duration
+        self.hu = hu                                        # профиль ГУ: HU_PROFILES (канал, производитель, кнопки)
         self.size = size                                    # какой экран ГУ объявляем в VIDEO_ENCODER_INIT
         # циклы паузы: pause_every с от первого кадра (потом от каждого START) шлём PAUSE, через pause_for с - START
         self.pause_cycles, self.pause_every, self.pause_for = pause_cycles, pause_every, pause_for
@@ -668,8 +686,8 @@ class HeadUnit:
         self.send_init_burst()
 
     def send_init_burst(self):
-        self.send_cmd(STATISTIC_INFO, build_statistic_info())
-        self.send_cmd(HU_INFO, build_hu_info())
+        self.send_cmd(STATISTIC_INFO, build_statistic_info(HU_PROFILES[self.o.hu]["channel"]))
+        self.send_cmd(HU_INFO, build_hu_info(self.o.hu))
         if not self.o.no_auth:
             self.auth_random = make_random_value()
             self.send_cmd(HU_AUTHEN_REQUEST, build_auth_request(self.auth_random))
@@ -1235,8 +1253,12 @@ def parse_args(argv=None) -> argparse.Namespace:
                    help="--view: do not play MEDIA/TTS on the PC speakers (playback needs the sounddevice module)")
     p.add_argument("--view-scale", type=float, default=None, metavar="K",
                    help="--view: window scale (default: fit to the PC screen, at most 1.0); click coordinates are mapped back")
-    p.add_argument("--size", default="1920x720", metavar="WxH",
-                   help="screen size the HU asks for in VIDEO_ENCODER_INIT (default 1920x720); the bridge answers with its own "
+    p.add_argument("--hu", choices=tuple(HU_PROFILES), default="honda",
+                   help="HU profile: channel in STATISTIC_INFO, manufacturer/model in HU_INFO, default --size and the wheel "
+                        "buttons. mazda = Desay G6S (Mazda CX-5, 1728x648) with the Commander knob: buttons under the window, "
+                        "mouse wheel = knob turn, arrows = tilts, Enter = OK")
+    p.add_argument("--size", default=None, metavar="WxH",
+                   help="screen size the HU asks for in VIDEO_ENCODER_INIT (default by --hu: 1920x720, mazda 1728x648); the bridge answers with its own "
                         "choice in INIT_DONE, the log shows both")
     p.add_argument("--no-auth", action="store_true", help="do not send HU_AUTHEN_REQUEST")
     p.add_argument("--touch-test", action="store_true",
@@ -1244,7 +1266,7 @@ def parse_args(argv=None) -> argparse.Namespace:
     p.add_argument("--out", type=Path, default=HERE / "out", help="output directory (default pc-headunit/out)")
     a = p.parse_args(argv)
     try:
-        a.size = parse_size(a.size)
+        a.size = parse_size(a.size) if a.size else HU_PROFILES[a.hu]["size"]
     except ValueError as e:
         p.error(f"--size: {e}")
     if a.view_scale is not None and not a.view:
@@ -1262,10 +1284,34 @@ def parse_args(argv=None) -> argparse.Namespace:
     return a
 
 
+# Клавиатура и колесо мыши окна -> шайба Mazda (carlife_view.Viewer knob=): событие tk -> hard key.
+MAZDA_KNOB_KEYS = {"wheel_up": 0x07, "wheel_down": 0x06, "<Left>": 0x15, "<Right>": 0x16, "<Up>": 0x17,
+                   "<Down>": 0x18, "<Return>": 0x14}
+
+
 def wheel_buttons(hu: HeadUnit) -> list[tuple[str, object]]:
     """Ряд кнопок руля под окном. Vezel по CarLife шлёт только голос (MODULE_CONTROL VR=1) и BACK (0x0E);
     треки и трубка у него идут по BT, здесь они hard key CarLife, как у других ГУ (HARD_KEY_TO_ANDROID моста)."""
     k = hu.send_hard_key
+    if hu.o.hu == "mazda":
+        # Mazda Commander (лог h737/04.11): поворот 6/7, наклоны 0x15..0x18, нажатие OK 0x14, Домой = MAIN 0x1E,
+        # NAVI 0x0B, MEDIA 0x09, BACK 0x0E. «Избранное» не берём: его код неизвестен.
+        return [
+            ("⟲", lambda: k(0x07)),
+            ("⟳", lambda: k(0x06)),
+            ("←", lambda: k(0x15)),
+            ("→", lambda: k(0x16)),
+            ("↑", lambda: k(0x17)),
+            ("↓", lambda: k(0x18)),
+            ("OK", lambda: k(0x14)),
+            ("Назад", lambda: k(HARD_KEY_BACK)),
+            ("Домой", lambda: k(0x1E)),
+            ("Нави", lambda: k(0x0B)),
+            ("Медиа", lambda: k(0x09)),
+            ("Голос", hu.send_voice_key),
+            ("|<<", lambda: k(0x0F)),
+            (">>|", lambda: k(0x10)),
+        ]
     return [
         ("Голос", hu.send_voice_key),
         ("VR_START", lambda: k(0x21)),
@@ -1292,7 +1338,8 @@ def run_view(hu: HeadUnit, scale: float | None) -> int:
     if not hu.tcp6:
         hu.listen()                                         # порт занят - узнаём сразу, до окна
     viewer = V.Viewer(ffmpeg, hu.o.size, scale, hu.send_touch_event, hu.send_hard_key, lambda: hu.finish("window closed"),
-                      lambda: worker.is_alive(), hu.log, HARD_KEY_BACK, HARD_KEY_HOME, wheel=wheel_buttons(hu))
+                      lambda: worker.is_alive(), hu.log, HARD_KEY_BACK, HARD_KEY_HOME, wheel=wheel_buttons(hu),
+                      knob=MAZDA_KNOB_KEYS if hu.o.hu == "mazda" else None)
     hu.video_sink, hu.size_sink = viewer.pipe.on_video, viewer.pipe.set_video_size
 
     def work():
@@ -1320,7 +1367,7 @@ def main(argv=None) -> int:
                           discover_timeout=a.discover_timeout, probe_8999=a.probe_8999,
                           video_kbps=a.video_kbps, dip_kbps=a.dip_kbps, dip_at=a.dip_at, dip_for=a.dip_for,
                           pause_cycles=a.pause_cycles, pause_every=a.pause_every, pause_for=a.pause_for,
-                          size=a.size))
+                          size=a.size, hu=a.hu))
     if a.view:
         if not a.mute:
             hu.speakers = Speakers(hu.log)

@@ -162,4 +162,25 @@
     <string name="l_notif_clear_all">مسح الكل</string>
     <string name="l_notif_dismiss">تجاهل</string>
     <string name="l_notif_open_in">فتح في %1$s</string>
+    <string name="l_alice_listening">أنا أستمع</string>
+    <string name="l_alice_thinking">أفكّر...</string>
+    <string name="l_alice_speaking">أتحدّث</string>
+    <string name="l_alice_route">المسار في تطبيق الملاحة</string>
+    <string name="l_alice_route_hint">اختر مسارًا واضغط «انطلق»</string>
+    <string name="l_alice_close">إغلاق Alice</string>
+    <string name="l_gemini_close">إغلاق Gemini</string>
+    <string name="l_favorites">المفضّلة</string>
+    <string name="l_favorites_empty">لا توجد جهات اتصال مفضّلة. ضع عليها نجمة في دفتر الهاتف</string>
+    <string name="l_s_colors">الألوان</string>
+    <string name="l_s_colors_sub">لون التمييز والخلفية، لليل والنهار كلٌّ على حدة</string>
+    <string name="l_s_colors_night">الليل</string>
+    <string name="l_s_colors_day">النهار</string>
+    <string name="l_s_colors_reset">إعادة الضبط</string>
+    <string name="l_s_colors_accent">لون التمييز</string>
+    <string name="l_s_colors_bg_hue">درجة لون الخلفية</string>
+    <string name="l_s_colors_bg_sat">تشبّع الخلفية</string>
+    <string name="l_s_colors_hint">ما دامت هذه الشاشة مفتوحة، يعرض سطح المكتب الألوان التي تعدّلها. تظهر ألوان الليل في السمة الداكنة، وألوان النهار في الفاتحة.</string>
+    <string name="l_s_alice_voice">Alice بالصوت فقط</string>
+    <string name="l_s_alice_voice_on">بلا نافذة، شريط صغير في الأسفل؛ يعمل حتى والهاتف مقفل</string>
+    <string name="l_s_alice_voice_off">Alice في لوحة بجانب الشريط الجانبي</string>
 </resources>

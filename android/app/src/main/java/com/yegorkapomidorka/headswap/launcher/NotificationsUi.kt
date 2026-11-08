@@ -444,6 +444,9 @@ private fun GoldHandle(modifier: Modifier = Modifier) {
     val lineH = max(4, Math.round(t / 12f)).toFloat()
     val pad = lineH * 1.6f
     val anim = LauncherModel.animations
+    // язычок цвета акцента; перелив - акцент, высветленный к белому (у золота - #FFF1B8)
+    val gold = LocalAccent.current
+    val goldLight = if (gold == Pal.GOLD) GOLD_LIGHT else androidx.compose.ui.graphics.lerp(gold, Color.White, 0.7f)
     val tr = rememberInfiniteTransition(label = "gold-handle")
     val shimmer = tr.animateFloat(0f, 1f, infiniteRepeatable(tween(2400, easing = LinearEasing)), label = "shimmer")
     val glow = tr.animateFloat(0.35f, 0.85f, infiniteRepeatable(tween(1200, easing = FastOutSlowInEasing), RepeatMode.Reverse), label = "glow")
@@ -459,7 +462,7 @@ private fun GoldHandle(modifier: Modifier = Modifier) {
         for (i in 3 downTo 1) {
             val grow = lineH * 0.5f * i
             drawRoundRect(
-                Pal.GOLD.copy(alpha = g * 0.10f), Offset(left - grow, top - grow),
+                gold.copy(alpha = g * 0.10f), Offset(left - grow, top - grow),
                 Size(lineW + 2 * grow, lineH + 2 * grow), CornerRadius(lineH / 2 + grow),
             )
         }
@@ -467,7 +470,7 @@ private fun GoldHandle(modifier: Modifier = Modifier) {
         val cx = left + lineW * (x * 1.4f - 0.2f)
         val half = lineW * 0.9f
         val brush = Brush.horizontalGradient(
-            0f to Pal.GOLD, 0.35f to Pal.GOLD, 0.5f to GOLD_LIGHT, 0.65f to Pal.GOLD, 1f to Pal.GOLD,
+            0f to gold, 0.35f to gold, 0.5f to goldLight, 0.65f to gold, 1f to gold,
             startX = cx - half, endX = cx + half,
         )
         drawRoundRect(brush, Offset(left, top), Size(lineW, lineH), CornerRadius(lineH / 2))

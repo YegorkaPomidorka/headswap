@@ -42,10 +42,24 @@ internal object EmbeddedDisplayPolicy {
         check(existing in 0 until MAX_CHILDREN) { "Одновременно доступны не более трёх виджетов" }
     }
 
-    /** Алиса Яндекса открывается по ASSIST, а не из списка запуска: только этот компонент идёт без CATEGORY_LAUNCHER. */
+    const val GEMINI_PACKAGE = "com.google.android.googlequicksearchbox"
+    const val GEMINI_CLASS = "com.google.android.voicesearch.handsfree.HandsFreeActivity"
+    /** RecognizerIntent.ACTION_VOICE_SEARCH_HANDS_FREE: Google app открывает плашку Gemini сразу с микрофоном (стенд 07.11). */
+    const val ACTION_HANDS_FREE = "android.speech.action.VOICE_SEARCH_HANDS_FREE"
+
+    fun gemini(packageName: String, className: String): Boolean = packageName == GEMINI_PACKAGE && className == GEMINI_CLASS
+
+    /**
+     * Помощник, а не список запуска: Алиса Яндекса по ASSIST, Gemini по [ACTION_HANDS_FREE] (ASSIST у Google app открывает
+     * старый голосовой поиск). Только эти компоненты идут без CATEGORY_LAUNCHER.
+     */
     fun assistLaunch(packageName: String, className: String): Boolean =
         (packageName == "com.yandex.searchapp" || packageName == "ru.yandex.searchplugin") &&
-            className == "ru.yandex.searchplugin.AssistantActivityAlias"
+            className == "ru.yandex.searchplugin.AssistantActivityAlias" || gemini(packageName, className)
+
+    /** Действие запуска помощника из [assistLaunch]. */
+    fun assistAction(packageName: String, className: String): String =
+        if (gemini(packageName, className)) ACTION_HANDS_FREE else "android.intent.action.ASSIST"
 
     /** WindowConfiguration.WINDOWING_MODE_MULTI_WINDOW. */
     const val WINDOWING_MULTI_WINDOW = 6
@@ -56,9 +70,30 @@ internal object EmbeddedDisplayPolicy {
     /**
      * Telegram в полноэкранном режиме берёт высоту строки состояния телефона (152 px при 520 dpi), если уже открывался
      * на телефоне, и игнорирует нулевой инсет плитки: сверху пустая полоса. В многооконном режиме он верит инсету (ADR 0031).
+     * Портретные по манифесту (Звук и т.п.) в полноэкранном режиме система рисует узким столбиком с полями
+     * (letterbox); в многооконном она игнорирует запрос ориентации и растягивает окно на плитку.
+     * Запуск часто идёт через заставку без ориентации (Звук: SplashAliasDefault), а портрет просят остальные экраны,
+     * поэтому при UNSPECIFIED у запускаемого смотрим на весь пакет: портретных больше половины - тоже портретное.
      * Остальным не включаем: YouTube в многооконном режиме не уходит на весь экран.
      */
-    fun multiWindowLaunch(packageName: String): Boolean = packageName in multiWindowPackages
+    fun multiWindowLaunch(packageName: String, screenOrientation: Int = -1, packageOrientations: List<Int> = emptyList()): Boolean =
+        packageName in multiWindowPackages || screenOrientation in portraitOrientations ||
+            screenOrientation == -1 && packageOrientations.count { it in portraitOrientations } * 2 > packageOrientations.size
+
+    /** Ориентации всех activity пакета для [multiWindowLaunch]; пусто, если пакет не виден. */
+    fun packageOrientations(pm: android.content.pm.PackageManager, packageName: String): List<Int> = runCatching {
+        @Suppress("DEPRECATION")
+        pm.getPackageInfo(packageName, android.content.pm.PackageManager.GET_ACTIVITIES).activities.orEmpty()
+            .map { it.screenOrientation }
+    }.getOrDefault(emptyList())
+
+    /** Строка для лога: решение и из чего оно. */
+    fun describeLaunch(packageName: String, screenOrientation: Int, packageOrientations: List<Int>): String =
+        "multiWindow=${multiWindowLaunch(packageName, screenOrientation, packageOrientations)} orientation=$screenOrientation " +
+            "portrait=${packageOrientations.count { it in portraitOrientations }}/${packageOrientations.size}"
+
+    /** ActivityInfo.SCREEN_ORIENTATION_PORTRAIT, SENSOR_PORTRAIT, REVERSE_PORTRAIT, USER_PORTRAIT. */
+    private val portraitOrientations = setOf(1, 7, 9, 12)
 
     fun requireChildId(id: Int, parentId: Int) {
         check(parentId > 0 && id > 0 && id != parentId) { "Виджет не получил собственный дополнительный экран" }

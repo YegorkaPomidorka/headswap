@@ -1123,6 +1123,7 @@ class BridgeService : Service() {
             core.usbAudioEnabled = false
             core.mapHomeKey = true
             core.desktopInputEnabled = true
+            core.volumeSwipeProvider = { aaPrefs.volumeSwipe }
             DesktopNavHints.target = core   // подсказки навигатора рабочего стола (свой хост Car App, теневая AA) в MetaRelay
             // в машине adb нет: стартуем вместе с рабочим столом; у навигатора выключены подсказки на приборке - AA не трогаем (h800).
             // Действующий навигатор как у лаунчера: сохранённый, пока установлен, иначе первый известный (LauncherModel.init
@@ -1133,6 +1134,7 @@ class BridgeService : Service() {
             if (pick.shadowWanted(aaPrefs.metaNavi, pick.effective(lp.navigator, installed), lp::navHints)) AaShadowNav.start(this)
             else if (aaPrefs.metaNavi) AppLog.i("SHADOWNAV не стартую: у навигатора выключены подсказки на приборке", false)
             core.touchDecimationProvider = { aaPrefs.touchDecimation }
+            core.dupDownFilterProvider = { aaPrefs.dupDownFilter }
             core.transcodeEnabled = true
             core.refDecoderFactory = { sink -> RefDecoder(sink) { AppLog.i(it, false) } }
             core.videoMode = mode
@@ -1273,6 +1275,7 @@ class BridgeService : Service() {
             core.voiceChunkProvider = { aaPrefs.voiceChunk }
             core.ttsPrerollProvider = { aaPrefs.ttsPreroll }
             core.touchDecimationProvider = { aaPrefs.touchDecimation }
+            core.dupDownFilterProvider = { aaPrefs.dupDownFilter }
             core.phoneMic = PhoneMicCapture(applicationContext)
             core.usbAudioEnabled = aaPrefs.usbAudio
             EqLive.settings = aaPrefs.eq

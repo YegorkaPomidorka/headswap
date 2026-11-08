@@ -28,7 +28,9 @@ internal class DesktopAudioLoopback private constructor(
         // Голос навигатора (Яндекс: NAVIGATION_GUIDANCE) без этого уходит в BT A2DP, и ГУ его не играет.
         // Пока он смешан с музыкой в медиа-канал; SONIFICATION (щелчки, звуки системы) не берём.
         private val USAGES = intArrayOf(AudioAttributes.USAGE_MEDIA, AudioAttributes.USAGE_GAME, AudioAttributes.USAGE_UNKNOWN,
-            AudioAttributes.USAGE_ASSISTANCE_NAVIGATION_GUIDANCE)
+            AudioAttributes.USAGE_ASSISTANCE_NAVIGATION_GUIDANCE,
+            // голос Gemini (стенд 07.11): обычный захват ASSISTANT не видит, системный AudioMix видит
+            AudioAttributes.USAGE_ASSISTANT)
 
         /** Канальная маска выходная: createAudioRecordSink сам переводит её во входную. */
         fun open(context: Context, sampleRate: Int): DesktopAudioLoopback = unwrap {

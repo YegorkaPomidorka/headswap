@@ -334,6 +334,21 @@ internal object EmbedHost {
         worker.post { drainTouch(slot) }
     }
 
+    /** Шайба ГУ в окно: нажатие навигационной клавиши на дочернем дисплее. false - окна нет, клавиша не ушла. */
+    fun key(slot: EmbedSlot, keycode: Int): Boolean {
+        if (slot.status != EmbedStatus.READY) return false
+        worker.post {
+            if (slot.handle <= 0) return@post
+            try {
+                timed(slot, "key") { EmbeddedSessionRegistry.key(uid, slot.handle, keycode) }
+            } catch (e: Exception) {
+                AppLog.i("EMBED ${slot.name}: клавиша $keycode отклонена: ${e.javaClass.simpleName}: ${e.message}", false)
+                if (leaseGone(e)) lostLease(slot)
+            }
+        }
+        return true
+    }
+
     /**
      * Back в окно; если приложение ушло из корня (его задачи больше нет сверху), onClosed вызовется на главном потоке.
      * Задачу проверяем несколько раз: у закрывающейся активности top ещё держится, а ответ -1 (список задач
@@ -604,7 +619,18 @@ internal object EmbedHost {
             val pkg = key.substringBefore('/')
             val cls = key.substringAfter('/')
             AppLog.i("EMBED ${slot.name}: запуск $key handle=${slot.handle} (state=${slot.lastState} stale=${slot.stale})", false)
-            if (slot === alice) AppLog.i("ASSIST Алиса -> дочерний дисплей, окно ${slot.geomW}x${slot.geomH}", false)
+            // То же решение о режиме окна, что примет хост (DelegatedDesktopRuntime): его лог в файл не попадает
+            appContext?.packageManager?.let { pm ->
+                val orientation = runCatching {
+                    pm.getActivityInfo(android.content.ComponentName(pkg, if (cls.startsWith('.')) pkg + cls else cls), 0).screenOrientation
+                }.getOrDefault(-1)
+                val all = com.yegorkapomidorka.headswap.dex.EmbeddedDisplayPolicy.packageOrientations(pm, pkg)
+                AppLog.i("EMBED ${slot.name}: окно ${com.yegorkapomidorka.headswap.dex.EmbeddedDisplayPolicy.describeLaunch(pkg, orientation, all)}", false)
+            }
+            if (slot === alice) AppLog.i("ASSIST помощник -> дочерний дисплей, окно ${slot.geomW}x${slot.geomH}", false)
+            if (slot === alice && pkg == com.yegorkapomidorka.headswap.dex.EmbeddedDisplayPolicy.GEMINI_PACKAGE) {
+                appContext?.let { com.yegorkapomidorka.headswap.dex.PhoneAssistant.clearPackage(it, pkg) }
+            }
             timed(slot, "launch") { EmbeddedSessionRegistry.launch(uid, slot.handle, pkg, cls) }
             // Яндекс-помощник по умолчанию перезапускает себя через MainActivity на экране телефона: ловим и переносим
             // другое приложение в панели (Алиса открыла Навигатор с маршрутом) - в лаунчер

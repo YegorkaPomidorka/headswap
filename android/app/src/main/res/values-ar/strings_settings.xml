@@ -285,4 +285,9 @@
     <string name="about_author_ildar">Ildar Sadykov</string>
     <string name="about_open_project">صفحة المشروع</string>
     <string name="about_license_unavailable">نص الترخيص غير متاح. راجع صفحة المشروع.</string>
+    <string name="dup_down_auto">تلقائي (تكرار خلال 150 مللي ثانية)</string>
+    <string name="dup_down_on">التصفية دائمًا</string>
+    <string name="dup_down_off">بلا تصفية</string>
+    <string name="car_vw_golf_8_r_line">Volkswagen Golf 8 R-Line</string>
+    <string name="car_vw_tayron_gte_2020">Volkswagen Tayron GTE 2020 (MIB 2.5)</string>
 </resources>

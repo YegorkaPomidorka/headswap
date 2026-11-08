@@ -31,6 +31,7 @@ import com.yegorkapomidorka.headswap.launcher.LauncherPrefs
 import com.yegorkapomidorka.headswap.aa.AaState
 import com.yegorkapomidorka.headswap.aa.CustomResError
 import com.yegorkapomidorka.headswap.aa.CustomVideoMode
+import com.yegorkapomidorka.headswap.aa.DupDownFilter
 import com.yegorkapomidorka.headswap.aa.MediaChunk
 import com.yegorkapomidorka.headswap.aa.TouchDecimation
 import com.yegorkapomidorka.headswap.aa.TtsPreroll
@@ -59,6 +60,7 @@ class DevScreen(host: MainActivity) : Screen(host) {
     private val voiceChunkRows = LinkedHashMap<VoiceChunk, RadioRow>()
     private val ttsPrerollRows = LinkedHashMap<TtsPreroll, RadioRow>()
     private val touchDecimationRows = LinkedHashMap<TouchDecimation, RadioRow>()
+    private val dupDownRows = LinkedHashMap<DupDownFilter, RadioRow>()
 
     /** AVC-энкодеры телефона (null = список получить не удалось, тогда размер не проверяем). Список не меняется, считаем один раз. */
     private val avcEncoders: List<MediaCodecInfo.VideoCapabilities>? by lazy {
@@ -146,6 +148,21 @@ class DevScreen(host: MainActivity) : Screen(host) {
             lp(WRAP, WRAP).margins(c, 8, 2, 8, 0),
         )
         refreshTouchDecimation()
+        body.addView(
+            group(listOf(row(c.getString(R.string.dev_volume_swipe_title), c.getString(R.string.dev_volume_swipe_sub), aa.volumeSwipe) { aa.volumeSwipe = it })),
+        )
+
+        body.addView(c.sectionTitle(c.getString(R.string.dev_section_dup_down)))
+        for (m in DupDownFilter.values()) {
+            val row = RadioRow(c, c.getString(m.titleRes), "") { setDupDownFilter(m) }
+            dupDownRows[m] = row
+            body.addView(row.view, lp(MATCH, WRAP))
+        }
+        body.addView(
+            c.text(c.getString(R.string.dev_dup_down_note), 13f, 400, c.clr(R.color.on2)),
+            lp(WRAP, WRAP).margins(c, 8, 2, 8, 0),
+        )
+        refreshDupDownFilter()
 
         body.addView(c.sectionTitle(c.getString(R.string.dev_section_video)))
         body.addView(
@@ -280,6 +297,15 @@ class DevScreen(host: MainActivity) : Screen(host) {
 
     private fun refreshTouchDecimation() {
         for ((m, row) in touchDecimationRows) row.setSelected(aa.touchDecimation == m)
+    }
+
+    private fun setDupDownFilter(m: DupDownFilter) {
+        aa.dupDownFilter = m
+        refreshDupDownFilter()
+    }
+
+    private fun refreshDupDownFilter() {
+        for ((m, row) in dupDownRows) row.setSelected(aa.dupDownFilter == m)
     }
 
     private fun row(title: String, sub: String, checked: Boolean, onChange: (Boolean) -> Unit) =

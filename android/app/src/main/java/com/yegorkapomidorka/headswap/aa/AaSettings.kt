@@ -46,6 +46,11 @@ class AaPrefs(ctx: Context) {
         get() = TouchDecimation.parse(sp.getString("touchDecimation", TouchDecimation.DEFAULT.name))
         set(v) = sp.edit().putString("touchDecimation", v.name).apply()
 
+    /** Фильтр повторного DOWN без UP (имя DupDownFilter, по умолчанию Авто = только Honda). Сессия читает на каждое касание. */
+    var dupDownFilter: DupDownFilter
+        get() = DupDownFilter.parse(sp.getString("dupDownFilter", DupDownFilter.DEFAULT.name))
+        set(v) = sp.edit().putString("dupDownFilter", v.name).apply()
+
     /**
      * Режим моста (ключ BridgeMode, по умолчанию Android Auto): сырое сохранённое значение, на Android ниже 13 оно
      * может быть DESKTOP - применяемый режим даёт [BridgeMode.effective]. Читается один раз на подключение.
@@ -164,6 +169,11 @@ class AaPrefs(ctx: Context) {
     var micVrStatus: Boolean
         get() = sp.getBoolean("micVrStatus", true)
         set(v) = sp.edit().putBoolean("micVrStatus", v).apply()
+
+    /** Рабочий стол: громкость двумя пальцами у правого края. На Honda Vezel 20832125 включена всегда. */
+    var volumeSwipe: Boolean
+        get() = sp.getBoolean("volumeSwipe", false)
+        set(v) = sp.edit().putBoolean("volumeSwipe", v).apply()
 
     /** Сообщать ГУ о звонках (TelephonyManager -> MODULE_STATUS PHONE + TELE_STATE); по умолчанию выкл. Читается на подключение. */
     var callsToHu: Boolean
