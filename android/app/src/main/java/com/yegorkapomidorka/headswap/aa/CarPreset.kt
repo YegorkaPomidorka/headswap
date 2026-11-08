@@ -68,6 +68,8 @@ enum class CarPreset(val titleRes: Int, val settings: CarSettings = CarSettings(
     VW_DISCOVER_PRO_9_2(R.string.car_vw_discover_pro_9_2, CarSettings(videoMode = VideoMode.WIDE_2_1)),
     /** 1920×1080, остальное «Авто» (Александр). */
     VW_GOLF_8_PRO(R.string.car_vw_golf_8_pro, CarSettings(videoMode = VideoMode.R1080)),
+    /** Европейский Golf 8 R-Line: кадр 2:1 как у Octavia Pro, по воздуху в полноценном режиме (юзер, 08.11). */
+    VW_GOLF_8_R_LINE(R.string.car_vw_golf_8_r_line, CarSettings(videoMode = VideoMode.WIDE_2_1)),
     VW_ID_UNYX(R.string.car_vw_id_unyx),
     VW_LAMANDO_L(R.string.car_vw_lamando_l),
     VW_SAGITAR_2021(R.string.car_vw_sagitar_2021),
