@@ -73,6 +73,8 @@ enum class CarPreset(val titleRes: Int, val settings: CarSettings = CarSettings(
     VW_ID_UNYX(R.string.car_vw_id_unyx),
     VW_LAMANDO_L(R.string.car_vw_lamando_l),
     VW_SAGITAR_2021(R.string.car_vw_sagitar_2021),
+    /** MIB 2.5, экран 1280×720: всё по умолчанию, работает (Егор, 08.11). */
+    VW_TAYRON_GTE_2020(R.string.car_vw_tayron_gte_2020),
     VW_TROC_2026(R.string.car_vw_troc_2026),
     VW_THARU_XR(R.string.car_vw_tharu_xr),
 
