@@ -46,6 +46,57 @@ class LauncherSpecTest {
         }
     }
 
+    @Test fun railButtonsFitForEverySize() {
+        for (row in LauncherSpecs.TABLE) for (size in RailSize.entries) {
+            val s = LauncherSpecs.forSize(row[0], row[1], size)
+            val free = s.h - s.navH - s.g - (s.g + s.g8)
+            assertTrue("${row[0]}x${row[1]} $size", s.clockH + s.railButtons * s.rb + s.railButtons * s.g4 <= free)
+            assertTrue("${row[0]}x${row[1]} $size", s.rb in 1..s.t && s.rail > 0 && s.narrow > 0)
+        }
+    }
+
+    @Test fun railWidthBySize() {
+        val g4 = LauncherSpecs.forSize(1920, 720).g4
+        assertEquals(135, LauncherSpecs.forSize(1920, 720, RailSize.NORMAL).rail)
+        assertEquals(95, LauncherSpecs.forSize(1920, 720, RailSize.MEDIUM).rail)
+        val small = LauncherSpecs.forSize(1920, 720, RailSize.SMALL)
+        assertEquals(Math.round(90 * 0.62).toInt() + 2 * maxOf(4, Math.round(g4 * 0.8).toInt()), small.rail)
+        assertTrue(small.clockInStatus && !small.clockInRail && small.clockH == 0)
+        assertTrue(LauncherSpecs.forSize(1920, 720, RailSize.MEDIUM).clockStacked)
+        // без выбора - как раньше
+        assertEquals(LauncherSpecs.forSize(1920, 720), LauncherSpecs.forSize(1920, 720, RailSize.NORMAL))
+        assertFalse(LauncherSpecs.forSize(1920, 720) == small)
+    }
+
+    @Test fun cutOnlyOnShortScreens() {
+        // выше 500 «Обрезанная» ведёт себя как «Маленькая»
+        val cut = LauncherSpecs.forSize(1280, 720, RailSize.CUT)
+        val small = LauncherSpecs.forSize(1280, 720, RailSize.SMALL)
+        assertFalse(cut.h480)
+        assertEquals(small.rail, cut.rail)
+        assertEquals(small.rb, cut.rb)
+        // 800x480: кнопка по 0.8 T
+        val low = LauncherSpecs.forSize(800, 480, RailSize.CUT)
+        assertTrue(low.h480)
+        assertEquals(Math.round(62 * 0.8).toInt(), low.rb)
+    }
+
+    @Test fun cardViewInRailForNarrowRailInStrip() {
+        assertTrue(LauncherSpecs.forSize(1280, 480, RailSize.SMALL).cardViewInRail)
+        assertTrue(LauncherSpecs.forSize(1280, 480, RailSize.CUT).cardViewInRail)
+        assertEquals(4, LauncherSpecs.forSize(1280, 480, RailSize.SMALL).railButtons)
+        assertFalse(LauncherSpecs.forSize(1280, 480, RailSize.NORMAL).cardViewInRail)
+        assertFalse(LauncherSpecs.forSize(1280, 480, RailSize.MEDIUM).cardViewInRail)
+        assertEquals(3, LauncherSpecs.forSize(1280, 480, RailSize.MEDIUM).railButtons)
+        assertTrue(LauncherSpecs.forSize(1920, 720, RailSize.NORMAL).cardViewInRail)
+    }
+
+    @Test fun railSizeRestoresUnknownAsNormal() {
+        assertEquals(RailSize.CUT, RailSize.restore("CUT"))
+        assertEquals(RailSize.NORMAL, RailSize.restore("bogus"))
+        assertEquals(RailSize.NORMAL, RailSize.restore(null))
+    }
+
     @Test fun foreignBarFollowsRailButton() {
         assertEquals(90, LauncherSpecs.forSize(1920, 720).barH)
         assertEquals(88, LauncherSpecs.forSize(1280, 480).barH)

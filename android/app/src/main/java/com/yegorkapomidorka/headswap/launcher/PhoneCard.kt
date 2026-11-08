@@ -176,7 +176,10 @@ private fun phoneView(phone: PhoneCardModel, accent: Color): PhoneView {
     }
 }
 
-/** Экран «Вызовы» (Calls.dc.html): статус, вкладки «Недавние» и «Контакты», 2 колонки x 4 строки, страницы стрелками. */
+/**
+ * Экран «Вызовы» (Calls.dc.html): статус, вкладки «Недавние», «Избранные» (звёздочка в телефонной книге) и «Контакты»,
+ * 2 колонки x 4 строки, страницы стрелками. tab: 0 недавние, 1 контакты, 2 избранные.
+ */
 @Composable
 fun CallsScreen() {
     val model = LauncherModel
@@ -192,7 +195,8 @@ fun CallsScreen() {
     val rows: List<CallsRow> = if (tab == 0) PhoneController.calls.map {
         CallsRow(it.title, PhoneLogic.whenLabel(System.currentTimeMillis(), it.timeMs, yesterday = yesterday),
             if (it.type == CallType.MISSED) Pal.MISSED else Pal.TEXT, it.number)
-    } else PhoneController.contacts.map { CallsRow(it.name.ifEmpty { it.number }, "", Pal.TEXT, it.number) }
+    } else (if (tab == 2) PhoneController.favorites else PhoneController.contacts)
+        .map { CallsRow(it.name.ifEmpty { it.number }, "", Pal.TEXT, it.number) }
     val perPage = 8
     val pages = Pager.pageCount(rows.size, perPage)
     val current = Pager.clamp(page, rows.size, perPage)
@@ -204,6 +208,7 @@ fun CallsScreen() {
         StatusBar()
         PagerHeader(current, pages, onPage = { page = it }, leading = {
             TabPill(stringResource(R.string.l_recent), selected = tab == 0) { tab = 0; page = 0 }
+            TabPill(stringResource(R.string.l_favorites), selected = tab == 2) { tab = 2; page = 0 }
             TabPill(stringResource(R.string.l_contacts), selected = tab == 1) { tab = 1; page = 0 }
         })
         Box(Modifier.weight(1f).fillMaxWidth()) {
@@ -213,6 +218,7 @@ fun CallsScreen() {
                         stringResource(when {
                             !permitted -> R.string.l_calls_no_permission
                             tab == 0 -> R.string.l_calls_empty
+                            tab == 2 -> R.string.l_favorites_empty
                             else -> R.string.l_contacts_empty
                         }), s.f1, color = Pal.SEC, maxLines = 3, align = TextAlign.Center,
                     )

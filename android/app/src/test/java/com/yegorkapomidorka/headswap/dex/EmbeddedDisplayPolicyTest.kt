@@ -15,11 +15,32 @@ class EmbeddedDisplayPolicyTest {
         EmbeddedDisplayPolicy.requireParent(DesktopModePolicy.ANDROID_DESKTOP, 24)
         EmbeddedDisplayPolicy.requireCapacity(0)
         EmbeddedDisplayPolicy.requireCapacity(1)
-        rejects { EmbeddedDisplayPolicy.requireCapacity(2) }
+        EmbeddedDisplayPolicy.requireCapacity(2)
+        rejects { EmbeddedDisplayPolicy.requireCapacity(3) }
         rejects { EmbeddedDisplayPolicy.requireCapacity(-1) }
         rejects { EmbeddedDisplayPolicy.requireParent(DesktopModePolicy.ANDROID_DESKTOP, 0) }
         rejects { EmbeddedDisplayPolicy.requireParent(DesktopModePolicy.SAMSUNG_DEX, 24) }
         rejects { EmbeddedDisplayPolicy.requireParent(2, 24) } // The former DriveDeck mode no longer exists.
+    }
+
+    @Test fun onlyAliceAssistantActivityLaunchesWithoutLauncherCategory() {
+        assertTrue(EmbeddedDisplayPolicy.assistLaunch("com.yandex.searchapp", "ru.yandex.searchplugin.AssistantActivityAlias"))
+        assertTrue(EmbeddedDisplayPolicy.assistLaunch("ru.yandex.searchplugin", "ru.yandex.searchplugin.AssistantActivityAlias"))
+        assertFalse(EmbeddedDisplayPolicy.assistLaunch("com.yandex.searchapp", "ru.yandex.searchplugin.MainActivity"))
+        assertFalse(EmbeddedDisplayPolicy.assistLaunch("com.yandex.searchapp", ".AssistantActivityAlias"))
+        assertFalse(EmbeddedDisplayPolicy.assistLaunch("com.example.app", "ru.yandex.searchplugin.AssistantActivityAlias"))
+        assertFalse(EmbeddedDisplayPolicy.assistLaunch("com.yandex.maps", "ru.yandex.searchplugin.AssistantActivityAlias"))
+    }
+
+    @Test fun geminiLaunchesHandsFreeAndAliceAssist() {
+        val g = "com.google.android.googlequicksearchbox"
+        val hf = "com.google.android.voicesearch.handsfree.HandsFreeActivity"
+        assertTrue(EmbeddedDisplayPolicy.assistLaunch(g, hf))
+        assertFalse(EmbeddedDisplayPolicy.assistLaunch(g, "com.google.android.googlequicksearchbox.SearchActivity"))
+        assertFalse(EmbeddedDisplayPolicy.assistLaunch("com.example.app", hf))
+        assertEquals("android.speech.action.VOICE_SEARCH_HANDS_FREE", EmbeddedDisplayPolicy.assistAction(g, hf))
+        assertEquals("android.intent.action.ASSIST",
+            EmbeddedDisplayPolicy.assistAction("com.yandex.searchapp", "ru.yandex.searchplugin.AssistantActivityAlias"))
     }
 
     @Test fun validatesWidgetGeometryBeforeAllocation() {
@@ -105,6 +126,15 @@ class EmbeddedDisplayPolicyTest {
         for (bad in listOf("com.example; input keyevent 3", "-n", "com.example/nav", "com.example\nother")) {
             rejects { EmbeddedDisplayPolicy.launchCommand(25, 24, 10, bad, ".MainActivity") }
             rejects { EmbeddedDisplayPolicy.launchCommand(25, 24, 10, "com.example.navigator", bad) }
+        }
+    }
+
+    @Test fun onlyTelegramLaunchesMultiWindow() {
+        for (pkg in listOf("org.telegram.messenger", "org.telegram.messenger.web", "org.telegram.messenger.beta")) {
+            assertEquals(true, EmbeddedDisplayPolicy.multiWindowLaunch(pkg))
+        }
+        for (pkg in listOf("com.google.android.youtube", "ru.yandex.yandexnavi", "org.telegram.messengerx")) {
+            assertEquals(false, EmbeddedDisplayPolicy.multiWindowLaunch(pkg))
         }
     }
 

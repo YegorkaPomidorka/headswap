@@ -143,11 +143,21 @@ class LauncherLogicTest {
         assertEquals("4G", NetLabel.cellular(null))
     }
 
-    @Test fun cardViewCyclesAndRestores() {
-        assertEquals(CardView.CLOCK, CardView.NAVIGATOR.next())
-        assertEquals(CardView.NAVIGATOR, CardView.CLOCK.next())
+    @Test fun cardViewRestoresOldPrefs() {
         assertEquals(CardView.NAVIGATOR, CardView.restore("junk"))
         assertEquals(CardView.CLOCK, CardView.restore("CLOCK"))
+        assertEquals(CardView.MUSIC, CardView.restore(null, CardView.MUSIC))
+        assertEquals(HomeLayout.QUAD, HomeLayout.restore(null))
+        assertEquals(HomeLayout.WIDE_RIGHT, HomeLayout.restore("WIDE_RIGHT"))
+    }
+
+
+    @Test fun smallTileIsCappedOnWideScreens() {
+        val wide = LauncherSpecs.forSize(1920, 720)
+        assertTrue(wide.tileSmall < wide.narrow)
+        assertEquals(Math.round(wide.t * 4.4).toInt(), wide.tileSmall)
+        val r720 = LauncherSpecs.forSize(1280, 720)
+        assertEquals(r720.narrow, r720.tileSmall)
     }
 
     @Test fun afterBackClosesWhenTaskIsGoneOrInBackground() {
@@ -206,7 +216,13 @@ class LauncherLogicTest {
         // открыт текст лицензии -> список лицензий -> «Система» -> шагов внутри настроек больше нет
         assertEquals(SettingsPage.ABOUT to false, BackNav.settingsStep(SettingsPage.ABOUT, licenseOpen = true))
         assertEquals(SettingsPage.SYSTEM to false, BackNav.settingsStep(SettingsPage.ABOUT, licenseOpen = false))
-        for (p in SettingsPage.entries.filter { it != SettingsPage.ABOUT }) assertNull(BackNav.settingsStep(p, licenseOpen = false))
+        for (p in SettingsPage.entries.filter { it != SettingsPage.ABOUT && it != SettingsPage.COLORS }) {
+            assertNull(BackNav.settingsStep(p, licenseOpen = false))
+        }
+    }
+
+    @Test fun backFromColorsReturnsToLook() {
+        assertEquals(SettingsPage.LOOK to false, BackNav.settingsStep(SettingsPage.COLORS, licenseOpen = false))
     }
 
     @Test fun railBackIsGreyOnlyOnHome() {
@@ -269,6 +285,13 @@ class LauncherLogicTest {
         assertEquals(null, PlayerChip.lastOnline(null, null))
     }
 
+    @Test fun lastLocalKeptWhileOnlinePlays() {
+        assertEquals("com.aimp", PlayerChip.lastLocal("com.aimp", PlayerChip.YANDEX))
+        assertEquals("com.spotify", PlayerChip.lastLocal("com.aimp", "com.spotify"))
+        assertEquals("com.aimp", PlayerChip.lastLocal("com.aimp", null))
+        assertEquals(null, PlayerChip.lastLocal(null, PlayerChip.VK))
+    }
+
     @Test fun settingsGridBordersMatchOnAllResolutions() {
         for (row in LauncherSpecs.TABLE) {
             val s = LauncherSpecs.forSize(row[0], row[1])
@@ -322,6 +345,19 @@ class LauncherLogicTest {
             assertTrue((next - 90f) % 360f != 0f)
             assertEquals(0f, (next - 90f) % 45f)
         }
+    }
+
+    @Test fun hintsDefaultOffForAll() {
+        for (pkg in NavigatorPick.KNOWN) assertFalse(pkg, NavigatorPick.hintsDefault(pkg))
+    }
+
+    @Test fun shadowAaFollowsNavigatorHints() {
+        val hints = mapOf("com.google.android.apps.maps" to false, "ru.dublgis.dgismobile" to true)
+        val of = { p: String -> hints[p] ?: true }
+        assertFalse(NavigatorPick.shadowWanted(true, "com.google.android.apps.maps", of))
+        assertTrue(NavigatorPick.shadowWanted(true, "ru.dublgis.dgismobile", of))
+        assertTrue(NavigatorPick.shadowWanted(true, null, of))
+        assertFalse(NavigatorPick.shadowWanted(false, "ru.dublgis.dgismobile", of))
     }
 
     @Test fun needsPlusOnlyYandex() {

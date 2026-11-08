@@ -24,6 +24,7 @@ internal object EmbeddedSessionRegistry {
     private class Lease(val handle: Int, val uid: Int, val parent: Parent, val token: IBinder) {
         lateinit var death: IBinder.DeathRecipient
         @Volatile var linked = false
+        @Volatile var childDisplay = -1   // id дочернего дисплея от createChildDisplay
         @Volatile var packageName: String? = null
         var closing: CompletableFuture<Unit>? = null // Guarded by lock.
     }
@@ -73,7 +74,7 @@ internal object EmbeddedSessionRegistry {
         try {
             token.linkToDeath(lease.death, 0)
             lease.linked = true
-            activeCall(lease) { it.createChildDisplay(surface, token, width, height, density) }
+            lease.childDisplay = activeCall(lease) { it.createChildDisplay(surface, token, width, height, density) }
             synchronized(lock) {
                 check(parent === lease.parent && leases[lease.handle] === lease && token.isBinderAlive) {
                     "Сеанс рабочего стола завершился"
@@ -86,6 +87,9 @@ internal object EmbeddedSessionRegistry {
             throw error
         }
     }
+
+    /** id дочернего дисплея окна; -1, если окно закрыто. */
+    fun childDisplayId(uid: Int, handle: Int): Int = runCatching { active(uid, handle).childDisplay }.getOrDefault(-1)
 
     private fun active(uid: Int, handle: Int): Lease = synchronized(lock) {
         val lease = checkNotNull(leases[handle]) { "Встроенное окно уже закрыто" }

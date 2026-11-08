@@ -183,9 +183,8 @@ private fun PlayerChipColumn(modifier: Modifier) {
                 onTap = { if (slot.pkg == null) LauncherActions.choosePhonePlayer() else LauncherActions.choosePlayer(slot.pkg) },
                 onLong = if (slot.kind == PlayerChip.Kind.PHONE) ({ LauncherActions.openPlayers() }) else null,
             ) {
-                // иконка выбранного приложения; «любой плеер» без закрепления - тот, что выбран или играет сейчас
-                val iconPkg = slot.pkg ?: model.musicPlayer?.takeIf { it !in PlayerChip.ONLINE }
-                    ?: MusicController.state.pkg?.takeIf { it !in PlayerChip.ONLINE }
+                // иконка выбранного приложения; «любой плеер» без закрепления - последний свой, что выбирали или слушали
+                val iconPkg = slot.pkg ?: model.lastLocalPlayer
                 val icon = iconPkg?.let { rememberPackageIcon(it) }
                 if (icon != null) {
                     Image(icon, null, Modifier.size(m.dp(s.pcApp)).clip(CircleShape).alpha(if (slot.selected) 1f else 0.55f))

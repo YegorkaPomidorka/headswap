@@ -74,7 +74,16 @@ private class NavLook(
     val fg: Color, val fg2: Color, val fg3: Color, val card: Color, val maneuverIc: Color, val eta: Color,
     val btn: Color, val btn2: Color, val endFg: Color, val divider: Color, val sel: Color, val tile: Color,
     val gridIcBg: Color, val fullBg: Color,
-)
+    /** Акцент: выбранный номер, переключатель, главная кнопка, курсор. */
+    val acc: Color = Pal.GOLD, val onAcc: Color = Pal.ON_GOLD,
+) {
+    /** Свой акцент из «Вид › Цвета»: золотые места макета перекрашиваются им. */
+    fun withAccent(a: Color): NavLook = if (a == Pal.GOLD) this else NavLook(
+        fg, fg2, fg3, card, maneuverIc = a, eta = a, btn = btn, btn2 = btn2, endFg = endFg, divider = divider,
+        sel = a.copy(alpha = sel.alpha), tile = tile, gridIcBg = a.copy(alpha = gridIcBg.alpha), fullBg = fullBg,
+        acc = a, onAcc = Pal.onAccent(a),
+    )
+}
 
 private val DARK = NavLook(
     fg = Color(0xFFF2F5F7), fg2 = Color(0xFFC8D1F0), fg3 = Color(0xFFA9B4D6), card = Color(0xEB0E141A),
@@ -137,7 +146,7 @@ fun NavHostOverlay() {
     }
     val density = LocalDensity.current
     val m = LocalMetrics.current
-    val look = if (LocalPalette.current.light) LIGHT else DARK
+    val look = (if (LocalPalette.current.light) LIGHT else DARK).withAccent(LocalAccent.current)
     // «Масштаб карты» меняет и наши карточки с кнопками - в одну меру с картой навигатора
     val scale = CarAppHost.pkg?.let { com.yegorkapomidorka.headswap.carapp.CarConfigMath.step(LauncherModel.mapScale(it)) } ?: 1f
     val d = remember(m.spec, scale) { NavDims(m.spec.h / 720f * scale, m.spec.wide) }
@@ -154,6 +163,7 @@ fun NavHostOverlay() {
         }
         // ряд действий сверху справа: 2ГИС ставит лимит скорости в правый верхний угол видимой области
         CarAppHost.setAreas(left, d.gap + d.btn + d.gap, if (hasActions) d.gap + d.btn else 0)
+        AliceVoice.navLeftPx = left
     }
     Box(
         Modifier.absoluteOffset { IntOffset(r.left.roundToInt(), r.top.roundToInt()) }
@@ -368,8 +378,8 @@ private fun RowView(row: CarRow, selected: Boolean, look: NavLook, d: NavDims, o
             horizontalArrangement = Arrangement.spacedBy(m.dp(24))) {
             if (row.image != null) CarIconView(row.image, d.btnIc + d.gap, null)
             else if (row.number > 0) {
-                Box(Modifier.size(m.dp(64)).clip(CircleShape).background(if (selected) Pal.GOLD else look.btn2), contentAlignment = Alignment.Center) {
-                    Txt(row.number.toString(), d.rowText, color = if (selected) Pal.ON_GOLD else look.fg, weight = FontWeight.Bold)
+                Box(Modifier.size(m.dp(64)).clip(CircleShape).background(if (selected) look.acc else look.btn2), contentAlignment = Alignment.Center) {
+                    Txt(row.number.toString(), d.rowText, color = if (selected) look.onAcc else look.fg, weight = FontWeight.Bold)
                 }
             }
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(m.dp(6))) {
@@ -389,21 +399,21 @@ private fun RowView(row: CarRow, selected: Boolean, look: NavLook, d: NavDims, o
 @Composable
 private fun Switch(on: Boolean, look: NavLook, d: NavDims) {
     val m = LocalMetrics.current
-    Box(Modifier.size(m.dp(104), m.dp(56)).clip(RoundedCornerShape(m.dp(28))).background(if (on) Pal.GOLD else look.btn2).padding(m.dp(6)),
+    Box(Modifier.size(m.dp(104), m.dp(56)).clip(RoundedCornerShape(m.dp(28))).background(if (on) look.acc else look.btn2).padding(m.dp(6)),
         contentAlignment = if (on) Alignment.CenterEnd else Alignment.CenterStart) {
-        Box(Modifier.size(m.dp(44)).clip(CircleShape).background(if (on) Pal.ON_GOLD else look.fg2))
+        Box(Modifier.size(m.dp(44)).clip(CircleShape).background(if (on) look.onAcc else look.fg2))
     }
 }
 
 @Composable
 private fun Pill(a: CarAction, look: NavLook, d: NavDims, modifier: Modifier) {
     val m = LocalMetrics.current
-    Pressable(modifier.height(m.dp(d.pill)).clip(RoundedCornerShape(m.dp(d.pill / 2))).background(if (a.primary) Pal.GOLD else look.btn2),
+    Pressable(modifier.height(m.dp(d.pill)).clip(RoundedCornerShape(m.dp(d.pill / 2))).background(if (a.primary) look.acc else look.btn2),
         enabled = a.enabled, description = a.title, onTap = { a.click?.send() }) { pressed ->
         if (pressed) Box(Modifier.matchParentSize().background(if (a.primary) Color(0x33000000) else Pal.SURFACE_PRESSED))
         Row(Modifier.matchParentSize(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center) {
-            if (a.icon != null && a.title.isEmpty()) CarIconView(a.icon, d.btnIc, if (a.primary) Pal.ON_GOLD else look.fg)
-            Txt(a.title, d.pillText, color = if (a.primary) Pal.ON_GOLD else look.fg, weight = if (a.primary) FontWeight.Bold else FontWeight.SemiBold)
+            if (a.icon != null && a.title.isEmpty()) CarIconView(a.icon, d.btnIc, if (a.primary) look.onAcc else look.fg)
+            Txt(a.title, d.pillText, color = if (a.primary) look.onAcc else look.fg, weight = if (a.primary) FontWeight.Bold else FontWeight.SemiBold)
         }
     }
 }
@@ -465,7 +475,7 @@ private fun SearchScreen(s: CarUi.Search, look: NavLook, d: NavDims) {
                     modifier = Modifier.fillMaxWidth().focusRequester(focus),
                     singleLine = true,
                     textStyle = TextStyle(color = look.fg, fontSize = m.sp(d.title), fontWeight = FontWeight.Medium),
-                    cursorBrush = SolidColor(Pal.GOLD),
+                    cursorBrush = SolidColor(look.acc),
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
                     keyboardActions = KeyboardActions(onSearch = { s.submitted?.invoke(text) }),
                 )

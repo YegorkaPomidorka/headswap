@@ -16,7 +16,14 @@ object LauncherActions {
 
     /** Домой, единственная точка возврата на главный экран. */
     fun home() { if (model.foreign != null) ForeignActions.home() else model.home() }
-    fun openPicker() { model.go(Area.Picker) }
+    fun openPicker() { model.pickerForLayers = false; model.go(Area.Picker) }
+    /** «+» в «Слоях» (настройки «Экран»): тот же выбор приложения, выбранное уходит в слои, Назад - в настройки. */
+    fun openLayerPicker() { model.pickerForLayers = true; model.go(Area.Picker) }
+    fun addLayer(l: Layer) {
+        model.addLayer(l)
+        model.pickerForLayers = false
+        model.back()
+    }
     /** Шестерёнка на рейке: настройки; повторное нажатие - назад. */
     fun openSettings() {
         if (model.area == Area.Settings) { model.back(); return }
@@ -37,6 +44,10 @@ object LauncherActions {
         PhoneController.dial(model.context, number)
     }
     fun cycleCardView() { model.nextCardView() }
+    fun swapTiles() { model.swapTiles() }
+
+    /** «Развернуть» плашку-приложение: то же окно на весь экран (ключ тот же - только смена размера, без перезапуска). */
+    fun openTileApp() { model.tileAppKey?.let { AppRef.parse(it) }?.let { openApp(it) } }
 
     /** Карточка «Телефон» без доступа: окно Headswap на экране телефона с запросом разрешений карточки. */
     fun openPhoneRequest() {
@@ -75,6 +86,7 @@ object LauncherActions {
         model.go(Area.App(ref))
     }
 
+
     /** Тап по телу карточки музыки: приложение плеера на весь экран справа от рейки. */
     fun openMusicApp() {
         val pkg = MusicController.state.pkg ?: model.musicPlayer ?: return
@@ -83,6 +95,187 @@ object LauncherActions {
     }
 
     fun openPlayers() { model.go(Area.Players) }
+
+    /** «Яндекс — с Алисой», потом «Яндекс Старт» (старое имя пакета): тот же порядок, что в [com.yegorkapomidorka.headswap.dex.PhoneAssistant]. */
+    private val ALICE_PACKAGES = listOf("com.yandex.searchapp", "ru.yandex.searchplugin")
+    private const val ALICE_CLASS = "ru.yandex.searchplugin.AssistantActivityAlias"
+
+    private fun installed(pkg: String) = runCatching { model.context.packageManager.getApplicationInfo(pkg, 0) }.isSuccess
+
+    /**
+     * Помощник кнопки голоса: Яндекс с Алисой; нет его - Gemini из Google app (только голосом, ADR 0035).
+     * Ни того ни другого - Алиса (окно покажет ошибку).
+     */
+    internal fun gemini(): Boolean = ALICE_PACKAGES.none(::installed) &&
+        installed(com.yegorkapomidorka.headswap.dex.EmbeddedDisplayPolicy.GEMINI_PACKAGE)
+
+    /** Ключ «пакет/класс» помощника для дочернего окна. */
+    internal fun aliceKey(): String {
+        if (gemini()) return com.yegorkapomidorka.headswap.dex.EmbeddedDisplayPolicy.run { "$GEMINI_PACKAGE/$GEMINI_CLASS" }
+        val pkg = ALICE_PACKAGES.firstOrNull(::installed) ?: ALICE_PACKAGES[0]
+        return "$pkg/$ALICE_CLASS"
+    }
+
+    /** Кнопка голоса: панель Алисы слева за рейкой; повторное нажатие закрывает. Главный поток. */
+    fun toggleAssistant() {
+        if (VOICE_ONLY) { voiceOnly(); return }
+        if (model.assistantOpen) closeAssistant("повторная кнопка голоса") else openAssistant()
+    }
+
+    /** «Алиса только голосом» (ADR 0034): скрытый дисплей и плашка вместо панели слева. Gemini - всегда голосом. */
+    private val VOICE_ONLY get() = model.aliceVoiceOnly || gemini()
+
+    /**
+     * Алиса на скрытом дочернем дисплее: он ALWAYS_UNLOCKED, и Яндекс, которого сессия помощника перезапускает полным
+     * приложением, не упирается в блокировку телефона (на экране телефона упирался, стенд 07.11). Слой за экраном,
+     * на ГУ ничего не видно; голос идёт захватом звука.
+     * Повторное нажатие - панель заново: задачи Яндекса закрываем и запускаем как в первый раз. ASSIST поверх живой задачи
+     * утаскивал её (singleTask) на заблокированный экран телефона, прослушивание сбрасывалось, а перенос обратно
+     * посреди перехода MIUI оставлял на телефоне призрак окна, глотавший жесты (стенд 07.11).
+     */
+    private fun voiceOnly() {
+        if (model.assistantOpen) {
+            AppLog.i("ASSIST скрытая Алиса: повторное нажатие, панель заново", false)
+            // closeAssistant чистит дисплей в потоке, потом видит, что панель снова открыта, и перезапускает слот
+            closeAssistant("скрытая Алиса: повторное нажатие")
+        }
+        model.assistantHidden = true
+        openAssistant()
+        val gemini = gemini()
+        AliceVoice.start(model.context, gemini)
+        if (gemini) {
+            // Gemini отвечает только при включённом экране телефона и только штатной сессии помощника: запуск
+            // интентом на скрытом дисплее он блокирует («Main display is OFF», «Interaction blocked», стенд 07.11)
+            geminiAt = android.os.SystemClock.uptimeMillis()
+            val ctx = model.context.applicationContext
+            Thread({
+                val assist = com.yegorkapomidorka.headswap.dex.PhoneAssistant
+                assist.closePhonePackage(ctx, "com.google.android.apps.maps")
+                assist.closePhonePackage(ctx, assist.YOUTUBE_MUSIC)
+            }, "assist-maps").start()
+            val inject = com.yegorkapomidorka.headswap.dex.DesktopKeys.injectKey
+            AppLog.i("ASSIST Gemini: клавиша помощника${if (inject == null) " - нет шлюза ввода" else ""}", false)
+            inject?.invoke(android.view.KeyEvent.KEYCODE_VOICE_ASSIST)
+        }
+        val main = hiddenHandler
+        main.removeCallbacks(hiddenClose)
+        main.postDelayed(hiddenClose, HIDDEN_MS)
+        // значок голоса на ГУ - на время вопроса, не на всё время жизни дисплея
+        main.postDelayed({ if (model.assistantHidden) com.yegorkapomidorka.headswap.dex.DesktopKeys.voiceStatus?.invoke(false) }, 10_000L)
+    }
+
+    /** Скрытая Алиса держит дисплей столько после последнего нажатия, потом отпускает. */
+    private const val HIDDEN_MS = 120_000L
+    /** Один Handler: removeCallbacks снимает только свои сообщения, с новым Handler таймер не сбрасывался (стенд 07.11). */
+    private val hiddenHandler = android.os.Handler(android.os.Looper.getMainLooper())
+    private val hiddenClose = Runnable { closeAssistant("скрытая Алиса: время вышло") }
+
+    /** Алиса на телефоне (кнопкой голоса или сама): её маршрут из экрана телефона - в плитку навигатора, «Поехали» жмёт водитель. */
+    fun startRouteCatcher(ctx: android.content.Context) {
+        val main = android.os.Handler(android.os.Looper.getMainLooper())
+        com.yegorkapomidorka.headswap.dex.PhoneAssistant.watchPhone(ctx, com.yegorkapomidorka.headswap.carapp.RouteIntent::geoFor,
+            onRoute = { t, geo -> main.post { if (VOICE_ONLY) routeFromAlice(t, geo) } },
+            onMusic = { t -> main.post { musicFromGemini(t) } })
+    }
+
+    /** Когда последний раз звали Gemini: YouTube Music перехватываем только сразу после вопроса. */
+    private var geminiAt = 0L
+    private const val GEMINI_MUSIC_MS = 60_000L
+    private const val YANDEX_MUSIC = "ru.yandex.music"
+
+    /**
+     * Gemini на «включи музыку» открывает YouTube Music: Яндекс Музыку он не знает (стенд 07.11). Задачу закрываем,
+     * её сессию ставим на паузу и играем выбранный плеер Headswap. Запрос (трек, артист) не переносим - продолжаем плеер.
+     */
+    private fun musicFromGemini(t: android.app.ActivityManager.RunningTaskInfo) {
+        val ytm = com.yegorkapomidorka.headswap.dex.PhoneAssistant.YOUTUBE_MUSIC
+        // плеер не выбран («Плеер телефона») - Яндекс Музыка, если стоит: ради неё перехват и затеян
+        val player = model.musicPlayer ?: model.localPlayer ?: YANDEX_MUSIC.takeIf(::installed)
+        if (android.os.SystemClock.uptimeMillis() - geminiAt > GEMINI_MUSIC_MS || player == null || player == ytm) {
+            AppLog.i("ASSIST YouTube Music не трогаем (Gemini не звали или плеер ${player ?: "не выбран"})", false)
+            return
+        }
+        AppLog.i("ASSIST музыка от Gemini: YouTube Music -> $player", false)
+        val ctx = model.context.applicationContext
+        val taskId = t.taskId
+        Thread({ com.yegorkapomidorka.headswap.dex.PhoneAssistant.removeTask(taskId) }, "assist-music").start()
+        MusicController.pausePackage(ctx, ytm)
+        MusicController.playPackage(ctx, player)
+        // YouTube Music после закрытия задачи ещё может запустить воспроизведение: добиваем паузой
+        for (ms in longArrayOf(1500L, 4000L)) hiddenHandler.postDelayed({ MusicController.pausePackage(ctx, ytm) }, ms)
+    }
+
+    fun openAssistant() {
+        if (model.assistantOpen) return
+        AppLog.i("ASSIST панель открыта, экран=${model.area}", false)
+        model.assistantOpen = true
+        com.yegorkapomidorka.headswap.dex.DesktopKeys.voiceStatus?.invoke(true)
+    }
+
+    /** Закрыть панель и отпустить дочерний дисплей; [why] - причина для лога. */
+    fun closeAssistant(why: String) {
+        if (!model.assistantOpen) return
+        AppLog.i("ASSIST панель закрыта: $why", false)
+        model.assistantOpen = false
+        model.assistantHidden = false
+        AliceVoice.stop()
+        hiddenHandler.removeCallbacks(hiddenClose)
+        com.yegorkapomidorka.headswap.dex.DesktopKeys.voiceStatus?.invoke(false)
+        com.yegorkapomidorka.headswap.dex.PhoneAssistant.stopWatch()
+        val ctx = model.context.applicationContext
+        // сначала закрыть задачи панели, потом отпустить дисплей (иначе Яндекс переедет под лаунчер)
+        Thread({
+            com.yegorkapomidorka.headswap.dex.PhoneAssistant.clearDisplay(ctx, EmbedHost.aliceDisplayId())
+            android.os.Handler(android.os.Looper.getMainLooper()).post {
+                // успели открыть снова: задачу мы только что закрыли - пусть слот перезапустит Алису
+                if (!model.assistantOpen) EmbedHost.want(EmbedHost.alice, null, 0, 0) else EmbedHost.refresh(EmbedHost.alice)
+            }
+        }, "assist-close").start()
+    }
+
+    /**
+     * Алиса открыла в своей панели другое приложение. Маршрут (Навигатор по yandexnavi://build_route_on_map) - как в AA:
+     * задачу закрываем, панель тоже, навигатор на всю область и ACTION_NAVIGATE + geo: в его машинную часть. Навигатор
+     * обычным окном - переносим задачу в его окно. Не маршрут - оставляем в панели. Главный поток.
+     */
+    internal fun assistantOpened(t: android.app.ActivityManager.RunningTaskInfo) {
+        if (!model.assistantOpen) return
+        val pkg = t.topActivity?.packageName ?: return
+        val data = t.baseIntent.dataString
+        val geo = com.yegorkapomidorka.headswap.carapp.RouteIntent.geoFor(data)
+        if (geo == null && model.assistantHidden && pkg == model.navigatorPkg) {
+            // «Открой навигатор» поднимает пустую задачу Навигатора; следующий build_route_on_map ушёл бы в неё же
+            // (base MAIN, ловец маршрут не видит, стенд 07.11). Закрываем - маршрут создаст новую задачу.
+            AppLog.i("ASSIST скрытая Алиса открыла $pkg без маршрута: задачу закрываем", false)
+            val id = t.taskId
+            Thread({ com.yegorkapomidorka.headswap.dex.PhoneAssistant.removeTask(id) }, "assist-navi").start()
+            return
+        }
+        if (geo == null) { AppLog.i("ASSIST $pkg не маршрут ($data), остаётся в панели", false); return }
+        routeFromAlice(t, geo)
+    }
+
+    private fun routeFromAlice(t: android.app.ActivityManager.RunningTaskInfo, geo: String) {
+        val pkg = t.topActivity?.packageName ?: t.baseIntent.component?.packageName ?: return
+        val navigate = android.content.Intent(com.yegorkapomidorka.headswap.carapp.RouteIntent.ACTION_NAVIGATE, android.net.Uri.parse(geo))
+        val nav = model.navigatorPkg
+        val car = com.yegorkapomidorka.headswap.carapp.CarAppHost.pkg?.takeIf { it == nav }
+        AppLog.i("ASSIST маршрут от Алисы $geo -> ${car?.let { "машинная часть $it" } ?: "окно навигатора $nav"}", false)
+        val taskId = t.taskId
+        val ctx = model.context.applicationContext
+        Thread({
+            val assist = com.yegorkapomidorka.headswap.dex.PhoneAssistant
+            assist.removeTask(taskId)
+            // навигатор окном (Google Карты): маршрут его же intent'ом в его окно
+            if (car == null && nav != null) assist.openRoute(ctx, nav, geo, EmbedHost.navDisplayId())
+            // окном тот же пакет - его задачу не трогаем, иначе закроем само окно
+            if (car != null || nav != pkg) assist.closePhoneTasks(ctx, pkg)
+        }, "assist-route").start()
+        closeAssistant("маршрут -> навигатор")
+        if (VOICE_ONLY) AliceVoice.route()
+        if (model.navigatorPkg != null && model.area != Area.Navigator) model.go(Area.Navigator)
+        if (car != null) com.yegorkapomidorka.headswap.carapp.CarAppHost.newIntent(navigate)
+    }
 
     /** Кнопка MEDIA ГУ: плеер на весь экран; плеер не выбран или не установлен - выбор плеера. */
     fun openMusic() {
@@ -139,6 +332,8 @@ object LauncherActions {
 
     fun embeddedBack() {
         AppLog.i("LAUNCHER Назад на рейке: экран=${model.area}", false)
+        // панель Алисы закрывается сама, Back в Яндекс не шлём
+        if (model.assistantOpen && !model.assistantHidden) { closeAssistant("Назад"); return }
         when (model.area) {
             is Area.App -> {
                 val now = android.os.SystemClock.uptimeMillis()
@@ -168,6 +363,7 @@ object LauncherActions {
 
     /** Слот сообщил, что задачи приложения больше нет (процесс убит, Back из корня, окно потеряно): слой убираем. */
     internal fun embedGone(slot: EmbedSlot) {
+        if (slot === EmbedHost.alice) { closeAssistant("задача Алисы исчезла"); return }
         if (model.foreign != null) { if (slot === EmbedHost.app) ForeignActions.gone(); return }
         backClosed(slot)
     }

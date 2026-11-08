@@ -9,6 +9,7 @@ import com.yegorkapomidorka.headswap.aa.AaTranscoder
 import com.yegorkapomidorka.headswap.aa.BitratePolicy
 import com.yegorkapomidorka.headswap.aa.BitrateProfile
 import com.yegorkapomidorka.headswap.aa.DesktopVideoQuality
+import com.yegorkapomidorka.headswap.aa.DupDownFilter
 import com.yegorkapomidorka.headswap.aa.DesktopVideoSelection
 import com.yegorkapomidorka.headswap.aa.DesktopVideoGeometry
 import com.yegorkapomidorka.headswap.aa.CallStateSource
@@ -159,6 +160,11 @@ class CarLifeSession(
     private var touchCount = 0
     private var maxFingers = 0
     private var lastMoveFingers = 0
+    private var singleDownHeld = false
+    private var singleDownX = -1
+    private var singleDownY = -1
+    private var singleDownMs = 0L
+    private var dupDownCount = 0
     private val rxByType = java.util.TreeMap<Int, Int>()
     private var huInfo: String? = null
     private var huStatistic: String? = null
@@ -1222,6 +1228,27 @@ class CarLifeSession(
         if (t.masked != 2 || n != lastMoveFingers) {
             AppLog.i("TOUCH action=${t.action} пальцев=$n тело=${m.body.size} байт", false)
             lastMoveFingers = if (t.masked == 2) n else 0
+        }
+        // Honda (h725 Civic 20772104, h864 XR-V 20772122) шлёт каждое касание как DOWN, DOWN, UP с теми же x,y.
+        // Повтор DOWN без UP лаунчер считает вторым нажатием: «Настройки» мигают, «Назад» двойное.
+        // Авто = любая ГУ, но только повтор в окне DupDownFilter.AUTO_WINDOW_MS: у ГУ, теряющей UP, следующий
+        // тап в ту же точку приходит позже и проходит. Переопределяется в «Для разработчиков» (DupDownFilter).
+        val dupMode = bridge.dupDownFilter()
+        if (dupMode == DupDownFilter.OFF) {
+            singleDownHeld = false
+        } else if (n == 1 && t.masked == 0) {
+            val now = SystemClock.elapsedRealtime()
+            val same = singleDownHeld && t.x == singleDownX && t.y == singleDownY
+            if (DupDownFilter.drop(dupMode, same, now - singleDownMs)) {
+                if (dupDownCount++ == 0) AppLog.i("TOUCH повторный DOWN без UP через ${now - singleDownMs} мс (x=${t.x} y=${t.y}) — отбрасываю, дальше молча")
+                return
+            }
+            singleDownHeld = true
+            singleDownX = t.x
+            singleDownY = t.y
+            singleDownMs = now
+        } else if (n > 1 || t.masked == 1 || t.masked == 3) {
+            singleDownHeld = false
         }
         // Gesture opcodes also normalize to action 3; only raw TOUCH_ACTION means CANCEL.
         val desktopCancel = bridge.desktopInputEnabled && m.type == Msg.TOUCH_ACTION && t.masked == 3

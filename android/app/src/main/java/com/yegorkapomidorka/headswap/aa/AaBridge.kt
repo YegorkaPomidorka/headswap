@@ -453,6 +453,10 @@ class AaBridgeCore(
         },
     )
     @Volatile private var touchDecimationLogged = 1
+
+    /** Режим фильтра повторного DOWN без UP ([DupDownFilter]), читается на каждое касание. */
+    @Volatile var dupDownFilterProvider: () -> DupDownFilter = { DupDownFilter.DEFAULT }
+    fun dupDownFilter() = dupDownFilterProvider()
     private val mediaReleaseTimer = AudioTimer()
     private val voiceExitTimer = AudioTimer()
     private var carlifePaused = false          // VIDEO_ENCODER_PAUSE после последнего START
@@ -1331,6 +1335,7 @@ class AaBridgeCore(
             log("BRIDGE руль keycode=$code: нет аналога в AA, игнор", true)
             return
         }
+        if (android == KEYCODE_SEARCH && toPhoneAssistant("руль keycode=$code")) return
         val p = peer
         if (p == null) {
             log("BRIDGE руль keycode=$code проигнорирован: AA не подключён", true)
@@ -1369,9 +1374,36 @@ class AaBridgeCore(
         return dup
     }
 
+    /**
+     * Режим рабочего стола: кнопку голоса получает помощник телефона, а не AA. Там AA теневая, без экрана и
+     * микрофона (только стрелки навигации), и KEYCODE_SEARCH в неё ничего не открывает (поездка 04.11, Vezel).
+     * В режиме Android Auto null.
+     */
+    @Volatile var phoneAssistant: (() -> Unit)? = null
+
+    /** true, если кнопку голоса забрал помощник телефона (или это дребезг); false - пусть идёт в AA. */
+    private fun toPhoneAssistant(what: String): Boolean {
+        val launch = phoneAssistant ?: return false
+        if (voiceKeyBounce(what)) return true
+        log("BRIDGE $what -> помощник телефона", true)
+        launch()
+        return true
+    }
+
+    /**
+     * Рабочий стол: панель Алисы открыта/закрыта -> MODULE_STATUS VR=1/0, как Baidu MD (prepareShowVr/prepareCloseVr).
+     * Без него Vezel через несколько секунд после кнопки голоса пишет, что голосовую сессию не активировать (поездка 05.11).
+     */
+    @Synchronized
+    fun desktopVoiceStatus(on: Boolean) {
+        val s = if (on) 1 else 0
+        if (link.sendModuleStatus(CarlifeAudio.MODULE_VR, s)) log("BRIDGE CarLife MODULE_STATUS VR=$s (панель Алисы)", true)
+    }
+
     /** MODULE_CONTROL VR=1 от ГУ (кнопка голоса) -> AA KEYCODE_SEARCH: AA открывает ассистента и сам просит микрофон. */
     fun onCarlifeVoiceKey() {
         lastUserInputMs = clockMs()
+        if (toPhoneAssistant("кнопка голоса (MODULE_CONTROL VR=1)")) return
         val p = peer
         if (p == null) {
             log("BRIDGE кнопка голоса проигнорирована: AA не подключён", true)

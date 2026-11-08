@@ -13,7 +13,7 @@
     <string name="set_sound">Sound</string>
     <string name="set_usb_audio_title">Sound through Headswap</string>
     <string name="set_usb_audio_sub">To the car speakers over cable or Wi-Fi. Off: over Bluetooth</string>
-    <string name="set_usb_audio_desktop">In desktop mode sound goes over Bluetooth</string>
+    <string name="set_usb_audio_desktop">To get desktop sound, activate access again. Until then sound goes over Bluetooth</string>
     <string name="set_calls_title">Tell the head unit about calls</string>
     <string name="set_calls_sub">Needs the “Phone” permission: Headswap learns about an incoming call and tells the car, music is muted for the call</string>
 
@@ -185,6 +185,11 @@
     <!-- Touch decimation (TouchDecimation) -->
     <string name="tdec_off">Off</string>
     <string name="tdec_x2">×2</string>
+
+    <!-- Double touch from head unit (DupDownFilter) -->
+    <string name="dup_down_auto">Auto (repeat within 150 ms)</string>
+    <string name="dup_down_on">Always filter</string>
+    <string name="dup_down_off">Don\'t filter</string>
 
     <!-- Frame rate (FpsSetting) -->
     <string name="fps_auto_title">Auto</string>

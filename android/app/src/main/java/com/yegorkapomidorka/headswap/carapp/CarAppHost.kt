@@ -58,6 +58,9 @@ object CarAppHost {
     /** cmd car_host_off / car_host: навигаторы на Car App Library - обычным окном (сравнить на стенде). */
     @Volatile var enabled = true
 
+    /** «Подсказки на приборке» навигатора (настройка лаунчера, h800): false - этот пакет окном, как на телефоне. */
+    @Volatile var allowFor: (String) -> Boolean = { true }
+
     /** cmd car_dump: писать шаблоны целиком в лог (для разбора новых навигаторов). */
     @Volatile var dumpTemplates = false
 
@@ -126,6 +129,13 @@ object CarAppHost {
 
     /** «Назад» хоста: приложение само решает, что закрыть. */
     fun back() { h.post { session?.back() } }
+
+    /** Intent навигатору хоста (маршрут от Алисы); хост не поднят - false, и intent не ушёл. */
+    fun newIntent(i: android.content.Intent): Boolean {
+        if (pkg == null) return false
+        h.post { session?.newIntent(i) ?: log("onNewIntent: сессии нет") }
+        return true
+    }
 
     /** cmd car_click --ei i N: нажать N-й кликабельный элемент текущего шаблона. */
     fun click(i: Int) { h.post { CarTemplateDump.click(i) } }

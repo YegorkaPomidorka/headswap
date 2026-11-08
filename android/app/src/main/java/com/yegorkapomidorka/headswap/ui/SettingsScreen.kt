@@ -54,6 +54,7 @@ import com.yegorkapomidorka.headswap.aa.MusicRate
 import com.yegorkapomidorka.headswap.aa.VideoMode
 import com.yegorkapomidorka.headswap.desktop.DesktopAppCatalog
 import com.yegorkapomidorka.headswap.dex.DelegatedDesktopAccess
+import com.yegorkapomidorka.headswap.dex.DesktopAudioAccess
 import com.yegorkapomidorka.headswap.dex.DesktopPick
 import com.yegorkapomidorka.headswap.dex.DexPrefs
 import com.yegorkapomidorka.headswap.link.car.CarNetwork
@@ -1221,6 +1222,7 @@ class SettingsSectionScreen(host: MainActivity, val section: SettingsSection) : 
         usbAudioRow = ToggleRow(c, c.getString(R.string.set_usb_audio_title), c.getString(R.string.set_usb_audio_sub), aa.usbAudio) {
             aa.usbAudio = it
             refreshEqEntry()
+            refreshUsbAudio()
         }
         body.addView(usbAudioRow!!.view)
         refreshUsbAudio()
@@ -1250,13 +1252,16 @@ class SettingsSectionScreen(host: MainActivity, val section: SettingsSection) : 
 
     private var usbAudioRow: ToggleRow? = null
 
-    /** ADR 0020: в режиме рабочего стола звук только по Bluetooth - строка неактивна, выбор для Android Auto сохраняется. */
+    /**
+     * ADR 0025: один переключатель на оба режима. На рабочем столе захват звука даёт только активация с ним включённым -
+     * если активировали при выключенном (или в бете 7, где звук был только по Bluetooth), подсказываем повторить.
+     */
     private fun refreshUsbAudio() {
         val row = usbAudioRow ?: return
         val desktop = BridgeMode.effective(aa.bridgeMode, Build.VERSION.SDK_INT) == BridgeMode.DESKTOP
-        row.setEnabled(!desktop)
-        row.setChecked(aa.usbAudio && !desktop)
-        row.subView?.text = ctx.getString(if (desktop) R.string.set_usb_audio_desktop else R.string.set_usb_audio_sub)
+        row.setChecked(aa.usbAudio)
+        val reactivate = desktop && aa.usbAudio && DelegatedDesktopAccess.isReady(ctx) && !DesktopAudioAccess.hasPermission(ctx)
+        row.subView?.text = ctx.getString(if (reactivate) R.string.set_usb_audio_desktop else R.string.set_usb_audio_sub)
     }
 
     /** Включение просит READ_PHONE_STATE (API 31+); результат - в onPermissionResult. */
@@ -1649,7 +1654,7 @@ class SettingsSectionScreen(host: MainActivity, val section: SettingsSection) : 
 
     // --- обновления ---
 
-    /** Переключатель проверки + строка состояния с кнопкой «Проверить» / «Обновить» (как карточка автозапуска). */
+    /** Переключатель проверки + строка состояния с кнопкой «Проверить и обновить» / «Обновить сейчас» (как карточка автозапуска). */
     private fun updateCard(): View {
         val c = ctx
         val prefs = UpdatePrefs(c)
@@ -1669,7 +1674,7 @@ class SettingsSectionScreen(host: MainActivity, val section: SettingsSection) : 
             pad(c, 14, 0, 14, 0)
             background = c.rippleBg(null, 20)
             isClickable = true
-            setOnClickListener { if (Updater.available(c) != null) Updater.start(host, confirm = false) else Updater.check(c, manual = true) }
+            setOnClickListener { Updater.checkAndUpdate(host) }
         }
         updStatus = status
         updButton = button

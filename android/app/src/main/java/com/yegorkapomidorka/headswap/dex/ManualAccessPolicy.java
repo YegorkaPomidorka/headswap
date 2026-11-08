@@ -76,6 +76,14 @@ public final class ManualAccessPolicy {
         return packageName + "/" + INSTRUMENTATION_CLASS;
     }
 
+    /** Notification listener of the phone-notifications feature: full class name (it lives in the namespace, not in the applicationId). */
+    public static final String NOTIFICATION_LISTENER_CLASS = "com.yegorkapomidorka.headswap.notify.HeadswapNotificationListener";
+
+    public static String notificationListener(String packageName) {
+        requirePackage(packageName);
+        return packageName + "/" + NOTIFICATION_LISTENER_CLASS;
+    }
+
     public static List<String> arguments(Options options) {
         requirePackage(options.packageName);
         requireToken(options.token);

@@ -49,8 +49,9 @@ class DelegatedInputRegistryTest {
         registry.registerChild(12, 14, child, 800, 900)
         rejects { registry.registerChild(12, 15, child, 800, 900) }
         registry.registerChild(12, 15, Any(), 800, 900)
-        rejects { registry.registerChild(12, 16, Any(), 800, 900) }
-        rejects { registry.registerChild(14, 16, Any(), 800, 900) }
+        registry.registerChild(12, 16, Any(), 800, 900)
+        rejects { registry.registerChild(12, 17, Any(), 800, 900) }
+        rejects { registry.registerChild(14, 17, Any(), 800, 900) }
     }
 
     @Test fun closingParentRevokesAllChildInputAndResizeRequiresOwner() {

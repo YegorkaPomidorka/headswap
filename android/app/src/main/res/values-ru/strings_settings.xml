@@ -13,7 +13,7 @@
     <string name="set_sound">Звук</string>
     <string name="set_usb_audio_title">Звук через Headswap</string>
     <string name="set_usb_audio_sub">В динамики машины по кабелю или Wi-Fi. Выключено — по Bluetooth</string>
-    <string name="set_usb_audio_desktop">В режиме рабочего стола звук идёт по Bluetooth</string>
+    <string name="set_usb_audio_desktop">Для звука на рабочем столе повторите активацию доступа. Пока звук идёт по Bluetooth</string>
     <string name="set_calls_title">Сообщать ГУ о звонках</string>
     <string name="set_calls_sub">Нужно разрешение «Телефон»: Headswap узнаёт о входящем и сообщает машине, музыка на время звонка глушится</string>
 
@@ -185,6 +185,11 @@
     <!-- Прореживание тача (TouchDecimation) -->
     <string name="tdec_off">Выкл</string>
     <string name="tdec_x2">×2</string>
+
+    <!-- Двойное касание от ГУ (DupDownFilter) -->
+    <string name="dup_down_auto">Авто (повтор до 150 мс)</string>
+    <string name="dup_down_on">Фильтровать всегда</string>
+    <string name="dup_down_off">Не фильтровать</string>
 
     <!-- Frame rate (FpsSetting) -->
     <string name="fps_auto_title">Авто</string>

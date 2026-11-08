@@ -10,7 +10,7 @@
     <string name="upd_status_available">Version %1$s is available</string>
     <string name="upd_status_downloading">Downloading %1$s… %2$d%%</string>
     <string name="upd_status_installing">Opening the installer…</string>
-    <string name="upd_btn_check">Check</string>
+    <string name="upd_btn_check">Check and update</string>
     <string name="upd_btn_update">Update</string>
     <string name="upd_btn_update_now">Update now</string>
     <string name="upd_banner_sub">Tap to update, settings stay</string>

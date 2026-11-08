@@ -19,6 +19,7 @@ import com.yegorkapomidorka.headswap.dex.DelegatedDesktopAccess
 import com.yegorkapomidorka.headswap.dex.PhoneActivation
 import com.yegorkapomidorka.headswap.dex.PhoneActivationPolicy
 import com.yegorkapomidorka.headswap.dex.PhoneActivationState
+import com.yegorkapomidorka.headswap.dex.VdmDesktop
 
 /**
  * «Активация с телефона» в разделе «Режим»: статус попытки, кнопка, ручной ввод портов и кода. Сама работа идёт в
@@ -221,6 +222,15 @@ class PhoneActivationBlock(
             status.setTextColor(c.clr(R.color.warn))
             status.visibility = View.VISIBLE
             if (!view.isAttachedToWindow) Toast.makeText(c, R.string.pa_need_wifi_debug, Toast.LENGTH_LONG).show()
+            runCatching { c.startActivity(PhoneActivation.developerSettingsIntent()) }
+            return
+        }
+        // Android 17: без отладки по USB Samsung останавливает adbd при подключении ГУ, и экран машины гаснет с телефоном
+        if (VdmDesktop.usbDebugMissing(c)) {
+            status.text = c.getString(R.string.pa_need_usb_debug)
+            status.setTextColor(c.clr(R.color.warn))
+            status.visibility = View.VISIBLE
+            if (!view.isAttachedToWindow) Toast.makeText(c, R.string.pa_need_usb_debug, Toast.LENGTH_LONG).show()
             runCatching { c.startActivity(PhoneActivation.developerSettingsIntent()) }
             return
         }
