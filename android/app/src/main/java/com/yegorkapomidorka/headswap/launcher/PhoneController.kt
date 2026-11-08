@@ -35,6 +35,8 @@ internal object PhoneController {
         private set
     var contacts by mutableStateOf<List<ContactRecord>>(emptyList())
         private set
+    var favorites by mutableStateOf<List<ContactRecord>>(emptyList())
+        private set
     var logPermitted by mutableStateOf(false)
         private set
     var contactsPermitted by mutableStateOf(false)
@@ -144,7 +146,7 @@ internal object PhoneController {
     }
 
     fun reloadContacts(ctx: Context) {
-        if (!has(ctx, Manifest.permission.READ_CONTACTS)) { contacts = emptyList(); return }
+        if (!has(ctx, Manifest.permission.READ_CONTACTS)) { contacts = emptyList(); favorites = emptyList(); return }
         val args = Bundle().apply {
             putInt(ContentResolver.QUERY_ARG_LIMIT, CONTACTS_LIMIT)
             putStringArray(ContentResolver.QUERY_ARG_SORT_COLUMNS, arrayOf(ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME))
@@ -166,6 +168,31 @@ internal object PhoneController {
             }.orEmpty()
         }.getOrElse { Log.w(TAG, "contacts: ${it.javaClass.simpleName}"); emptyList() }
         if (list != contacts) contacts = list
+        reloadFavorites(ctx)
+    }
+
+    /** Избранные (STARRED) из телефонной книги: по одному номеру на контакт, основной номер первым. */
+    fun reloadFavorites(ctx: Context) {
+        if (!has(ctx, Manifest.permission.READ_CONTACTS)) { favorites = emptyList(); return }
+        val list = runCatching {
+            ctx.contentResolver.query(
+                ContactsContract.CommonDataKinds.Phone.CONTENT_URI,
+                arrayOf(ContactsContract.CommonDataKinds.Phone.CONTACT_ID, ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME,
+                    ContactsContract.CommonDataKinds.Phone.NUMBER),
+                "${ContactsContract.CommonDataKinds.Phone.STARRED} = 1", null,
+                "${ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME} COLLATE LOCALIZED ASC, " +
+                    "${ContactsContract.CommonDataKinds.Phone.IS_SUPER_PRIMARY} DESC, ${ContactsContract.CommonDataKinds.Phone.IS_PRIMARY} DESC",
+            )?.use { c ->
+                val seen = HashSet<Long>()
+                buildList {
+                    while (seen.size < CONTACTS_LIMIT && c.moveToNext()) {
+                        val id = c.getLong(0)
+                        if (seen.add(id)) add(ContactRecord(id, c.getString(1).orEmpty(), c.getString(2).orEmpty()))
+                    }
+                }
+            }.orEmpty()
+        }.getOrElse { Log.w(TAG, "favorites: ${it.javaClass.simpleName}"); emptyList() }
+        if (list != favorites) favorites = list
     }
 
     // --- управление звонком ---

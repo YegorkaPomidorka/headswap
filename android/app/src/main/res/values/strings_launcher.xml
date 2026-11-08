@@ -78,6 +78,8 @@
     <string name="l_contacts">Contacts</string>
     <string name="l_calls_empty">No calls</string>
     <string name="l_contacts_empty">No contacts</string>
+    <string name="l_favorites">Favorites</string>
+    <string name="l_favorites_empty">No favorite contacts. Star them in the phone book</string>
     <string name="l_calls_no_permission">Allow access to calls and contacts on the phone</string>
 
     <string name="l_set_theme">Theme</string>
