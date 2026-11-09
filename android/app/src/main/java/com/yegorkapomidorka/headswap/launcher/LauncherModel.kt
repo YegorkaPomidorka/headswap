@@ -199,7 +199,7 @@ internal object LauncherModel {
         EmbedHost.onGone = { LauncherActions.embedGone(it) }
         EmbedHost.onAssistantOpened = { LauncherActions.assistantOpened(it) }
         CarAppHost.scaleFor = { pkg -> CarConfigMath.step(prefs.mapScale(pkg)) }
-        CarAppHost.allowFor = { pkg -> prefs.navHints(pkg) }
+        CarAppHost.allowFor = { pkg -> prefs.navHints(pkg) && !NavigatorPick.noHints(pkg) }
         LauncherActions.startRouteCatcher(context.applicationContext)
         ready = true
         reloadCatalog()
@@ -344,8 +344,11 @@ internal object LauncherModel {
 
     /** Установленные известные навигаторы (по каталогу приложений с лаунчерным входом). */
     val installedPackages: Set<String> get() = catalog.mapTo(HashSet()) { it.packageName }
-    val navigatorPkg: String? get() = NavigatorPick.effective(savedNavigator, installedPackages)
-    val installedNavigators: List<String> get() = NavigatorPick.KNOWN.filter { it in installedPackages }
+    /** Интерфейс на арабском (h1003): навигаторы - Google Карты и Waze, без Я.Музыки. */
+    val arabic: Boolean get() = com.yegorkapomidorka.headswap.AppLocale.isArabic(appCtx)
+    val onlinePlayers: List<String> get() = PlayerChip.online(arabic)
+    val navigatorPkg: String? get() = NavigatorPick.effective(savedNavigator, installedPackages, arabic)
+    val installedNavigators: List<String> get() = NavigatorPick.known(arabic).filter { it in installedPackages }
 
     /** Предыдущий экран лаунчера для «Назад»; после самого «Назад» пуст, чтобы не ходить по кругу. */
     var previous: Area? = null

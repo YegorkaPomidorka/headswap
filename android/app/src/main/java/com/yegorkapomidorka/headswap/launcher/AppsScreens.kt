@@ -94,7 +94,9 @@ internal fun <T> PagedApps(
         val padBottom = s.m
         val availW = constraints.maxWidth - padStart - padEnd
         val availH = constraints.maxHeight - padTop - padBottom - s.t - s.g
-        val iconPx = (s.t * 1.0f).toInt()
+        // минимум два ряда: на низкой ленте 1280x480 при иконке T влезал один (Егор 09.11) - иконка мельче, но не меньше T/2
+        val rowExtra = s.appLbl + s.g * 2
+        val iconPx = if (!s.strip || availH >= 2 * (s.t + rowExtra) + s.g) s.t else maxOf(s.t / 2, (availH - s.g) / 2 - rowExtra)
         val plan = GridPlan.of(availW, availH, iconPx * 2, iconPx + s.appLbl + s.g * 2, s.g)
         val pages = Pager.pageCount(items.size, plan.perPage)
         val current = Pager.clamp(page, items.size, plan.perPage)

@@ -64,12 +64,17 @@ import kotlinx.coroutines.withContext
 /** Разделы настроек; [COLORS] и [ABOUT] - вложенные страницы «Вида» и «Системы», своей кнопки слева у них нет. */
 enum class SettingsPage { LOOK, NAVIGATOR, MUSIC, HOME, SYSTEM, ABOUT, COLORS }
 
-/** Навигаторы раздела «Навигатор», плитки 2x2 в порядке макета. */
+/** Навигаторы раздела «Навигатор», плитки по две в ряд в порядке макета. */
 private val NAV_TILES = listOf(
     NavigatorPick.YANDEX_NAVI to R.string.l_nav_yandex_navi,
-    "ru.dublgis.dgismobile" to R.string.l_nav_2gis,
+    NavigatorPick.DGIS to R.string.l_nav_2gis,
     NavigatorPick.YANDEX_MAPS to R.string.l_nav_yandex_maps,
-    "com.google.android.apps.maps" to R.string.l_nav_google_maps,
+    NavigatorPick.GOOGLE_MAPS to R.string.l_nav_google_maps,
+)
+/** Арабский интерфейс (h1003): Google Карты и Waze, один ряд. */
+private val NAV_TILES_AR = listOf(
+    NavigatorPick.GOOGLE_MAPS to R.string.l_nav_google_maps,
+    NavigatorPick.WAZE to R.string.l_nav_waze,
 )
 
 /**
@@ -183,10 +188,12 @@ fun LauncherSettingsScreen() {
                                 })
                                 // низкий ряд (экраны высотой 480): подпись не влезает под название - без неё
                                 val subFits = rowH >= ((s.f2 + d.sub) * 1.25).roundToInt() + 4 + 2 * d.padV
-                                SwitchCard(stringResource(R.string.l_nav_hints), hints, d, cell(2).fillMaxWidth(), sub = sub.takeIf { subFits }) {
+                                // Waze - только окно, подсказок нет вовсе (h1003): тумблер не показываем
+                                val noHints = NavigatorPick.noHints(navPkg)
+                                if (!noHints) SwitchCard(stringResource(R.string.l_nav_hints), hints, d, cell(2).fillMaxWidth(), sub = sub.takeIf { subFits }) {
                                     model.chooseNavHints(navPkg, it)
                                 }
-                                var row = 3
+                                var row = if (noHints) 2 else 3
                                 // масштаб - dpi своего хоста Car App; навигатору окном и через AA он не нужен
                                 if (EmbedHost.nav.carHost) MapScaleCard(navPkg, d, cell(row++).fillMaxWidth())
                                 Placed(row++) { RestartNavCard(d, Modifier) } // кнопка - через обёртку, рамка шайбы (h737)
@@ -199,11 +206,11 @@ fun LauncherSettingsScreen() {
                             val found by produceState(emptyList<String>()) {
                                 value = withContext(Dispatchers.IO) { MusicController.players(model.context) }
                             }
-                            val players = PlayerChip.allPlayers(found, model.installedPackages)
+                            val players = PlayerChip.allPlayers(found, model.installedPackages, model.onlinePlayers)
                             val local = model.localPlayer?.takeIf { it in players } ?: players.firstOrNull()
                             PlayersCard(stringResource(R.string.l_s_slot1), players.map { PlayerOpt.App(it) },
                                 local?.let { PlayerOpt.App(it) }, d, cell(0).fillMaxWidth()) { model.chooseLocalPlayer((it as PlayerOpt.App).pkg) }
-                            val second = PlayerChip.secondSlotPlayers(players)
+                            val second = PlayerChip.secondSlotPlayers(players, model.onlinePlayers)
                             PlayersCard(stringResource(R.string.l_s_slot2), listOf(PlayerOpt.Last) + second.map { PlayerOpt.App(it) },
                                 model.onlinePlayer?.takeIf { it in second }?.let { PlayerOpt.App(it) } ?: PlayerOpt.Last, d, cell(1).fillMaxWidth()) {
                                 model.chooseOnlinePlayer((it as? PlayerOpt.App)?.pkg)
@@ -634,10 +641,9 @@ private fun NavigatorTiles(d: SettingsDims, rowH: Int, modifier: Modifier) {
     val model = LauncherModel
     val installed = model.installedPackages
     Column(modifier, verticalArrangement = Arrangement.spacedBy(m.dp(d.gap))) {
-        for (r in 0 until 2) {
+        for (row in (if (model.arabic) NAV_TILES_AR else NAV_TILES).chunked(2)) {
             Row(Modifier.height(m.dp(rowH)).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(m.dp(d.gap))) {
-                for (c in 0 until 2) {
-                    val (pkg, res) = NAV_TILES[r * 2 + c]
+                for ((pkg, res) in row) {
                     val has = pkg in installed
                     val label = stringResource(res)
                     OptionBox(has && model.navigatorPkg == pkg, Modifier.weight(1f).fillMaxHeight().alpha(if (has) 1f else 0.4f),
@@ -814,6 +820,22 @@ private fun HomeMiniature(left: Boolean, gapPx: Int, modifier: Modifier) {
     val gap = m.dp(gapPx)
     val small = RoundedCornerShape(m.dp(gapPx))
     Row(modifier.clip(RoundedCornerShape(m.dp(max(1, (10 * k).roundToInt())))).background(pal.mini)) {
+        // лента 1280x480: на главном один ряд - обложка, большая плашка и сетка приложений, нижнего ряда нет (Егор 09.11)
+        if (m.spec.strip) {
+            Row(Modifier.fillMaxSize().padding(gap), horizontalArrangement = Arrangement.spacedBy(gap)) {
+                val cells = listOf<@Composable RowScope.() -> Unit>(
+                    { MusicMiniCell(0.25f, small) },
+                    { BigMiniCell(0.5f, small) },
+                    {
+                        Box(Modifier.weight(0.25f).fillMaxHeight().clip(small).background(pal.btn2), contentAlignment = Alignment.Center) {
+                            SvgIcon(Ico.PLUS, (22 * k).roundToInt(), pal.fg2, stroke = 2.4f)
+                        }
+                    },
+                )
+                for (c in if (left) cells.asReversed() else cells) c(this)
+            }
+            return@Row
+        }
         Column(Modifier.weight(1f).fillMaxHeight().padding(gap), verticalArrangement = Arrangement.spacedBy(gap)) {
             Row(Modifier.weight(2f).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(gap)) {
                 if (left) { BigMiniCell(0.67f, small); MusicMiniCell(0.33f, small) } else { MusicMiniCell(0.33f, small); BigMiniCell(0.67f, small) }

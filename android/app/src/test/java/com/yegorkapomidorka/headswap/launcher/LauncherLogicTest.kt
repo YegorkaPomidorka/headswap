@@ -352,6 +352,38 @@ class LauncherLogicTest {
         for (pkg in NavigatorPick.KNOWN) assertFalse(pkg, NavigatorPick.hintsDefault(pkg))
     }
 
+    @Test fun wazeWithoutHintsAndShadowAa() {
+        assertTrue(NavigatorPick.noHints(NavigatorPick.WAZE))
+        assertFalse(NavigatorPick.noHints(NavigatorPick.GOOGLE_MAPS))
+        assertFalse(NavigatorPick.shadowWanted(true, NavigatorPick.WAZE) { true })
+        assertTrue(NavigatorPick.shadowWanted(true, NavigatorPick.GOOGLE_MAPS) { true })
+    }
+
+    @Test fun arabicNavigatorsGoogleAndWaze() {
+        val all = setOf(NavigatorPick.YANDEX_NAVI, NavigatorPick.DGIS, NavigatorPick.GOOGLE_MAPS, NavigatorPick.WAZE)
+        assertEquals(NavigatorPick.GOOGLE_MAPS, NavigatorPick.defaultFor(all, arabic = true))
+        assertEquals(NavigatorPick.YANDEX_NAVI, NavigatorPick.defaultFor(all))
+        assertEquals(NavigatorPick.WAZE, NavigatorPick.defaultFor(setOf(NavigatorPick.DGIS, NavigatorPick.WAZE), arabic = true))
+        assertNull(NavigatorPick.defaultFor(setOf(NavigatorPick.DGIS), arabic = true))
+        // сохранённый 2ГИС в арабском не действует, Waze - действует
+        assertEquals(NavigatorPick.GOOGLE_MAPS, NavigatorPick.effective(NavigatorPick.DGIS, all, arabic = true))
+        assertEquals(NavigatorPick.WAZE, NavigatorPick.effective(NavigatorPick.WAZE, all, arabic = true))
+        assertEquals(NavigatorPick.DGIS, NavigatorPick.effective(NavigatorPick.DGIS, all))
+    }
+
+    @Test fun arabicHidesYandexMusic() {
+        val ar = PlayerChip.online(true)
+        val inst = setOf(PlayerChip.YANDEX, PlayerChip.VK)
+        assertEquals(PlayerChip.VK, PlayerChip.onlineSlot(inst, PlayerChip.YANDEX, null, online = ar))
+        assertEquals(PlayerChip.VK, PlayerChip.onlineSlot(inst, null, PlayerChip.YANDEX, online = ar))
+        assertEquals(PlayerChip.YANDEX, PlayerChip.onlineSlot(inst, null, null))
+        assertEquals(listOf("x", PlayerChip.VK), PlayerChip.allPlayers(listOf("x", PlayerChip.YANDEX), inst, ar))
+        val slots = PlayerChip.slots(inst, PlayerChip.YANDEX, null, local = PlayerChip.YANDEX, online = ar)
+        assertNull(slots[0].pkg)
+        assertTrue(slots[0].selected)
+        assertEquals(PlayerChip.VK, slots[1].pkg)
+    }
+
     @Test fun shadowAaFollowsNavigatorHints() {
         val hints = mapOf("com.google.android.apps.maps" to false, "ru.dublgis.dgismobile" to true)
         val of = { p: String -> hints[p] ?: true }
