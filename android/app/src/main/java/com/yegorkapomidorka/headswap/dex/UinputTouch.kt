@@ -29,6 +29,7 @@ internal object UinputTouch {
     private val gestures = HashMap<Int, Boolean>()
     private val converters = HashMap<Int, UinputTouchEvents>()
     private var describedDowns = 0
+    @Volatile private var lastHostError = ""
 
     /** Из [VdmHostProvider.call]; вызывающий уже проверен как uid 2000. */
     fun accept(context: Context, extras: Bundle?): Bundle {
@@ -114,6 +115,11 @@ internal object UinputTouch {
         }
         if (triplets.isNotEmpty()) runCatching { h.events(displayId, triplets) }
             .onFailure { log("событие не отправлено: ${it.javaClass.simpleName}: ${it.message}") }
+        // events() oneway: ошибку записи в хосте видно только через lastError (h1025: test1 молча не писал на A15).
+        if (action == MotionEvent.ACTION_UP || action == MotionEvent.ACTION_CANCEL) worker.execute {
+            val error = runCatching { h.lastError() }.getOrElse { "${it.javaClass.simpleName}: ${it.message}" }
+            if (error.isNotEmpty() && error != lastHostError) { lastHostError = error; log("ошибка хоста: $error") }
+        }
         return true
     }
 

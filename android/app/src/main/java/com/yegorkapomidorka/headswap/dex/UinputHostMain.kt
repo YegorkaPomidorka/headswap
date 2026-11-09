@@ -66,7 +66,7 @@ class UinputHostMain private constructor(private val args: VdmHostPolicy.Args) {
         deviceClass.constructors.firstOrNull { it.parameterTypes.size == 9 || it.parameterTypes.size == 10 }
             ?: error("нет известного конструктора Device: ${deviceClass.constructors.joinToString { it.parameterTypes.size.toString() }}")
     }
-    /** A14: injectEvent(int[]); новее - injectEvent(int[], long время в мкс). */
+    /** A14: injectEvent(int[]); A15+: injectEvent(int[], long offsetMicros) - смещение от сейчас, нам 0. */
     private val injectMethod by lazy {
         deviceClass.methods.firstOrNull { it.name == "injectEvent" && it.parameterTypes.firstOrNull() == IntArray::class.java }
             ?: error("нет Device.injectEvent")
@@ -74,7 +74,7 @@ class UinputHostMain private constructor(private val args: VdmHostPolicy.Args) {
 
     private fun inject(device: Any, triplets: IntArray) {
         if (injectMethod.parameterTypes.size == 1) injectMethod.invoke(device, triplets)
-        else injectMethod.invoke(device, triplets, android.os.SystemClock.uptimeMillis() * 1000)
+        else injectMethod.invoke(device, triplets, 0L)
     }
 
     private fun absInfo(max: Int): Any = absInfoClass.getConstructor().newInstance().also { info ->
