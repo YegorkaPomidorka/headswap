@@ -15,10 +15,18 @@ data class ColorSet(val accentHue: Int, val bgHue: Int, val bgSat: Int) {
         /** Светлое золото: акцент 46°, кремовый фон 44°. */
         val DAY = ColorSet(46, 44, 100)
 
+        /**
+         * Оттенок вне круга: хвост дорожки слайдера после 360° - «без цвета». Фон ночью чистый чёрный, днём белый;
+         * акцент наоборот (ночью белый, днём чёрный), чтобы не слиться с фоном. Просьба юзера про чёрный, 09.11.
+         */
+        const val HUE_NEUTRAL = 400
+
+        fun neutral(hue: Int) = hue > 360
+
         fun decode(s: String?, fallback: ColorSet): ColorSet {
             val p = s?.split(',')?.mapNotNull { it.trim().toIntOrNull() } ?: return fallback
             if (p.size != 3) return fallback
-            return ColorSet(p[0].coerceIn(0, 360), p[1].coerceIn(0, 360), p[2].coerceIn(0, 100))
+            return ColorSet(p[0].coerceIn(0, HUE_NEUTRAL), p[1].coerceIn(0, HUE_NEUTRAL), p[2].coerceIn(0, 100))
         }
     }
 }
@@ -28,7 +36,8 @@ object LauncherColors {
         Color.hsl((h % 360).toFloat().coerceIn(0f, 359.9f), (s / 100f).coerceIn(0f, 1f), (l / 100f).coerceIn(0f, 1f), a)
 
     /** Акцент: насыщенность 65%, светлота 52% ночью (золото #D4AF37) и 45% днём - на светлом фоне темнее. */
-    fun accent(light: Boolean, hue: Int): Color = hsl(hue, 65f, if (light) 45f else 52f)
+    fun accent(light: Boolean, hue: Int): Color =
+        if (ColorSet.neutral(hue)) hsl(0, 0f, if (light) 12f else 94f) else hsl(hue, 65f, if (light) 45f else 52f)
 
     /** Палитра для набора; набор по умолчанию - ручная палитра без пересчёта. */
     fun palette(light: Boolean, set: ColorSet): LauncherPalette = when {
@@ -41,16 +50,20 @@ object LauncherColors {
     private fun night(c: ColorSet): LauncherPalette {
         val b = c.bgHue
         val k = c.bgSat / 100f
-        fun bg(s: Float, l: Float, a: Float = 1f) = hsl(b, s * k, l, a)
+        val black = ColorSet.neutral(b)
+        fun bg(s: Float, l: Float, a: Float = 1f) = if (black) hsl(0, 0f, l, a) else hsl(b, s * k, l, a)
+        // чёрный фон - сплошной, без градиента и свечения акцента (OLED)
+        val solid = Color.Black
         return LauncherPalette(
             light = false,
-            bgStops = listOf(0f to bg(40f, 6f), 0.42f to bg(34f, 10f), 0.70f to bg(26f, 14f), 1f to bg(30f, 10f)),
-            glowLeft = 0.24f, glowRight = 0.13f,
+            bgStops = if (black) listOf(0f to solid, 1f to solid)
+            else listOf(0f to bg(40f, 6f), 0.42f to bg(34f, 10f), 0.70f to bg(26f, 14f), 1f to bg(30f, 10f)),
+            glowLeft = if (black) 0f else 0.24f, glowRight = if (black) 0f else 0.13f,
             fg = bg(20f, 96f), fg2 = bg(45f, 86f), fg3 = bg(34f, 76f),
             surf = bg(60f, 85f, 0.07f), btn2 = bg(60f, 85f, 0.12f), pressed = bg(60f, 85f, 0.20f),
             btnSet = bg(60f, 85f, 0.10f), railFg = bg(20f, 96f),
             missed = Color(0xFFFFB4A9), backOff = bg(15f, 44f), tagBg = bg(30f, 7f, 0.6f), mapBg = bg(25f, 12f),
-            bgSolid = bg(25f, 14f), mini = bg(30f, 7f),
+            bgSolid = if (black) solid else bg(25f, 14f), mini = bg(30f, 7f),
             bar = bg(22f, 13f), sep = Color(1f, 1f, 1f, 0.08f),
             accent = accent(false, c.accentHue),
         )
@@ -60,17 +73,21 @@ object LauncherColors {
     private fun day(c: ColorSet): LauncherPalette {
         val b = c.bgHue
         val k = c.bgSat / 100f
-        fun bg(s: Float, l: Float, a: Float = 1f) = hsl(b, s * k, l, a)
-        fun tint(a: Float) = hsl(c.accentHue, 55f, 30f, a)
+        val white = ColorSet.neutral(b)
+        fun bg(s: Float, l: Float, a: Float = 1f) = if (white) hsl(0, 0f, l, a) else hsl(b, s * k, l, a)
+        fun tint(a: Float) = if (ColorSet.neutral(c.accentHue)) hsl(0, 0f, 20f, a) else hsl(c.accentHue, 55f, 30f, a)
+        // белый фон - сплошной, без градиента и свечения
+        val solid = Color.White
         return LauncherPalette(
             light = true,
-            bgStops = listOf(0f to bg(60f, 95f), 0.5f to bg(52f, 91f), 1f to bg(45f, 86f)),
-            glowLeft = 0.45f, glowRight = 0.25f,
+            bgStops = if (white) listOf(0f to solid, 1f to solid)
+            else listOf(0f to bg(60f, 95f), 0.5f to bg(52f, 91f), 1f to bg(45f, 86f)),
+            glowLeft = if (white) 0f else 0.45f, glowRight = if (white) 0f else 0.25f,
             fg = bg(22f, 23f), fg2 = bg(17f, 30f), fg3 = bg(14f, 38f),
             surf = tint(0.10f), btn2 = tint(0.15f), pressed = tint(0.22f),
             btnSet = tint(0.15f), railFg = bg(17f, 30f),
             missed = Color(0xFFB3361F), backOff = bg(12f, 60f), tagBg = Color(1f, 1f, 1f, 0.88f), mapBg = bg(25f, 92f),
-            bgSolid = bg(52f, 91f), mini = bg(60f, 95f),
+            bgSolid = if (white) solid else bg(52f, 91f), mini = if (white) solid else bg(60f, 95f),
             bar = bg(40f, 86f), sep = tint(0.14f),
             accent = accent(true, c.accentHue),
         )

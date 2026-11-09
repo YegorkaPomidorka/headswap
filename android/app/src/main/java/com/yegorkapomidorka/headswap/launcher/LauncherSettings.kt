@@ -158,10 +158,10 @@ fun LauncherSettingsScreen() {
                             ColorsModeCard(d, cell(0).fillMaxWidth())
                             val set = if (model.colorsEditDay) model.dayColors else model.nightColors
                             val light = model.colorsEditDay
-                            ColorSliderCard(stringResource(R.string.l_s_colors_accent), set.accentHue, 360, d, cell(1).fillMaxWidth(),
-                                hueTrack(light, accent = true)) { model.editColors(set.copy(accentHue = it)) }
-                            ColorSliderCard(stringResource(R.string.l_s_colors_bg_hue), set.bgHue, 360, d, cell(2).fillMaxWidth(),
-                                hueTrack(light, accent = false)) { model.editColors(set.copy(bgHue = it)) }
+                            ColorSliderCard(stringResource(R.string.l_s_colors_accent), set.accentHue, ColorSet.HUE_NEUTRAL, d, cell(1).fillMaxWidth(),
+                                hueTrack(light, accent = true)) { model.editColors(set.copy(accentHue = hue(it))) }
+                            ColorSliderCard(stringResource(R.string.l_s_colors_bg_hue), set.bgHue, ColorSet.HUE_NEUTRAL, d, cell(2).fillMaxWidth(),
+                                hueTrack(light, accent = false)) { model.editColors(set.copy(bgHue = hue(it))) }
                             ColorSliderCard(stringResource(R.string.l_s_colors_bg_sat), set.bgSat, 100, d, cell(3).fillMaxWidth(),
                                 satTrack(light, set.bgHue)) { model.editColors(set.copy(bgSat = it)) }
                             Card(cell(4).fillMaxWidth()) {
@@ -401,17 +401,28 @@ private fun ColorsModeCard(d: SettingsDims, modifier: Modifier) {
     }
 }
 
-/** Радуга оттенков для слайдера: акцент - как он будет на экране, фон - приглушённый. */
-private fun hueTrack(light: Boolean, accent: Boolean): Brush = Brush.horizontalGradient(
-    (0..360 step 60).map { h ->
-        if (accent) LauncherColors.accent(light, h)
+/**
+ * Радуга оттенков для слайдера: акцент - как он будет на экране, фон - приглушённый. Хвост после 360° -
+ * «без цвета» ([ColorSet.HUE_NEUTRAL]): чёрный или белый, резкой границей.
+ */
+private fun hueTrack(light: Boolean, accent: Boolean): Brush {
+    val end = 360f / ColorSet.HUE_NEUTRAL
+    val rainbow = (0..360 step 60).map { h ->
+        h / 360f * end to if (accent) LauncherColors.accent(light, h)
         else Color.hsl((h % 360).toFloat(), if (light) 0.5f else 0.35f, if (light) 0.85f else 0.24f)
-    },
-)
+    }
+    val none = if (accent) LauncherColors.accent(light, ColorSet.HUE_NEUTRAL) else if (light) Color.White else Color.Black
+    return Brush.horizontalGradient(*(rainbow + listOf(end + 0.001f to none, 1f to none)).toTypedArray())
+}
+
+/** Оттенок со слайдера: хвост после 360° - одно значение [ColorSet.HUE_NEUTRAL], ручка уходит в конец. */
+private fun hue(v: Int) = if (ColorSet.neutral(v)) ColorSet.HUE_NEUTRAL else v
 
 /** Насыщенность фона: от серого до цветного того же оттенка. */
 private fun satTrack(light: Boolean, hue: Int): Brush {
     val l = if (light) 0.86f else 0.2f
+    // фон без цвета: насыщенность ни на что не влияет - дорожка серая
+    if (ColorSet.neutral(hue)) return Brush.horizontalGradient(listOf(Color.hsl(0f, 0f, l), Color.hsl(0f, 0f, l)))
     return Brush.horizontalGradient(listOf(Color.hsl(hue.toFloat() % 360f, 0f, l), Color.hsl(hue.toFloat() % 360f, if (light) 0.6f else 0.45f, l)))
 }
 
