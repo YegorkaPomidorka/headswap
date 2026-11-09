@@ -131,16 +131,12 @@ object NotifGeom {
         max(0, Math.round(screenH * 0.75f) - top - footer - pad)
 
     /**
-     * Стык большой плитки с соседней: слева от неё, если там есть место, иначе справа; null - плитка на всю область
-     * (одна плитка на всю ширину), стыка нет. Место - больше зазора [g] и поля [edge] главного между плиткой и краем
-     * области: поля у краёв разные (g и m), в RTL они меняются местами, и поле m слева от карты принималось за стык -
-     * полоска уезжала к левому краю, на значки строки статуса (арабский, h1003).
+     * X полоски уведомлений - фиксированный для разрешения: стык музыки и карты в стандартной раскладке главного (музыка
+     * у рейки шириной [music], поле [g] у рейки и между плитками). От текущих плиток не зависит (Егор 08.11, 09.11).
+     * [rtl] - арабский: рейка справа, всё зеркально.
      */
-    fun seamX(bigLeft: Float, bigRight: Float, areaLeft: Float, areaRight: Float, g: Float, edge: Float = 0f): Float? = when {
-        bigLeft - areaLeft > g + edge -> bigLeft - g / 2f
-        areaRight - bigRight > g + edge -> bigRight + g / 2f
-        else -> null
-    }
+    fun fixedLineX(areaLeft: Float, areaRight: Float, g: Float, music: Float, rtl: Boolean): Float =
+        if (rtl) areaRight - g - music - g / 2f else areaLeft + g + music + g / 2f
 
     /**
      * Полоска на строке статуса не лезет на текст (Vezel 08.11: с большой плиткой часов стык плиток ушёл под дату).

@@ -88,8 +88,8 @@ private class Shown {
     var panelCx by mutableFloatStateOf(0f)
     /** нижний край панели (Y корня, без сдвига graphicsLayer): к нему в режиме чёлки прибита полоска отдельным слоем */
     var panelBottom by mutableFloatStateOf(0f)
-    /** X стыка плиток, последний раз виденный на главном: на экранах без стыка полоска стоит там же (Егор 08.11) */
-    var seamX: Float? = null
+    /** X полоски, посчитанный при рейке на месте: в полноэкранном приложении (рейки нет) остаётся тот же пиксель */
+    var lineX: Float? = null
 }
 
 /**
@@ -155,17 +155,14 @@ private fun NotificationsOverlayBody(barBandH: Int) {
     val topY = model.statusBottom ?: area.top
     val ear = px(32f)
     val barCy = (model.statusBottom ?: area.top) - barBandH / 2f // полоса строки статуса - в масштабе лаунчера
-    // Полоска и язычок - над стыком плиток главного (между музыкой и картой), и на всех экранах в том же пикселе (Егор 08.11):
-    // в настройках, с картой на весь экран и т.п. X стыка запоминается с главного. Плитка на всю ширину - стыка нет (раньше
-    // за него принимался её правый край, и язычок со шторкой улетали вправо). Главного ещё не было - у левого края области.
-    val big = model.bigTileRect
-    val seam = if (model.area == Area.Home && big != null && big.width > 0f) {
-        NotifGeom.seamX(big.left, big.right, area.left, area.right, s.g.toFloat(), maxOf(s.g, s.m).toFloat())
-    } else null
-    if (seam != null) shown.seamX = seam
-    // стыка не было - у края возле рейки: слева, в арабском (RTL, рейка справа) - у правого края (h1003)
-    val edgeHalf = ear + NotifGeom.tongueWidth(s.t, Math.round(area.width), ear, s.g).first / 2f
-    val centerX = shown.seamX ?: if (localeRtl()) area.right - edgeHalf else area.left + edgeHalf
+    // Полоска и язычок прибиты к пикселю своего разрешения (Егор 08.11 «зафиксируй по пикселям», 09.11): над стыком музыки
+    // и карты стандартной раскладки, от плиток не зависит - 2:1, 1:2, ⇄, «Слои», настройки, карта на весь экран её не
+    // двигают. В арабском (RTL) рейка и плитки зеркальные - и пиксель зеркальный, у правой рейки (h1003).
+    val fullscreenApp = model.area is Area.App && EmbedHost.app.fullscreen
+    if (!fullscreenApp || shown.lineX == null) {
+        shown.lineX = NotifGeom.fixedLineX(area.left, area.right, s.g.toFloat(), s.music.toFloat(), localeRtl())
+    }
+    val centerX = shown.lineX!!
     val dragThr = px(30f).toFloat()
     // Строка статуса скрыта (Для разработчиков, Егор 07.11): полоски на строке нет, вместо неё от верха экрана висит чёлка -
     // та же панель, свёрнутая до 168x30 с полоской на нижнем крае. Язычок и шторка растут из неё (animateContentSize), а не

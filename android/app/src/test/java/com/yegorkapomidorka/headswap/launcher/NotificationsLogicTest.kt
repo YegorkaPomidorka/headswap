@@ -39,13 +39,11 @@ class NotificationsLogicTest {
         assertTrue(accept(raw(title = "Звонок пропущен", text = "")))
     }
 
-    @Test fun seamOfBigTile() {
-        assertEquals(692f, NotifGeom.seamX(700f, 1260f, 120f, 1260f, 16f)!!, 0.01f) // карта справа - стык слева от неё
-        assertEquals(708f, NotifGeom.seamX(120f, 700f, 120f, 1260f, 16f)!!, 0.01f)  // большая слева - справа от неё
-        assertEquals(null, NotifGeom.seamX(120f, 1260f, 120f, 1260f, 16f))           // на всю ширину - стыка нет
-        // RTL (h1003): карта слева, поле m=24 у левого края области - не стык; стык справа от карты, у музыки
-        assertEquals(708f, NotifGeom.seamX(144f, 700f, 120f, 1260f, 16f, 24f)!!, 0.01f)
-        assertEquals(null, NotifGeom.seamX(144f, 1244f, 120f, 1260f, 16f, 24f))
+    @Test fun fixedLineXPerResolution() {
+        // рейка слева 0..120, музыка 400, поле 16: полоска на стыке музыки и карты, x = 120 + 16 + 400 + 8
+        assertEquals(544f, NotifGeom.fixedLineX(120f, 1280f, 16f, 400f, rtl = false), 0.01f)
+        // арабский: рейка справа, область 0..1160 - зеркально, у правой рейки
+        assertEquals(736f, NotifGeom.fixedLineX(0f, 1160f, 16f, 400f, rtl = true), 0.01f)
     }
 
     @Test fun lineAvoidsStatusText() {
