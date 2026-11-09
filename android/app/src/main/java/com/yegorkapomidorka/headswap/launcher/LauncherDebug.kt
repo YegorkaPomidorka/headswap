@@ -32,6 +32,7 @@ internal object LauncherDebug {
             when (intent.getStringExtra("area")) {
                 "home" -> LauncherActions.home()
                 "settings" -> model.go(Area.Settings)
+                "apps" -> model.go(Area.AllApps)
                 "nav" -> LauncherActions.openNavigator()
             }
             // шторка уведомлений для снимков стенда (--es shade open|close)
