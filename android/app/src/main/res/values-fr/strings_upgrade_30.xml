@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- One-time window after updating to 3.0: direct video passthrough and frame rate Auto are the defaults -->
+<resources>
+    <string name="u30_title">Transmission directe de la vidéo</string>
+    <string name="u30_lead">Ce mode est activé par défaut.</string>
+    <string name="u30_pros">Ce que vous gagnez</string>
+    <string name="u30_pro_1">Latence de l\'image réduite</string>
+    <string name="u30_pro_2">Le téléphone chauffe moins et économise la batterie</string>
+    <string name="u30_pro_3">Les écrans larges d\'autoradio recadrent eux-mêmes l\'image</string>
+    <string name="u30_changed">Ce qui a changé</string>
+    <string name="u30_chg_1">La fréquence d\'images est en mode <b>Auto</b> : c\'est Android Auto qui la définit</string>
+    <string name="u30_chg_2">Vos anciens réglages vidéo sont conservés, ils s\'appliquent au réencodage</string>
+    <string name="u30_warn">En cas de problème</string>
+    <string name="u30_warn_text">Écran noir, saccades, artefacts ou image qui ne remplit pas l\'écran : activez le <b>réencodage</b>, comme avant.</string>
+    <string name="u30_where">Réglages → Vidéo → Mode</string>
+    <string name="u30_ok">Compris</string>
+    <string name="u30_open">Ouvrir les réglages vidéo</string>
+</resources>

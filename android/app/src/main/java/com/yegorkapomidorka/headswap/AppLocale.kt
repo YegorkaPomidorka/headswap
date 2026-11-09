@@ -8,7 +8,7 @@ import android.os.LocaleList
 import java.util.Locale
 
 /**
- * Язык интерфейса приложения: «system» (по умолчанию), «en», «ru» или «ar».
+ * Язык интерфейса приложения: «system» (по умолчанию), «en», «ru», «ar» или «fr».
  * Арабский применяется с расширением «-u-nu-latn» (западные цифры 0–9, как в остальном интерфейсе и на ГУ);
  * [get] возвращает «ar» (сравнение по language).
  * Android 13+: системный per-app язык (LocaleManager, виден и в системных настройках, см. res/xml/locales_config.xml).
@@ -16,7 +16,7 @@ import java.util.Locale
  */
 object AppLocale {
     const val SYSTEM = "system"
-    val TAGS = listOf(SYSTEM, "en", "ru", "ar")
+    val TAGS = listOf(SYSTEM, "en", "ru", "ar", "fr")
 
     private const val PREFS = "app_locale"
     private const val KEY = "tag"

@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- update/Updater.kt: settings, home banner, dialogs -->
+    <string name="upd_title">Mises à jour</string>
+    <string name="upd_check_title">Rechercher les mises à jour</string>
+    <string name="upd_check_sub">Chercher une nouvelle version sur GitHub à l\'ouverture de l\'application</string>
+    <string name="upd_status_never">Pas encore vérifié</string>
+    <string name="upd_status_latest">Vous avez la dernière version</string>
+    <string name="upd_status_checking">Vérification…</string>
+    <string name="upd_status_available">La version %1$s est disponible</string>
+    <string name="upd_status_downloading">Téléchargement de %1$s… %2$d%%</string>
+    <string name="upd_status_installing">Ouverture du programme d\'installation…</string>
+    <string name="upd_btn_check">Vérifier et mettre à jour</string>
+    <string name="upd_btn_update">Mettre à jour</string>
+    <string name="upd_btn_update_now">Mettre à jour maintenant</string>
+    <string name="upd_banner_sub">Touchez pour mettre à jour, les réglages sont conservés</string>
+    <string name="upd_later">Plus tard</string>
+
+    <string name="upd_dialog_title">Headswap %1$s</string>
+    <string name="upd_dialog_size">Téléchargement : %1$s. La mise à jour s\'installe par-dessus la version actuelle, les réglages sont conservés.</string>
+    <string name="upd_dialog_no_size">La mise à jour s\'installe par-dessus la version actuelle, les réglages sont conservés.</string>
+    <string name="upd_dialog_bridge">La voiture est connectée : la mise à jour coupera la connexion.</string>
+    <string name="upd_unknown_title">Autoriser l\'installation des mises à jour</string>
+    <string name="upd_unknown_message">Les réglages Android vont s\'ouvrir : activez « Autoriser depuis cette source » pour Headswap, puis revenez et touchez de nouveau « Mettre à jour ».</string>
+
+    <string name="upd_err_check">Vérification impossible : %1$s</string>
+    <string name="upd_err_download">Impossible de télécharger la mise à jour : %1$s</string>
+    <string name="upd_err_install">Impossible d\'installer la mise à jour : %1$s</string>
+    <string name="upd_err_no_release">aucune version publiée sur GitHub pour le moment</string>
+    <string name="upd_err_no_apk">la version %1$s ne contient pas d\'APK</string>
+    <string name="upd_err_incomplete">le fichier n\'a pas été téléchargé en entier</string>
+    <string name="upd_err_checksum">somme de contrôle incorrecte</string>
+    <string name="upd_err_not_apk">le fichier n\'est pas un APK Headswap</string>
+    <string name="upd_err_not_newer">la version sur GitHub (%1$s) n\'est pas plus récente que la version installée (%2$s)</string>
+    <string name="upd_err_conflict">conflit avec l\'application installée (signée avec une autre clé ?)</string>
+</resources>

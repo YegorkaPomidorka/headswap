@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Home screen in the “Own launcher” mode -->
+<resources>
+    <string name="home_desk_stage_activation">Activation</string>
+    <string name="home_desk_stage_headunit">Autoradio</string>
+    <string name="home_desk_stage_desktop">Écran d\'accueil</string>
+    <string name="home_desk_stage_video">Vidéo</string>
+    <string name="home_desk_stage_audio">Son</string>
+
+    <string name="home_desk_st_active">activée</string>
+    <string name="home_desk_st_needed">requise</string>
+    <string name="home_desk_st_needed_again">de nouveau requise</string>
+    <string name="home_desk_st_error">erreur</string>
+
+    <string name="home_desk_title_activate">Activer Headswap</string>
+    <string name="home_desk_title_error">L\'écran d\'accueil n\'a pas démarré</string>
+
+    <string name="home_desk_sub_activate">Une activation unique via « Débogage sans fil » est nécessaire.</string>
+    <string name="home_desk_sub_activate_paired">L\'activation est perdue après un redémarrage du téléphone. Refaites-la via « Débogage sans fil » : une demi-minute.</string>
+    <string name="home_desk_sub_ok">%1$s sur l\'écran de la voiture. Vous pouvez ranger le téléphone.</string>
+    <string name="home_desk_sub_starting">Démarrage de l\'écran d\'accueil.</string>
+
+    <string name="home_desk_btn_activate">Activer</string>
+    <string name="home_desk_btn_stop">Arrêter</string>
+    <string name="home_desk_sub_usb_debug">Activez le débogage USB dans les options pour les développeurs : sous Android 17, sans lui, l\'écran de la voiture s\'éteint en même temps que le téléphone.</string>
+</resources>

@@ -1,0 +1,295 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Settings screen -->
+    <string name="set_title">Réglages</string>
+    <string name="set_back">Retour</string>
+
+    <string name="theme_title">Thème</string>
+    <string name="theme_system">Système</string>
+    <string name="theme_light">Clair</string>
+    <string name="theme_medium">Moyen</string>
+    <string name="theme_dark">Sombre</string>
+
+    <string name="set_sound">Son</string>
+    <string name="set_usb_audio_title">Son via Headswap</string>
+    <string name="set_usb_audio_sub">Vers les haut-parleurs de la voiture par câble ou Wi-Fi. Désactivé : via Bluetooth</string>
+    <string name="set_usb_audio_desktop">Pour avoir le son du bureau, activez à nouveau l\'accès. D\'ici là, le son passe par Bluetooth</string>
+    <string name="set_calls_title">Signaler les appels à l\'autoradio</string>
+    <string name="set_calls_sub">Nécessite l\'autorisation « Téléphone » : Headswap détecte un appel entrant et le signale à la voiture, la musique est coupée pendant l\'appel</string>
+
+    <string name="eq_title">Égaliseur</string>
+    <string name="eq_presets">Préréglage</string>
+    <string name="eq_preset_flat">Désactivé</string>
+    <string name="eq_preset_bass">Basses</string>
+    <string name="eq_preset_vocal">Voix</string>
+    <string name="eq_preset_rock">Rock</string>
+    <string name="eq_preset_electronic">Électro</string>
+    <string name="eq_preset_custom">Personnalisé</string>
+    <string name="eq_bands">Bandes</string>
+    <string name="eq_preamp">Préampli</string>
+    <string name="eq_reset">Réinitialiser</string>
+    <string name="eq_db">%1$s dB</string>
+    <string name="eq_hz">%1$s Hz</string>
+    <string name="eq_khz">%1$s kHz</string>
+    <string name="eq_note">Musique uniquement : les instructions de navigation et la voix ne sont pas traitées. Fonctionne par câble et en Wi-Fi, s\'applique instantanément.</string>
+    <string name="eq_usb_only">Fonctionne uniquement avec le son via Headswap ; le son passe actuellement par Bluetooth</string>
+    <string name="eq_sum_usb_only">Fonctionne uniquement avec le son via Headswap</string>
+    <string name="eq_sum">égaliseur : %1$s</string>
+
+    <string name="set_video">Vidéo</string>
+    <string name="set_transcode_title">Réencodage</string>
+    <string name="set_transcode_desc">Votre téléphone réencode la vidéo pour l\'écran de l\'autoradio : toute résolution et toute fréquence d\'images.</string>
+    <string name="set_transcode_plus">+ Plus stable, fonctionne avec n\'importe quel autoradio</string>
+    <string name="set_transcode_minus">− Charge sur le téléphone, consommation de batterie, latence +60 ms</string>
+    <string name="set_direct_title">Transmission directe</string>
+    <string name="set_direct_desc">La vidéo d\'Android Auto est envoyée telle quelle à l\'autoradio. Les écrans larges sont rognés par l\'autoradio lui-même.</string>
+    <string name="set_direct_plus">+ Latence, échauffement et consommation de batterie réduits</string>
+    <string name="set_direct_minus">− La fréquence d\'images n\'est pas réglable</string>
+    <string name="set_direct_desktop_desc">En mode « Lanceur propre », le téléphone encode son écran une seule fois et fournit à l\'autoradio un flux H.264 prêt à l\'emploi, sans transcodage.</string>
+
+    <string name="set_resolution">Résolution vidéo</string>
+    <string name="set_res_pick">Choisir la résolution</string>
+    <string name="set_res_group_standard">Écrans standard</string>
+    <string name="set_res_group_wide">Écrans larges</string>
+    <string name="set_res_group_portrait">Écrans portrait</string>
+    <string name="set_res_ratio_wide_976">2.3:1</string>
+    <string name="set_apply_next">S\'applique à la prochaine connexion.</string>
+    <string name="set_needs_transcode">Nécessite un réencodage</string>
+    <string name="set_custom_res_active">Résolution personnalisée %1$s en vigueur (%2$s)</string>
+
+    <string name="set_music_rate">Fréquence d\'échantillonnage de la musique</string>
+    <string name="set_music_rate_note">Fréquence plus basse : moins de charge sur la liaison USB et sur les autoradios peu puissants, mais qualité réduite. Auto : 48 kHz, 32 kHz pour les autoradios Hyundai CN7. S\'applique à la prochaine connexion.</string>
+    <string name="set_fps">Fréquence d\'images</string>
+    <string name="set_fps_note">S\'applique à la prochaine connexion. En transmission directe, la fréquence d\'images ne peut pas être modifiée.</string>
+    <string name="set_fps_direct">En transmission directe, Android Auto définit la fréquence d\'images</string>
+    <string name="set_aa_density">Échelle de l\'interface Android Auto</string>
+    <string name="set_aa_density_auto">Auto · %1$d dpi</string>
+    <string name="set_aa_density_manual">%1$d dpi</string>
+    <string name="set_aa_density_auto_sub">selon la résolution choisie</string>
+    <string name="set_aa_density_manual_sub">manuel, auto pour cette résolution : %1$d</string>
+    <string name="set_aa_density_reset">Auto</string>
+    <string name="set_aa_density_smaller">Plus petit</string>
+    <string name="set_aa_density_larger">Plus grand</string>
+    <string name="set_aa_density_note">Plus le dpi est élevé, plus l\'affichage est grand. S\'applique à la prochaine connexion. Avec un dpi élevé, Android Auto peut changer de disposition : une seule colonne au lieu de l\'écran partagé.</string>
+    <string name="set_sum_density">%1$d dpi</string>
+
+    <string name="set_cert">Certificat de l\'autoradio</string>
+    <string name="set_cert_hint">Changez-le si Android Auto ne se connecte pas</string>
+
+    <string name="set_car_make">Marque de la voiture</string>
+    <string name="set_car_make_default">Aucune marque (la vidéo et YouTube via Fermata fonctionnent)</string>
+    <string name="set_car_make_default_short">Aucune marque</string>
+    <string name="set_car_make_note">Logo de la marque sur le bouton de sortie d\'Android Auto. Si une marque est sélectionnée, Android Auto masque les applications vidéo tierces (Fermata Auto). S\'applique à la prochaine connexion.</string>
+
+    <string name="set_mic">Microphone</string>
+    <string name="mic_car_title">Voiture</string>
+    <string name="mic_car_sub">Microphone de l\'autoradio</string>
+    <string name="mic_phone_title">Téléphone</string>
+    <string name="mic_phone_sub">Microphone du téléphone, nécessite l\'autorisation d\'enregistrer l\'audio</string>
+    <string name="mic_auto_title">Auto</string>
+    <string name="mic_auto_sub">Voiture d\'abord, téléphone après 2 s de silence</string>
+    <string name="mic_no_permission">Pas d\'autorisation d\'enregistrer l\'audio : le microphone du téléphone ne fonctionnera pas.</string>
+
+    <string name="set_report_title">Signaler un problème</string>
+    <string name="set_report_note">journal + rapport</string>
+    <string name="set_rerun_setup">Relancer la configuration</string>
+    <string name="set_check_ready">Vérifier la disponibilité</string>
+    <string name="set_for_devs">Pour les développeurs</string>
+    <string name="set_support">Soutenir Yegor</string>
+    <string name="set_support_url">https://yegorkapomidorka.com/headswap/en/#donate</string>
+    <string name="set_sec_appearance">Apparence</string>
+    <string name="set_sec_sound">Son et microphone</string>
+    <string name="set_sec_headunit">Autoradio</string>
+    <string name="set_sec_apps">Applications de l\'autoradio</string>
+    <string name="set_sum_apps">Trouvées : %1$d</string>
+    <string name="apps_warn_banner">La vidéo est réservée à l\'arrêt. En conduisant, gardez les yeux sur la route : utilisation à vos risques et périls.</string>
+    <string name="apps_warn_title">Vidéo et conduite</string>
+    <string name="apps_warn_text">Headswap ne bloque pas la vidéo lorsque la voiture roule. Le conducteur est responsable de la sécurité : ne regardez pas de vidéo en conduisant, utilisez-la uniquement à l\'arrêt.</string>
+    <string name="apps_warn_ok">Compris</string>
+    <string name="apps_installed_title">Installées sur ce téléphone</string>
+    <string name="apps_installed_note">Hors Google Play — affichées dans Android Auto uniquement si « Sources inconnues » est activé</string>
+    <string name="apps_installed_empty">Rien de trouvé pour l\'instant. Installez une application de la liste ci-dessous ou toute autre application Android Auto.</string>
+    <string name="apps_recommended_title">Recommandées</string>
+    <string name="apps_download">Télécharger</string>
+    <string name="apps_open">Ouvrir</string>
+    <string name="apps_fermata_desc">Vidéo du téléphone, YouTube, recopie d\'écran</string>
+    <string name="apps_parkedtube_desc">YouTube en plein écran sur l\'autoradio, clavier russe</string>
+    <string name="apps_aabrowser_desc">Navigateur en plein écran sur l\'autoradio</string>
+    <string name="apps_aabrowser_req">Nécessite Android 15+</string>
+    <string name="apps_unsupported">Ne fonctionnera pas sur ce téléphone : Android 15 ou version ultérieure requis.</string>
+    <string name="apps_hint_title">Je ne vois pas l\'application dans Android Auto</string>
+    <string name="apps_hint_text">Vérifiez que la case « Sources inconnues » est cochée dans Android Auto et que « Marque de la voiture » est réglée sur « Aucune marque » : si une marque est sélectionnée, Android Auto masque les applications vidéo. Redémarrez ensuite le serveur de l\'autoradio. Après une mise à jour d\'Android Auto, les applications disparaissent parfois — cela vient de Google.</string>
+    <string name="set_mode">Mode</string>
+    <string name="set_help">Aide</string>
+    <string name="set_sum_appearance">Langue : %1$s · thème : %2$s</string>
+    <string name="set_sum_mic">microphone : %1$s</string>
+    <string name="set_sum_headunit">Certificat %1$s</string>
+    <string name="set_footer">Headswap %1$s</string>
+
+    <!-- Video modes (VideoMode) -->
+    <string name="video_r800_title">800×480</string>
+    <string name="video_r800_sub">Pour les petits écrans</string>
+    <string name="video_r1024_title">1024×600</string>
+    <string name="video_r1024_sub">Pour les écrans d\'autoradio 1024×600, sans étirement</string>
+    <string name="video_r720_title">1280×720 (standard)</string>
+    <string name="video_r720_sub">Convient à la plupart des autoradios</string>
+    <string name="video_r1080_title">1920×1080</string>
+    <string name="video_r1080_sub">Plus net, mais plus lourd pour le téléphone et l\'autoradio</string>
+    <string name="video_wide_title">Large 8:3 (rognage)</string>
+    <string name="video_wide_sub">Pour les écrans larges : 1280×480, en plus grand</string>
+    <string name="video_wide_mid_title">Large 8:3 moyen (Mazda CX-5)</string>
+    <string name="video_wide_mid_sub">1728×648 : résolution native de l\'écran Mazda</string>
+    <string name="video_wide_hd_title">Large 8:3 HD (rognage)</string>
+    <string name="video_wide_hd_sub">1920×720 : plus net et plus petit, davantage de contenu tient à l\'écran</string>
+    <string name="video_wide_640_title">Large 3:1 (Citroen C5 X)</string>
+    <string name="video_wide_640_sub">1920×640 : résolution native de l\'écran de la Citroen C5 X, sans bandes latérales</string>
+    <string name="video_wide_2_1_title">Large 2:1 (Octavia Pro, VW Discover Pro 9.2)</string>
+    <string name="video_wide_2_1_sub">1280×640 : résolution native des écrans de l\'Octavia Pro et du VW Discover Pro 9.2, sans étirement</string>
+    <string name="video_wide_976_title">Large 2240×976 (VW Tiguan L Pro)</string>
+    <string name="video_wide_976_sub">Rognage large mis à l\'échelle de la fenêtre CarLife de l\'autoradio VW CNS3</string>
+    <string name="video_wide_836_title">Large 1920×836 (VW Tiguan L Pro, transmission directe)</string>
+    <string name="video_wide_836_sub">Proportions de la fenêtre 2240×976 sans mise à l\'échelle sur le téléphone : c\'est l\'autoradio qui l\'effectue. Pour un rognage sans transcodage</string>
+    <string name="video_portrait_960_title">Portrait 3:4</string>
+    <string name="video_portrait_960_sub">960×1280 : tout l\'écran portrait</string>
+    <string name="video_portrait_1152_title">Portrait 5:6 (Hyundai Tucson NX4c)</string>
+    <string name="video_portrait_1152_sub">960×1152 : un écran 960×1280 sans la barre de climatisation en bas, sans étirement</string>
+
+    <!-- Music sample rate (MusicRate) -->
+    <string name="mrate_auto">Auto</string>
+    <string name="mrate_48">48 kHz</string>
+    <string name="mrate_44">44,1 kHz</string>
+    <string name="mrate_32">32 kHz</string>
+    <string name="mrate_24">24 kHz</string>
+    <string name="mrate_22">22 kHz</string>
+
+    <!-- Music packet size (MediaChunk) -->
+    <string name="mchunk_auto">Comme l\'envoie Android Auto</string>
+    <string name="mchunk_4096">4096 o</string>
+    <string name="mchunk_2560">2560 o (comme Baidu)</string>
+    <string name="mchunk_2048">2048 o</string>
+    <string name="mchunk_1024">1024 o</string>
+
+    <!-- Voice packet size (VoiceChunk) -->
+    <string name="vchunk_auto">Auto</string>
+    <string name="vchunk_2048">2048 o</string>
+    <string name="vchunk_1024">1024 o</string>
+    <string name="vchunk_512">512 o</string>
+
+    <!-- Silence before prompt (TtsPreroll) -->
+    <string name="tpreroll_auto">Auto</string>
+    <string name="tpreroll_0">Désactivé</string>
+    <string name="tpreroll_100">100 ms</string>
+    <string name="tpreroll_200">200 ms</string>
+    <string name="tpreroll_400">400 ms</string>
+
+    <!-- Touch decimation (TouchDecimation) -->
+    <string name="tdec_off">Désactivé</string>
+    <string name="tdec_x2">×2</string>
+
+    <!-- Double touch from head unit (DupDownFilter) -->
+    <string name="dup_down_auto">Auto (répétition en moins de 150 ms)</string>
+    <string name="dup_down_on">Toujours filtrer</string>
+    <string name="dup_down_off">Ne pas filtrer</string>
+
+    <!-- Frame rate (FpsSetting) -->
+    <string name="fps_auto_title">Auto</string>
+    <string name="fps_auto_sub">Selon la demande de l\'autoradio</string>
+    <string name="fps_15_title">15 i/s</string>
+    <string name="fps_15_sub">Plus léger pour les autoradios peu puissants et la liaison</string>
+    <string name="fps_30_title">30 i/s</string>
+    <string name="fps_30_sub">Plus fluide, mais plus lourd</string>
+    <string name="fps_60_title">60 i/s</string>
+    <string name="fps_60_sub">Fréquence d\'images cible plus élevée ; nécessite un téléphone et un autoradio performants</string>
+
+    <!-- Wireless (branch B) -->
+    <string name="wl_title">Sans fil</string>
+    <string name="wl_note">Pour les voitures avec CarLife sans fil. Activez le point d\'accès sur le téléphone, connectez-y l\'autoradio (menu de l\'autoradio : Wi-Fi), ouvrez CarLife sur l\'autoradio et appuyez sur le bouton ci-dessous. Aucun câble nécessaire ; si vous en branchez un, l\'USB est prioritaire.</string>
+    <string name="wl_start">Attendre la voiture en Wi-Fi</string>
+    <string name="wl_status_line">État : %1$s</string>
+    <string name="wl_off">désactivé</string>
+    <string name="wl_no_permission">Sans l\'autorisation « Appareils à proximité », la voiture ne peut pas se connecter en Wi-Fi</string>
+    <string name="wl_report">Envoyer le rapport sans fil</string>
+    <string name="wl_car_line">Voiture : %1$s</string>
+    <string name="wl_car_none">non sélectionnée</string>
+    <string name="wl_car_note">Lorsque le téléphone se connecte à cette voiture en Bluetooth, Headswap commence automatiquement à l\'attendre en Wi-Fi</string>
+    <string name="wl_car_pick">Sélectionner la voiture</string>
+    <string name="wl_car_forget">Oublier la voiture</string>
+    <string name="wl_car_no_permission">Sans l\'autorisation « Appareils à proximité », les événements Bluetooth de la voiture ne sont pas transmis</string>
+    <string name="wl_car_unavailable">Ce téléphone ne peut pas associer une voiture (pas de configuration d\'appareil associé)</string>
+    <string name="wl_cw_note">Si le téléphone reste sur un autre réseau Wi-Fi (par exemple à la maison), Headswap peut rejoindre seul le point d\'accès de la voiture : Internet reste sur votre réseau principal. Saisissez le nom et le mot de passe affichés par l\'autoradio.</string>
+    <string name="wl_cw_line">Wi-Fi de la voiture : %1$s</string>
+    <string name="wl_cw_none">non défini</string>
+    <string name="wl_cw_set">défini : %1$s</string>
+    <string name="wl_cw_ssid_hint">Nom du réseau (SSID)</string>
+    <string name="wl_cw_pass_hint">Mot de passe (vide : réseau ouvert)</string>
+    <string name="wl_cw_save">Enregistrer et vérifier</string>
+    <string name="wl_cw_forget">Supprimer</string>
+    <string name="wl_cw_need_ssid">Saisissez le nom du réseau</string>
+    <string name="wl_cw_checking">Connexion au Wi-Fi de la voiture… confirmez la demande du système</string>
+    <string name="wl_cw_ok">Connecté au Wi-Fi de la voiture</string>
+    <string name="wl_cw_fail">Connexion impossible : la voiture est hors de portée, le mot de passe est incorrect ou la demande a été refusée</string>
+
+    <!-- My car (CarPreset) -->
+    <string name="car_title">Ma voiture</string>
+    <string name="car_other_title">Ma voiture n\'est pas dans la liste</string>
+    <string name="car_citroen_c5_x">Citroen C5 X</string>
+    <string name="car_dongfeng_df6_2023">Dongfeng DF6 2023</string>
+    <string name="car_peugeot_5008_2024">Dongfeng Peugeot 5008 2024</string>
+    <string name="car_honda_breeze_2">Honda Breeze, 2e génération</string>
+    <string name="car_honda_crv_6">Honda CR-V, 6e génération, avant restylage</string>
+    <string name="car_honda_crv_2026">Honda CR-V 2026 1.5T</string>
+    <string name="car_honda_crv_2026_hybrid">Honda CR-V 2026 hybride</string>
+    <string name="car_honda_vezel_2022">Honda Vezel 2022–2024 (GAC Honda)</string>
+    <string name="car_hyundai_elantra_7">Hyundai Elantra, 7e génération, avant restylage</string>
+    <string name="car_hyundai_ix35_2021">Hyundai ix35 2021</string>
+    <string name="car_hyundai_tucson_nx4c">Hyundai Tucson NX4c</string>
+    <string name="car_jetta_vs">Jetta VS5/VS7 (Baidu CarLife uniquement, pas J-Link)</string>
+    <string name="car_kia_k3_2023">Kia K3 2023</string>
+    <string name="car_kia_sportage_ace">Kia Sportage Ace</string>
+    <string name="car_mazda_3_cn_2025">Mazda 3 2025 (Chine)</string>
+    <string name="car_mazda_cx5_2025">Mazda CX-5 2025–2026</string>
+    <string name="car_mazda_cx50">Mazda CX-50</string>
+    <string name="car_mitsubishi_outlander_4">Mitsubishi Outlander 4 2022</string>
+    <string name="car_skoda_kamiq_gt_2021">Skoda Kamiq GT 2021</string>
+    <string name="car_skoda_octavia_pro">Skoda Octavia Pro</string>
+    <string name="car_toyota_corolla_cross_2024">Toyota Corolla Cross 2024–2025</string>
+    <string name="car_toyota_levin">Toyota Levin</string>
+    <string name="car_toyota_rav4_2025">Toyota RAV4 2025</string>
+    <string name="car_vw_bora_2021">Volkswagen Bora 2021</string>
+    <string name="car_vw_discover_pro_9_2">Volkswagen Discover Pro 9.2 (1280×640)</string>
+    <string name="car_vw_golf_8_pro">Volkswagen Golf 8 Pro 2021</string>
+    <string name="car_vw_golf_8_r_line">Volkswagen Golf 8 R-Line</string>
+    <string name="car_vw_id_unyx">Volkswagen ID.Unyx</string>
+    <string name="car_vw_lamando_l">Volkswagen Lamando L</string>
+    <string name="car_vw_sagitar_2021">Volkswagen Sagitar 2021–2022, avant restylage</string>
+    <string name="car_vw_tayron_gte_2020">Volkswagen Tayron GTE 2020 (MIB 2.5)</string>
+    <string name="car_vw_troc_2026">Volkswagen T-Roc restylé 2026</string>
+    <string name="car_vw_tharu_xr">Volkswagen Tharu XR 2025–2026</string>
+    <string name="car_vw_tiguan_l_pro">Volkswagen Tiguan L Pro / Teramont Pro</string>
+    <string name="car_field">Voiture</string>
+    <string name="car_pick_hint">Choisissez votre voiture</string>
+    <string name="car_will_apply">Sera appliqué</string>
+    <string name="car_label_mode">Mode vidéo</string>
+    <string name="car_auto">Auto</string>
+    <string name="car_value_keep">Inchangé</string>
+    <string name="car_apply">Appliquer</string>
+
+    <!-- Bridge mode: Android Auto / Headswap Desktop (SettingsSection.MODE) -->
+    <string name="bm_title">Mode</string>
+    <string name="bm_aa_note">L\'autoradio affiche Android Auto depuis votre téléphone.</string>
+    <string name="bm_own_launcher">Lanceur propre</string>
+    <string name="bm_launcher_title">Lanceur</string>
+    <string name="bm_need_13">Android 13+ requis</string>
+    <string name="bm_sum_state">%1$s · %2$s</string>
+    <string name="bm_act_on">Activé</string>
+    <string name="bm_act_off">Non activé</string>
+    <string name="bm_act_lost">Accès perdu, activez à nouveau</string>
+    <string name="about_title">À propos</string>
+    <string name="about_note">Auteurs et licences</string>
+    <string name="about_authors">Auteurs</string>
+    <string name="about_opensource">Open source</string>
+    <string name="about_author_yegor">Yegor</string>
+    <string name="about_author_ildar">Ildar Sadykov</string>
+    <string name="about_open_project">Page du projet</string>
+    <string name="about_license_unavailable">Le texte de la licence n\'est pas disponible. Consultez la page du projet.</string>
+</resources>

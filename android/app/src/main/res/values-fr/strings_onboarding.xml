@@ -1,0 +1,144 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Onboarding step: title, numbered list (string-array), hint, buttons; short is the name in the readiness checklist. -->
+    <string name="step_aa_dev_title">Activez le mode développeur d\'Android Auto</string>
+    <string-array name="step_aa_dev_list">
+        <item>Appuyez sur « Ouvrir Android Auto »</item>
+        <item>Faites défiler tout en bas</item>
+        <item>Appuyez 10 fois sur « Version » et confirmez</item>
+    </string-array>
+    <string name="step_aa_dev_primary">Ouvrir Android Auto</string>
+    <string name="step_aa_dev_short">Mode développeur d\'Android Auto</string>
+
+    <string name="step_aa_unknown_title">Autorisez les installations depuis des sources inconnues</string>
+    <string-array name="step_aa_unknown_list">
+        <item>Appuyez sur « Ouvrir Android Auto »</item>
+        <item>Appuyez sur ⋮ et choisissez « Paramètres développeur »</item>
+        <item>Faites défiler jusqu\'à « Sources inconnues »</item>
+        <item>Cochez la case</item>
+    </string-array>
+    <string name="step_aa_unknown_hint">Sans cela, Android Auto n\'affichera pas les applis installées hors de Google Play.</string>
+    <string name="step_aa_unknown_primary">Ouvrir Android Auto</string>
+    <string name="step_aa_unknown_short">Sources inconnues</string>
+
+    <string name="step_autostart_title">Démarrez le serveur de l\'autoradio</string>
+    <string-array name="step_autostart_list">
+        <item>Appuyez sur « Ouvrir Android Auto »</item>
+        <item>Appuyez sur ⋮ en haut à droite</item>
+        <item>Choisissez « Démarrer le serveur de l\'unité principale »</item>
+    </string-array>
+    <string name="step_autostart_hint">Il suffit de l\'activer une fois : le serveur de l\'autoradio reste actif en arrière-plan, Headswap ne l\'arrête pas. Si Android le ferme de lui-même, réactivez-le dans les réglages d\'Android Auto. Le démarrage automatique via l\'accessibilité n\'existe plus : le serveur de l\'autoradio doit être lancé à la main.</string>
+    <string name="step_autostart_primary">Ouvrir Android Auto</string>
+    <string name="step_autostart_short">Serveur de l\'autoradio</string>
+
+    <string name="step_notif_title">Activez les notifications</string>
+    <string-array name="step_notif_list">
+        <item>Appuyez sur « Autoriser » en bas de l\'écran</item>
+        <item>Appuyez sur « Autoriser » dans la fenêtre Android « Autoriser Headswap à vous envoyer des notifications ? »</item>
+    </string-array>
+    <string name="step_notif_hint">Le volet des notifications indique l\'état de la connexion, et Android ne déchargera pas Headswap quand l\'écran est éteint.</string>
+    <string name="step_notif_hint_launcher">Le code d\'activation de Headswap se saisit directement dans la notification. Le volet des notifications indique aussi l\'état de la connexion à l\'autoradio.</string>
+    <string name="step_notif_short">Notifications</string>
+
+    <!-- Items 3-4 (autostart) are shown on Xiaomi only -->
+    <string name="step_background_title">Supprimez la limite de batterie</string>
+    <string-array name="step_background_list">
+        <item>Appuyez sur « Supprimer la limite de batterie »</item>
+        <item>Choisissez « Aucune restriction »</item>
+        <item>Revenez en arrière et appuyez sur « Démarrage automatique »</item>
+        <item>Faites défiler jusqu\'à Headswap et activez l\'interrupteur</item>
+    </string-array>
+    <string name="step_background_primary">Supprimer la limite de batterie</string>
+    <string name="step_background_extra">Démarrage automatique</string>
+    <string name="step_background_short">Fonctionnement en arrière-plan</string>
+
+    <string name="step_mic_title">Autorisez l\'accès au microphone</string>
+    <string-array name="step_mic_list">
+        <item>Appuyez sur « Autoriser » en bas de l\'écran</item>
+        <item>Appuyez sur « Pendant l\'utilisation de l\'appli »</item>
+    </string-array>
+    <string name="step_mic_hint">Nécessaire pour appeler l\'assistant vocal.</string>
+    <string name="step_mic_short">Microphone</string>
+
+    <string name="step_bluetooth_title">Activez le Bluetooth</string>
+    <string-array name="step_bluetooth_list">
+        <item>Appuyez sur « Ouvrir le Bluetooth »</item>
+        <item>Activez le Bluetooth</item>
+        <item>Connectez-vous à l\'autoradio</item>
+    </string-array>
+    <string name="step_bluetooth_hint">Nécessaire pour les appels : dans Android Auto, ils passent uniquement par le Bluetooth.</string>
+    <string name="step_bluetooth_primary">Ouvrir le Bluetooth</string>
+    <string name="step_bluetooth_short">Bluetooth pour les appels</string>
+
+    <string name="step_location_title">Activez la localisation</string>
+    <string-array name="step_location_list">
+        <item>Appuyez sur « Ouvrir les réglages de localisation »</item>
+        <item>Activez l\'interrupteur « Utiliser la localisation »</item>
+    </string-array>
+    <string name="step_location_hint">Sans elle, Google Maps et les autres applis de cartes d\'Android Auto affichent « accès à la localisation requis ».</string>
+    <string name="step_location_primary">Ouvrir les réglages de localisation</string>
+    <string name="step_location_short">Localisation pour Maps</string>
+
+    <string name="step_first_title">À la première connexion</string>
+    <string-array name="step_first_list">
+        <item>Déverrouillez le téléphone et branchez le câble à l\'autoradio</item>
+        <item>Cochez « Utiliser par défaut pour cet accessoire USB »</item>
+        <item>Appuyez sur « OK »</item>
+    </string-array>
+    <string name="step_first_hint">Si l\'autoradio affiche un écran « 启动CarLife », appuyez sur ce bouton.</string>
+    <string name="step_first_primary">Compris</string>
+    <string name="step_first_short">Première connexion</string>
+
+    <string name="onb_already_done">Déjà fait</string>
+    <string name="onb_skip">Passer</string>
+    <string name="onb_allow">Autoriser</string>
+    <string name="onb_later">Plus tard</string>
+    <string name="onb_back">Retour</string>
+    <string name="onb_next">Suivant</string>
+    <string name="onb_got_it">Compris</string>
+    <string name="onb_step_progress">Étape %1$d sur %2$d</string>
+    <string name="onb_done_chip">Déjà terminé</string>
+
+    <string name="onb_checklist_title">Vérification de l\'état de préparation</string>
+    <string name="onb_all_ready">Tout est prêt pour le trajet</string>
+    <string name="onb_ready_count">Prêt : %1$d sur %2$d</string>
+    <string name="onb_checklist_hint">Appuyez sur un élément pour ouvrir son étape.</string>
+    <string name="onb_done">Terminé</string>
+    <string name="onb_status_marked">coché</string>
+    <string name="onb_status_ready">prêt</string>
+    <string name="onb_status_unmarked">non coché</string>
+    <string name="onb_status_off">non activé</string>
+    <string name="step_car_title">Quelle voiture avez-vous ?</string>
+    <string name="step_car_short">Voiture</string>
+    <string name="step_car_body">Nous renseignerons les réglages vérifiés par la communauté sur cette voiture. Les utilisateurs expérimentés peuvent passer cette étape.</string>
+
+    <!-- Mode choice and the “Own launcher” path (OnboardingMode.dc.html) -->
+    <string name="step_mode_title">Choisissez un mode</string>
+    <string name="step_mode_subtitle">Ce qu\'affiche l\'autoradio. Vous pouvez le modifier à tout moment dans les réglages.</string>
+    <string name="step_mode_aa_body">AA standard : cartes, musique et appels depuis Android Auto. Fonctionne via son serveur d\'autoradio.</string>
+    <string name="step_mode_own_body">L\'autoradio affiche le bureau Headswap ou un lanceur automobile depuis le téléphone.</string>
+    <string name="step_mode_warn_title">Attention</string>
+    <string name="step_mode_warn_body">Ce mode nécessite le mode développeur d\'Android et l\'activation de Headswap via le « Débogage sans fil ».</string>
+    <string name="step_mode_warn_risk">Ces réglages présentent des risques. Vous les activez à vos propres risques.</string>
+    <string name="step_mode_primary">Suivant</string>
+    <string name="step_mode_short">Mode</string>
+
+    <string name="step_devmode_title">Activez le mode développeur</string>
+    <string-array name="step_devmode_list">
+        <item>Appuyez sur « Ouvrir les réglages », « À propos du téléphone » s\'ouvre</item>
+        <item>Appuyez 7 fois sur « Numéro de build » jusqu\'à ce que « Vous êtes maintenant développeur » s\'affiche</item>
+        <item>Si le téléphone le demande, saisissez son code PIN</item>
+    </string-array>
+    <string name="step_devmode_hint">Le mode développeur n\'est nécessaire que pour le « Débogage sans fil ». S\'il est déjà activé, appuyez sur « Déjà fait ».</string>
+    <string name="step_devmode_primary">Ouvrir les réglages</string>
+    <string name="step_devmode_short">Mode développeur</string>
+
+    <!-- Items and hint of the activation step; title, buttons and status come from PhoneActivationBlock -->
+    <string-array name="step_activate_list">
+        <item>Appuyez sur « Activer », « Options pour les développeurs » s\'ouvre (sur Xiaomi : Paramètres supplémentaires → Options pour les développeurs)</item>
+        <item>Activez le « Débogage sans fil » et appuyez sur « Associer l\'appareil avec un code d\'association »</item>
+        <item>Saisissez le code affiché dans la notification Headswap</item>
+    </string-array>
+    <string name="step_activate_hint">L\'activation est perdue après le redémarrage du téléphone. Headswap vous demandera de la refaire, cela prend une demi-minute.</string>
+    <string name="step_activate_short">Activation de Headswap</string>
+</resources>

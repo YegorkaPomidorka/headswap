@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- One-time window after updating to 2.6.0: accessibility service removed, head unit server is started by hand -->
+<resources>
+    <string name="upg_title">Fini le service d\'accessibilité !!!</string>
+    <string name="upg_lead">Headswap ne demande plus l\'accessibilité et ne redémarre plus automatiquement le serveur de l\'autoradio.</string>
+    <string name="upg_pros">Avantages</string>
+    <string name="upg_pro_1">Plus besoin de déverrouiller le téléphone pour se connecter</string>
+    <string name="upg_pro_2">Plus besoin d\'autoriser des réglages d\'accessibilité risqués</string>
+    <string name="upg_pro_3">Le serveur AA consomme très peu de batterie en arrière-plan</string>
+    <string name="upg_cons">Inconvénients</string>
+    <string name="upg_con_1">Vous démarrez le serveur de l\'autoradio à la main, une seule fois</string>
+    <string name="upg_con_2">Si Android l\'arrête, disons une fois par semaine, relancez-le</string>
+    <string name="upg_con_3">La notification reste dans le volet, vous pouvez <b>simplement</b> la balayer</string>
+    <string name="upg_notif_when">27 min</string>
+    <string name="upg_notif_text">Le serveur de l\'autoradio est en cours d\'exécution</string>
+    <string name="upg_ok">Compris</string>
+</resources>

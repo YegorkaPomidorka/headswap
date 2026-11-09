@@ -93,9 +93,9 @@ object PhoneLogic {
 object MusicLogic {
     data class Action(val id: String, val name: String)
 
-    private val LIKE = listOf("like", "love", "heart", "favorite", "favourite", "thumb", "нрав", "люб", "избран", "أعجبني", "مفضلة")
-    private val UNLIKE = listOf("unlike", "unfavorite", "unfavourite", "remove", "убрать", "удалить", "إزالة", "حذف")
-    private val DISLIKE = listOf("dislike", "дизлайк", "не нрав", "لم يعجبني")
+    private val LIKE = listOf("like", "love", "heart", "favorite", "favourite", "thumb", "нрав", "люб", "избран", "أعجبني", "مفضلة", "j'aime", "j’aime", "favori", "coup de cœur")
+    private val UNLIKE = listOf("unlike", "unfavorite", "unfavourite", "remove", "убрать", "удалить", "إزالة", "حذف", "retirer", "supprimer")
+    private val DISLIKE = listOf("dislike", "дизлайк", "не нрав", "لم يعجبني", "n'aime pas", "n’aime pas")
 
     /** Действие «нравится» среди custom actions, если плеер его отдаёт. */
     fun findLike(actions: List<Action>): Action? = actions.firstOrNull { isLike(it) }

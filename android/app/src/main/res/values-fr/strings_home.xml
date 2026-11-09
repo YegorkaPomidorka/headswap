@@ -1,0 +1,112 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Home screen: hero titles -->
+    <string name="home_title_no_bridge">Pont non démarré</string>
+    <string name="home_title_reconnecting">Rétablissement de la connexion</string>
+    <string name="home_title_ok">Tout fonctionne</string>
+    <string name="home_title_off">Démarrez le serveur de l\'autoradio</string>
+    <string name="home_title_connecting">Connexion</string>
+    <string name="home_title_parked">Voiture déconnectée</string>
+    <string name="home_title_server_down">Le serveur de l\'autoradio ne répond pas</string>
+    <string name="home_title_ready">Prêt pour le trajet</string>
+    <string name="home_title_unknown">Vérifiez le serveur de l\'autoradio</string>
+    <string name="home_title_checking">Vérification du serveur de l\'autoradio</string>
+
+    <!-- Home screen: hero subtitles -->
+    <string name="home_err_no_cert">Aucun certificat d\'autoradio dans cette version de l\'application.</string>
+    <string name="home_sub_start_chain">Activez-le une seule fois : ensuite le serveur reste actif en arrière-plan et vous n\'avez plus besoin de déverrouiller le téléphone pour vous connecter.</string>
+    <string name="home_sub_reconnecting">USB déconnecté. La session Android Auto attend jusqu\'à %1$d s.</string>
+    <string name="home_sub_ok">Android Auto est sur l\'écran de la voiture. Vous pouvez ranger le téléphone.</string>
+    <string name="home_sub_ok_wifi">Android Auto est sur l\'écran de la voiture via Wi-Fi, sans câble. Vous pouvez ranger le téléphone.</string>
+    <string name="home_sub_refused">Câble USB connecté, mais le serveur de l\'autoradio ne répond pas. %1$s</string>
+    <string name="home_sub_aa_dropped">Android Auto s\'est déconnecté. Réactivez le serveur de l\'autoradio.</string>
+    <string name="home_sub_cable_ok">Câble USB connecté. En attente d\'Android Auto.</string>
+    <string name="home_sub_parked">Le serveur de l\'autoradio est resté actif en arrière-plan. Au prochain trajet, branchez simplement le câble.</string>
+    <string name="home_sub_server_down">Android a fermé le serveur de l\'autoradio. Réactivez-le : Android Auto → ⋮ → « Démarrer le serveur de l\'unité principale ».</string>
+    <string name="home_sub_ready">Connectez le téléphone à l\'autoradio avec un câble USB.</string>
+    <string name="home_sub_unknown">Headswap n\'a pas pu vérifier le serveur. Dans Android Auto → ⋮ : si vous voyez « Arrêter le serveur de l\'unité principale », il est actif ; si vous voyez « Démarrer le serveur de l\'unité principale », activez-le.</string>
+    <string name="home_sub_checking">Quelques secondes : Headswap se connecte brièvement à Android Auto.</string>
+    <string name="home_sub_parked_unknown">Au prochain trajet : branchez le câble. Si Android Auto n\'apparaît pas, vérifiez le serveur de l\'autoradio : Android Auto → ⋮.</string>
+
+    <!-- Home screen: how to start the head unit server (bold = what to tap) -->
+    <string name="home_chain_label">Comment démarrer le serveur de l\'autoradio</string>
+    <string name="home_chain_1">Appuyez sur <b>« Ouvrir Android Auto »</b></string>
+    <string name="home_chain_2">Trois points <b>⋮</b> en haut à droite</string>
+    <string name="home_chain_3"><b>« Démarrer le serveur de l\'unité principale »</b></string>
+
+    <!-- Home screen: stage labels -->
+    <string name="home_stage_server">Serveur de l\'autoradio</string>
+    <string name="home_stage_headunit">Autoradio</string>
+    <string name="home_stage_video">Vidéo</string>
+    <string name="home_stage_audio">Audio</string>
+
+    <!-- Home screen: stage details -->
+    <string name="home_stage_no_cert">pas de certificat</string>
+    <string name="home_stage_holds">maintient la session</string>
+    <string name="home_stage_reconnecting">reconnexion</string>
+    <string name="home_stage_paused">en pause</string>
+    <string name="home_stage_working">fonctionne</string>
+    <string name="home_stage_connected">connecté</string>
+    <string name="home_stage_off">désactivé</string>
+    <string name="home_stage_not_started">à démarrer</string>
+    <string name="home_stage_connecting">connexion</string>
+    <string name="home_stage_handshake">prise de contact</string>
+    <string name="home_stage_hu_parked">déconnecté</string>
+    <string name="home_stage_no_answer">ne répond pas</string>
+    <string name="home_stage_started">démarré</string>
+    <string name="home_stage_wait_cable">en attente du câble</string>
+    <string name="home_stage_unknown">non vérifié</string>
+    <string name="home_stage_checking">vérification</string>
+
+    <!-- Home screen: widgets -->
+    <string name="home_settings">Paramètres</string>
+    <string name="home_btn_open_aa">Ouvrir les paramètres d\'Android Auto</string>
+    <string name="home_grace_waiting">En attente de reconnexion</string>
+    <string name="home_grace_left">%1$d s restantes</string>
+
+    <!-- Notification -->
+    <string name="notif_reconnecting">USB déconnecté · %1$d s restantes</string>
+    <string name="notif_video_usb">Vidéo · audio via USB</string>
+    <string name="notif_video_wifi">Vidéo · audio via Wi-Fi</string>
+    <string name="notif_video">Vidéo</string>
+    <string name="notif_server_off">Serveur de l\'autoradio non démarré</string>
+    <string name="notif_cable_waiting">Câble USB connecté · en attente d\'Android Auto</string>
+    <string name="notif_parked">Le serveur de l\'autoradio reste actif en arrière-plan</string>
+    <string name="notif_server_down">Android a fermé le serveur de l\'autoradio · réactivez-le</string>
+    <string name="notif_server_started">Serveur de l\'autoradio démarré</string>
+    <string name="notif_parked_unknown">Voiture déconnectée</string>
+    <string name="notif_server_unknown">Vérifiez que le serveur de l\'autoradio est actif</string>
+
+    <!-- Onboarding mock screens (drawn illustrations of system UI) -->
+    <string name="mock_aa_version">Version</string>
+    <string name="mock_aadev_title">Paramètres pour les développeurs</string>
+    <string name="mock_aadev_unknown">Sources inconnues</string>
+    <string name="mock_menu_help">Aide et commentaires</string>
+    <string name="mock_menu_start">Démarrer le serveur de l\'unité principale</string>
+    <string name="mock_menu_exit">Quitter le mode développeur</string>
+    <string name="mock_notif_now">Headswap · maintenant</string>
+    <string name="mock_bg_activity">Économie de batterie</string>
+    <string name="mock_bg_no_limits">Aucune restriction</string>
+    <string name="mock_bg_no_limits_sub">L\'économie de batterie ne limitera pas l\'activité de l\'application en arrière-plan</string>
+    <string name="mock_bg_autostart">Démarrage automatique</string>
+    <string name="mock_mic_question">Autoriser Headswap à enregistrer l\'audio ?</string>
+    <string name="mock_mic_while_using">Seulement pendant l\'utilisation de l\'appli</string>
+    <string name="mock_mic_once">Uniquement cette fois-ci</string>
+    <string name="mock_mic_deny">Ne pas autoriser</string>
+    <string name="mock_bt_headunit">Autoradio</string>
+    <string name="mock_bt_connected">Connecté</string>
+    <string name="mock_loc_use">Utiliser la position</string>
+    <string name="mock_loc_use_sub">Les applications disposant de cette autorisation peuvent accéder à votre position.</string>
+    <string name="mock_usb_question">Ouvrir Headswap pour gérer l\'accessoire USB ?</string>
+    <string name="mock_usb_default">Utiliser par défaut pour cet accessoire USB</string>
+    <string name="mock_dev_title">Options pour les développeurs</string>
+    <string name="mock_dev_wifi">Débogage sans fil</string>
+    <string name="mock_dev_pair">Associer l\'appareil avec un code d\'association</string>
+    <string name="mock_about_title">À propos du téléphone</string>
+    <string name="mock_about_build">Numéro de build</string>
+    <string name="mock_about_build_sub">sur Xiaomi : « Version d\'OS »</string>
+    <string name="mock_cancel">Annuler</string>
+    <string name="mock_ok">OK</string>
+
+    <string name="home_wireless">Sans fil : %1$s</string>
+</resources>
