@@ -270,14 +270,7 @@ object VIco {
         roundRectPath(13f, 8f, 4f, 13f, 1f), roundRectPath(18.5f, 3f, 4f, 18f, 1f),
     ).mapIndexed { i, d -> VPath(d, fill = true, alpha = if (i < level) 1f else 0.35f) }
 
-    /** Батарея телефона (viewBox 24): контур с «носиком» и заливка внутри по [BatteryLogic.fill] (восемь делений). */
-    fun battery(percent: Int): List<VPath> {
-        val w = 13f * BatteryLogic.fill(percent)
-        return listOf(VPath(roundRectPath(2f, 5.5f, 18f, 13f, 3f), strokeW = 2f), VPath("M22.5 10v4", strokeW = 2f)) +
-            if (w > 0f) listOf(VPath(roundRectPath(4.5f, 8.5f, w, 7f, minOf(1f, w / 2)), fill = true)) else emptyList()
-    }
-
-    /** Молния рядом с батареей: телефон на зарядке. */
+    /** Молния справа от батарейки: телефон на зарядке. */
     val BOLT = listOf(VPath("M13 2 5 14h6l-1 8 8-12h-6z", fill = true, strokeW = 1.5f))
 
     /** Раздел «Вид»: круг, закрашенный наполовину. */

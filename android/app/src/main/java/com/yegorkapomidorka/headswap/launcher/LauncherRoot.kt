@@ -320,11 +320,34 @@ private fun StatusIcons(st: StatusInfo, showNet: Boolean, showBattery: Boolean) 
             SvgIcon(Ico.VOLUME, s.statusFs, Pal.SEC2)
             Txt(st.volume.toString(), s.statusFs, color = Pal.SEC2)
         }
-        // заряд телефона в конце ряда; молния - на зарядке. Нет данных или выключено в «Вид» - ничего не рисуем
+        // заряд телефона в конце ряда: цифра внутри батарейки, молния справа - на зарядке.
+        // Нет данных или выключено в «Вид» - ничего не рисуем
         if (showBattery && st.battery >= 0) Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(m.dp(s.g4))) {
+            BatteryBadge(st.battery, s.statusFs, Pal.SEC2)
             if (st.charging) VectorIcon(VIco.BOLT, 24f, s.statusFs, Pal.SEC2)
-            VectorIcon(VIco.battery(st.battery), 24f, s.statusFs, Pal.SEC2)
-            Txt("${st.battery}%", s.statusFs, color = Pal.SEC2)
         }
+    }
+}
+
+/** Батарейка с цифрой заряда внутри (без «%»): контур со скруглением и «носик» справа. Высота - [fs], ширина - 2·fs. */
+@Composable
+private fun BatteryBadge(percent: Int, fs: Int, color: Color) {
+    val m = LocalMetrics.current
+    val nub = maxOf(2, fs / 9)
+    Box(
+        Modifier.width(m.dp(fs * 2)).height(m.dp(fs)).drawBehind {
+            val sw = maxOf(1.5f, size.height / 11f)
+            val nubW = nub * size.width / (fs * 2)
+            val bodyW = size.width - nubW - sw
+            drawRoundRect(color, Offset(sw / 2, sw / 2), Size(bodyW - sw / 2, size.height - sw),
+                androidx.compose.ui.geometry.CornerRadius(size.height * 0.25f),
+                style = androidx.compose.ui.graphics.drawscope.Stroke(sw))
+            val nubH = size.height * 0.36f
+            drawRoundRect(color, Offset(bodyW + sw * 0.5f, (size.height - nubH) / 2), Size(nubW, nubH),
+                androidx.compose.ui.geometry.CornerRadius(nubW / 2))
+        }.padding(end = m.dp(nub)),
+        contentAlignment = Alignment.Center,
+    ) {
+        Txt(percent.toString(), (fs * 0.68f).toInt(), color = color, weight = FontWeight.SemiBold)
     }
 }
