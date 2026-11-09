@@ -199,7 +199,7 @@ internal object LauncherModel {
         EmbedHost.onGone = { LauncherActions.embedGone(it) }
         EmbedHost.onAssistantOpened = { LauncherActions.assistantOpened(it) }
         CarAppHost.scaleFor = { pkg -> CarConfigMath.step(prefs.mapScale(pkg)) }
-        CarAppHost.allowFor = { pkg -> prefs.navHints(pkg) }
+        CarAppHost.allowFor = { pkg -> prefs.navHints(pkg) && !NavigatorPick.aaOnly(pkg) }
         LauncherActions.startRouteCatcher(context.applicationContext)
         ready = true
         reloadCatalog()

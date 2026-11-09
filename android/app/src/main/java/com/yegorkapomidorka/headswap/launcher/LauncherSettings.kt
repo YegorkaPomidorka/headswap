@@ -177,7 +177,7 @@ fun LauncherSettingsScreen() {
                                 // h800: подсказки на приборке - машинная часть (Яндекс - только с Плюсом) или теневая AA (Google);
                                 // выкл - окно как на телефоне, без подписки и без AA. Своё значение у каждого навигатора.
                                 val hints = model.navHints(navPkg)
-                                val google = navPkg == NavigatorPick.GOOGLE_MAPS
+                                val google = NavigatorPick.aaOnly(navPkg)
                                 val sub = stringResource(when {
                                     hints && google -> R.string.l_nav_hints_on_aa
                                     hints && NavigatorPick.needsPlus(navPkg) -> R.string.l_nav_hints_on_plus

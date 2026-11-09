@@ -125,10 +125,16 @@ object NavigatorPick {
 
     /**
      * «Подсказки на приборке» по умолчанию (h800, ADR 0028). Вкл - машинная часть на своём хосте Car App или теневая AA;
-     * выкл - навигатор окном, как на телефоне. По умолчанию выкл (Егор 05.11): окно работает без Плюса и без AA.
-     * Waze - сразу машинной версией (h1003): его WazeCarAppService без подписок, свой хост берёт его как 2ГИС.
+     * выкл - навигатор окном, как на телефоне. По умолчанию выкл у всех (Егор 05.11): окно работает без Плюса и без AA.
      */
-    fun hintsDefault(pkg: String): Boolean = pkg == WAZE
+    @Suppress("UNUSED_PARAMETER")
+    fun hintsDefault(pkg: String): Boolean = false
+
+    /**
+     * Машинная часть только у настоящей Android Auto: свой хост Car App не пускают. Waze (h1003, стенд 09.11): HostValidator
+     * со списком подписей gearhead, TEMPLATE_RENDERER засчитывает лишь на AAOS - «Unrecognized host». Подсказки - теневой AA.
+     */
+    fun aaOnly(pkg: String?): Boolean = pkg == GOOGLE_MAPS || pkg == WAZE
 
     /** Теневую AA держим, пока у выбранного навигатора подсказки включены; навигатора нет - как раньше, держим. */
     fun shadowWanted(metaNavi: Boolean, navPkg: String?, hints: (String) -> Boolean): Boolean =

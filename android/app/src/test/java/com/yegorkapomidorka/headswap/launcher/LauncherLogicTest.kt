@@ -348,9 +348,15 @@ class LauncherLogicTest {
         assertFalse(u.update(-1, 5_000))
     }
 
-    @Test fun hintsDefaultOffForAllButWaze() {
-        for (pkg in NavigatorPick.KNOWN - NavigatorPick.WAZE) assertFalse(pkg, NavigatorPick.hintsDefault(pkg))
-        assertTrue(NavigatorPick.hintsDefault(NavigatorPick.WAZE))
+    @Test fun hintsDefaultOffForAll() {
+        for (pkg in NavigatorPick.KNOWN) assertFalse(pkg, NavigatorPick.hintsDefault(pkg))
+    }
+
+    @Test fun googleAndWazeOnlyViaAa() {
+        assertTrue(NavigatorPick.aaOnly(NavigatorPick.GOOGLE_MAPS))
+        assertTrue(NavigatorPick.aaOnly(NavigatorPick.WAZE))
+        assertFalse(NavigatorPick.aaOnly(NavigatorPick.DGIS))
+        assertFalse(NavigatorPick.aaOnly(NavigatorPick.YANDEX_NAVI))
     }
 
     @Test fun arabicNavigatorsGoogleAndWaze() {
