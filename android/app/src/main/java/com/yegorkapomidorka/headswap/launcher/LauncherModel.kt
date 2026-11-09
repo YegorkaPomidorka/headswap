@@ -348,8 +348,8 @@ internal object LauncherModel {
 
     /** Установленные известные навигаторы (по каталогу приложений с лаунчерным входом). */
     val installedPackages: Set<String> get() = catalog.mapTo(HashSet()) { it.packageName }
-    /** Интерфейс на арабском (h1003): навигаторы - Google Карты и Waze, без Я.Музыки. */
-    val arabic: Boolean get() = com.yegorkapomidorka.headswap.AppLocale.isArabic(appCtx)
+    /** Интерфейс на арабском или французском (h1003): навигаторы - Google Карты и Waze, без Я.Музыки. */
+    val arabic: Boolean get() = com.yegorkapomidorka.headswap.AppLocale.usesGlobalApps(appCtx)
     val onlinePlayers: List<String> get() = PlayerChip.online(arabic)
     val navigatorPkg: String? get() = NavigatorPick.effective(savedNavigator, installedPackages, arabic)
     val installedNavigators: List<String> get() = NavigatorPick.known(arabic).filter { it in installedPackages }

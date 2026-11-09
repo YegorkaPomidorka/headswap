@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="diag_title">Autodiagnostic</string>
+    <string name="diag_analyzing">Analyse du journal…</string>
+    <string name="diag_failed">Impossible d\'analyser le journal.</string>
+    <string name="diag_send">Envoyer le journal aux développeurs</string>
+    <string name="diag_privacy">L\'analyse se fait sur le téléphone, le journal n\'est envoyé nulle part</string>
+    <string name="diag_home_btn">Autodiagnostic</string>
+    <string name="diag_settings_item">Diagnostic de la connexion</string>
+
+    <string name="diag_lead_one">Nous avons trouvé une cause probable.</string>
+    <plurals name="diag_lead_many">
+        <item quantity="one">Nous avons trouvé %d cause possible. Commencez par la première : c\'est la plus probable.</item>
+        <item quantity="many">Nous avons trouvé %d causes possibles. Commencez par la première : c\'est la plus probable.</item>
+        <item quantity="other">Nous avons trouvé %d causes possibles. Commencez par la première : c\'est la plus probable.</item>
+    </plurals>
+    <string name="diag_lead_next">Essayez ensuite la suivante.</string>
+    <string name="diag_lead_all_failed">Aucune des pistes n\'a aidé : envoyez le journal et nous allons examiner le problème.</string>
+
+    <string name="diag_chip_likely">Le plus probable</string>
+    <string name="diag_chip_maybe">Possible</string>
+    <string name="diag_chip_not_helped">n\'a pas aidé</string>
+    <string name="diag_how_to_fix">COMMENT CORRIGER</string>
+    <string name="diag_show_log">Ce que contient le journal ⌄</string>
+    <string name="diag_hide_log">Ce que contient le journal ⌃</string>
+    <string name="diag_show_solution">Afficher la solution ⌄</string>
+    <string name="diag_helped">Ça a aidé</string>
+    <string name="diag_not_helped">Ça n\'a pas aidé</string>
+
+    <string name="diag_done_title">Parfait, ça fonctionne</string>
+    <string name="diag_done_sub">Le conseil « %1$s » a aidé</string>
+    <string name="diag_done">Terminé</string>
+
+    <string name="diag_works_title">Aucune panne évidente</string>
+    <string name="diag_none_title">Cause introuvable</string>
+    <string name="diag_none_text">Le journal n\'a pas révélé la cause. Envoyez-le aux développeurs : nous allons l\'examiner et ajouter une astuce.</string>
+
+    <string name="diag_old_version">Mettez Headswap à jour : beaucoup de choses ont déjà été corrigées.</string>
+    <string name="diag_old_update">Mettre à jour</string>
+
+    <string name="diag_act_open_aa">Ouvrir Android Auto</string>
+    <string name="diag_act_video">Réglages vidéo</string>
+    <string name="diag_act_audio">Réglages du son</string>
+    <string name="diag_act_battery">Réglages de la batterie</string>
+    <string name="diag_act_autostart">Démarrage automatique</string>
+    <string name="diag_act_app_settings">Autorisations</string>
+    <string name="diag_act_wifi">Réglages Wi-Fi</string>
+    <string name="diag_act_hotspot">Point d\'accès</string>
+    <string name="diag_act_bluetooth">Bluetooth</string>
+    <string name="diag_act_onboarding">Relancer la configuration</string>
+    <string name="diag_act_update">Rechercher une mise à jour</string>
+    <string name="diag_act_share_log">Envoyer le journal</string>
+</resources>

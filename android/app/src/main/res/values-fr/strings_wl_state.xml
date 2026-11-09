@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Беспровод (бета, ветка B): состояние ожидания машины, пишет BridgeService в CarLifeState.wireless -->
+<resources>
+    <string name="wl_state_waiting">en attente de la voiture par Wi-Fi (%1$s)</string>
+    <string name="wl_state_no_hotspot">pas de point d\'accès : activez le point d\'accès Wi-Fi du téléphone</string>
+    <string name="wl_state_p2p_busy">Wi-Fi Direct est occupé : désactivez le point d\'accès du téléphone</string>
+    <string name="wl_state_connected">voiture connectée par Wi-Fi</string>
+    <string name="wl_state_lost">connexion perdue, en attente de la voiture</string>
+    <string name="wl_state_auto">la voiture est à proximité par Bluetooth, en attente par Wi-Fi (%1$s)</string>
+    <string name="wl_hint_title">La voiture est à proximité mais ne s\'est pas connectée par Wi-Fi</string>
+    <string name="wl_hint_text">Connectez le téléphone au Wi-Fi de la voiture ou activez le point d\'accès. Touchez pour ouvrir le Wi-Fi.</string>
+    <string name="wl_bt_hint_title">Reconnectez le Bluetooth de la voiture</string>
+    <string name="wl_bt_hint_text">La voiture est connectée par Bluetooth mais n\'a pas ouvert CarLife sans fil. Désactivez puis réactivez le Bluetooth du téléphone.</string>
+    <string name="wl_state_wifi_off">activez le Wi-Fi du téléphone (inutile de rejoindre un réseau) et désactivez le point d\'accès</string>
+    <string name="wl_wifi_off_title">Activez le Wi-Fi du téléphone</string>
+    <string name="wl_wifi_off_text">La voiture se connecte par Wi-Fi Direct : activez le Wi-Fi (inutile de rejoindre un réseau) et désactivez le point d\'accès. Touchez pour ouvrir le Wi-Fi.</string>
+    <string name="wl_usb_to_air_title">Câble débranché</string>
+    <string name="wl_usb_to_air_text">La voiture est à proximité par Bluetooth, connexion sans fil en cours.</string>
+    <string name="wl_state_gave_up">la voiture ne s\'est pas connectée en %1$d min</string>
+</resources>

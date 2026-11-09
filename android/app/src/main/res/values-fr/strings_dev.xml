@@ -1,0 +1,105 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="dev_title">Pour les développeurs</string>
+
+    <string name="dev_section_mic">Microphone de l\'autoradio</string>
+    <string name="dev_mic_vr_sub">Envoyer VR 1/0 avec MIC_RECORD_* (comme Baidu)</string>
+
+    <string name="dev_section_meta">Métadonnées sur l\'autoradio (appliquées après la reconnexion USB)</string>
+    <string name="dev_meta_music_title">Musique</string>
+    <string name="dev_meta_music_sub">Titre, pochette et progression : MEDIA_INFO / MEDIA_PROGRESS_BAR</string>
+    <string name="dev_meta_navi_title">Navigation</string>
+    <string name="dev_meta_navi_sub">Virages et distance : NAVI_NEXT_TURN_INFO quand l\'autoradio s\'abonne</string>
+    <string name="dev_meta_icon_title">Champ 6 : icône</string>
+    <string name="dev_meta_icon_sub">bytes turnIconData, flèche PNG (comme Baidu 8.6.7)</string>
+    <string name="dev_meta_time_title">Champ 6 : durée</string>
+    <string name="dev_meta_time_sub">int32 durée avant la manœuvre, en s (comme apollo-DuerOS)</string>
+    <string name="dev_meta_progress_title">Progression en secondes</string>
+    <string name="dev_meta_progress_sub">MEDIA_PROGRESS_BAR en s au lieu de ms (si l\'autoradio affiche 1000× trop)</string>
+
+    <string name="dev_section_music_chunk">Taille des paquets musique (expérimental)</string>
+    <string name="dev_music_chunk_note">Plus petite, elle réduit le tampon de l\'autoradio mais augmente le nombre de paquets sur l\'USB. Si le son saccade, revenez à « Comme l\'envoie Android Auto »</string>
+    <string name="dev_section_voice_chunk">Taille des paquets voix (expérimental)</string>
+    <string name="dev_voice_chunk_note">Réponses de l\'assistant et consignes de navigation. Auto : 1024 o sur VW CNS2 Delphi, sinon comme l\'envoie AA</string>
+    <string name="dev_section_tts_preroll">Silence avant la consigne (expérimental)</string>
+    <string name="dev_tts_preroll_note">Des zéros après le début de la consigne, pour que l\'autoradio ouvre le canal audio. Auto : 400 ms sur VW</string>
+    <string name="dev_volume_swipe_title">Volume à deux doigts</string>
+    <string name="dev_volume_swipe_sub">Lanceur : deux doigts sur le bord droit, vers le haut pour monter, vers le bas pour baisser. Toujours activé sur Honda Vezel.</string>
+    <string name="dev_section_touch_decimation">Décimation du toucher (expérimental)</string>
+    <string name="dev_touch_decimation_note">Ignorer un MOVE sur deux : l\'autoradio envoie jusqu\'à ~70 événements par seconde, la vidéo tourne à 30 ips au maximum. Le dernier point avant que le doigt se lève n\'est jamais perdu.</string>
+    <string name="dev_section_dup_down">Double appui sur l\'autoradio</string>
+    <string name="dev_dup_down_note">Certains autoradios (Honda) envoient chaque appui deux fois : les boutons du lanceur se déclenchent deux fois, les Réglages s\'ouvrent et se ferment aussitôt. Le filtre ignore le second DOWN au même point sans UP.</string>
+
+
+    <string name="dev_section_video">Vidéo (appliqué à la reconnexion)</string>
+    <string name="dev_own_idr_title">Image clé propre en transmission directe</string>
+    <string name="dev_own_idr_sub">Toutes les 2 s, le téléphone envoie à l\'autoradio sa propre image clé : l\'image revient après la caméra de recul et le menu de la voiture. Désactivez si l\'autoradio récupère seul (p. ex. VW) : moins de trafic et de charge sur le téléphone</string>
+    <string name="dev_custom_res_title">Résolution personnalisée</string>
+    <string name="dev_custom_res_sub">À la place du mode des réglages vidéo</string>
+    <string name="dev_section_desktop">Bureau de l\'autoradio</string>
+    <string name="dev_hide_status_title">Masquer la barre d\'état</string>
+    <string name="dev_hide_status_sub">Pour les autoradios qui affichent déjà leur propre barre avec l\'heure et les icônes en haut (certains VW). Les notifications s\'affichent comme une encoche avec un liseré doré : tirez vers le bas pour ouvrir le volet</string>
+    <string name="dev_custom_w">Largeur</string>
+    <string name="dev_custom_h">Hauteur</string>
+    <string name="dev_custom_hint">Largeur 640–2240, hauteur 640–1080 (portrait : l\'inverse), nombres pairs</string>
+    <string name="dev_custom_from_hu">Selon la demande de l\'autoradio · %1$d×%2$d</string>
+    <string name="dev_custom_k_plate">Canevas AA</string>
+    <string name="dev_custom_k_margins">Marges</string>
+    <string name="dev_custom_k_scale">Échelle</string>
+    <string name="dev_custom_k_bitrate">Débit</string>
+    <string name="dev_custom_v_size">%1$d×%2$d</string>
+    <string name="dev_custom_v_scale_one">1:1</string>
+    <string name="dev_custom_v_scale">×%1$.2f</string>
+    <string name="dev_custom_v_bitrate">jusqu\'à %1$.1f Mbit/s</string>
+    <string name="dev_custom_err_width">La largeur est hors de la plage</string>
+    <string name="dev_custom_err_height">La hauteur est hors de la plage</string>
+    <string name="dev_custom_err_odd">Les valeurs doivent être paires</string>
+    <string name="dev_custom_err_encoder">Le téléphone ne peut pas encoder cette taille</string>
+    <string name="dev_custom_err_fmt">%1$s. Non enregistré</string>
+    <string name="dev_custom_warn_16">Pas un multiple de 16 : l\'encodeur de certains téléphones peut refuser cette taille</string>
+    <string name="dev_custom_warn_scale">Étirement supérieur à 1,3 : l\'image sera floue</string>
+    <string name="dev_custom_warn_transcode">Le ré-encodage est désactivé : ce sera du 1280×720</string>
+    <string name="dev_custom_note">Fonctionne uniquement avec le ré-encodage.</string>
+
+    <string name="dev_section_actions">Actions</string>
+    <string name="dev_action_scan">Analyser</string>
+    <string name="dev_action_stop_bridge">Arrêter le pont</string>
+    <string name="dev_action_aa_settings">Paramètres d\'Android Auto</string>
+    <string name="dev_action_check_server">Vérifier le serveur de l\'autoradio</string>
+    <string name="dev_check_server_alive">Le serveur de l\'autoradio répond</string>
+    <string name="dev_check_server_refused">Le serveur de l\'autoradio refuse la connexion</string>
+    <string name="dev_check_server_hung">Le serveur de l\'autoradio ne répond pas à la prise de contact</string>
+    <string name="dev_check_server_error">Erreur : %1$s</string>
+    <string name="dev_check_server_bridge">Le pont est en cours d\'exécution : la vérification interromprait la session actuelle. Arrêtez d\'abord le pont.</string>
+    <string name="dev_check_server_usb">Un accessoire USB (la voiture) est connecté : la vérification couperait la connexion. Débranchez le câble.</string>
+    <string name="dev_check_server_running">Une vérification est déjà en cours</string>
+
+    <string name="dev_section_status">État</string>
+    <string name="dev_section_log">Journal</string>
+    <plurals name="dev_log_lines">
+        <item quantity="one">%d ligne</item>
+        <item quantity="many">%d lignes</item>
+        <item quantity="other">%d lignes</item>
+    </plurals>
+    <string name="dev_log_meta">%1$s · %2$s</string>
+
+    <string name="dev_log_share">Partager le journal</string>
+    <string name="dev_log_save_zip">Enregistrer en .zip</string>
+    <string name="dev_log_clear">Effacer</string>
+    <string name="dev_log_archive_note">L\'archive contient : le journal, le modèle du téléphone et la version d\'Android, les réglages du pont, les données de l\'autoradio. Ni contacts ni position.</string>
+
+    <string name="dev_section_notes">Remarques</string>
+    <string name="dev_notes_adb">Pour adb sur HyperOS, activez « Installer via USB » et « Débogage USB (réglages de sécurité) » dans les options pour les développeurs. Le pont n\'en a pas besoin.</string>
+    <string name="dev_open_dev_settings">Ouvrir les options pour les développeurs</string>
+    <string name="dev_open_failed">Impossible d\'ouvrir : %1$s</string>
+
+    <string name="dev_clear_title">Effacer le journal ?</string>
+    <string name="dev_clear_message">Les lignes à l\'écran seront effacées et les anciens fichiers headswap-*.log seront supprimés. Le fichier actuel est conservé.</string>
+    <string name="dev_clear_confirm">Effacer</string>
+    <string name="dev_clear_cancel">Annuler</string>
+    <plurals name="dev_deleted_old_files">
+        <item quantity="one">%d ancien fichier supprimé</item>
+        <item quantity="many">%d anciens fichiers supprimés</item>
+        <item quantity="other">%d anciens fichiers supprimés</item>
+    </plurals>
+</resources>
