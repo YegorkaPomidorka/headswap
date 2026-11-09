@@ -179,6 +179,8 @@ class DesktopAudioCapture(context: Context) {
             audio.startRecording()
             check(audio.recordingState == AudioRecord.RECORDSTATE_RECORDING) { "Android не запустил передачу звука" }
             started = true
+            // Один START на захват: повторный снял бы huPausedAa, и подсказка уводила бы ГУ с радио.
+            // MEDIA INIT/MUSIC=1 уходят с первым MEDIA_DATA, его пускает DesktopSilenceGate (h913).
             sessions.runIfCurrent(capture.generation) {
                 if (!capture.cancelled.get()) capture.core.onAudioStart(DesktopAudioPolicy.MEDIA_CHANNEL)
             }
@@ -189,6 +191,7 @@ class DesktopAudioCapture(context: Context) {
             AppLog.i("DESKTOP AUDIO: ${if (loopback != null) "AudioMix loopback (media/game/unknown)" else "REMOTE_SUBMIX"} PCM 48000 Hz stereo16 started (memory only)")
             val input = ByteArray(DesktopAudioPolicy.READ_BYTES)
             val frames = DesktopPcmFrames()
+            val gate = DesktopSilenceGate()
             var statsAt = SystemClock.elapsedRealtime()
             while (!capture.cancelled.get()) {
                 val now = SystemClock.elapsedRealtime()
@@ -204,9 +207,18 @@ class DesktopAudioCapture(context: Context) {
                 DesktopAudioState.pcmBytes += pcm.size
                 if (pcm.any { it != 0.toByte() }) DesktopAudioState.nonSilentBuffers++
                 DesktopAudioState.level = peak(pcm)
+                val step = gate.step(DesktopSilenceGate.audible(pcm), SystemClock.elapsedRealtime())
+                if (step == DesktopSilenceGate.Step.DROP) continue
+                if (step == DesktopSilenceGate.Step.START) AppLog.i("DESKTOP AUDIO: звук пошёл, открываю MEDIA на ГУ", false)
+                if (step == DesktopSilenceGate.Step.STOP) AppLog.i("DESKTOP AUDIO: тишина ${DesktopSilenceGate.HOLD_MS} мс, закрываю MEDIA на ГУ", false)
                 sessions.runIfCurrent(capture.generation) {
-                    if (!capture.cancelled.get()) capture.core.onAudioData(DesktopAudioPolicy.MEDIA_CHANNEL, pcm,
-                        SystemClock.elapsedRealtimeNanos() / 1000)
+                    if (capture.cancelled.get()) return@runIfCurrent
+                    when (step) {
+                        DesktopSilenceGate.Step.START, DesktopSilenceGate.Step.SEND ->
+                            capture.core.onAudioData(DesktopAudioPolicy.MEDIA_CHANNEL, pcm, SystemClock.elapsedRealtimeNanos() / 1000)
+                        DesktopSilenceGate.Step.STOP -> capture.core.onAudioStop(DesktopAudioPolicy.MEDIA_CHANNEL)
+                        DesktopSilenceGate.Step.DROP -> Unit
+                    }
                 }
             }
         } catch (error: Exception) {
