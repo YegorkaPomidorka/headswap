@@ -46,14 +46,36 @@ class UinputHostMain private constructor(private val args: VdmHostPolicy.Args) {
 
     // --- тачскрин ---
 
-    private val deviceClass by lazy { Class.forName("com.android.commands.uinput.Device") }
-    private val absInfoClass by lazy { Class.forName("src.com.android.commands.uinput.InputAbsInfo") }
+    /**
+     * h1007test1: uinput.jar в общем CLASSPATH с нашим apk из /data получил изолированный namespace, и
+     * libuinputcommand_jni не загрузилась (libdl_android.so not accessible). Отдельный загрузчик только с системным
+     * jar и общим (shared) namespace, как у системного загрузчика команды uinput.
+     */
+    private val uinputLoader: ClassLoader by lazy {
+        val factory = Class.forName("com.android.internal.os.ClassLoaderFactory")
+        val create = factory.getMethod("createClassLoader", String::class.java, String::class.java, String::class.java,
+            ClassLoader::class.java, Int::class.javaPrimitiveType, Boolean::class.javaPrimitiveType, String::class.java)
+        val libs = System.getProperty("java.library.path").orEmpty().ifEmpty { "/system/lib64:/system/lib" }
+        create.invoke(null, VdmHostPolicy.UINPUT_JAR, libs, libs, ClassLoader.getSystemClassLoader().parent,
+            Build.VERSION.SDK_INT, true, null) as ClassLoader
+    }
+    private val deviceClass by lazy { Class.forName("com.android.commands.uinput.Device", true, uinputLoader) }
+    private val absInfoClass by lazy { Class.forName("src.com.android.commands.uinput.InputAbsInfo", true, uinputLoader) }
     /** A14: (id, name, vid, pid, bus, cfg, ffMax, abs, port); A15+: (id, name, vid, pid, version, bus, cfg, ffMax, abs, port). */
     private val constructor by lazy {
         deviceClass.constructors.firstOrNull { it.parameterTypes.size == 9 || it.parameterTypes.size == 10 }
             ?: error("нет известного конструктора Device: ${deviceClass.constructors.joinToString { it.parameterTypes.size.toString() }}")
     }
-    private val injectMethod by lazy { deviceClass.getMethod("injectEvent", IntArray::class.java) }
+    /** A14: injectEvent(int[]); новее - injectEvent(int[], long время в мкс). */
+    private val injectMethod by lazy {
+        deviceClass.methods.firstOrNull { it.name == "injectEvent" && it.parameterTypes.firstOrNull() == IntArray::class.java }
+            ?: error("нет Device.injectEvent")
+    }
+
+    private fun inject(device: Any, triplets: IntArray) {
+        if (injectMethod.parameterTypes.size == 1) injectMethod.invoke(device, triplets)
+        else injectMethod.invoke(device, triplets, android.os.SystemClock.uptimeMillis() * 1000)
+    }
 
     private fun absInfo(max: Int): Any = absInfoClass.getConstructor().newInstance().also { info ->
         absInfoClass.getField("minimum").setInt(info, 0)
@@ -150,7 +172,7 @@ class UinputHostMain private constructor(private val args: VdmHostPolicy.Args) {
         override fun events(displayId: Int, triplets: IntArray) {
             if (getCallingUid() != appUid || triplets.size % 3 != 0 || triplets.size > 3 * 64) return
             val dev = synchronized(this@UinputHostMain) { devices[displayId] } ?: return
-            runCatching { injectMethod.invoke(dev.device, triplets) }.onFailure { lastError = it.describe() }
+            runCatching { inject(dev.device, triplets) }.onFailure { lastError = it.describe() }
         }
 
         override fun close(displayId: Int) {
@@ -251,8 +273,30 @@ class UinputHostMain private constructor(private val args: VdmHostPolicy.Args) {
         const val ABS_MT_TRACKING_ID = 0x39
 
         @Keep @JvmStatic fun main(argv: Array<String>) {
+            if (argv.firstOrNull() == "--selftest") return selftest(argv.getOrNull(1)?.toIntOrNull() ?: 0)
             try { UinputHostMain(VdmHostPolicy.Args.parse(argv)).run() }
             catch (e: Throwable) { println("UINPUTHOST ошибка:${e.javaClass.simpleName}: ${e.message}"); exitProcess(1) }
+        }
+
+        /** Проверка из adb shell без приложения: тачскрин на дисплей, описание, тап в центр, закрытие. */
+        private fun selftest(displayId: Int) {
+            val host = UinputHostMain(VdmHostPolicy.Args.parse(arrayOf("--package", "com.android.shell", "--pid", "2")))
+            try {
+                if (Looper.getMainLooper() == null) @Suppress("DEPRECATION") Looper.prepareMainLooper()
+                host.openDevice(displayId, 1280, 640)
+                Thread.sleep(1500)
+                println("UINPUTHOST selftest: ${host.describeDevice(displayId)}")
+                val c = UinputTouchEvents()
+                val dev = host.devices.getValue(displayId)
+                host.inject(dev.device, c.convert(0, 0, intArrayOf(0), floatArrayOf(640f), floatArrayOf(320f), 1280, 640))
+                host.inject(dev.device, c.convert(1, 0, intArrayOf(0), floatArrayOf(640f), floatArrayOf(320f), 1280, 640))
+                Thread.sleep(500)
+                host.closeDevice(displayId)
+                println("UINPUTHOST selftest: ок")
+            } catch (e: Throwable) {
+                println("UINPUTHOST selftest ошибка: ${host.run { e.describe() }}")
+            }
+            exitProcess(0)
         }
     }
 }

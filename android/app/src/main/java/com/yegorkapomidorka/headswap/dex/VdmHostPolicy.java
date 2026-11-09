@@ -33,7 +33,7 @@ public final class VdmHostPolicy {
         ManualAccessPolicy.requireApkPath(apkPath);
         ManualAccessPolicy.requirePackage(packageName);
         if (appPid <= 1) throw new IllegalArgumentException("Некорректный PID приложения");
-        return "rm -f " + UINPUT_LOG + "; CLASSPATH='" + UINPUT_JAR + ":" + apkPath + "' /system/bin/setsid /system/bin/nohup /system/bin/app_process / "
+        return "rm -f " + UINPUT_LOG + "; CLASSPATH='" + apkPath + "' /system/bin/setsid /system/bin/nohup /system/bin/app_process / "
             + UINPUT_ENTRY + " --package " + packageName + " --pid " + appPid + " </dev/null >" + UINPUT_LOG + " 2>&1 &";
     }
 
