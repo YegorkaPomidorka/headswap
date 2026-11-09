@@ -45,7 +45,7 @@
     <string name="set_direct_desc">La vidéo d\'Android Auto est envoyée telle quelle à l\'autoradio. Les écrans larges sont rognés par l\'autoradio lui-même.</string>
     <string name="set_direct_plus">+ Latence, échauffement et consommation de batterie réduits</string>
     <string name="set_direct_minus">− La fréquence d\'images n\'est pas réglable</string>
-    <string name="set_direct_desktop_desc">En mode « Lanceur propre », le téléphone encode son écran une seule fois et fournit à l\'autoradio un flux H.264 prêt à l\'emploi, sans transcodage.</string>
+    <string name="set_direct_desktop_desc">En mode « Lanceur intégré », le téléphone encode son écran une seule fois et fournit à l\'autoradio un flux H.264 prêt à l\'emploi, sans transcodage.</string>
 
     <string name="set_resolution">Résolution vidéo</string>
     <string name="set_res_pick">Choisir la résolution</string>
@@ -277,7 +277,7 @@
     <!-- Bridge mode: Android Auto / Headswap Desktop (SettingsSection.MODE) -->
     <string name="bm_title">Mode</string>
     <string name="bm_aa_note">L\'autoradio affiche Android Auto depuis votre téléphone.</string>
-    <string name="bm_own_launcher">Lanceur propre</string>
+    <string name="bm_own_launcher">Lanceur intégré</string>
     <string name="bm_launcher_title">Lanceur</string>
     <string name="bm_need_13">Android 13+ requis</string>
     <string name="bm_sum_state">%1$s · %2$s</string>
