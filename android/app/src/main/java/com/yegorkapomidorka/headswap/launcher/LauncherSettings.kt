@@ -159,9 +159,9 @@ fun LauncherSettingsScreen() {
                             val set = if (model.colorsEditDay) model.dayColors else model.nightColors
                             val light = model.colorsEditDay
                             ColorSliderCard(stringResource(R.string.l_s_colors_accent), set.accentHue, ColorSet.HUE_NEUTRAL, d, cell(1).fillMaxWidth(),
-                                hueTrack(light, accent = true)) { model.editColors(set.copy(accentHue = hue(it))) }
+                                hueTrack(light, accent = true)) { model.editColors(set.copy(accentHue = it)) }
                             ColorSliderCard(stringResource(R.string.l_s_colors_bg_hue), set.bgHue, ColorSet.HUE_NEUTRAL, d, cell(2).fillMaxWidth(),
-                                hueTrack(light, accent = false)) { model.editColors(set.copy(bgHue = hue(it))) }
+                                hueTrack(light, accent = false)) { model.editColors(set.copy(bgHue = it)) }
                             ColorSliderCard(stringResource(R.string.l_s_colors_bg_sat), set.bgSat, 100, d, cell(3).fillMaxWidth(),
                                 satTrack(light, set.bgHue)) { model.editColors(set.copy(bgSat = it)) }
                             Card(cell(4).fillMaxWidth()) {
@@ -414,9 +414,6 @@ private fun hueTrack(light: Boolean, accent: Boolean): Brush {
     val none = if (accent) LauncherColors.accent(light, ColorSet.HUE_NEUTRAL) else if (light) Color.White else Color.Black
     return Brush.horizontalGradient(*(rainbow + listOf(end + 0.001f to none, 1f to none)).toTypedArray())
 }
-
-/** Оттенок со слайдера: хвост после 360° - одно значение [ColorSet.HUE_NEUTRAL], ручка уходит в конец. */
-private fun hue(v: Int) = if (ColorSet.neutral(v)) ColorSet.HUE_NEUTRAL else v
 
 /** Насыщенность фона: от серого до цветного того же оттенка. */
 private fun satTrack(light: Boolean, hue: Int): Brush {
