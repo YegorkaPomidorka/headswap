@@ -119,15 +119,19 @@ fun MusicCard(modifier: Modifier) {
             Modifier.align(Alignment.BottomStart).fillMaxWidth().padding(start = m.dp(s.g), end = m.dp(s.g), bottom = m.dp(s.titleB)),
             verticalArrangement = Arrangement.spacedBy(m.dp(s.g4)),
         ) {
+            // лента 1280x480: обложка узкая (290T/96), крупный шрифт резал «Ничего не играет» (Егор 09.11) - на ступень мельче
+            val titleFs = if (s.strip) s.f2 else s.f1
+            val subFs = if (s.strip) s.appLbl else s.f2
+            val titleLines = if (s.strip) 2 else 1
             when {
                 !st.access -> Txt(stringResource(R.string.l_music_no_access), s.fs, color = Pal.SEC2, maxLines = 4)
                 st.hasSession -> {
-                    Txt(st.title, s.f1, weight = FontWeight.Bold)
-                    Txt(st.artist, s.f2, color = Color(0xFFD9DEF5))
+                    Txt(st.title, titleFs, weight = FontWeight.Bold, maxLines = titleLines)
+                    Txt(st.artist, subFs, color = Color(0xFFD9DEF5))
                 }
                 else -> {
-                    Txt(stringResource(R.string.l_music_idle), s.f1, weight = FontWeight.Bold)
-                    player?.let { Txt(LauncherModel.packageLabel(it), s.f2, color = Color(0xFFD9DEF5)) }
+                    Txt(stringResource(R.string.l_music_idle), titleFs, weight = FontWeight.Bold, maxLines = titleLines)
+                    player?.let { Txt(LauncherModel.packageLabel(it), subFs, color = Color(0xFFD9DEF5)) }
                 }
             }
         }

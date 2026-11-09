@@ -6,6 +6,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
@@ -346,15 +347,23 @@ fun HomeTileButtons() {
     }
 }
 
-/** Вид «Часы»: крупные часы и дата; в малой плашке мельче, чтобы время влезло по ширине. */
+/**
+ * Вид «Часы»: крупные часы и дата; в малой плашке мельче. Размер ещё и по плитке: в ленте 1280x480 2T не влезало
+ * по ширине - «13:…» (Егор 09.11). Моно-цифра ~0,62 кегля, время с запасом 15% по ширине и не выше 45% высоты.
+ */
 @Composable
 private fun ClockFace(small: Boolean) {
     val m = LocalMetrics.current
     val s = m.spec
     val st = LauncherModel.status
-    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+    BoxWithConstraints(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        val base = if (small) s.t else s.t * 2
+        val chars = maxOf(5, st.time.length)
+        val byW = (constraints.maxWidth * 0.85f / (chars * 0.62f)).toInt()
+        val byH = (constraints.maxHeight * 0.45f).toInt()
+        val timeFs = minOf(base, byW, byH).coerceAtLeast(s.f1)
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Txt(st.time, if (small) s.t else s.t * 2, weight = FontWeight.Bold, mono = true)
+            Txt(st.time, timeFs, weight = FontWeight.Bold, mono = true)
             Txt(st.date, if (small) s.f2 else s.f1, color = Pal.SEC2)
         }
     }
