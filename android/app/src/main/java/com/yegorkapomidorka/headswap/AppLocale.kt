@@ -8,15 +8,16 @@ import android.os.LocaleList
 import java.util.Locale
 
 /**
- * Язык интерфейса приложения: «system» (по умолчанию), «en», «ru» или «ar».
+ * Язык интерфейса приложения: «system» (по умолчанию), «en», «ru», «ar» или «zh-CN».
  * Арабский применяется с расширением «-u-nu-latn» (западные цифры 0–9, как в остальном интерфейсе и на ГУ);
  * [get] возвращает «ar» (сравнение по language).
+ * Китайский упрощённый: тег «zh-CN» (ресурсы values-zh-rCN); [get] сводит любой китайский language «zh» к нему.
  * Android 13+: системный per-app язык (LocaleManager, виден и в системных настройках, см. res/xml/locales_config.xml).
  * Android 10–12: выбор хранится в prefs, контексты activity/сервисов оборачиваются через [wrap] в attachBaseContext.
  */
 object AppLocale {
     const val SYSTEM = "system"
-    val TAGS = listOf(SYSTEM, "en", "ru", "ar")
+    val TAGS = listOf(SYSTEM, "en", "ru", "ar", "zh-CN")
 
     private const val PREFS = "app_locale"
     private const val KEY = "tag"
@@ -26,7 +27,8 @@ object AppLocale {
         if (Build.VERSION.SDK_INT >= 33) {
             val list = ctx.getSystemService(LocaleManager::class.java).applicationLocales
             if (list.isEmpty) return SYSTEM
-            return list[0].language.takeIf { it in TAGS } ?: SYSTEM
+            val lang = list[0].language
+            return (if (lang == "zh") "zh-CN" else lang).takeIf { it in TAGS } ?: SYSTEM
         }
         return stored(ctx)
     }

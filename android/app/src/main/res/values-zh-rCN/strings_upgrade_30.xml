@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 升级到 3.0 后仅显示一次的窗口：视频直通与自动帧率成为默认设置 -->
+<resources>
+    <string name="u30_title">视频直通</string>
+    <string name="u30_lead">此模式现已默认开启。</string>
+    <string name="u30_pros">带来的好处</string>
+    <string name="u30_pro_1">画面延迟更低</string>
+    <string name="u30_pro_2">手机发热更少，更省电</string>
+    <string name="u30_pro_3">宽屏车机会自行裁切画面</string>
+    <string name="u30_changed">有哪些变化</string>
+    <string name="u30_chg_1">帧率为<b>自动</b>：由 Android Auto 决定</string>
+    <string name="u30_chg_2">原有的视频设置已保留，仅在重新编码时生效</string>
+    <string name="u30_warn">如果出现问题</string>
+    <string name="u30_warn_text">如果出现黑屏、卡顿、花屏或画面无法铺满屏幕，请像以前一样开启<b>重新编码</b>。</string>
+    <string name="u30_where">设置 → 视频 → 模式</string>
+    <string name="u30_ok">知道了</string>
+    <string name="u30_open">打开视频设置</string>
+</resources>

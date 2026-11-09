@@ -119,6 +119,7 @@ private val LANGS = listOf(
     "en" to R.string.lang_en,
     "ru" to R.string.lang_ru,
     "ar" to R.string.lang_ar,
+    "zh-CN" to R.string.lang_zh,
 )
 
 private val THEMES = listOf(
