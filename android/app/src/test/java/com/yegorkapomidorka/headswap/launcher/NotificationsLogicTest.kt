@@ -43,6 +43,9 @@ class NotificationsLogicTest {
         assertEquals(692f, NotifGeom.seamX(700f, 1260f, 120f, 1260f, 16f)!!, 0.01f) // карта справа - стык слева от неё
         assertEquals(708f, NotifGeom.seamX(120f, 700f, 120f, 1260f, 16f)!!, 0.01f)  // большая слева - справа от неё
         assertEquals(null, NotifGeom.seamX(120f, 1260f, 120f, 1260f, 16f))           // на всю ширину - стыка нет
+        // RTL (h1003): карта слева, поле m=24 у левого края области - не стык; стык справа от карты, у музыки
+        assertEquals(708f, NotifGeom.seamX(144f, 700f, 120f, 1260f, 16f, 24f)!!, 0.01f)
+        assertEquals(null, NotifGeom.seamX(144f, 1244f, 120f, 1260f, 16f, 24f))
     }
 
     @Test fun lineAvoidsStatusText() {

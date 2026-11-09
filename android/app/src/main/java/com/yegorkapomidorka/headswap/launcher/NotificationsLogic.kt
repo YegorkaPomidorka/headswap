@@ -132,11 +132,13 @@ object NotifGeom {
 
     /**
      * Стык большой плитки с соседней: слева от неё, если там есть место, иначе справа; null - плитка на всю область
-     * (одна плитка на всю ширину), стыка нет. Место - больше зазора [g] между плиткой и краем области.
+     * (одна плитка на всю ширину), стыка нет. Место - больше зазора [g] и поля [edge] главного между плиткой и краем
+     * области: поля у краёв разные (g и m), в RTL они меняются местами, и поле m слева от карты принималось за стык -
+     * полоска уезжала к левому краю, на значки строки статуса (арабский, h1003).
      */
-    fun seamX(bigLeft: Float, bigRight: Float, areaLeft: Float, areaRight: Float, g: Float): Float? = when {
-        bigLeft - areaLeft > g -> bigLeft - g / 2f
-        areaRight - bigRight > g -> bigRight + g / 2f
+    fun seamX(bigLeft: Float, bigRight: Float, areaLeft: Float, areaRight: Float, g: Float, edge: Float = 0f): Float? = when {
+        bigLeft - areaLeft > g + edge -> bigLeft - g / 2f
+        areaRight - bigRight > g + edge -> bigRight + g / 2f
         else -> null
     }
 

@@ -160,7 +160,7 @@ private fun NotificationsOverlayBody(barBandH: Int) {
     // за него принимался её правый край, и язычок со шторкой улетали вправо). Главного ещё не было - у левого края области.
     val big = model.bigTileRect
     val seam = if (model.area == Area.Home && big != null && big.width > 0f) {
-        NotifGeom.seamX(big.left, big.right, area.left, area.right, s.g.toFloat())
+        NotifGeom.seamX(big.left, big.right, area.left, area.right, s.g.toFloat(), maxOf(s.g, s.m).toFloat())
     } else null
     if (seam != null) shown.seamX = seam
     val centerX = shown.seamX ?: (area.left + ear + NotifGeom.tongueWidth(s.t, Math.round(area.width), ear, s.g).first / 2f)
