@@ -27,6 +27,18 @@ class LauncherColorsTest {
         assertEquals(s, ColorSet.decode(s.encode(), ColorSet.NIGHT))
         assertEquals(ColorSet.NIGHT, ColorSet.decode(null, ColorSet.NIGHT))
         assertEquals(ColorSet.DAY, ColorSet.decode("1,2", ColorSet.DAY))
-        assertEquals(ColorSet(360, 0, 100), ColorSet.decode("999,-5,400", ColorSet.DAY))
+        assertEquals(ColorSet(ColorSet.HUE_NEUTRAL, 0, 100), ColorSet.decode("999,-5,400", ColorSet.DAY))
+    }
+
+    @Test fun neutralHueGivesBlackNightAndWhiteDay() {
+        val n = ColorSet(ColorSet.HUE_NEUTRAL, ColorSet.HUE_NEUTRAL, 80)
+        val night = LauncherColors.palette(false, n)
+        val day = LauncherColors.palette(true, n)
+        night.bgStops.forEach { assertEquals(0f, it.second.red + it.second.green + it.second.blue, 0f) }
+        day.bgStops.forEach { assertEquals(3f, it.second.red + it.second.green + it.second.blue, 0.001f) }
+        assertEquals(0f, night.glowLeft, 0f)
+        // акцент контрастный фону: ночью светлый серый, днём тёмный
+        assertTrue(night.accent.red > 0.9f && night.accent.red == night.accent.blue)
+        assertTrue(day.accent.red < 0.2f && day.accent.red == day.accent.blue)
     }
 }
