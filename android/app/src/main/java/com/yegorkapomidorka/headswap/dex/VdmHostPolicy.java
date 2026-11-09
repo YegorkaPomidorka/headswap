@@ -16,6 +16,27 @@ public final class VdmHostPolicy {
             + " --package " + packageName + " --pid " + appPid + " </dev/null >" + LOG + " 2>&1 &";
     }
 
+    /**
+     * h1007: на Android 13–15 программный ввод (injectInputEvent) режется, пока экран телефона погашен; ввод от
+     * настоящего устройства на включённый дисплей ГУ проходит. Хост-тачскрин через /dev/uinput, он доступен только uid 2000.
+     */
+    public static final int UINPUT_MIN_SDK = 33;
+    public static final int UINPUT_MAX_SDK = 35;
+    public static final String UINPUT_ENTRY = ManualAccessPolicy.DEX_CLASS_PACKAGE + ".UinputHostMain";
+    public static final String UINPUT_LOG = "/data/local/tmp/headswap-uinput-host.log";
+    /** Системная команда uinput: её класс Device открывает /dev/uinput с любым bus (JSON разрешает только usb/bluetooth). */
+    public static final String UINPUT_JAR = "/system/framework/uinput.jar";
+
+    public static boolean uinputSdk(int sdk) { return sdk >= UINPUT_MIN_SDK && sdk <= UINPUT_MAX_SDK; }
+
+    public static String uinputStartCommand(String apkPath, String packageName, int appPid) {
+        ManualAccessPolicy.requireApkPath(apkPath);
+        ManualAccessPolicy.requirePackage(packageName);
+        if (appPid <= 1) throw new IllegalArgumentException("Некорректный PID приложения");
+        return "rm -f " + UINPUT_LOG + "; CLASSPATH='" + UINPUT_JAR + ":" + apkPath + "' /system/bin/setsid /system/bin/nohup /system/bin/app_process / "
+            + UINPUT_ENTRY + " --package " + packageName + " --pid " + appPid + " </dev/null >" + UINPUT_LOG + " 2>&1 &";
+    }
+
     public static final class Args {
         public final String packageName;
         public final int appPid;

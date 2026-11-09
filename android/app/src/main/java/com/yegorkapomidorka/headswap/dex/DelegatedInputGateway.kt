@@ -44,6 +44,7 @@ internal class DelegatedInputGateway(context: Context) : IDelegatedInputGateway.
     }
     @Synchronized fun deactivate() {
         VdmHostLink.releaseAll()
+        UinputTouch.dropAll()
         wakeLocks.releaseAll()
         imeRoutes.clear()
         liveDisplayIds = emptySet()
@@ -56,6 +57,7 @@ internal class DelegatedInputGateway(context: Context) : IDelegatedInputGateway.
         registry.registerParent(displayId, token, width, height)
         liveDisplayIds = registry.registeredDisplayIds()
         holdAwake(displayId)
+        UinputTouch.want(context, displayId, width, height) // h1007: только экран рабочего стола, не дочерние
         localIme(registry.requireDisplay(displayId, token))
     }
 
@@ -98,11 +100,13 @@ internal class DelegatedInputGateway(context: Context) : IDelegatedInputGateway.
     @Synchronized override fun resizeDisplay(displayId: Int, token: IBinder, width: Int, height: Int) {
         requireActive(); requireTrustedDisplay(displayId)
         registry.resize(displayId, token, width, height)
+        if (registry.requireDisplay(displayId, token).parent == null) UinputTouch.want(context, displayId, width, height)
     }
 
     @Synchronized override fun unregisterDisplay(displayId: Int, token: IBinder) {
         requireCaller() // Cleanup remains possible after activation has ended.
         registry.unregister(displayId, token)
+        UinputTouch.drop(displayId)
         liveDisplayIds = registry.registeredDisplayIds()
         imeRoutes.retain(liveDisplayIds)
         wakeLocks.retain(liveDisplayIds)
@@ -163,6 +167,8 @@ internal class DelegatedInputGateway(context: Context) : IDelegatedInputGateway.
                             IntArray(event.pointerCount) { event.getPointerId(it) },
                             FloatArray(event.pointerCount) { event.getX(it) },
                             FloatArray(event.pointerCount) { event.getY(it) })
+                        // h1007: при погашенном экране телефона Android 13–15 выбрасывает inject - жест в тачскрин uinput.
+                        if (owned.parent == null && UinputTouch.route(displayId, event, owned.width, owned.height)) return
                     }
                     require(actionButton == 0 || actionButton == MotionEvent.BUTTON_PRIMARY)
                     if (actionButton != 0) setActionButton.invoke(event, actionButton)
