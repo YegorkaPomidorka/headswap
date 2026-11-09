@@ -61,6 +61,15 @@ class DesktopAudioOutputLeaseTest {
         lease.writeCompleted(150)
         assertTrue(lease.canCapture(3_200))
         assertFalse(lease.canCapture(3_201))
-        assertFalse(lease.canCapture(199))
+    }
+
+    @Test fun writeCompletedAfterCallerSampledClockIsFresh() {
+        // #190: reconcile samples elapsedRealtime, the writer completes a packet a millisecond later,
+        // then canCapture takes the lock. That must not release the capture.
+        val lease = DesktopAudioOutputLease(0)
+        lease.writeCompleted(60_000)
+        assertTrue(lease.canCapture(59_999))
+        assertTrue(lease.canCapture(63_000))
+        assertFalse(lease.canCapture(63_001))
     }
 }

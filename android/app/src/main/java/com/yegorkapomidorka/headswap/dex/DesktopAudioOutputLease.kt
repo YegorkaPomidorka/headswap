@@ -14,7 +14,11 @@ internal class DesktopAudioOutputLease(private val startedAtMs: Long) {
     @Synchronized fun canCapture(nowMs: Long): Boolean {
         if (closed) return false
         // The initial grace is anchored to the session, never to a capture/reconcile attempt.
-        val anchor = completedAtMs ?: startedAtMs
+        val completed = completedAtMs
+        // nowMs is sampled before taking the lock; the USB writer may complete a write in between.
+        // A write newer than the caller's clock is fresh, not invalid (#190: capture dropped every ~15 min).
+        if (completed != null && nowMs < completed) return true
+        val anchor = completed ?: startedAtMs
         return nowMs >= anchor && nowMs - anchor <= FRESHNESS_MS
     }
 
