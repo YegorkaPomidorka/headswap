@@ -61,12 +61,30 @@ internal object VdmHostRestart {
         }
     }
 
+    /**
+     * h913 (S22 Ultra, A16, без Wi-Fi в машине): Samsung выключает беспроводную отладку, как только телефон уходит
+     * из Wi-Fi, и первый перезапуск по Wi-Fi, после которого [pinViaAdbd] закрепляет 5555, не случается ни разу.
+     * Поэтому закрепляем порт сразу при первом подключении хоста, пока Wi-Fi с активации ещё есть.
+     */
+    fun onHostConnected(context: Context?) {
+        val ctx = context?.applicationContext ?: return
+        if (!pinPort || tcpipTried.get() || tcpPortProperty() == FIXED_TCP_PORT.toString()) return
+        if (busy.get()) return // удачный перезапуск сам вызовет pinViaAdbd
+        if (!PhoneActivationState(ctx).paired || !PhoneAdb.hasIdentity(ctx)) return
+        val wifiDebug = Settings.Global.getInt(ctx.contentResolver, "adb_wifi_enabled", 0)
+        if (wifiDebug != 1) return log("tcpip при подключении: отладка по Wi-Fi уже выключена (adb_wifi=$wifiDebug)")
+        thread(name = "vdm-pin", isDaemon = true) {
+            runCatching { pinViaAdbd(ctx) }.onFailure { log("tcpip при подключении: ${it.javaClass.simpleName}") }
+        }
+    }
+
     /** null - можно перезапускать; иначе причина для лога. */
     private fun blocker(ctx: Context): String? = when {
         !VdmDesktop.supported -> "Android ниже 17"
         !DelegatedDesktopAccess.isReady(ctx) -> "активация закончилась"
         !PhoneActivationState(ctx).paired || !PhoneAdb.hasIdentity(ctx) -> "активация не с телефона (нет пары adb)"
-        Settings.Global.getInt(ctx.contentResolver, "adb_wifi_enabled", 0) != 1 -> "отладка по Wi-Fi выключена"
+        Settings.Global.getInt(ctx.contentResolver, "adb_wifi_enabled", 0) != 1 &&
+            !(pinPort && tcpPortProperty() == FIXED_TCP_PORT.toString()) -> "отладка по Wi-Fi выключена, порт $FIXED_TCP_PORT не закреплён"
         else -> null
     }
 
