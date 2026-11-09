@@ -32,7 +32,7 @@ internal object DesktopPick {
                 val a = info.activityInfo ?: return@mapNotNull null
                 DesktopAppCatalog.Entry(a.packageName, a.name,
                     runCatching { info.loadLabel(pm).toString() }.getOrDefault(a.packageName),
-                    enabled = a.enabled && a.applicationInfo.enabled, exported = a.exported)
+                    enabled = a.applicationInfo.enabled, exported = a.exported) // a.enabled - из манифеста, см. LauncherModel
             }
         }.getOrElse { AppLog.i("DESKTOP лаунчеры: LAUNCHER ${it.javaClass.simpleName}", false); emptyList() }
         val homes = runCatching {

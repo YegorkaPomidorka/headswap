@@ -112,8 +112,10 @@ internal class DelegatedDesktopRuntime(private val context: Context, private val
     private fun launch(id: Int, component: ComponentName, ownActivity: Boolean, requireLauncher: Boolean, assist: Boolean = false) {
         require(id > 0) { "Запуск на основном экране запрещён" }
         val pm = context.packageManager
+        // выключенный компонент getActivityInfo без MATCH_DISABLED_COMPONENTS не найдёт; info.enabled - значение из манифеста,
+        // у activity-alias, включённого на ходу (сменённая иконка Телеграма), там false
         val info = pm.getActivityInfo(component, 0)
-        check(info.enabled && info.applicationInfo.enabled && (info.exported || ownActivity &&
+        check(info.applicationInfo.enabled && (info.exported || ownActivity &&
             info.applicationInfo.uid == context.applicationInfo.uid && component.packageName == context.packageName)) {
             "Приложение рабочего стола отключено или не разрешает внешний запуск"
         }
@@ -122,7 +124,7 @@ internal class DelegatedDesktopRuntime(private val context: Context, private val
                 .setPackage(component.packageName), 0)
             check(candidates.any { it.activityInfo?.let { candidate ->
                 candidate.packageName == component.packageName && candidate.name == component.className &&
-                    candidate.exported && candidate.enabled && candidate.applicationInfo.enabled
+                    candidate.exported && candidate.applicationInfo.enabled
             } == true }) { "Виджет принимает только доступное приложение из списка запуска" }
         }
         val action = if (assist) EmbeddedDisplayPolicy.assistAction(component.packageName, component.className) else Intent.ACTION_MAIN
