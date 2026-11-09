@@ -270,6 +270,9 @@ object VIco {
         roundRectPath(13f, 8f, 4f, 13f, 1f), roundRectPath(18.5f, 3f, 4f, 18f, 1f),
     ).mapIndexed { i, d -> VPath(d, fill = true, alpha = if (i < level) 1f else 0.35f) }
 
+    /** Молния справа от батарейки: телефон на зарядке. */
+    val BOLT = listOf(VPath("M13 2 5 14h6l-1 8 8-12h-6z", fill = true, strokeW = 1.5f))
+
     /** Раздел «Вид»: круг, закрашенный наполовину. */
     val HALF_CIRCLE = listOf(
         VPath("M3 12a9 9 0 1 0 18 0 9 9 0 1 0-18 0", strokeW = 2f),

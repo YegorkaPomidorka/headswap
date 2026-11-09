@@ -131,6 +131,7 @@
     <string name="l_s_rail_normal">Normal</string>
     <string name="l_s_rail_cut">Compact</string>
     <string name="l_s_anim">Animations des boutons</string>
+    <string name="l_s_battery">Batterie du téléphone</string>
     <string name="l_s_map_scale">Échelle</string>
     <string name="l_s_map_scale_sub">Uniquement pour %1$s · s\'applique immédiatement</string>
     <string name="l_s_scale_smaller">Plus petite</string>
