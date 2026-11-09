@@ -114,11 +114,12 @@ fun NotificationsOverlay() {
     }
     val density = LocalDensity.current
     val metrics = remember(spec, density) { if (spec === bs) base else LauncherMetrics(spec, density) }
-    CompositionLocalProvider(LocalMetrics provides metrics) { NotificationsOverlayBody(bs.statusBandH) }
+    CompositionLocalProvider(LocalMetrics provides metrics) { NotificationsOverlayBody(bs.statusBandH, bs) }
 }
 
 @Composable
-private fun NotificationsOverlayBody(barBandH: Int) {
+/** [home] - спека главного экрана: X полоски считается по его плиткам, а не по уменьшенному масштабу язычка (лента 1280x480). */
+private fun NotificationsOverlayBody(barBandH: Int, home: LauncherSpec) {
     val model = LauncherModel
     val repo = NotificationsRepo
     val area = model.areaRect
@@ -160,7 +161,7 @@ private fun NotificationsOverlayBody(barBandH: Int) {
     // двигают. В арабском (RTL) рейка и плитки зеркальные - и пиксель зеркальный, у правой рейки (h1003).
     val fullscreenApp = model.area is Area.App && EmbedHost.app.fullscreen
     if (!fullscreenApp || shown.lineX == null) {
-        shown.lineX = NotifGeom.fixedLineX(area.left, area.right, s.g.toFloat(), s.music.toFloat(), localeRtl())
+        shown.lineX = NotifGeom.fixedLineX(area.left, area.right, home.g.toFloat(), home.music.toFloat(), localeRtl())
     }
     val centerX = shown.lineX!!
     val dragThr = px(30f).toFloat()
