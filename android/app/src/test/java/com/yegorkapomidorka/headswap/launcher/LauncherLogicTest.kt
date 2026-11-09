@@ -352,11 +352,11 @@ class LauncherLogicTest {
         for (pkg in NavigatorPick.KNOWN) assertFalse(pkg, NavigatorPick.hintsDefault(pkg))
     }
 
-    @Test fun googleAndWazeOnlyViaAa() {
-        assertTrue(NavigatorPick.aaOnly(NavigatorPick.GOOGLE_MAPS))
-        assertTrue(NavigatorPick.aaOnly(NavigatorPick.WAZE))
-        assertFalse(NavigatorPick.aaOnly(NavigatorPick.DGIS))
-        assertFalse(NavigatorPick.aaOnly(NavigatorPick.YANDEX_NAVI))
+    @Test fun wazeWithoutHintsAndShadowAa() {
+        assertTrue(NavigatorPick.noHints(NavigatorPick.WAZE))
+        assertFalse(NavigatorPick.noHints(NavigatorPick.GOOGLE_MAPS))
+        assertFalse(NavigatorPick.shadowWanted(true, NavigatorPick.WAZE) { true })
+        assertTrue(NavigatorPick.shadowWanted(true, NavigatorPick.GOOGLE_MAPS) { true })
     }
 
     @Test fun arabicNavigatorsGoogleAndWaze() {

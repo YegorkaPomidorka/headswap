@@ -131,14 +131,15 @@ object NavigatorPick {
     fun hintsDefault(pkg: String): Boolean = false
 
     /**
-     * Машинная часть только у настоящей Android Auto: свой хост Car App не пускают. Waze (h1003, стенд 09.11): HostValidator
-     * со списком подписей gearhead, TEMPLATE_RENDERER засчитывает лишь на AAOS - «Unrecognized host». Подсказки - теневой AA.
+     * Подсказок на приборке нет совсем - только окно (h1003, стенд 09.11). Waze: свой хост Car App не пускает (HostValidator
+     * со списком подписей gearhead, TEMPLATE_RENDERER засчитывает лишь на AAOS), а при теневой AA телефонный Waze уходит
+     * в режим «на экране машины» - список манёвров без карты, и манёвров в AA не шлёт (навигатор AA - Google Карты).
      */
-    fun aaOnly(pkg: String?): Boolean = pkg == GOOGLE_MAPS || pkg == WAZE
+    fun noHints(pkg: String?): Boolean = pkg == WAZE
 
     /** Теневую AA держим, пока у выбранного навигатора подсказки включены; навигатора нет - как раньше, держим. */
     fun shadowWanted(metaNavi: Boolean, navPkg: String?, hints: (String) -> Boolean): Boolean =
-        metaNavi && (navPkg == null || hints(navPkg))
+        metaNavi && (navPkg == null || (!noHints(navPkg) && hints(navPkg)))
 
     fun defaultFor(installed: Set<String>, arabic: Boolean = false): String? = known(arabic).firstOrNull { it in installed }
 

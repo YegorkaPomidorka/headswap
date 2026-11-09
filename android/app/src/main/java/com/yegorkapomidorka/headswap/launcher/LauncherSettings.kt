@@ -177,7 +177,7 @@ fun LauncherSettingsScreen() {
                                 // h800: подсказки на приборке - машинная часть (Яндекс - только с Плюсом) или теневая AA (Google);
                                 // выкл - окно как на телефоне, без подписки и без AA. Своё значение у каждого навигатора.
                                 val hints = model.navHints(navPkg)
-                                val google = NavigatorPick.aaOnly(navPkg)
+                                val google = navPkg == NavigatorPick.GOOGLE_MAPS
                                 val sub = stringResource(when {
                                     hints && google -> R.string.l_nav_hints_on_aa
                                     hints && NavigatorPick.needsPlus(navPkg) -> R.string.l_nav_hints_on_plus
@@ -188,10 +188,12 @@ fun LauncherSettingsScreen() {
                                 })
                                 // низкий ряд (экраны высотой 480): подпись не влезает под название - без неё
                                 val subFits = rowH >= ((s.f2 + d.sub) * 1.25).roundToInt() + 4 + 2 * d.padV
-                                SwitchCard(stringResource(R.string.l_nav_hints), hints, d, cell(2).fillMaxWidth(), sub = sub.takeIf { subFits }) {
+                                // Waze - только окно, подсказок нет вовсе (h1003): тумблер не показываем
+                                val noHints = NavigatorPick.noHints(navPkg)
+                                if (!noHints) SwitchCard(stringResource(R.string.l_nav_hints), hints, d, cell(2).fillMaxWidth(), sub = sub.takeIf { subFits }) {
                                     model.chooseNavHints(navPkg, it)
                                 }
-                                var row = 3
+                                var row = if (noHints) 2 else 3
                                 // масштаб - dpi своего хоста Car App; навигатору окном и через AA он не нужен
                                 if (EmbedHost.nav.carHost) MapScaleCard(navPkg, d, cell(row++).fillMaxWidth())
                                 Placed(row++) { RestartNavCard(d, Modifier) } // кнопка - через обёртку, рамка шайбы (h737)
