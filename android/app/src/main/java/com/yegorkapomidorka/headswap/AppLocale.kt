@@ -8,7 +8,7 @@ import android.os.LocaleList
 import java.util.Locale
 
 /**
- * Язык интерфейса приложения: «system» (по умолчанию), «en», «ru» или «ar».
+ * Язык интерфейса приложения: «system» (по умолчанию), «en», «ru», «ar» или «fr».
  * Арабский применяется с расширением «-u-nu-latn» (западные цифры 0–9, как в остальном интерфейсе и на ГУ);
  * [get] возвращает «ar» (сравнение по language).
  * Android 13+: системный per-app язык (LocaleManager, виден и в системных настройках, см. res/xml/locales_config.xml).
@@ -16,7 +16,7 @@ import java.util.Locale
  */
 object AppLocale {
     const val SYSTEM = "system"
-    val TAGS = listOf(SYSTEM, "en", "ru", "ar")
+    val TAGS = listOf(SYSTEM, "en", "ru", "ar", "fr")
 
     private const val PREFS = "app_locale"
     private const val KEY = "tag"
@@ -41,14 +41,18 @@ object AppLocale {
         ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putString(KEY, t).apply()
     }
 
+    /** Языки, при которых лаунчер прячет русские сервисы: навигаторы Google Карты и Waze, без Я.Музыки (h1003). */
+    private val GLOBAL_APPS_LANGS = setOf("ar", "fr")
+
     /**
-     * Интерфейс на арабском (выбран явно или «Системный» при арабской системе). Без IPC: на 33+ per-app язык уже в
-     * конфигурации контекста, ниже - выбор из prefs или язык системы. Лаунчер по нему прячет русские сервисы (h1003).
+     * Интерфейс на языке из [GLOBAL_APPS_LANGS] (выбран явно или «Системный» при такой системе). Без IPC: на 33+
+     * per-app язык уже в конфигурации контекста, ниже - выбор из prefs или язык системы.
      */
-    fun isArabic(ctx: Context): Boolean {
-        if (Build.VERSION.SDK_INT >= 33) return ctx.resources.configuration.locales[0]?.language == "ar"
+    fun usesGlobalApps(ctx: Context): Boolean {
+        if (Build.VERSION.SDK_INT >= 33) return ctx.resources.configuration.locales[0]?.language in GLOBAL_APPS_LANGS
         val t = stored(ctx)
-        return if (t == SYSTEM) android.content.res.Resources.getSystem().configuration.locales[0]?.language == "ar" else t == "ar"
+        val lang = if (t == SYSTEM) android.content.res.Resources.getSystem().configuration.locales[0]?.language else t
+        return lang in GLOBAL_APPS_LANGS
     }
 
     /** Нужен ли ручной recreate() после [set]. */

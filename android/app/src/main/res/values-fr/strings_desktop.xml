@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- BridgeService, режим Headswap Desktop -->
+    <string name="desk_not_activated">Headswap Desktop n\'est pas activé : ouvrez Paramètres > Mode et appuyez sur Activer</string>
+    <string name="desk_cert_na">non requis (bureau)</string>
+    <string name="desk_connecting">Démarrage du bureau…</string>
+    <string name="desk_waiting_frame">Lanceur : en attente d\'une image…</string>
+    <string name="desk_disconnected">Le bureau s\'est déconnecté. Arrêtez puis reconnectez.</string>
+    <string name="desk_recovering">Rétablissement du bureau (%1$d/2)…</string>
+    <string name="desk_recovery_stopped">Rétablissement interrompu. Vérifiez l\'USB, l\'accès au bureau et déverrouillez le téléphone</string>
+    <string name="desk_recovery_screen_busy">L\'écran précédent n\'est pas encore libéré ; rétablissement automatique annulé</string>
+
+    <!-- Activation from the phone itself (wireless debugging), Settings - Mode -->
+    <string name="pa_title">Activer Headswap</string>
+    <string name="pa_step_1">Ouvrez « Options pour les développeurs » → « Débogage sans fil » et activez-le.</string>
+    <string name="pa_step_2">Appuyez sur « Associer l\'appareil avec un code d\'association ».</string>
+    <string name="pa_step_3">Saisissez le code dans la notification Headswap.</string>
+    <string name="pa_step_paired">Appuyez sur « Activer ». Le téléphone est déjà associé, aucun code n\'est nécessaire.</string>
+    <string name="pa_hint">Refaites l\'activation après chaque redémarrage du téléphone.</string>
+    <string name="pa_button">Activer</string>
+    <string name="pa_button_again">Activer à nouveau</string>
+    <string name="pa_cancel">Annuler</string>
+    <string name="pa_manual_toggle">Saisir le port et le code manuellement</string>
+    <string name="pa_manual_hint">Port et code issus de la boîte de dialogue d\'association. Une fois l\'association faite, le port de débogage suffit.</string>
+    <string name="pa_field_pair_port">Port d\'association</string>
+    <string name="pa_field_code">Code à six chiffres</string>
+    <string name="pa_field_connect_port">Port du débogage sans fil</string>
+    <string name="pa_manual_go">Activer avec ces valeurs</string>
+    <string name="pa_forget">Associer à nouveau</string>
+    <string name="pa_forget_done">Association oubliée. La prochaine fois, Headswap demandera un nouveau code.</string>
+    <string name="pa_need_notif">Autorisez les notifications de Headswap : le code d\'association se saisit dans l\'une d\'elles. Ou saisissez le port et le code manuellement.</string>
+    <string name="pa_need_wifi_debug">Activez le débogage sans fil dans les options pour les développeurs (n\'importe quel réseau Wi-Fi convient, pas besoin d\'internet), puis appuyez de nouveau sur Activer.</string>
+    <string name="pa_field_bad_port">Port : de 1 à 65535</string>
+    <string name="pa_field_bad_code">Six chiffres</string>
+
+    <string name="pa_s_searching">Recherche du débogage sans fil…</string>
+    <string name="pa_s_wait_code">En attente du code d\'association : saisissez-le dans la notification Headswap.</string>
+    <string name="pa_s_pairing">Association…</string>
+    <string name="pa_s_connecting">Connexion au débogage sans fil…</string>
+    <string name="pa_s_starting">Activation du bureau. Headswap peut redémarrer.</string>
+    <string name="pa_s_pending">En attente de la confirmation de l\'accès par Headswap redémarré…</string>
+    <string name="pa_s_failed">Non activé : %1$s</string>
+    <string name="pa_s_expired">L\'activation n\'a pas abouti. Ouvrez Paramètres > Mode et appuyez de nouveau sur Activer.</string>
+    <string name="pa_s_expired_why">L\'activation n\'a pas abouti : %1$s</string>
+
+    <string name="pa_notif_channel_progress">Activation depuis le téléphone</string>
+    <string name="pa_notif_channel_code">Code d\'association</string>
+    <string name="pa_notif_title">Activation de Headswap Desktop</string>
+    <string name="pa_notif_cancel">Annuler</string>
+    <string name="pa_notif_code_title">Saisissez le code d\'association</string>
+    <string name="pa_notif_code_text">Dans le débogage sans fil, appuyez sur « Associer l\'appareil avec un code d\'association », puis saisissez ici les six chiffres.</string>
+    <string name="pa_notif_code_error">%1$s Saisissez à nouveau le code.</string>
+    <string name="pa_notif_code_label">Code à six chiffres</string>
+    <string name="pa_notif_reply">Saisir le code</string>
+    <string name="pa_notif_done">Headswap Desktop est activé</string>
+
+    <string name="pa_err_no_wifi">Pas de Wi-Fi. Le débogage sans fil ne fonctionne qu\'en Wi-Fi : connectez-vous à un réseau et réessayez.</string>
+    <string name="pa_err_port">Le port doit être un nombre de 1 à 65535.</string>
+    <string name="pa_err_code">Le code comporte six chiffres, affichés dans la boîte de dialogue d\'association du système.</string>
+    <string name="pa_err_no_pair_port">La boîte de dialogue d\'association est introuvable. Gardez « Associer l\'appareil avec un code d\'association » ouvert pendant la saisie du code. Sur Android 17, autorisez Headswap à accéder au réseau local, ou saisissez le port manuellement.</string>
+    <string name="pa_err_no_connect_port">Le débogage sans fil est désactivé ou introuvable. Activez « Débogage sans fil » dans les options pour les développeurs (le Wi-Fi doit être activé), ou saisissez le port manuellement.</string>
+    <string name="pa_err_refused">Le port est fermé : le débogage sans fil est désactivé ou le port a changé. Consultez l\'écran du débogage sans fil.</string>
+    <string name="pa_err_timeout">Pas de réponse dans le délai imparti. Vérifiez le Wi-Fi et que le débogage sans fil est activé.</string>
+    <string name="pa_err_permission">Android a bloqué la connexion réseau. Autorisez Headswap à accéder au réseau local et réessayez.</string>
+    <string name="pa_err_pair_rejected">Le code est incorrect ou la boîte de dialogue d\'association a été fermée. Rouvrez-la et utilisez le nouveau code.</string>
+    <string name="pa_err_not_paired">Le téléphone ne reconnaît plus cet appareil. Refaites l\'association avec un nouveau code.</string>
+    <string name="pa_err_tls">La connexion sécurisée a été refusée. Vérifiez le débogage sans fil et refaites l\'association si besoin.</string>
+    <string name="pa_err_tls_provider">Le composant TLS du système a échoué. Enregistrez le journal et signalez le problème.</string>
+    <string name="pa_err_closed">Le téléphone a fermé la connexion. Vérifiez le port sur l\'écran du débogage sans fil.</string>
+    <string name="pa_err_identity">La clé ADB enregistrée est illisible. Refaites l\'association.</string>
+    <string name="pa_err_shell">Le débogage sans fil n\'a pas donné d\'accès shell. Vérifiez la liste des appareils associés.</string>
+    <string name="pa_err_package">Le Headswap installé a changé. Rouvrez l\'application et réessayez.</string>
+    <string name="pa_err_unsupported">Ce firmware ne permet pas de lancer l\'activation depuis le téléphone.</string>
+    <string name="pa_err_dispatch">Le lancement n\'a pas été confirmé. Ouvrez Paramètres > Mode et appuyez de nouveau sur Activer.</string>
+    <string name="pa_err_io">La communication avec le débogage sans fil a échoué. Enregistrez le journal et réessayez.</string>
+    <string name="pa_err_internal">Erreur interne lors de la préparation de la connexion. Enregistrez le journal et réessayez.</string>
+    <string name="pa_need_usb_debug">Sur Android 17, activez aussi le débogage USB dans les options pour les développeurs (laissez le débogage sans fil activé) : sans cela, l\'écran de la voiture peut s\'éteindre en même temps que le téléphone. Puis appuyez de nouveau sur Activer.</string>
+</resources>
