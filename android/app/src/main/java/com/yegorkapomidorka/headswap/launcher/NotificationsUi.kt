@@ -163,7 +163,9 @@ private fun NotificationsOverlayBody(barBandH: Int) {
         NotifGeom.seamX(big.left, big.right, area.left, area.right, s.g.toFloat(), maxOf(s.g, s.m).toFloat())
     } else null
     if (seam != null) shown.seamX = seam
-    val centerX = shown.seamX ?: (area.left + ear + NotifGeom.tongueWidth(s.t, Math.round(area.width), ear, s.g).first / 2f)
+    // стыка не было - у края возле рейки: слева, в арабском (RTL, рейка справа) - у правого края (h1003)
+    val edgeHalf = ear + NotifGeom.tongueWidth(s.t, Math.round(area.width), ear, s.g).first / 2f
+    val centerX = shown.seamX ?: if (localeRtl()) area.right - edgeHalf else area.left + edgeHalf
     val dragThr = px(30f).toFloat()
     // Строка статуса скрыта (Для разработчиков, Егор 07.11): полоски на строке нет, вместо неё от верха экрана висит чёлка -
     // та же панель, свёрнутая до 168x30 с полоской на нижнем крае. Язычок и шторка растут из неё (animateContentSize), а не
