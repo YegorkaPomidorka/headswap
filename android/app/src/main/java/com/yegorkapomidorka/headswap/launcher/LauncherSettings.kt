@@ -820,6 +820,22 @@ private fun HomeMiniature(left: Boolean, gapPx: Int, modifier: Modifier) {
     val gap = m.dp(gapPx)
     val small = RoundedCornerShape(m.dp(gapPx))
     Row(modifier.clip(RoundedCornerShape(m.dp(max(1, (10 * k).roundToInt())))).background(pal.mini)) {
+        // лента 1280x480: на главном один ряд - обложка, большая плашка и сетка приложений, нижнего ряда нет (Егор 09.11)
+        if (m.spec.strip) {
+            Row(Modifier.fillMaxSize().padding(gap), horizontalArrangement = Arrangement.spacedBy(gap)) {
+                val cells = listOf<@Composable RowScope.() -> Unit>(
+                    { MusicMiniCell(0.25f, small) },
+                    { BigMiniCell(0.5f, small) },
+                    {
+                        Box(Modifier.weight(0.25f).fillMaxHeight().clip(small).background(pal.btn2), contentAlignment = Alignment.Center) {
+                            SvgIcon(Ico.PLUS, (22 * k).roundToInt(), pal.fg2, stroke = 2.4f)
+                        }
+                    },
+                )
+                for (c in if (left) cells.asReversed() else cells) c(this)
+            }
+            return@Row
+        }
         Column(Modifier.weight(1f).fillMaxHeight().padding(gap), verticalArrangement = Arrangement.spacedBy(gap)) {
             Row(Modifier.weight(2f).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(gap)) {
                 if (left) { BigMiniCell(0.67f, small); MusicMiniCell(0.33f, small) } else { MusicMiniCell(0.33f, small); BigMiniCell(0.67f, small) }

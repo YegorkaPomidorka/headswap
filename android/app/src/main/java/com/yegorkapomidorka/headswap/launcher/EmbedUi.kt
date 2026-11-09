@@ -361,7 +361,7 @@ private fun ClockFace(small: Boolean) {
         val chars = maxOf(5, st.time.length)
         val byW = (constraints.maxWidth * 0.85f / (chars * 0.62f)).toInt()
         val byH = (constraints.maxHeight * 0.45f).toInt()
-        val timeFs = minOf(base, byW, byH).coerceAtLeast(s.f1)
+        val timeFs = if (!s.strip) base else minOf(base, byW, byH).coerceAtLeast(s.f1)
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Txt(st.time, timeFs, weight = FontWeight.Bold, mono = true)
             Txt(st.date, if (small) s.f2 else s.f1, color = Pal.SEC2)
