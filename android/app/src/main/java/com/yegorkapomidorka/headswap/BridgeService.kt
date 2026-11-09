@@ -1130,8 +1130,9 @@ class BridgeService : Service() {
             // зовётся один раз на процесс - на вторую сессию рабочего стола его applyShadowNav не придёт)
             val lp = com.yegorkapomidorka.headswap.launcher.LauncherPrefs(this)
             val pick = com.yegorkapomidorka.headswap.launcher.NavigatorPick
-            val installed = pick.KNOWN.filterTo(HashSet()) { packageManager.getLaunchIntentForPackage(it) != null }
-            if (pick.shadowWanted(aaPrefs.metaNavi, pick.effective(lp.navigator, installed), lp::navHints)) AaShadowNav.start(this)
+            val arabic = AppLocale.isArabic(this)
+            val installed = pick.known(arabic).filterTo(HashSet()) { packageManager.getLaunchIntentForPackage(it) != null }
+            if (pick.shadowWanted(aaPrefs.metaNavi, pick.effective(lp.navigator, installed, arabic), lp::navHints)) AaShadowNav.start(this)
             else if (aaPrefs.metaNavi) AppLog.i("SHADOWNAV не стартую: у навигатора выключены подсказки на приборке", false)
             core.touchDecimationProvider = { aaPrefs.touchDecimation }
             core.dupDownFilterProvider = { aaPrefs.dupDownFilter }

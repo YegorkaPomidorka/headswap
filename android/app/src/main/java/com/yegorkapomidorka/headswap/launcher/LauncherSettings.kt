@@ -64,12 +64,17 @@ import kotlinx.coroutines.withContext
 /** Разделы настроек; [COLORS] и [ABOUT] - вложенные страницы «Вида» и «Системы», своей кнопки слева у них нет. */
 enum class SettingsPage { LOOK, NAVIGATOR, MUSIC, HOME, SYSTEM, ABOUT, COLORS }
 
-/** Навигаторы раздела «Навигатор», плитки 2x2 в порядке макета. */
+/** Навигаторы раздела «Навигатор», плитки по две в ряд в порядке макета. */
 private val NAV_TILES = listOf(
     NavigatorPick.YANDEX_NAVI to R.string.l_nav_yandex_navi,
-    "ru.dublgis.dgismobile" to R.string.l_nav_2gis,
+    NavigatorPick.DGIS to R.string.l_nav_2gis,
     NavigatorPick.YANDEX_MAPS to R.string.l_nav_yandex_maps,
-    "com.google.android.apps.maps" to R.string.l_nav_google_maps,
+    NavigatorPick.GOOGLE_MAPS to R.string.l_nav_google_maps,
+)
+/** Арабский интерфейс (h1003): Google Карты и Waze, один ряд. */
+private val NAV_TILES_AR = listOf(
+    NavigatorPick.GOOGLE_MAPS to R.string.l_nav_google_maps,
+    NavigatorPick.WAZE to R.string.l_nav_waze,
 )
 
 /**
@@ -199,11 +204,11 @@ fun LauncherSettingsScreen() {
                             val found by produceState(emptyList<String>()) {
                                 value = withContext(Dispatchers.IO) { MusicController.players(model.context) }
                             }
-                            val players = PlayerChip.allPlayers(found, model.installedPackages)
+                            val players = PlayerChip.allPlayers(found, model.installedPackages, model.onlinePlayers)
                             val local = model.localPlayer?.takeIf { it in players } ?: players.firstOrNull()
                             PlayersCard(stringResource(R.string.l_s_slot1), players.map { PlayerOpt.App(it) },
                                 local?.let { PlayerOpt.App(it) }, d, cell(0).fillMaxWidth()) { model.chooseLocalPlayer((it as PlayerOpt.App).pkg) }
-                            val second = PlayerChip.secondSlotPlayers(players)
+                            val second = PlayerChip.secondSlotPlayers(players, model.onlinePlayers)
                             PlayersCard(stringResource(R.string.l_s_slot2), listOf(PlayerOpt.Last) + second.map { PlayerOpt.App(it) },
                                 model.onlinePlayer?.takeIf { it in second }?.let { PlayerOpt.App(it) } ?: PlayerOpt.Last, d, cell(1).fillMaxWidth()) {
                                 model.chooseOnlinePlayer((it as? PlayerOpt.App)?.pkg)
@@ -634,10 +639,9 @@ private fun NavigatorTiles(d: SettingsDims, rowH: Int, modifier: Modifier) {
     val model = LauncherModel
     val installed = model.installedPackages
     Column(modifier, verticalArrangement = Arrangement.spacedBy(m.dp(d.gap))) {
-        for (r in 0 until 2) {
+        for (row in (if (model.arabic) NAV_TILES_AR else NAV_TILES).chunked(2)) {
             Row(Modifier.height(m.dp(rowH)).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(m.dp(d.gap))) {
-                for (c in 0 until 2) {
-                    val (pkg, res) = NAV_TILES[r * 2 + c]
+                for ((pkg, res) in row) {
                     val has = pkg in installed
                     val label = stringResource(res)
                     OptionBox(has && model.navigatorPkg == pkg, Modifier.weight(1f).fillMaxHeight().alpha(if (has) 1f else 0.4f),

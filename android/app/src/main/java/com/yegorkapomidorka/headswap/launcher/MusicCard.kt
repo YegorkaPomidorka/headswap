@@ -168,7 +168,8 @@ private fun PlayerChipColumn(modifier: Modifier) {
     val m = LocalMetrics.current
     val s = m.spec
     val accent = LocalAccent.current
-    val slots = PlayerChip.slots(model.installedPackages, model.musicPlayer, model.lastOnlinePlayer, model.localPlayer, model.onlinePlayer)
+    val slots = PlayerChip.slots(model.installedPackages, model.musicPlayer, model.lastOnlinePlayer, model.localPlayer, model.onlinePlayer,
+        model.onlinePlayers)
     val shape = RoundedCornerShape(m.dp(s.pcB))
     // backdrop-blur макета в Compose не повторить (blur размывает своё содержимое, а не фон) - только стекло и обводка
     Column(

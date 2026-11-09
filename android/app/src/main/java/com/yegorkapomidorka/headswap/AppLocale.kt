@@ -41,6 +41,16 @@ object AppLocale {
         ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putString(KEY, t).apply()
     }
 
+    /**
+     * Интерфейс на арабском (выбран явно или «Системный» при арабской системе). Без IPC: на 33+ per-app язык уже в
+     * конфигурации контекста, ниже - выбор из prefs или язык системы. Лаунчер по нему прячет русские сервисы (h1003).
+     */
+    fun isArabic(ctx: Context): Boolean {
+        if (Build.VERSION.SDK_INT >= 33) return ctx.resources.configuration.locales[0]?.language == "ar"
+        val t = stored(ctx)
+        return if (t == SYSTEM) android.content.res.Resources.getSystem().configuration.locales[0]?.language == "ar" else t == "ar"
+    }
+
     /** Нужен ли ручной recreate() после [set]. */
     val needsRecreate: Boolean get() = Build.VERSION.SDK_INT < 33
 
