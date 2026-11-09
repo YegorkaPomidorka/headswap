@@ -38,7 +38,7 @@
     <string name="l_nav_hints_off_plus">Comme sur le téléphone · sans abonnement</string>
     <string name="l_nav_hints_off_aa">Comme sur le téléphone · Android Auto n\'est pas lancé</string>
     <string name="l_nav_aa_server_hint">Ouvrez les réglages d\'AA sur le téléphone\n⋮ → Démarrer le serveur de l\'unité principale</string>
-    <string name="l_view_navigator">Navigateur GPS</string>
+    <string name="l_view_navigator">Navigation</string>
     <string name="l_view_clock">Horloge</string>
 
     <string name="l_music_idle">Aucune lecture en cours</string>
@@ -87,7 +87,7 @@
     <string name="l_theme_gold_deep">Or foncé</string>
     <string name="l_theme_gold_light">Or clair</string>
     <string name="l_theme_dark">Sombre</string>
-    <string name="l_set_navigator">Navigateur GPS</string>
+    <string name="l_set_navigator">Navigation</string>
     <string name="l_set_default">Par défaut</string>
     <string name="l_set_hand">Volant</string>
     <string name="l_left">À gauche</string>
@@ -107,7 +107,7 @@
     <string name="l_phone_no_access">Pas d\'accès</string>
     <string name="l_phone_open_request">Ouvrez la demande sur le téléphone</string>
     <string name="l_sec_look">Apparence</string>
-    <string name="l_sec_nav">Navigateur GPS</string>
+    <string name="l_sec_nav">Navigation</string>
     <string name="l_sec_music">Musique</string>
     <string name="l_sec_home">Écran</string>
     <string name="l_sec_system">Système</string>
@@ -131,7 +131,7 @@
     <string name="l_s_rail_normal">Normal</string>
     <string name="l_s_rail_cut">Compact</string>
     <string name="l_s_anim">Animations des boutons</string>
-    <string name="l_s_map_scale">Échelle de la carte</string>
+    <string name="l_s_map_scale">Échelle</string>
     <string name="l_s_map_scale_sub">Uniquement pour %1$s · s\'applique immédiatement</string>
     <string name="l_s_scale_smaller">Plus petite</string>
     <string name="l_s_scale_larger">Plus grande</string>

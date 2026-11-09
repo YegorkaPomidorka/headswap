@@ -24,15 +24,15 @@
     <string name="dev_section_tts_preroll">Silence avant la consigne (expérimental)</string>
     <string name="dev_tts_preroll_note">Des zéros après le début de la consigne, pour que l\'autoradio ouvre le canal audio. Auto : 400 ms sur VW</string>
     <string name="dev_volume_swipe_title">Volume à deux doigts</string>
-    <string name="dev_volume_swipe_sub">Bureau : deux doigts sur le bord droit, vers le haut pour monter, vers le bas pour baisser. Toujours activé sur Honda Vezel.</string>
+    <string name="dev_volume_swipe_sub">Lanceur : deux doigts sur le bord droit, vers le haut pour monter, vers le bas pour baisser. Toujours activé sur Honda Vezel.</string>
     <string name="dev_section_touch_decimation">Décimation du toucher (expérimental)</string>
     <string name="dev_touch_decimation_note">Ignorer un MOVE sur deux : l\'autoradio envoie jusqu\'à ~70 événements par seconde, la vidéo tourne à 30 ips au maximum. Le dernier point avant que le doigt se lève n\'est jamais perdu.</string>
-    <string name="dev_section_dup_down">Double toucher de l\'autoradio</string>
-    <string name="dev_dup_down_note">Certains autoradios (Honda) envoient chaque toucher deux fois : les boutons du lanceur se déclenchent deux fois, les Paramètres s\'ouvrent et se ferment aussitôt. Le filtre ignore le second DOWN au même point sans UP.</string>
+    <string name="dev_section_dup_down">Double appui sur l\'autoradio</string>
+    <string name="dev_dup_down_note">Certains autoradios (Honda) envoient chaque appui deux fois : les boutons du lanceur se déclenchent deux fois, les Réglages s\'ouvrent et se ferment aussitôt. Le filtre ignore le second DOWN au même point sans UP.</string>
 
 
     <string name="dev_section_video">Vidéo (appliqué à la reconnexion)</string>
-    <string name="dev_own_idr_title">Image clé propre en passthrough direct</string>
+    <string name="dev_own_idr_title">Image clé propre en transmission directe</string>
     <string name="dev_own_idr_sub">Toutes les 2 s, le téléphone envoie à l\'autoradio sa propre image clé : l\'image revient après la caméra de recul et le menu de la voiture. Désactivez si l\'autoradio récupère seul (p. ex. VW) : moins de trafic et de charge sur le téléphone</string>
     <string name="dev_custom_res_title">Résolution personnalisée</string>
     <string name="dev_custom_res_sub">À la place du mode des réglages vidéo</string>

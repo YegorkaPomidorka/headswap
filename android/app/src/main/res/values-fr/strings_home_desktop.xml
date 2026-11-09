@@ -9,7 +9,7 @@
 
     <string name="home_desk_st_active">activée</string>
     <string name="home_desk_st_needed">requise</string>
-    <string name="home_desk_st_needed_again">de nouveau requise</string>
+    <string name="home_desk_st_needed_again">à refaire</string>
     <string name="home_desk_st_error">erreur</string>
 
     <string name="home_desk_title_activate">Activer Headswap</string>

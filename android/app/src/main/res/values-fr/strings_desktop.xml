@@ -4,7 +4,7 @@
     <string name="desk_not_activated">Headswap Desktop n\'est pas activé : ouvrez Paramètres > Mode et appuyez sur Activer</string>
     <string name="desk_cert_na">non requis (bureau)</string>
     <string name="desk_connecting">Démarrage du bureau…</string>
-    <string name="desk_waiting_frame">Bureau : en attente d\'une image…</string>
+    <string name="desk_waiting_frame">Lanceur : en attente d\'une image…</string>
     <string name="desk_disconnected">Le bureau s\'est déconnecté. Arrêtez puis reconnectez.</string>
     <string name="desk_recovering">Rétablissement du bureau (%1$d/2)…</string>
     <string name="desk_recovery_stopped">Rétablissement interrompu. Vérifiez l\'USB, l\'accès au bureau et déverrouillez le téléphone</string>
