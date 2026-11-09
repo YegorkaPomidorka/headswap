@@ -1,0 +1,144 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 引导步骤：标题、编号列表（string-array）、提示、按钮；short 为就绪清单中的名称。 -->
+    <string name="step_aa_dev_title">开启 Android Auto 开发者模式</string>
+    <string-array name="step_aa_dev_list">
+        <item>点按“打开 Android Auto”</item>
+        <item>一直滑动到最底部</item>
+        <item>连续点按“版本”10 次并确认</item>
+    </string-array>
+    <string name="step_aa_dev_primary">打开 Android Auto</string>
+    <string name="step_aa_dev_short">Android Auto 开发者模式</string>
+
+    <string name="step_aa_unknown_title">允许安装未知来源的应用</string>
+    <string-array name="step_aa_unknown_list">
+        <item>点按“打开 Android Auto”</item>
+        <item>点按 ⋮，选择“开发者设置”</item>
+        <item>向下滑动到“未知来源”</item>
+        <item>勾选该选项</item>
+    </string-array>
+    <string name="step_aa_unknown_hint">否则，Android Auto 不会显示不是从 Google Play 安装的应用。</string>
+    <string name="step_aa_unknown_primary">打开 Android Auto</string>
+    <string name="step_aa_unknown_short">未知来源</string>
+
+    <string name="step_autostart_title">启动车机服务</string>
+    <string-array name="step_autostart_list">
+        <item>点按“打开 Android Auto”</item>
+        <item>点按右上角的 ⋮</item>
+        <item>选择“启动车机服务”</item>
+    </string-array>
+    <string name="step_autostart_hint">只需开启一次：车机服务会在后台持续运行，Headswap 不会将其关闭。如果 Android 自行将其关闭，请在 Android Auto 设置中重新开启。现在已不再通过无障碍功能自动启动，因此车机服务需要手动启动。</string>
+    <string name="step_autostart_primary">打开 Android Auto</string>
+    <string name="step_autostart_short">车机服务</string>
+
+    <string name="step_notif_title">开启通知</string>
+    <string-array name="step_notif_list">
+        <item>点按屏幕底部的“允许”</item>
+        <item>在 Android 弹出的“允许 Headswap 向您发送通知吗？”窗口中点按“允许”</item>
+    </string-array>
+    <string name="step_notif_hint">通知栏会显示连接情况，熄屏时 Android 也不会清理 Headswap。</string>
+    <string name="step_notif_hint_launcher">Headswap 的激活码直接在通知中输入。通知栏还会显示与车机的连接情况。</string>
+    <string name="step_notif_short">通知</string>
+
+    <!-- 第 3-4 项（自启动）仅在小米手机上显示 -->
+    <string name="step_background_title">解除电池限制</string>
+    <string-array name="step_background_list">
+        <item>点按“解除电池限制”</item>
+        <item>选择“无限制”</item>
+        <item>返回并点按“自启动”</item>
+        <item>找到 Headswap 并打开开关</item>
+    </string-array>
+    <string name="step_background_primary">解除电池限制</string>
+    <string name="step_background_extra">自启动</string>
+    <string name="step_background_short">后台运行</string>
+
+    <string name="step_mic_title">允许使用麦克风</string>
+    <string-array name="step_mic_list">
+        <item>点按屏幕底部的“允许”</item>
+        <item>点按“仅在使用该应用时允许”</item>
+    </string-array>
+    <string name="step_mic_hint">用于唤起语音助手。</string>
+    <string name="step_mic_short">麦克风</string>
+
+    <string name="step_bluetooth_title">开启蓝牙</string>
+    <string-array name="step_bluetooth_list">
+        <item>点按“打开蓝牙”</item>
+        <item>开启蓝牙</item>
+        <item>连接车机</item>
+    </string-array>
+    <string name="step_bluetooth_hint">通话需要用到：在 Android Auto 中，通话只能通过蓝牙进行。</string>
+    <string name="step_bluetooth_primary">打开蓝牙</string>
+    <string name="step_bluetooth_short">用于通话的蓝牙</string>
+
+    <string name="step_location_title">开启位置信息</string>
+    <string-array name="step_location_list">
+        <item>点按“打开位置信息设置”</item>
+        <item>打开“使用位置信息”开关</item>
+    </string-array>
+    <string name="step_location_hint">否则 Android Auto 中的 Google 地图和其他地图应用会提示“需要位置信息权限”。</string>
+    <string name="step_location_primary">打开位置信息设置</string>
+    <string name="step_location_short">地图所需的位置信息</string>
+
+    <string name="step_first_title">首次连接时</string>
+    <string-array name="step_first_list">
+        <item>解锁手机，并将数据线插入车机</item>
+        <item>勾选“默认情况下用于该 USB 配件”</item>
+        <item>点按“确定”</item>
+    </string-array>
+    <string name="step_first_hint">如果车机显示“启动CarLife”界面，请点按该按钮。</string>
+    <string name="step_first_primary">知道了</string>
+    <string name="step_first_short">首次连接</string>
+
+    <string name="onb_already_done">已完成</string>
+    <string name="onb_skip">跳过</string>
+    <string name="onb_allow">允许</string>
+    <string name="onb_later">稍后</string>
+    <string name="onb_back">返回</string>
+    <string name="onb_next">下一步</string>
+    <string name="onb_got_it">知道了</string>
+    <string name="onb_step_progress">第 %1$d 步，共 %2$d 步</string>
+    <string name="onb_done_chip">已完成</string>
+
+    <string name="onb_checklist_title">就绪检查</string>
+    <string name="onb_all_ready">出行所需的一切均已就绪</string>
+    <string name="onb_ready_count">已就绪 %1$d / %2$d</string>
+    <string name="onb_checklist_hint">点按某一项可打开对应步骤。</string>
+    <string name="onb_done">完成</string>
+    <string name="onb_status_marked">已标记</string>
+    <string name="onb_status_ready">已就绪</string>
+    <string name="onb_status_unmarked">未标记</string>
+    <string name="onb_status_off">未开启</string>
+    <string name="step_car_title">您的车是什么型号？</string>
+    <string name="step_car_short">车型</string>
+    <string name="step_car_body">我们会填入社区在这款车上验证过的设置。有经验的用户可以跳过此步骤。</string>
+
+    <!-- 模式选择与“自带桌面”流程（OnboardingMode.dc.html） -->
+    <string name="step_mode_title">选择模式</string>
+    <string name="step_mode_subtitle">选择在车机上显示的内容。您随时可以在“设置”中更改。</string>
+    <string name="step_mode_aa_body">标准 AA：使用 Android Auto 的地图、音乐和通话，通过其车机服务运行。</string>
+    <string name="step_mode_own_body">车机显示 Headswap 桌面，或手机上的车机桌面应用。</string>
+    <string name="step_mode_warn_title">注意</string>
+    <string name="step_mode_warn_body">此模式需要开启 Android 开发者模式，并通过“无线调试”激活 Headswap。</string>
+    <string name="step_mode_warn_risk">这些设置存在风险，开启后请自行承担后果。</string>
+    <string name="step_mode_primary">下一步</string>
+    <string name="step_mode_short">模式</string>
+
+    <string name="step_devmode_title">开启开发者模式</string>
+    <string-array name="step_devmode_list">
+        <item>点按“打开设置”，将打开“关于手机”</item>
+        <item>连续点按“版本号”7 次，直到出现“您已处于开发者模式”</item>
+        <item>如果手机要求，请输入锁屏密码</item>
+    </string-array>
+    <string name="step_devmode_hint">开发者模式仅用于“无线调试”。如果已经开启，请点按“已完成”。</string>
+    <string name="step_devmode_primary">打开设置</string>
+    <string name="step_devmode_short">开发者模式</string>
+
+    <!-- 激活步骤的列表项和提示；标题、按钮和状态来自 PhoneActivationBlock -->
+    <string-array name="step_activate_list">
+        <item>点按“激活”，将打开“开发者选项”（小米手机：更多设置 → 开发者选项）</item>
+        <item>打开“无线调试”，然后点按“使用配对码配对设备”</item>
+        <item>在 Headswap 的通知中输入显示的配对码</item>
+    </string-array>
+    <string name="step_activate_hint">手机重启后激活会失效。Headswap 会提示您重新激活，只需半分钟。</string>
+    <string name="step_activate_short">Headswap 激活</string>
+</resources>

@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- update/Updater.kt: 设置、主屏幕横幅、对话框 -->
+    <string name="upd_title">更新</string>
+    <string name="upd_check_title">检查更新</string>
+    <string name="upd_check_sub">打开应用时在 GitHub 上查找新版本</string>
+    <string name="upd_status_never">尚未检查</string>
+    <string name="upd_status_latest">已是最新版本</string>
+    <string name="upd_status_checking">正在检查…</string>
+    <string name="upd_status_available">有新版本 %1$s</string>
+    <string name="upd_status_downloading">正在下载 %1$s… %2$d%%</string>
+    <string name="upd_status_installing">正在打开安装程序…</string>
+    <string name="upd_btn_check">检查并更新</string>
+    <string name="upd_btn_update">更新</string>
+    <string name="upd_btn_update_now">立即更新</string>
+    <string name="upd_banner_sub">点按即可更新，设置会保留</string>
+    <string name="upd_later">稍后</string>
+
+    <string name="upd_dialog_title">Headswap %1$s</string>
+    <string name="upd_dialog_size">下载大小：%1$s。更新将覆盖安装当前版本，设置会保留。</string>
+    <string name="upd_dialog_no_size">更新将覆盖安装当前版本，设置会保留。</string>
+    <string name="upd_dialog_bridge">车机当前已连接：更新会中断连接。</string>
+    <string name="upd_unknown_title">允许安装更新</string>
+    <string name="upd_unknown_message">即将打开 Android 设置：请为 Headswap 开启“允许来自此来源的应用”，然后返回并再次点按“更新”。</string>
+
+    <string name="upd_err_check">无法检查更新：%1$s</string>
+    <string name="upd_err_download">无法下载更新：%1$s</string>
+    <string name="upd_err_install">无法安装更新：%1$s</string>
+    <string name="upd_err_no_release">GitHub 上尚无发布版本</string>
+    <string name="upd_err_no_apk">发布版本 %1$s 中没有 APK</string>
+    <string name="upd_err_incomplete">文件未完整下载</string>
+    <string name="upd_err_checksum">校验和不匹配</string>
+    <string name="upd_err_not_apk">该文件不是 Headswap 的 APK</string>
+    <string name="upd_err_not_newer">GitHub 上的版本（%1$s）不比已安装的版本（%2$s）新</string>
+    <string name="upd_err_conflict">与已安装的应用冲突（可能签名密钥不同？）</string>
+</resources>
