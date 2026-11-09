@@ -150,8 +150,14 @@ fun LauncherSettingsScreen() {
                             ThemeCard(d, cell(0).fillMaxWidth())
                             Placed(1) { ColorsLinkCard(d, Modifier) }
                             RailSizeCard(d, cell(2, 2).fillMaxWidth())
-                            SwitchCard(stringResource(R.string.l_s_anim), model.animations, d, cell(4).fillMaxWidth()) {
-                                model.chooseAnimations(it)
+                            // ряд 4 пополам: анимации | заряд телефона в строке статуса (свободных рядов нет)
+                            Row(cell(4).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(m.dp(d.gap))) {
+                                SwitchCard(stringResource(R.string.l_s_anim), model.animations, d, Modifier.weight(1f).fillMaxHeight()) {
+                                    model.chooseAnimations(it)
+                                }
+                                SwitchCard(stringResource(R.string.l_s_battery), model.showBattery, d, Modifier.weight(1f).fillMaxHeight()) {
+                                    model.chooseShowBattery(it)
+                                }
                             }
                         }
                         SettingsPage.COLORS -> {
@@ -621,7 +627,8 @@ private fun SwitchCard(label: String, on: Boolean, d: SettingsDims, modifier: Mo
     Card(modifier) {
         Row(Modifier.fillMaxSize().padding(start = m.dp(d.padStart), end = m.dp(8)), verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(m.dp(s.g))) {
-            if (sub == null) Txt(label, s.f2, Modifier.weight(1f), ellipsis = false)
+            // два переключателя в половинной ширине: длинная подпись переносится, а не обрезается
+            if (sub == null) Txt(label, s.f2, Modifier.weight(1f), maxLines = 2, ellipsis = false)
             else Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(m.dp(4))) {
                 Txt(label, s.f2, ellipsis = false)
                 Txt(sub, d.sub, color = Pal.SEC, ellipsis = true)

@@ -298,13 +298,13 @@ fun StatusBar(title: String? = null, showNet: Boolean = true) {
         if (title != null) Box(Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
             Txt(title, s.statusFs, Modifier.busy { titleX = it }, color = Pal.TEXT, weight = FontWeight.SemiBold)
         }
-        Ltr { Box(Modifier.busy { iconsX = it }) { StatusIcons(st, showNet) } }
+        Ltr { Box(Modifier.busy { iconsX = it }) { StatusIcons(st, showNet, model.showBattery) } }
     }
 }
 
-/** Дата, Bluetooth, Wi-Fi, сеть и громкость: порядок слева направо при любом языке ([Ltr] снаружи, чтобы ряд создался в нём). */
+/** Дата, Bluetooth, Wi-Fi, сеть, громкость и заряд телефона: порядок слева направо при любом языке ([Ltr] снаружи, чтобы ряд создался в нём). */
 @Composable
-private fun StatusIcons(st: StatusInfo, showNet: Boolean) {
+private fun StatusIcons(st: StatusInfo, showNet: Boolean, showBattery: Boolean) {
     val m = LocalMetrics.current
     val s = m.spec
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(m.dp(s.g))) {
@@ -319,6 +319,12 @@ private fun StatusIcons(st: StatusInfo, showNet: Boolean) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(m.dp(s.g4))) {
             SvgIcon(Ico.VOLUME, s.statusFs, Pal.SEC2)
             Txt(st.volume.toString(), s.statusFs, color = Pal.SEC2)
+        }
+        // заряд телефона в конце ряда; молния - на зарядке. Нет данных или выключено в «Вид» - ничего не рисуем
+        if (showBattery && st.battery >= 0) Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(m.dp(s.g4))) {
+            if (st.charging) VectorIcon(VIco.BOLT, 24f, s.statusFs, Pal.SEC2)
+            VectorIcon(VIco.battery(st.battery), 24f, s.statusFs, Pal.SEC2)
+            Txt("${st.battery}%", s.statusFs, color = Pal.SEC2)
         }
     }
 }

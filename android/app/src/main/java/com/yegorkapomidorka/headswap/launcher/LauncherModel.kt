@@ -56,6 +56,8 @@ internal object LauncherModel {
     var railSize by mutableStateOf(RailSize.NORMAL)
     var mapLeft by mutableStateOf(false)
     var animations by mutableStateOf(true)
+    /** Заряд телефона в строке статуса ([LauncherPrefs.showBattery]). */
+    var showBattery by mutableStateOf(true)
     var autoplay by mutableStateOf(true)
     /** «Уведомления» телефона на экране ГУ (слушатель - [NotificationsRepo]). */
     var notifications by mutableStateOf(true)
@@ -178,6 +180,7 @@ internal object LauncherModel {
         railSize = prefs.railSize
         mapLeft = prefs.mapLeft
         animations = prefs.animations
+        showBattery = prefs.showBattery
         autoplay = prefs.autoplay
         notifications = prefs.notifications
         NotificationsRepo.setEnabled(notifications)
@@ -259,6 +262,7 @@ internal object LauncherModel {
     fun chooseRailSize(value: RailSize) { railSize = value; prefs.railSize = value }
     fun chooseMapLeft(left: Boolean) { mapLeft = left; prefs.mapLeft = left }
     fun chooseAnimations(on: Boolean) { animations = on; prefs.animations = on }
+    fun chooseShowBattery(on: Boolean) { showBattery = on; prefs.showBattery = on }
     fun chooseAutoplay(on: Boolean) { autoplay = on; prefs.autoplay = on }
     /** Из «Для разработчиков» на телефоне: лаунчер мог ещё не стартовать, поэтому префы — своим экземпляром. */
     fun chooseHideStatusBar(ctx: Context, on: Boolean) { hideStatusBar = on; LauncherPrefs(ctx.applicationContext).hideStatusBar = on }

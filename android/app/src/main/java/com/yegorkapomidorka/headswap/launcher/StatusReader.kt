@@ -20,6 +20,8 @@ data class StatusInfo(
     /** Уровень сотового сигнала 0..4 для столбиков в рейке; -1 - не сотовая сеть или уровень неизвестен. */
     val signal: Int = -1,
     val bluetooth: Boolean = false, val wifi: Boolean = false, val volume: Int = 0,
+    /** Заряд самого телефона 0..100; -1 - неизвестен (значок не рисуем). */
+    val battery: Int = -1, val charging: Boolean = false,
 )
 
 internal object StatusReader {
@@ -27,17 +29,22 @@ internal object StatusReader {
     private val timeFormat = DateTimeFormatter.ofPattern("HH:mm", Locale.ROOT)
     private val dateFormat = DateTimeFormatter.ofPattern("dd.MM", Locale.ROOT)
 
-    fun read(ctx: Context, now: LocalDateTime = LocalDateTime.now()): StatusInfo = StatusInfo(
-        time = now.format(timeFormat),
-        date = weekday(now.dayOfWeek, appLocale(ctx)) + " " + now.format(dateFormat),
-        net = network(ctx),
-        signal = signal(ctx),
-        bluetooth = runCatching { ctx.getSystemService(BluetoothManager::class.java)?.adapter?.isEnabled == true }
-            .getOrDefault(false),
-        wifi = runCatching { ctx.getSystemService(WifiManager::class.java)?.isWifiEnabled == true }.getOrDefault(false),
-        volume = runCatching { ctx.getSystemService(AudioManager::class.java)?.getStreamVolume(AudioManager.STREAM_MUSIC) ?: 0 }
-            .getOrDefault(0),
-    )
+    fun read(ctx: Context, now: LocalDateTime = LocalDateTime.now()): StatusInfo {
+        val battery = BatteryLogic.read(ctx)
+        return StatusInfo(
+            time = now.format(timeFormat),
+            date = weekday(now.dayOfWeek, appLocale(ctx)) + " " + now.format(dateFormat),
+            net = network(ctx),
+            signal = signal(ctx),
+            bluetooth = runCatching { ctx.getSystemService(BluetoothManager::class.java)?.adapter?.isEnabled == true }
+                .getOrDefault(false),
+            wifi = runCatching { ctx.getSystemService(WifiManager::class.java)?.isWifiEnabled == true }.getOrDefault(false),
+            volume = runCatching { ctx.getSystemService(AudioManager::class.java)?.getStreamVolume(AudioManager.STREAM_MUSIC) ?: 0 }
+                .getOrDefault(0),
+            battery = battery.percent,
+            charging = battery.charging,
+        )
+    }
 
     /** Язык приложения: ctx здесь applicationContext, на Android 10-12 выбранный язык он знает только через [AppLocale.wrap]. */
     private fun appLocale(ctx: Context): Locale = AppLocale.wrap(ctx).resources.configuration.locales[0]
