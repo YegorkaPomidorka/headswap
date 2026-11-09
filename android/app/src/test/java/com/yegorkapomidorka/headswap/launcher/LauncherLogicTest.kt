@@ -275,7 +275,17 @@ class LauncherLogicTest {
         val local = PlayerChip.slots(all, "com.aimp", null, local = "com.aimp")
         assertEquals("com.aimp", local[0].pkg)
         assertTrue(local[0].selected)
-        assertEquals(listOf("com.aimp", "x"), PlayerChip.localPlayers(listOf(PlayerChip.YANDEX, "com.aimp", PlayerChip.VK, "x")))
+        // во второй слот можно закрепить любой плеер, не только онлайн-сервис
+        val aimp2 = PlayerChip.slots(all, null, PlayerChip.VK, fixedOnline = "com.aimp")[1]
+        assertEquals(PlayerChip.Slot(PlayerChip.Kind.APP, "com.aimp", false), aimp2)
+        // в первый - онлайн-сервис; второй тогда его не дублирует
+        val ya = PlayerChip.slots(all, null, PlayerChip.YANDEX, local = PlayerChip.YANDEX)
+        assertEquals(listOf(PlayerChip.YANDEX, PlayerChip.YT_MUSIC), ya.map { it.pkg })
+        assertEquals(PlayerChip.YT_MUSIC, PlayerChip.slots(all, null, null, local = PlayerChip.YANDEX, fixedOnline = PlayerChip.YANDEX)[1].pkg)
+        // списки настроек: найденные плееры плюс установленные онлайн; во втором онлайн первыми
+        val players = PlayerChip.allPlayers(listOf("com.aimp", PlayerChip.VK), setOf(PlayerChip.YANDEX, PlayerChip.VK))
+        assertEquals(listOf("com.aimp", PlayerChip.VK, PlayerChip.YANDEX), players)
+        assertEquals(listOf(PlayerChip.YANDEX, PlayerChip.VK, "com.aimp"), PlayerChip.secondSlotPlayers(players))
     }
 
     @Test fun lastOnlineChangesOnlyOnOnlinePlayers() {

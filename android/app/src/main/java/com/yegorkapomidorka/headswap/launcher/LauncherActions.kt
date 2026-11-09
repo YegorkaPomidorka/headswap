@@ -301,8 +301,8 @@ object LauncherActions {
     /** Выбранный плеер запоминается и становится текущим: играет сразу, если у него есть сессия или MediaBrowserService. */
     fun choosePlayer(pkg: String) {
         model.chooseMusicPlayer(pkg)
-        // свой плеер из списка всех плееров становится первым слотом чипа
-        if (pkg !in PlayerChip.ONLINE) model.chooseLocalPlayer(pkg)
+        // свой плеер из списка всех плееров становится первым слотом чипа; закреплённый во втором слоте остаётся там
+        if (pkg !in PlayerChip.ONLINE && pkg != model.onlinePlayer) model.chooseLocalPlayer(pkg)
         MusicController.startPlayer(model.context, pkg) // главный поток: MediaBrowser создаёт Handler, connect асинхронный
         home()
     }

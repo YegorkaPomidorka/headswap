@@ -178,12 +178,13 @@ private fun PlayerChipColumn(modifier: Modifier) {
         for (slot in slots) {
             val fg = Pal.WHITE.copy(alpha = if (slot.selected) 0.9f else 0.55f)
             val bg = if (slot.selected) accent.copy(alpha = 0.32f) else Color.Transparent
-            val desc = stringResource(when (slot.kind) {
-                PlayerChip.Kind.PHONE -> R.string.l_player_mine
-                PlayerChip.Kind.YANDEX -> R.string.l_player_yandex
-                PlayerChip.Kind.YT_MUSIC -> R.string.l_player_ytm
-                PlayerChip.Kind.VK -> R.string.l_player_vk
-            })
+            val desc = when (slot.kind) {
+                PlayerChip.Kind.PHONE -> stringResource(R.string.l_player_mine)
+                PlayerChip.Kind.YANDEX -> stringResource(R.string.l_player_yandex)
+                PlayerChip.Kind.YT_MUSIC -> stringResource(R.string.l_player_ytm)
+                PlayerChip.Kind.VK -> stringResource(R.string.l_player_vk)
+                PlayerChip.Kind.APP -> LauncherModel.packageLabel(slot.pkg!!)
+            }
             RoundButton(
                 s.pcB, desc, background = bg,
                 onTap = { if (slot.pkg == null) LauncherActions.choosePhonePlayer() else LauncherActions.choosePlayer(slot.pkg) },
@@ -195,7 +196,7 @@ private fun PlayerChipColumn(modifier: Modifier) {
                 if (icon != null) {
                     Image(icon, null, Modifier.size(m.dp(s.pcApp)).clip(CircleShape).alpha(if (slot.selected) 1f else 0.55f))
                 } else when (slot.kind) {
-                    PlayerChip.Kind.PHONE -> SvgIcon(Ico.MUSIC, s.pcIc, fg, stroke = 2.4f)
+                    PlayerChip.Kind.PHONE, PlayerChip.Kind.APP -> SvgIcon(Ico.MUSIC, s.pcIc, fg, stroke = 2.4f)
                     PlayerChip.Kind.YANDEX -> Txt("Я", s.pcIc, color = fg, weight = FontWeight.Bold)
                     PlayerChip.Kind.YT_MUSIC -> VectorIcon(VIco.YT_MUSIC, 24f, s.pcIc, fg)
                     PlayerChip.Kind.VK -> Txt("VK", s.pcVk, color = fg, weight = FontWeight.Bold)
