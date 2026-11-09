@@ -243,7 +243,7 @@ object FullscreenApp {
 /**
  * Чип плееров на карточке музыки: два слота - свой плеер телефона (любая активная сессия) и последний онлайн-плеер
  * (Я.Музыка, YouTube Music, VK Музыка - что слушали последним, иначе первый установленный). Остальные медиаприложения -
- * долгий тап по «ноте» (список плееров).
+ * долгий тап по «ноте» (список плееров). В настройках в оба слота можно закрепить любой плеер телефона (жалобы юзеров 09.11).
  */
 object PlayerChip {
     const val YANDEX = "ru.yandex.music"
@@ -252,13 +252,15 @@ object PlayerChip {
     /** Онлайн-плееры второго слота; порядок - выбор по умолчанию, пока ничего не слушали. */
     val ONLINE = listOf(YANDEX, YT_MUSIC, VK)
 
-    enum class Kind { PHONE, YANDEX, YT_MUSIC, VK }
+    /** APP - любой другой плеер, закреплённый во втором слоте: подпись и иконка - самого приложения. */
+    enum class Kind { PHONE, YANDEX, YT_MUSIC, VK, APP }
     data class Slot(val kind: Kind, val pkg: String?, val selected: Boolean)
 
     private fun kindOf(pkg: String): Kind = when (pkg) {
         YANDEX -> Kind.YANDEX
         YT_MUSIC -> Kind.YT_MUSIC
-        else -> Kind.VK
+        VK -> Kind.VK
+        else -> Kind.APP
     }
 
     /**
@@ -268,17 +270,26 @@ object PlayerChip {
     fun slots(installed: Set<String>, chosen: String?, lastOnline: String?, local: String? = null, fixedOnline: String? = null): List<Slot> =
         buildList {
             add(Slot(Kind.PHONE, local, chosen == null || (local != null && chosen == local)))
-            val online = onlineSlot(installed, lastOnline, fixedOnline)
+            val online = onlineSlot(installed, lastOnline, fixedOnline, exclude = local)
             if (online != null) add(Slot(kindOf(online), online, chosen == online))
         }
 
-    /** Пакет второго слота: закреплённый в настройках, иначе последний услышанный, иначе первый установленный. */
-    fun onlineSlot(installed: Set<String>, lastOnline: String?, fixedOnline: String?): String? =
-        fixedOnline?.takeIf { it in installed && it in ONLINE }
-            ?: lastOnline?.takeIf { it in installed && it in ONLINE } ?: ONLINE.firstOrNull { it in installed }
+    /**
+     * Пакет второго слота: закреплённый в настройках (любой плеер), иначе последний услышанный онлайн, иначе первый
+     * установленный. [exclude] - плеер первого слота: второй его не дублирует.
+     */
+    fun onlineSlot(installed: Set<String>, lastOnline: String?, fixedOnline: String?, exclude: String? = null): String? {
+        fun ok(pkg: String?) = pkg != null && pkg in installed && pkg != exclude
+        return fixedOnline?.takeIf(::ok) ?: lastOnline?.takeIf { ok(it) && it in ONLINE } ?: ONLINE.firstOrNull(::ok)
+    }
 
-    /** Свои плееры для первого слота: всё найденное на телефоне, кроме онлайн-сервисов второго. */
-    fun localPlayers(players: List<String>): List<String> = players.filter { it !in ONLINE }
+    /** Плееры для слотов в настройках: всё найденное на телефоне плюс установленные онлайн-сервисы, без повторов. */
+    fun allPlayers(found: List<String>, installed: Set<String>): List<String> =
+        (found + ONLINE.filter { it in installed }).distinct()
+
+    /** Список второго слота: онлайн-сервисы первыми (это его основное назначение), за ними остальные плееры. */
+    fun secondSlotPlayers(players: List<String>): List<String> =
+        ONLINE.filter { it in players } + players.filter { it !in ONLINE }
 
     /** Последний онлайн-плеер после того, как выбрали или услышали [pkg]: меняется, только если это онлайн-плеер. */
     fun lastOnline(previous: String?, pkg: String?): String? = pkg?.takeIf { it in ONLINE } ?: previous

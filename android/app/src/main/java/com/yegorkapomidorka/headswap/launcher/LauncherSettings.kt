@@ -195,15 +195,17 @@ fun LauncherSettingsScreen() {
                             }
                         }
                         SettingsPage.MUSIC -> {
-                            val players by produceState(emptyList<String>()) {
-                                value = withContext(Dispatchers.IO) { PlayerChip.localPlayers(MusicController.players(model.context)) }
+                            // в оба слота - любой плеер телефона, онлайн-сервисы тоже (жалобы юзеров 09.11)
+                            val found by produceState(emptyList<String>()) {
+                                value = withContext(Dispatchers.IO) { MusicController.players(model.context) }
                             }
+                            val players = PlayerChip.allPlayers(found, model.installedPackages)
                             val local = model.localPlayer?.takeIf { it in players } ?: players.firstOrNull()
                             PlayersCard(stringResource(R.string.l_s_slot1), players.map { PlayerOpt.App(it) },
                                 local?.let { PlayerOpt.App(it) }, d, cell(0).fillMaxWidth()) { model.chooseLocalPlayer((it as PlayerOpt.App).pkg) }
-                            val online = PlayerChip.ONLINE.filter { it in model.installedPackages }
-                            PlayersCard(stringResource(R.string.l_s_slot2), listOf(PlayerOpt.Last) + online.map { PlayerOpt.App(it) },
-                                model.onlinePlayer?.takeIf { it in online }?.let { PlayerOpt.App(it) } ?: PlayerOpt.Last, d, cell(1).fillMaxWidth()) {
+                            val second = PlayerChip.secondSlotPlayers(players)
+                            PlayersCard(stringResource(R.string.l_s_slot2), listOf(PlayerOpt.Last) + second.map { PlayerOpt.App(it) },
+                                model.onlinePlayer?.takeIf { it in second }?.let { PlayerOpt.App(it) } ?: PlayerOpt.Last, d, cell(1).fillMaxWidth()) {
                                 model.chooseOnlinePlayer((it as? PlayerOpt.App)?.pkg)
                             }
                             SwitchCard(stringResource(R.string.l_s_autoplay), model.autoplay, d, cell(2).fillMaxWidth()) {
