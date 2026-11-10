@@ -213,11 +213,13 @@ internal object LauncherModel {
             val pm = appCtx.packageManager
             val query = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER)
             val found = runCatching {
+                // выключенные компоненты запрос и так не вернёт; ActivityInfo.enabled - значение из манифеста, у
+                // activity-alias, включённого на ходу (сменённая иконка Телеграма), там false
                 pm.queryIntentActivities(query, 0).mapNotNull { info ->
                     val a = info.activityInfo ?: return@mapNotNull null
                     DesktopAppCatalog.Entry(a.packageName, a.name,
                         runCatching { info.loadLabel(pm).toString() }.getOrDefault(a.packageName),
-                        enabled = a.enabled && a.applicationInfo.enabled, exported = a.exported)
+                        enabled = a.applicationInfo.enabled, exported = a.exported)
                 }
             }.getOrElse { AppLog.i("Launcher catalog: ${it.javaClass.simpleName}", false); emptyList() }
             val selected = DesktopAppCatalog.select(found, appCtx.packageName)
