@@ -9,6 +9,7 @@ data class CarSettings(
     val aaDensity: Int = AaDensity.AUTO,
     val fps: FpsSetting = FpsSetting.DEFAULT,
     val musicRate: MusicRate = MusicRate.DEFAULT,
+    val desktopFps: FpsSetting = FpsSetting.FPS30,
 )
 
 /** Корейские ГУ слабые: на 30 кадрах и 48 кГц рвут USB, советуем 32 кГц (h139, h218, h260); кадры «Авто» как у всех. */
@@ -18,7 +19,8 @@ private val KOREAN = CarSettings(musicRate = MusicRate.HZ32)
  * Подтверждённые машины (README, «Совместимость») и проверенные сообществом настройки для каждой.
  * Выбор машины разом пишет [settings] в AaPrefs, дальше любую настройку можно поменять вручную.
  * Всем машинам одинаково: прямой проброс и кадры «Авто» (по умолчанию 1280×720, у машин с особым экраном - своё разрешение), музыка «Авто»; отдельные значения только проверенные живьём.
- * Исключения - Elantra 7: перекодирование и 15 кадров; Tucson NX4c: перекодирование (вертикальный кадр с полями по обеим осям).
+ * Исключения - Elantra 7: перекодирование и 15 кадров; CR-V 2026/Hybrid: перекодирование и 30 кадров (h72, логи 05–10.11);
+ * Tucson NX4c: перекодирование (вертикальный кадр с полями по обеим осям).
  * Особенности ГУ, которые мост определяет сам (Hyundai CN7 - музыка 32 кГц в «Авто», VW ID - потолок битрейта), здесь не дублируются.
  * Имя элемента хранится в prefs: не переименовывать.
  */
@@ -31,9 +33,14 @@ enum class CarPreset(val titleRes: Int, val settings: CarSettings = CarSettings(
     HONDA_BREEZE_2(R.string.car_honda_breeze_2),
     /** h243: 1920×1080, «работает достойно». */
     HONDA_CRV_6(R.string.car_honda_crv_6, CarSettings(videoMode = VideoMode.R1080)),
-    /** SEMIDRIVE X9, экран 1920×720; на кадрах «Авто» полосы и мерцание (h72). */
-    HONDA_CRV_2026(R.string.car_honda_crv_2026, CarSettings(videoMode = VideoMode.WIDE_HD)),
-    HONDA_CRV_2026_HYBRID(R.string.car_honda_crv_2026_hybrid, CarSettings(videoMode = VideoMode.WIDE_HD)),
+    /**
+     * SEMIDRIVE X9, экран 1920×720; на кадрах «Авто» полосы и мерцание (h72). По логам 05–10.11:
+     * 8 Мбит/с на Wi-Fi и own IDR в passthrough дают мерцание, transcode + 30 стабилен.
+     */
+    HONDA_CRV_2026(R.string.car_honda_crv_2026, CarSettings(
+        transcode = true, videoMode = VideoMode.WIDE_HD, fps = FpsSetting.FPS30, desktopFps = FpsSetting.FPS30)),
+    HONDA_CRV_2026_HYBRID(R.string.car_honda_crv_2026_hybrid, CarSettings(
+        transcode = true, videoMode = VideoMode.WIDE_HD, fps = FpsSetting.FPS30, desktopFps = FpsSetting.FPS30)),
     /** Машина Егора: 1920×1080, 30 кадров. */
     HONDA_VEZEL_2022(R.string.car_honda_vezel_2022, CarSettings(videoMode = VideoMode.R1080)),
     /** ГУ CN7: прямой проброс моргает и гаснет (h638), канал слабый - перекодирование 1280×480 на 15 кадрах. */

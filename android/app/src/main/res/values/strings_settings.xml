@@ -45,7 +45,10 @@
     <string name="set_direct_desc">Android Auto video goes to the head unit as is. Wide screens are cropped by the head unit itself.</string>
     <string name="set_direct_plus">+ Lower latency, heat and battery drain</string>
     <string name="set_direct_minus">− Frame rate is not adjustable</string>
-    <string name="set_direct_desktop_desc">In Own launcher mode the phone encodes its own screen once and hands the head unit a ready H.264 stream, no transcoding.</string>
+    <string name="set_direct_desktop_desc">In Own launcher mode the phone captures the desktop and encodes it once; this is not Android Auto transcoding.</string>
+    <string name="set_desktop_single_encode_title">Single screen encode</string>
+    <string name="set_desktop_fps_title">Desktop frame rate</string>
+    <string name="set_desktop_fps_note">Applies on the next connection. Auto picks 30 fps unless the head unit asks for less.</string>
 
     <string name="set_resolution">Video resolution</string>
     <string name="set_res_pick">Choose resolution</string>

@@ -8,7 +8,7 @@ import org.junit.Test
 class DesktopVideoQualityTest {
     @Test
     fun fastUsbKeepsEightMegabitsWithoutChangingLegacy720() {
-        val policy = DesktopVideoQuality.bitratePolicy(BitrateProfile.USB)
+        val policy = DesktopVideoQuality.bitratePolicy(BitrateProfile.USB, 8_000_000)
         assertEquals(8_000_000, policy.startBps)
         for (now in 0L..60_000L step 100) policy.update(now, 0.0, 2_000_000.0)
         assertEquals(8_000_000, policy.current)
@@ -19,7 +19,7 @@ class DesktopVideoQualityTest {
 
     @Test
     fun slowUsbStillReducesTheHigherTargetAndRecoversOnlyToItsCeiling() {
-        val policy = DesktopVideoQuality.bitratePolicy(BitrateProfile.USB)
+        val policy = DesktopVideoQuality.bitratePolicy(BitrateProfile.USB, 8_000_000)
         val drain = 210.0 * 1024
         var queued = 0.0
         for (now in 0L..30_000L step 100) {
@@ -38,7 +38,7 @@ class DesktopVideoQualityTest {
 
     @Test
     fun knownHuAndThermalCapsRemainAuthoritative() {
-        val policy = DesktopVideoQuality.bitratePolicy(BitrateProfile.USB)
+        val policy = DesktopVideoQuality.bitratePolicy(BitrateProfile.USB, 8_000_000)
         policy.lowerCeiling(1_500_000)
         policy.setThermalCap(1_000_000)
         for (now in 0L..60_000L step 100) policy.update(now, 0.0, 2_000_000.0)
@@ -48,9 +48,18 @@ class DesktopVideoQualityTest {
         assertEquals(1_500_000, policy.current)
         assertEquals(1_500_000, policy.ceilingBps)
     }
+    @Test fun desktopWifiStartsAtSixAndNeverClimbsToEight() {
+        val policy = DesktopVideoQuality.bitratePolicy(BitrateProfile.WIFI, 6_000_000)
+        assertEquals(6_000_000, policy.startBps)
+        assertEquals(6_000_000, policy.current)
+        for (now in 0L..180_000L step 100) policy.update(now, 0.0, 2_000_000.0)
+        assertEquals(6_000_000, policy.current)
+        assertEquals(6_000_000, policy.ceilingBps)
+    }
+
     @Test fun sixtyFpsSurvivesSelectionWhileAutoAndKnownHuCapsRemainExplicit() {
         assertEquals(60, DesktopVideoQuality.chooseFps(FpsSetting.FPS60, 30))
-        assertEquals(60, DesktopVideoQuality.chooseFps(FpsSetting.AUTO, 60))
+        assertEquals(30, DesktopVideoQuality.chooseFps(FpsSetting.AUTO, 60))
         assertEquals(30, DesktopVideoQuality.chooseFps(FpsSetting.AUTO, 30))
         assertEquals(30, DesktopVideoQuality.chooseFps(FpsSetting.AUTO, 120))
         assertEquals(30, DesktopVideoQuality.chooseFps(FpsSetting.AUTO, 0))

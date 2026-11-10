@@ -45,7 +45,10 @@
     <string name="set_direct_desc">Видео АА уходит в ГУ как есть. Широкие экраны ГУ обрезает сама, без телефона.</string>
     <string name="set_direct_plus">+ Меньше задержка, нагрев и расход батареи</string>
     <string name="set_direct_minus">− Частота кадров не регулируется</string>
-    <string name="set_direct_desktop_desc">В режиме «Свой лаунчер» телефон сам кодирует свой экран один раз и отдаёт ГУ готовый поток H.264, без перекодирования.</string>
+    <string name="set_direct_desktop_desc">В режиме «Свой лаунчер» телефон захватывает рабочий стол и кодирует его один раз; это не перекодирование Android Auto.</string>
+    <string name="set_desktop_single_encode_title">Одно кодирование экрана</string>
+    <string name="set_desktop_fps_title">Частота кадров рабочего стола</string>
+    <string name="set_desktop_fps_note">Применится при следующем подключении. «Авто» выбирает 30 fps, если ГУ не просит меньше.</string>
 
     <string name="set_resolution">Разрешение видео</string>
     <string name="set_res_pick">Выбрать разрешение</string>

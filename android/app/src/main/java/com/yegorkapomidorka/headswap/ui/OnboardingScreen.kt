@@ -17,6 +17,7 @@ import com.yegorkapomidorka.headswap.R
 import com.yegorkapomidorka.headswap.aa.AaPrefs
 import com.yegorkapomidorka.headswap.aa.BridgeMode
 import com.yegorkapomidorka.headswap.aa.CarPreset
+import com.yegorkapomidorka.headswap.dex.DexPrefs
 import com.yegorkapomidorka.headswap.dex.PhoneActivation
 
 /**
@@ -288,6 +289,7 @@ class OnboardingScreen(host: MainActivity, private val showAll: Boolean, startAt
         applyBtn.setOnClickListener {
             val p = carChoice ?: return@setOnClickListener
             aa.applyCar(p)
+            DexPrefs(c).desktopFps = p.settings.desktopFps
             AppLog.i("онбординг, мой автомобиль: ${p.name}, применены ${p.settings}")
             next()
         }

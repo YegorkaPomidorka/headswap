@@ -45,7 +45,10 @@
     <string name="set_direct_desc">La vidéo d\'Android Auto est envoyée telle quelle à l\'autoradio. Les écrans larges sont rognés par l\'autoradio lui-même.</string>
     <string name="set_direct_plus">+ Latence, échauffement et consommation de batterie réduits</string>
     <string name="set_direct_minus">− La fréquence d\'images n\'est pas réglable</string>
-    <string name="set_direct_desktop_desc">En mode « Lanceur intégré », le téléphone encode son écran une seule fois et fournit à l\'autoradio un flux H.264 prêt à l\'emploi, sans transcodage.</string>
+    <string name="set_direct_desktop_desc">En mode « Lanceur intégré », le téléphone capture le bureau et l’encode une seule fois ; ce n’est pas un transcodage Android Auto.</string>
+    <string name="set_desktop_single_encode_title">Encodage unique de l’écran</string>
+    <string name="set_desktop_fps_title">Fréquence d’images du bureau</string>
+    <string name="set_desktop_fps_note">S’applique à la prochaine connexion. « Auto » choisit 30 i/s sauf si l’autoradio demande moins.</string>
 
     <string name="set_resolution">Résolution vidéo</string>
     <string name="set_res_pick">Choisir la résolution</string>

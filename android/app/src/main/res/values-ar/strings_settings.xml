@@ -45,7 +45,10 @@
     <string name="set_direct_desc">يصل فيديو Android Auto إلى شاشة السيارة كما هو. وتقصّ الشاشة نفسها الشاشات العريضة.</string>
     <string name="set_direct_plus">+ تأخير وحرارة واستهلاك بطارية أقل</string>
     <string name="set_direct_minus">− معدل الإطارات غير قابل للتعديل</string>
-    <string name="set_direct_desktop_desc">في وضع «مشغّل خاص» يرمّز الهاتف شاشته مرة واحدة ويسلّم شاشة السيارة بثًا جاهزًا بصيغة H.264 دون إعادة ترميز.</string>
+    <string name="set_direct_desktop_desc">في وضع «مشغّل خاص» يلتقط الهاتف سطح المكتب ويرمّزه مرة واحدة؛ هذا ليس إعادة ترميز Android Auto.</string>
+    <string name="set_desktop_single_encode_title">ترميز الشاشة مرة واحدة</string>
+    <string name="set_desktop_fps_title">معدل إطارات سطح المكتب</string>
+    <string name="set_desktop_fps_note">يُطبق عند الاتصال التالي. يختار «تلقائي» 30 إطارًا/ث ما لم تطلب الشاشة أقل.</string>
 
     <string name="set_resolution">دقة الفيديو</string>
     <string name="set_res_pick">اختر الدقة</string>

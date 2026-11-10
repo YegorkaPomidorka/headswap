@@ -80,8 +80,12 @@ CONTROL0, SENSOR1, VIDEO2, INPUT3, SPEECH4, SYSTEM5, MEDIA6, MIC7, BT8, MEDIA_PL
 - *Перекодирование* (включается вручную, ADR 0004): `feedTranscoder` → `AaTranscoder` (декодер → `GlRelay` → энкодер,
   повтор кадра каждые 100 мс, нить `aa-trans-feed` через `FeedQueue` — ADR 0011) → `onEncoderFrame` → ГУ.
 - *Прямой проброс* (по умолчанию с 3.0, ADR 0018): `passthroughFrame`; поля режет `SpsCrop` правкой SPS; раз в 2 с свой IDR (`IdrSplice`, ADR 0005; выключается галкой для разработчиков `AaPrefs.ownIdr`).
+- *Свой IDR* (`IdrSplice`) перед отправкой смотрит `link.videoStats()`: при бэклоге > 200 мс или очереди > 10
+  кадров IDR откладывается; после трёх отказов `sendVideo` выключается до конца AA-сессии (ADR 0039).
 - В ГУ: `CarLifeSession.sendVideo` → `AnnexB.fixSps` → `sendVideoData`. Очередь переполнилась (>30 кадров или
   ~500 мс) — кадры выбрасываются до следующего IDR.
+- *Свой лаунчер*: телефон кодирует Surface один раз; потолок битрейта — `VideoGeometry.bitrate` (WIDE_HD 6,
+  R720 4, R1080 8 Мбит/с), а не жёсткие 8. На Wi-Fi старт с потолка и без подъёма выше старта (ADR 0039).
 - Где решается «проброс или перекодирование» — в четырёх местах: `AaPrefs.transcode`, `VideoGeometry.effective()`,
   `BridgeService.startSession` (режим не кропается — принудительно перекодирование), рантайм-флаги ГУ (Pioneer, Mobis).
 
@@ -204,6 +208,7 @@ CONTROL0, SENSOR1, VIDEO2, INPUT3, SPEECH4, SYSTEM5, MEDIA6, MIC7, BT8, MEDIA_PL
 | Я.Карты/Навигатор просят Плюс, или навигатор окном без подсказок | настройка «Подсказки на приборке» (prefs `nav_hints:<pkg>`, по умолчанию выкл у всех) → `CarAppHost.allowFor` в `EmbedHost.carTargetFor`; теневая AA - `NavigatorPick.shadowWanted`; ADR 0028 |
 | Android 17: экран ГУ гаснет с телефоном, в логе `группа=0`, `VDM хост завершился` | отладка по USB (`adb_enabled=0`), `VdmHostLink`/`VdmHostRestart`, строки `VDM` и `VDMHOST`; ADR 0033 |
 | Навигатор в хосте: голая карта, нет кнопок/списка | шаблон не разобран (`CarUi.Unknown`): `carapp/CarUiMapper.map`, `cmd car_dump` |
+| Мерцание яркости/контраста, «дышит» картинка | `BitratePolicy`/`DesktopVideoQuality` (8 Мбит/с на Wi-Fi), `IdrSplice` (очередь), ADR 0039; в логе `битрейт энкодера`, `бэклог`, `свой IDR ... не принят` |
 | Тач мимо / рывками | `VideoGeometry.mapTouch`, `TouchDecimator`, `TouchPacer` |
 
 Конкретные машины и прошлые разборы — база кейсов ГУ в памяти Claude (`memory/hu/INDEX.md`, вне репо: там данные
