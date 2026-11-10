@@ -164,6 +164,9 @@ class AaTranscoder(
             // декодер -> GL-реле -> Surface энкодера: реле перерисовывает последний кадр на статике (>= 10 fps)
             try {
                 relay = GlRelay(surface!!, width, height, REDRAW_IDLE_MS, log, srcWidth, srcHeight, crop, target, limitHighFps = directSurface).also { it.start() }
+                // VirtualDisplay/Compose рендерит в эту поверхность: просим композитор отдавать кадры
+                // в темпе target fps, как ровный поток декодера AA, а не 60 Гц с дроблением гейтом.
+                relay?.let { applyInputFrameRate(it, target) }
             } catch (e: Exception) {
                 if (directSurface) {
                     // Direct input depends on GL for pacing and idle redraw. Never silently
@@ -201,8 +204,27 @@ class AaTranscoder(
         val old = target
         target = fps
         val r = relay
-        if (r != null) r.setTargetFps(fps) else log("транскодер: без GL-реле частоту не ограничить, целевой fps $fps только в статистике")
+        if (r != null) {
+            r.setTargetFps(fps)
+            applyInputFrameRate(r, fps)
+        } else {
+            log("транскодер: без GL-реле частоту не ограничить, целевой fps $fps только в статистике")
+        }
         log("транскодер: целевой fps $old -> $fps")
+    }
+
+    /**
+     * Только desktop: сообщаем композитору темп источника для поверхности, в которую рендерит VirtualDisplay.
+     * Без этого поверхность живёт на 60 Гц, а гейт режет её до 30 fps с неровными интервалами.
+     * Ошибка не критична: вендорный композитор может не поддержать подсказку.
+     */
+    private fun applyInputFrameRate(r: GlRelay, fps: Int) {
+        if (!directSurface || fps <= 0 || Build.VERSION.SDK_INT < 30) return
+        runCatching {
+            r.inputSurface.setFrameRate(fps.toFloat(), Surface.FRAME_RATE_COMPATIBILITY_FIXED_SOURCE)
+        }.onFailure {
+            log("транскодер: setFrameRate($fps) на входе DeX не принят: ${it.javaClass.simpleName}: ${it.message}")
+        }
     }
 
     override val currentBitrate: Int get() = curBitrate
