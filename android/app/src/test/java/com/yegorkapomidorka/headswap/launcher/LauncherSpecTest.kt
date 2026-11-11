@@ -144,7 +144,7 @@ class LauncherSpecTest {
         assertTrue(LauncherSpecs.forSize(1280, 480).strip)
         assertFalse(LauncherSpecs.forSize(800, 480).strip)
         assertFalse(LauncherSpecs.forSize(1280, 640).strip)
-        assertEquals(313, LauncherSpecs.forSize(1280, 480).music)
+        assertEquals(278, LauncherSpecs.forSize(1280, 480).music) // 290/96 T при T 92: обложка по колонке настроек (08.11)
         assertEquals(92 * 5 - 21, LauncherSpecs.forSize(1280, 480).phone) // только для оверлея входящего
     }
 
