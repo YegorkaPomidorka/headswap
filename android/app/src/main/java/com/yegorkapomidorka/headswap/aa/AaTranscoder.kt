@@ -50,6 +50,8 @@ class AaTranscoder(
     private var encoder: MediaCodec? = null
     private var surface: Surface? = null
     private var relay: GlRelay? = null
+    private var dump: VideoDump? = null
+    private val desktopCbr = directSurface && !tuning.contains("vbr")
     private var lastRedraws = 0L
     private var lastGated = 0L
     @Volatile private var target = fps
@@ -118,8 +120,12 @@ class AaTranscoder(
                 encoderNote = when (level) {
                     BAIDU_WITH_LEVEL -> "baidu: baseline+level256+VBR+repeat100ms"
                     BAIDU_NO_LEVEL -> "baidu: baseline+VBR+repeat100ms, без level"
-                    0 -> "baseline+CBR+noB+repeat100ms+realtime"
-                    1 -> "baseline+CBR+noB+repeat100ms"
+                    0 -> if (desktopCbr || tuning.contains("cbr")) {
+                        "baseline+CBR+noB+repeat100ms+realtime"
+                    } else {
+                        "baseline+VBR+noB+repeat100ms+realtime"
+                    }
+                    1 -> if (desktopCbr || tuning.contains("cbr")) "baseline+CBR+noB+repeat100ms" else "baseline+VBR+noB+repeat100ms"
                     else -> "минимальный формат+repeat100ms"
                 }
                 configured = true
@@ -180,12 +186,23 @@ class AaTranscoder(
         }
         if (relay == null && !crop.isNone) log("транскодер: !!!!!! без GL-реле кроп невозможен, кадр AA будет сжат целиком")
         running = true
+        // Диагностика CR-V 2026: пишем ровно выход энкодера (Annex-B) и PTS, если включён маркер.
+        dump?.close()
+        dump = VideoDump.open(if (directSurface) "desktop" else "aa").also {
+            it?.event("start ${width}x$height fps=$fps bitrate=$bitrate encoder=$encoderName direct=$directSurface")
+        }
         encThread = Thread({ encodeLoop(c) }, "aa-trans-enc").also { it.start() }
         if (threaded) {
             queue.clear()
             feedThread = Thread({ feedLoop() }, "aa-trans-feed").also { it.start() }
         }
-        log("транскодер: энкодер $encoderName ${width}x$height (вход ${if (directSurface) "Surface DeX, одно кодирование" else "AA"} ${srcWidth}x$srcHeight${if (crop.isNone) "" else ", кроп $crop"}) ${fps}fps ${bitrate / 1000}kbps ($encoderNote)")
+        val modeNote = when (bitrateMode) {
+            MediaCodecInfo.EncoderCapabilities.BITRATE_MODE_CBR -> "CBR"
+            MediaCodecInfo.EncoderCapabilities.BITRATE_MODE_VBR -> "VBR"
+            MediaCodecInfo.EncoderCapabilities.BITRATE_MODE_CQ -> "CQ"
+            else -> "mode=$bitrateMode"
+        }
+        log("транскодер: энкодер $encoderName ${width}x$height (вход ${if (directSurface) "Surface DeX, одно кодирование" else "AA"} ${srcWidth}x$srcHeight${if (crop.isNone) "" else ", кроп $crop"}) ${fps}fps ${bitrate / 1000}kbps ($encoderNote, $modeNote)")
     }
 
     override val surfaceInput: SurfaceVideoInput?
@@ -203,6 +220,7 @@ class AaTranscoder(
             checkNotNull(encoder) { "Энкодер рабочего стола ещё не создан" }.codecInfo, width, height, fps, curBitrate)
         val old = target
         target = fps
+        dump?.event("targetFps $old -> $fps")
         val r = relay
         if (r != null) {
             r.setTargetFps(fps)
@@ -240,6 +258,7 @@ class AaTranscoder(
         }
         try {
             c.setParameters(Bundle().apply { putInt(MediaCodec.PARAMETER_KEY_VIDEO_BITRATE, bps) })
+            dump?.event("bitrate $curBitrate -> $bps")
             curBitrate = bps
         } catch (e: Exception) {
             bitrateFailed = true
@@ -271,7 +290,11 @@ class AaTranscoder(
             // и ГУ рисовало полосы; VBR на том же потоке держит пики до ~40 КБ при той же картинке (transcode_test, 12.10.2026)
             f.setInteger(
                 MediaFormat.KEY_BITRATE_MODE,
-                if (tuning.contains("cbr")) MediaCodecInfo.EncoderCapabilities.BITRATE_MODE_CBR else MediaCodecInfo.EncoderCapabilities.BITRATE_MODE_VBR
+                if (desktopCbr || tuning.contains("cbr")) {
+                    MediaCodecInfo.EncoderCapabilities.BITRATE_MODE_CBR
+                } else {
+                    MediaCodecInfo.EncoderCapabilities.BITRATE_MODE_VBR
+                }
             )
             f.setInteger(MediaFormat.KEY_MAX_B_FRAMES, 0)
         }
@@ -545,6 +568,7 @@ class AaTranscoder(
                         buf.get(arr)
                         val data = AnnexB.normalize(arr)
                         if (info.flags and MediaCodec.BUFFER_FLAG_CODEC_CONFIG != 0) {
+                            dump?.config(data)
                             out.onEncoderConfig(data)
                         } else {
                             val lat = System.nanoTime() - info.presentationTimeUs * 1000
@@ -554,7 +578,9 @@ class AaTranscoder(
                             }
                             winOut.incrementAndGet()
                             totalOut.incrementAndGet()
-                            out.onEncoderFrame(data, info.flags and MediaCodec.BUFFER_FLAG_KEY_FRAME != 0)
+                            val key = info.flags and MediaCodec.BUFFER_FLAG_KEY_FRAME != 0
+                            dump?.frame(data, info.presentationTimeUs, key)
+                            out.onEncoderFrame(data, key)
                         }
                     }
                     c.releaseOutputBuffer(idx, false)
@@ -570,6 +596,7 @@ class AaTranscoder(
     }
 
     override fun requestSyncFrame() {
+        dump?.event("requestSyncFrame")
         try {
             encoder?.setParameters(Bundle().apply { putInt(MediaCodec.PARAMETER_KEY_REQUEST_SYNC_FRAME, 0) })
         } catch (e: Exception) {
@@ -632,6 +659,11 @@ class AaTranscoder(
             encThread?.join(1000)
         } catch (_: InterruptedException) {
         }
+        try {
+            dump?.close()
+        } catch (_: Exception) {
+        }
+        dump = null
         try {
             encoder?.stop()
         } catch (_: Exception) {
