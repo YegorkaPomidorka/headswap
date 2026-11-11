@@ -137,9 +137,13 @@ object NavigatorPick {
      */
     fun noHints(pkg: String?): Boolean = pkg == WAZE
 
-    /** Теневую AA держим, пока у выбранного навигатора подсказки включены; навигатора нет - как раньше, держим. */
+    /**
+     * Теневая AA нужна только Google Картам с включёнными подсказками: свой хост Car App они не пускают, а манёвры AA
+     * отдаёт лишь своему навигатору. Яндекс и 2ГИС шлют подсказки через наш хост, им теневая AA только стучится в 5277
+     * (h1041: 39 таймаутов за 10 минут). Навигатор не выбран - не держим.
+     */
     fun shadowWanted(metaNavi: Boolean, navPkg: String?, hints: (String) -> Boolean): Boolean =
-        metaNavi && (navPkg == null || (!noHints(navPkg) && hints(navPkg)))
+        metaNavi && navPkg == GOOGLE_MAPS && hints(navPkg)
 
     fun defaultFor(installed: Set<String>, arabic: Boolean = false): String? = known(arabic).firstOrNull { it in installed }
 
