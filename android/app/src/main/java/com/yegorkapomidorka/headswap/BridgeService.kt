@@ -239,6 +239,16 @@ class BridgeService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        if (intent?.action == ACTION_HU_DESKTOP) {
+            // долгое «Домой» в лаунчере (h1061): ГУ уходит в своё меню (радио, флешка), возврат - иконкой CarLife на ГУ.
+            // PAUSE/START от ГУ мост рабочего стола обрабатывает сам (onCarlifePause гасит вывод).
+            val s = session
+            val accepted = !stopRequested && s != null
+            AppLog.i("DESKTOP «Домой» долгое: меню ГУ, accepted=$accepted", true)
+            if (accepted) s!!.goToDesktop()
+            if (session == null && host == null && !linkWaiting) stopSelfResult(startId)
+            return stickiness()
+        }
         if (intent?.action == ACTION_DESKTOP_HOME) {
             // команда относится только к живой desktop-сессии: опоздавший клик не должен поднимать сервис и новый рабочий стол
             val accepted = !stopRequested && session != null && host?.showDesktop() == true
@@ -1441,6 +1451,8 @@ class BridgeService : Service() {
         const val ACTION_STOP = "com.yegorkapomidorka.headswap.STOP"
         /** Режим DESKTOP: показать рабочий стол (кнопка HOME для идущей сессии). Только к живой сессии, сервис сам не поднимает. */
         const val ACTION_DESKTOP_HOME = "com.yegorkapomidorka.headswap.DESKTOP_HOME"
+        /** Режим DESKTOP: CarLife GO_TO_DESKTOP - ГУ показывает своё меню. Только к живой сессии. */
+        const val ACTION_HU_DESKTOP = "com.yegorkapomidorka.headswap.HU_DESKTOP"
         /** adb shell am startservice -a com.yegorkapomidorka.headswap.LAUNCHER_DEBUG --es area settings --es page music --es theme light --es map left */
         const val ACTION_LAUNCHER_DEBUG = "com.yegorkapomidorka.headswap.LAUNCHER_DEBUG"
         /** Беспровод (бета): ждать машину по Wi-Fi, ветка B (хотспот телефона + маяк). */
@@ -1464,6 +1476,12 @@ class BridgeService : Service() {
         /** Из UI (приложение на экране): startService, не startForegroundService, чтобы не требовать startForeground для команды без сессии. */
         fun requestDesktopHome(ctx: Context) {
             ctx.startService(Intent(ctx, BridgeService::class.java).setAction(ACTION_DESKTOP_HOME))
+        }
+
+        /** Лаунчер рабочего стола: выйти в меню ГУ. Без живого сервиса не шлём - нечего будить. */
+        fun requestHuDesktop(ctx: Context) {
+            if (!alive) return
+            ctx.startService(Intent(ctx, BridgeService::class.java).setAction(ACTION_HU_DESKTOP))
         }
 
         /** Сервис создан и не уничтожен (один процесс): ресиверу ACL незачем будить пустой сервис ради отбоя. */

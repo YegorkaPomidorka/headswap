@@ -35,6 +35,11 @@ class LauncherLogicTest {
         assertEquals(Press.TAP, PressLogic.classify(1000, 5000, false))
     }
 
+    @Test fun huExitLongPressNeedsOneSecond() {
+        assertEquals(Press.TAP, PressLogic.classify(1000, 1999, true, PressLogic.LONG_HU_EXIT_MS))
+        assertEquals(Press.LONG, PressLogic.classify(1000, 2000, true, PressLogic.LONG_HU_EXIT_MS))
+    }
+
     @Test fun debounceDropsSecondTapWithin400ms() {
         val d = Debounce()
         assertTrue(d.allow(10_000))

@@ -37,11 +37,13 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.LayoutDirection
+import com.yegorkapomidorka.headswap.BridgeService
 import com.yegorkapomidorka.headswap.CarLifeState
 import com.yegorkapomidorka.headswap.R
 import kotlinx.coroutines.Dispatchers
@@ -237,15 +239,16 @@ private fun RailBackButton() {
     }
 }
 
-/** Лого: на главном - «Все приложения», на любом другом экране - домой. */
+/** Лого: на главном - «Все приложения», на любом другом экране - домой; долгое нажатие - в меню ГУ (h1061). */
 @Composable
 private fun RailLogoButton() {
     val s = LocalMetrics.current.spec
     val accent = LocalAccent.current
     val logo = rememberPressAnim(1000)
     val home = LauncherModel.area == Area.Home
+    val ctx = LocalContext.current
     RoundButton(s.rb, stringResource(if (home) R.string.l_all_apps else R.string.l_home), onTap = { LauncherActions.logo() },
-        onPress = logo::play) {
+        onLong = { BridgeService.requestHuDesktop(ctx) }, longMs = PressLogic.LONG_HU_EXIT_MS, onPress = logo::play) {
         Box(Modifier.matchParentSize().drawBehind {
             // как CSS circle farthest-corner: радиус 0.707 стороны, стопы 0 / 40% / 70%
             drawCircle(Brush.radialGradient(
