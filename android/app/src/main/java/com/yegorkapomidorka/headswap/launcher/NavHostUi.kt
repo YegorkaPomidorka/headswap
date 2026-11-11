@@ -227,7 +227,8 @@ private fun NavTileOverlay(n: CarUi.Nav?, look: NavLook, k: Float, wide: Boolean
                 .size(with(density) { w.toDp() }, with(density) { h.toDp() }),
         ) {
             n.maneuver?.let { ManeuverCard(it, look, d, Modifier.align(Alignment.TopStart).padding(start = m.dp(d.gap), top = m.dp(d.gap))) }
-            n.eta?.let { ArrivalCard(it, n.end, look, d, Modifier.align(Alignment.BottomStart).padding(start = m.dp(d.gap), bottom = m.dp(d.gap))) }
+            // без «Завершить»: плашку привыкли тапать, случайный тап в угол сбросил бы маршрут
+            n.eta?.let { ArrivalCard(it, null, look, d, Modifier.align(Alignment.BottomStart).padding(start = m.dp(d.gap), bottom = m.dp(d.gap))) }
         }
     }
 }
