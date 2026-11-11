@@ -18,16 +18,25 @@ object DesktopEncoderSupport {
             ?: throw IllegalArgumentException("Телефон не поддерживает кодирование AVC ${width}×$height при $fps кадрах/с. Выберите меньший размер или частоту")
     }
 
+    /**
+     * Для выбора размера рабочего стола до создания энкодера: тот же отбор, что в [AaTranscoder.start].
+     * Список кодеков не прочитался (JVM-тесты, сбой вендора) - не знаем, значит не мешаем.
+     */
+    fun isSupported(width: Int, height: Int, fps: Int): Boolean {
+        val candidates = runCatching { candidates() }.getOrNull() ?: return true
+        return runCatching { select(candidates, width, height, fps, DesktopVideoQuality.BITRATE_CEILING_BPS) }.isSuccess
+    }
+
+    private fun candidates(): List<Candidate> = MediaCodecList(MediaCodecList.REGULAR_CODECS).codecInfos.filter {
+        it.isEncoder && it.supportedTypes.any { type -> type.equals(MIME, ignoreCase = true) }
+    }.map { info -> Candidate(info.name) { w, h, rate, bps -> supports(info, w, h, rate, bps) } }
+
     fun requireSupported(width: Int, height: Int, fps: Int) {
         encoderName(width, height, fps, DesktopVideoQuality.BITRATE_CEILING_BPS)
     }
 
-    internal fun encoderName(width: Int, height: Int, fps: Int, bitrate: Int): String = select(
-        MediaCodecList(MediaCodecList.REGULAR_CODECS).codecInfos.filter {
-            it.isEncoder && it.supportedTypes.any { type -> type.equals(MIME, ignoreCase = true) }
-        }.map { info -> Candidate(info.name) { w, h, rate, bps -> supports(info, w, h, rate, bps) } },
-        width, height, fps, bitrate,
-    )
+    internal fun encoderName(width: Int, height: Int, fps: Int, bitrate: Int): String =
+        select(candidates(), width, height, fps, bitrate)
 
     internal fun requireSupported(info: MediaCodecInfo, width: Int, height: Int, fps: Int, bitrate: Int) {
         select(listOf(Candidate(info.name) { w, h, rate, bps -> supports(info, w, h, rate, bps) }),

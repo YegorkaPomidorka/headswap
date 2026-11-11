@@ -8,6 +8,7 @@ import com.yegorkapomidorka.headswap.aa.CarlifeAudio
 import com.yegorkapomidorka.headswap.aa.AaTranscoder
 import com.yegorkapomidorka.headswap.aa.BitratePolicy
 import com.yegorkapomidorka.headswap.aa.BitrateProfile
+import com.yegorkapomidorka.headswap.aa.DesktopEncoderSupport
 import com.yegorkapomidorka.headswap.aa.DesktopVideoQuality
 import com.yegorkapomidorka.headswap.aa.DupDownFilter
 import com.yegorkapomidorka.headswap.aa.DesktopVideoSelection
@@ -599,9 +600,10 @@ class CarLifeSession(
         AppLog.i("видео: FRAME_RATE_CHANGE fps=$fps, целевой fps $old -> $applied$hu$heat${if (live) "" else " (транскодер ещё не создан, применится при старте)"}")
     }
 
-    private fun resolveDesktopGeometry(width: Int = 0, height: Int = 0) {
+    private fun resolveDesktopGeometry(width: Int = 0, height: Int = 0, fps: Int = 0) {
         val selection = cfg.desktopVideo ?: return
-        mode = selection.resolve(width, height)
+        mode = selection.resolve(width, height, fps, DesktopEncoderSupport::isSupported)
+        selection.fallbackNote?.let { AppLog.i("DEX размер: $it") }
         bridge.configureDesktopVideo(this, mode, selection.densityFor(mode))
         CarLifeState.videoMode = mode
         CarLifeState.densityOverride = selection.densityFor(mode)
@@ -626,12 +628,12 @@ class CarLifeSession(
             sendCmd(Msg.VIDEO_ENCODER_INIT_DONE, Msgs.videoEncoderInfo(pendingW, pendingH, pendingFps))
             return
         }
-        resolveDesktopGeometry(rw, rh)
-        // размер задаёт видео-режим (по умолчанию 1280x720 fps 30: ГУ Honda принимает и показывает целиком, проверено в машине)
-        val (w, h, why) = Triple(mode.outW, mode.outH, "мост: режим ${mode.label}")
         // Mobis CCNC (h242): INIT_DONE с тем fps, что просила ГУ, а энкодер Baidu при этом идёт на 20 fps
         val mobis = bridge.huMobisNx4c
         val fps = if (mobis) (if (rf in 1..30) rf else Handshake.DEFAULT_FPS) else chooseVideoFps(rf)
+        resolveDesktopGeometry(rw, rh, if (mobis) maxOf(fps, AaBridgeCore.MOBIS_FPS) else fps)
+        // размер задаёт видео-режим (по умолчанию 1280x720 fps 30: ГУ Honda принимает и показывает целиком, проверено в машине)
+        val (w, h, why) = Triple(mode.outW, mode.outH, "мост: режим ${mode.label}")
         pendingW = w
         pendingH = h
         pendingFps = fps
@@ -735,7 +737,7 @@ class CarLifeSession(
         paused = false
         desktopVideoDelivery.start(SystemClock.elapsedRealtime())
         if (pendingW <= 0) {
-            resolveDesktopGeometry()
+            resolveDesktopGeometry(fps = if (cfg.desktopVideo != null) chooseVideoFps(0) else 0)
             if (cfg.desktopVideo != null) {
                 pendingFps = chooseVideoFps(0)
                 targetFps = pendingFps

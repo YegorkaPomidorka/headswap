@@ -65,14 +65,36 @@ class DesktopVideoSelection(val resolution: DesktopResolution, val densityOverri
         if (resolution == DesktopResolution.CUSTOM) DesktopGeometryPolicy.requireDimensions(customWidth, customHeight)
     }
     private var selected: NativeDesktopGeometry? = null
+    /** Почему размер отличается от настройки (энкодер не тянет), для лога; null - откат не понадобился. */
+    var fallbackNote: String? = null
+        private set
     fun initialGeometry() = if (resolution == DesktopResolution.CUSTOM) NativeDesktopGeometry(customWidth, customHeight)
         else NativeDesktopGeometry(resolution.width, resolution.height)
-    @Synchronized fun resolve(width: Int = 0, height: Int = 0): NativeDesktopGeometry = selected ?: run {
-        val result = if (resolution == DesktopResolution.AUTO && DesktopGeometryPolicy.accepts(width, height))
+
+    /**
+     * [supports] - объявляет ли энкодер телефона AVC такого размера при [fps]. Если выбранный размер не тянет
+     * (Helio G96 и 1728×648@30, Mazda CX-5 05.11), откатываемся на запрос ГУ, потом 1280×720 и 800×480. Не подошло ничего -
+     * оставляем выбранный, транскодер напишет причину.
+     */
+    @Synchronized fun resolve(width: Int = 0, height: Int = 0, fps: Int = 0,
+        supports: (Int, Int, Int) -> Boolean = { _, _, _ -> true }): NativeDesktopGeometry = selected ?: run {
+        val preferred = if (resolution == DesktopResolution.AUTO && DesktopGeometryPolicy.accepts(width, height))
             NativeDesktopGeometry(width, height) else initialGeometry()
+        val result = if (fps <= 0 || ok(supports, preferred.outW, preferred.outH, fps)) preferred else {
+            val hu = (width to height).takeIf { DesktopGeometryPolicy.accepts(width, height) }
+            val fallback = listOfNotNull(hu, 1280 to 720, 800 to 480).distinct()
+                .filter { it != preferred.outW to preferred.outH }
+                .firstOrNull { (w, h) -> ok(supports, w, h, fps) }
+            fallbackNote = if (fallback == null) "энкодер не тянет ${preferred.outW}x${preferred.outH}@$fps, запасные размеры тоже"
+                else "энкодер не тянет ${preferred.outW}x${preferred.outH}@$fps, беру ${fallback.first}x${fallback.second}"
+            fallback?.let { NativeDesktopGeometry(it.first, it.second) } ?: preferred
+        }
         selected = result
         result
     }
+
+    private fun ok(supports: (Int, Int, Int) -> Boolean, w: Int, h: Int, fps: Int) =
+        runCatching { supports(w, h, fps) }.getOrDefault(false)
     fun densityFor(mode: VideoGeometry): Int = if (densityOverride == 0) mode.density else densityOverride
 
     companion object {
