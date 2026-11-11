@@ -115,10 +115,20 @@ object NavigatorPick {
     const val GOOGLE_MAPS = "com.google.android.apps.maps"
     const val DGIS = "ru.dublgis.dgismobile"
     const val WAZE = "com.waze"
+    /**
+     * Amap (高德地图): встроенный автомобильный интерфейс com.autonavi.map.activity.UcarMapActivity (см. UcarBind).
+     * Amap's built-in car UI com.autonavi.map.activity.UcarMapActivity (see UcarBind).
+     */
+    const val AMAP = "com.autonavi.minimap"
     val KNOWN = listOf(YANDEX_NAVI, YANDEX_MAPS, DGIS,
-        GOOGLE_MAPS, WAZE, "app.organicmaps")
-    /** Арабский интерфейс (h1003): только Google Карты и Waze, Яндекса и 2ГИС нет ни в выборе, ни по умолчанию. */
-    val KNOWN_AR = listOf(GOOGLE_MAPS, WAZE)
+        GOOGLE_MAPS, WAZE, "app.organicmaps", AMAP)
+    /**
+     * Арабский интерфейс (h1003): только Google Карты и Waze, Яндекса и 2ГИС нет ни в выборе, ни по умолчанию.
+     * Amap добавлен: он сам по себе китайский и не зависит от языка интерфейса.
+     * Arabic UI (h1003): only Google Maps and Waze; no Yandex or 2GIS, neither in the picker nor as default.
+     * Amap is added on purpose: it is Chinese by nature and does not depend on the UI language.
+     */
+    val KNOWN_AR = listOf(GOOGLE_MAPS, WAZE, AMAP)
 
     fun known(arabic: Boolean): List<String> = if (arabic) KNOWN_AR else KNOWN
 

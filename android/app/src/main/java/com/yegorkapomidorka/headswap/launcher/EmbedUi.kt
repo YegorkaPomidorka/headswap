@@ -99,7 +99,12 @@ fun EmbedLayers() {
         (area == Area.Navigator || (area == Area.Home && CardView.NAVIGATOR in listOf(tiles.big, tiles.small)))
     // подпись окна навигатора в углу карточки (макет v2); на весь экран не нужна, у своего хоста там карточка прибытия
     val navPkg = model.navigatorPkg
-    val navTag = if (area != Area.Navigator && navPkg != null && !carNav) remember(navPkg) { LauncherModel.packageLabel(navPkg) } else null
+    // У автомобильного интерфейса Amap своя подпись в правом нижнем углу кадра, вторая в левом нижнем
+    // углу карточки («高德地图») была бы дублем — для Amap подпись не рисуем.
+    // Amap's car UI paints its own label in the bottom-right corner of the frame; a second one
+    // ("高德地图") in the card's bottom-left would just duplicate it, so the tag is skipped for Amap.
+    val navTag = if (area != Area.Navigator && navPkg != null && !carNav && navPkg != NavigatorPick.AMAP)
+        remember(navPkg) { LauncherModel.packageLabel(navPkg) } else null
     // плашка навигатора живая, как плашка-приложение: касания идут в карту, на весь экран - кнопкой навигации
     // на рейке или шайбой (Егор 11.11, h1045)
     EmbedLayer(EmbedHost.nav, navTarget, shown = navShown, interactive = true,

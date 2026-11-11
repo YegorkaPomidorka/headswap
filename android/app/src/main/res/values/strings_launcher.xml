@@ -169,6 +169,7 @@
     <string name="l_nav_yandex_maps">Yandex Maps</string>
     <string name="l_nav_google_maps">Google Maps</string>
     <string name="l_nav_waze" translatable="false">Waze</string>
+    <string name="l_nav_amap" translatable="false">高德地图</string>
     <!-- навигатор на своём хосте Car App -->
     <string name="l_u_m">m</string>
     <string name="l_u_km">km</string>

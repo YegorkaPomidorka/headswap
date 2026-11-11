@@ -77,6 +77,7 @@ private val NAV_TILES = listOf(
 private val NAV_TILES_AR = listOf(
     NavigatorPick.GOOGLE_MAPS to R.string.l_nav_google_maps,
     NavigatorPick.WAZE to R.string.l_nav_waze,
+    NavigatorPick.AMAP to R.string.l_nav_amap,
 )
 
 /**
@@ -835,6 +836,11 @@ private fun NavigatorTiles(d: SettingsDims, rowH: Int, modifier: Modifier) {
                         }
                     }
                 }
+                // Нечётное число плиток в ряду: держим вторую половину пустой, иначе последняя
+                // плитка растягивается на весь ряд и выглядит вдвое шире остальных.
+                // Odd number of tiles in a row: keep the second half empty, otherwise the last tile
+                // stretches over the whole row and looks twice as wide as the others.
+                if (row.size < 2) Spacer(Modifier.weight(1f).fillMaxHeight())
             }
         }
     }
