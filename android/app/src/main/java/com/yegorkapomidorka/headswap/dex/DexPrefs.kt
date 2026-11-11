@@ -43,6 +43,15 @@ class DexPrefs(context: Context) {
     var desktopTranscode: Boolean
         get() = prefs.getBoolean("desktop_transcode", false)
         set(value) { prefs.edit().putBoolean("desktop_transcode", value).apply() }
+
+    /**
+     * Tag the final H.264 as limited range (16-235). The CR-V 2026 head unit alternates between
+     * two composition paths that treat full-range streams differently, which shows up as ~1.7 Hz
+     * brightness pulsing; a limited-range stream looks identical on both paths.
+     */
+    var videoLimitedRange: Boolean
+        get() = prefs.getBoolean("video_limited_range", true)
+        set(value) { prefs.edit().putBoolean("video_limited_range", value).apply() }
 }
 
 object DexState {

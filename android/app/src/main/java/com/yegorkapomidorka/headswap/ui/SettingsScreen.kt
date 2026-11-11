@@ -409,6 +409,7 @@ class SettingsSectionScreen(host: MainActivity, val section: SettingsSection) : 
     private var desktopFpsSeg: Segmented? = null
     private var desktopFpsNote: TextView? = null
     private var desktopTranscodeSeg: Segmented? = null
+    private var videoRangeSeg: Segmented? = null
     private var densityValue: TextView? = null
     private var densitySub: TextView? = null
     private var densityMinus: View? = null
@@ -903,6 +904,16 @@ class SettingsSectionScreen(host: MainActivity, val section: SettingsSection) : 
             body.addView(modeDescription(), lp(MATCH, WRAP).margins(c, 8, 4, 8, 0))
         }
 
+        body.addView(c.sectionTitle(c.getString(R.string.set_video_range_title)))
+        val rangeSeg = Segmented(c, listOf(
+            c.getString(R.string.set_video_range_limited),
+            c.getString(R.string.set_video_range_full),
+        ), 15f) { setVideoLimitedRange(it == 0) }
+        videoRangeSeg = rangeSeg
+        body.addView(rangeSeg.view, lp(MATCH, WRAP))
+        note(c.getString(R.string.set_video_range_note))
+        refreshVideoRange()
+
         body.addView(c.sectionTitle(c.getString(R.string.set_resolution)))
         customResNote = note("").apply { visibility = View.GONE }
         body.addView(resolutionField(), lp(MATCH, WRAP))
@@ -1246,6 +1257,15 @@ class SettingsSectionScreen(host: MainActivity, val section: SettingsSection) : 
 
     private fun refreshDesktopTranscode() {
         desktopTranscodeSeg?.setSelected(if (DexPrefs(ctx).desktopTranscode) 1 else 0)
+    }
+
+    private fun setVideoLimitedRange(limited: Boolean) {
+        DexPrefs(ctx).videoLimitedRange = limited
+        refreshVideoRange()
+    }
+
+    private fun refreshVideoRange() {
+        videoRangeSeg?.setSelected(if (DexPrefs(ctx).videoLimitedRange) 0 else 1)
     }
 
     private fun refreshDesktopFps() {

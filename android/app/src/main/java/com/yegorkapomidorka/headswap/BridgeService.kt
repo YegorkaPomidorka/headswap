@@ -977,6 +977,7 @@ class BridgeService : Service() {
             h.core.spliceMs = spliceMs
         }
         h.core.carVwId = aaPrefs.carPreset == CarPreset.VW_ID_UNYX
+        h.core.videoLimitedRange = DexPrefs(this).videoLimitedRange
         h.core.phoneAssistant = null   // режим AA: кнопка голоса идёт в AA
         DesktopKeys.voiceStatus = null
         acquireSessionWakeLocks()
@@ -1081,6 +1082,7 @@ class BridgeService : Service() {
         // темп кадров CarLife, повтор статичных кадров и энкодер остаются как в основном видеоконвейере
         owner.core.transcodeEnabled = true
         owner.core.desktopTranscode = dexPrefs.desktopTranscode
+        owner.core.videoLimitedRange = dexPrefs.videoLimitedRange
         owner.core.spliceMs = 0L
         owner.core.carVwId = aaPrefs.carPreset == CarPreset.VW_ID_UNYX
         // кнопка голоса: системный помощник клавишей KEYCODE_ASSIST (как долгое нажатие питания), см. createDesktopHost

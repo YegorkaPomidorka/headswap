@@ -52,6 +52,10 @@
     <string name="set_desktop_transcode_note">Применится при следующем подключении. Транскодирование добавляет промежуточный H.264, как в Android Auto: больше задержки и нагрева, но стабильнее на некоторых ГУ.</string>
     <string name="set_desktop_fps_title">Частота кадров рабочего стола</string>
     <string name="set_desktop_fps_note">Применится при следующем подключении. «Авто» выбирает 30 fps, если ГУ не просит меньше.</string>
+    <string name="set_video_range_title">Цветовой диапазон</string>
+    <string name="set_video_range_limited">Ограниченный</string>
+    <string name="set_video_range_full">Полный</string>
+    <string name="set_video_range_note">Ограниченный (16–235) убирает переключение яркости на ГУ CR-V 2026. Применится при следующем подключении.</string>
 
     <string name="set_resolution">Разрешение видео</string>
     <string name="set_res_pick">Выбрать разрешение</string>

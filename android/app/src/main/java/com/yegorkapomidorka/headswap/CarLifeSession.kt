@@ -1175,6 +1175,7 @@ class CarLifeSession(
                     mode.outW, mode.outH, fps, actualBps, out, { AppLog.i(it, false) },
                     capabilityFps = if (mobis) AaBridgeCore.MOBIS_FPS else targetFps,
                     baidu = mobis,
+                    limitedRange = bridge.videoLimitedRange,
                 ).also { it.start() }
             } catch (e: Exception) {
                 AppLog.e("BRIDGE desktop transcode не создан, fallback на прямое кодирование", e)
@@ -1188,6 +1189,7 @@ class CarLifeSession(
             crop = if (directSurface) com.yegorkapomidorka.headswap.aa.VideoCrop.NONE else mode.cropFor(bridge.marginsAtBottom),
             baidu = mobis, directSurface = directSurface,
             capabilityFps = if (mobis) AaBridgeCore.MOBIS_FPS else targetFps,
+            limitedRange = bridge.videoLimitedRange,
         ).also { it.start() }
     } catch (e: Exception) {
         AppLog.e("BRIDGE транскодер не создан", e)

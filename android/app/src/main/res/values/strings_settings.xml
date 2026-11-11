@@ -52,6 +52,10 @@
     <string name="set_desktop_transcode_note">Applies on the next connection. Transcode inserts an intermediate H.264 stage, like Android Auto: more latency and heat, but steadier on some head units.</string>
     <string name="set_desktop_fps_title">Desktop frame rate</string>
     <string name="set_desktop_fps_note">Applies on the next connection. Auto picks 30 fps unless the head unit asks for less.</string>
+    <string name="set_video_range_title">Color range</string>
+    <string name="set_video_range_limited">Limited</string>
+    <string name="set_video_range_full">Full</string>
+    <string name="set_video_range_note">Limited (16–235) stops the brightness pulsing on the CR-V 2026 head unit. Applies on the next connection.</string>
 
     <string name="set_resolution">Video resolution</string>
     <string name="set_res_pick">Choose resolution</string>

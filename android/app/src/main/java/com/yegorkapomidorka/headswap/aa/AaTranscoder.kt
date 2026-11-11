@@ -49,6 +49,12 @@ class AaTranscoder(
     private val capabilityFps: Int = fps,
     /** Diagnostic dump tag; null = desktop/aa by input type. */
     private val dumpTag: String? = null,
+    /**
+     * Ask the encoder for limited-range (16-235) BT.709 output. The CR-V 2026 head unit has two
+     * composition paths that disagree on full-range streams, which pulses the backlight ~1.7 Hz;
+     * limited range renders the same on both.
+     */
+    private val limitedRange: Boolean = false,
 ) : VideoTranscoder {
     private var encoder: MediaCodec? = null
     private var surface: Surface? = null
@@ -271,6 +277,16 @@ class AaTranscoder(
     private fun format(level: Int): MediaFormat {
         val f = MediaFormat.createVideoFormat(MIME, width, height)
         f.setInteger(MediaFormat.KEY_COLOR_FORMAT, MediaCodecInfo.CodecCapabilities.COLOR_FormatSurface)
+        if (limitedRange) {
+            runCatching {
+                // Only the range is forced. The encoder's natural matrix here is BT.601/170M, and
+                // the head unit's composition paths agree on it; forcing BT.709 made saturated
+                // colors (call button, map icons) flicker between the two paths.
+                f.setInteger(MediaFormat.KEY_COLOR_RANGE, MediaFormat.COLOR_RANGE_LIMITED)
+            }.onFailure {
+                log("транскодер: ключ цветового диапазона не принят: ${it.javaClass.simpleName}: ${it.message}")
+            }
+        }
         f.setInteger(MediaFormat.KEY_BIT_RATE, bitrate)
         f.setInteger(MediaFormat.KEY_FRAME_RATE, fps)
         f.setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, 1)

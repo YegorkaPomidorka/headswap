@@ -153,6 +153,9 @@ class AaBridgeCore(
     /** Desktop only: insert an intermediate H.264 encode/decode stage before the CarLife encoder. */
     @Volatile var desktopTranscode = false
 
+    /** Encode the final stream as limited range (16-235) to avoid head-unit brightness pulsing. */
+    @Volatile var videoLimitedRange = true
+
     /**
      * Разрешение видео, снятое один раз при создании хоста (уже с учётом passthrough): им построена AA (SDR),
      * его же берут CarLife-сессия (INIT_DONE, энкодер) и маппинг тача. Prefs отсюда не читаются.
