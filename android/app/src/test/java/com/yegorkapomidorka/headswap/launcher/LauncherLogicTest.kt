@@ -388,9 +388,13 @@ class LauncherLogicTest {
         val hints = mapOf("com.google.android.apps.maps" to false, "ru.dublgis.dgismobile" to true)
         val of = { p: String -> hints[p] ?: true }
         assertFalse(NavigatorPick.shadowWanted(true, "com.google.android.apps.maps", of))
-        assertTrue(NavigatorPick.shadowWanted(true, "ru.dublgis.dgismobile", of))
-        assertTrue(NavigatorPick.shadowWanted(true, null, of))
-        assertFalse(NavigatorPick.shadowWanted(false, "ru.dublgis.dgismobile", of))
+        assertTrue(NavigatorPick.shadowWanted(true, "com.google.android.apps.maps") { true })
+        assertFalse(NavigatorPick.shadowWanted(false, "com.google.android.apps.maps") { true })
+    }
+
+    @Test fun shadowAaOnlyForGoogleMaps() {   // h1041: Яндекс и 2ГИС подсказки шлют через свой хост Car App
+        for (pkg in listOf(NavigatorPick.YANDEX_NAVI, NavigatorPick.YANDEX_MAPS, NavigatorPick.DGIS, NavigatorPick.WAZE, null))
+            assertFalse(pkg.toString(), NavigatorPick.shadowWanted(true, pkg) { true })
     }
 
     @Test fun needsPlusOnlyYandex() {
