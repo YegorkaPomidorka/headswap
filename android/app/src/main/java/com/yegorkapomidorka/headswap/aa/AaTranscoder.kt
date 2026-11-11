@@ -51,7 +51,6 @@ class AaTranscoder(
     private var surface: Surface? = null
     private var relay: GlRelay? = null
     private var dump: VideoDump? = null
-    private val desktopCbr = directSurface && !tuning.contains("vbr")
     private var lastRedraws = 0L
     private var lastGated = 0L
     @Volatile private var target = fps
@@ -120,12 +119,12 @@ class AaTranscoder(
                 encoderNote = when (level) {
                     BAIDU_WITH_LEVEL -> "baidu: baseline+level256+VBR+repeat100ms"
                     BAIDU_NO_LEVEL -> "baidu: baseline+VBR+repeat100ms, без level"
-                    0 -> if (desktopCbr || tuning.contains("cbr")) {
+                    0 -> if (tuning.contains("cbr")) {
                         "baseline+CBR+noB+repeat100ms+realtime"
                     } else {
                         "baseline+VBR+noB+repeat100ms+realtime"
                     }
-                    1 -> if (desktopCbr || tuning.contains("cbr")) "baseline+CBR+noB+repeat100ms" else "baseline+VBR+noB+repeat100ms"
+                    1 -> if (tuning.contains("cbr")) "baseline+CBR+noB+repeat100ms" else "baseline+VBR+noB+repeat100ms"
                     else -> "минимальный формат+repeat100ms"
                 }
                 configured = true
@@ -169,7 +168,7 @@ class AaTranscoder(
         if (directSurface || !tuning.contains("nogl")) {
             // декодер -> GL-реле -> Surface энкодера: реле перерисовывает последний кадр на статике (>= 10 fps)
             try {
-                relay = GlRelay(surface!!, width, height, REDRAW_IDLE_MS, log, srcWidth, srcHeight, crop, target, limitHighFps = directSurface).also { it.start() }
+                relay = GlRelay(surface!!, width, height, REDRAW_IDLE_MS, log, srcWidth, srcHeight, crop, target, limitHighFps = directSurface, fixedPacer = directSurface).also { it.start() }
                 // VirtualDisplay/Compose рендерит в эту поверхность: просим композитор отдавать кадры
                 // в темпе target fps, как ровный поток декодера AA, а не 60 Гц с дроблением гейтом.
                 relay?.let { applyInputFrameRate(it, target) }
@@ -290,7 +289,7 @@ class AaTranscoder(
             // и ГУ рисовало полосы; VBR на том же потоке держит пики до ~40 КБ при той же картинке (transcode_test, 12.10.2026)
             f.setInteger(
                 MediaFormat.KEY_BITRATE_MODE,
-                if (desktopCbr || tuning.contains("cbr")) {
+                if (tuning.contains("cbr")) {
                     MediaCodecInfo.EncoderCapabilities.BITRATE_MODE_CBR
                 } else {
                     MediaCodecInfo.EncoderCapabilities.BITRATE_MODE_VBR

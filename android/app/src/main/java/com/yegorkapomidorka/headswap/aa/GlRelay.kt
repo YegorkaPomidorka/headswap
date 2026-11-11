@@ -41,6 +41,8 @@ class GlRelay(
     /** Целевая частота выхода: гейт не отдаёт кадр в энкодер чаще (0 = без ограничения). */
     targetFps: Int = 0,
     limitHighFps: Boolean = false,
+    /** Desktop: draw the latest frame on a fixed 30-fps grid instead of on every source frame. */
+    private val fixedPacer: Boolean = false,
 ) {
     private val gate = FrameGate(targetFps, limitHighFps)
     private val thread = HandlerThread("aa-gl-relay")
@@ -81,6 +83,8 @@ class GlRelay(
     /** Последний кадр в текстуре гейт пропустил и он ещё не показан: tick отдаст его, как только гейт откроется. Только GL-нить. */
     private var skipped = false
     private var lastFreshNs = 0L
+    private var pacerNextNs = 0L
+    private var ptsNextNs = 0L
     @Volatile private var released = false
     private var lastDrawNs = 0L
     @Volatile private var initError: Throwable? = null
@@ -123,7 +127,31 @@ class GlRelay(
             stop()
             throw IllegalStateException("инициализация GL: ${it.message}", it)
         }
-        handler.postDelayed(tick, 20)
+        if (fixedPacer) {
+            pacerNextNs = SystemClock.elapsedRealtimeNanos()
+            handler.post(pacer)
+        } else {
+            handler.postDelayed(tick, 20)
+        }
+    }
+
+    /**
+     * Desktop: источник (VirtualDisplay/Compose) отдаёт кадры неравномерно, иногда с паузами
+     * до 100 мс. Рисуем последний кадр ровно раз в период цели, чтобы энкодер и ГУ получали
+     * стабильные 30 fps и ровные PTS, как в AA-пути.
+     */
+    private val pacer = object : Runnable {
+        override fun run() {
+            if (released) return
+            val fps = gate.targetFps.let { if (it > 0) it else 30 }
+            val period = 1_000_000_000L / fps
+            if (haveFrame) draw()
+            pacerNextNs += period
+            val now = SystemClock.elapsedRealtimeNanos()
+            if (pacerNextNs < now - period) pacerNextNs = now + period
+            val delayMs = ((pacerNextNs - SystemClock.elapsedRealtimeNanos()) / 1_000_000).coerceAtLeast(0)
+            handler.postDelayed(this, delayMs)
+        }
     }
 
     private val tick = object : Runnable {
@@ -212,6 +240,7 @@ class GlRelay(
         handler.post {
             try {
                 handler.removeCallbacks(tick)
+                handler.removeCallbacks(pacer)
                 st?.release()
                 // init() мог упасть до inputSurface: без проверки исключение пропустило бы освобождение EGL ниже
                 if (::inputSurface.isInitialized) inputSurface.release()
@@ -275,7 +304,7 @@ class GlRelay(
             haveFrame = true
             fresh.incrementAndGet()
             lastFreshNs = SystemClock.elapsedRealtimeNanos()
-            drawGated(fresh = true)
+            if (!fixedPacer) drawGated(fresh = true)
         } catch (t: Throwable) {
             log("GlRelay.onFrame: ${t.javaClass.simpleName}: ${t.message}")
         }
@@ -318,9 +347,23 @@ class GlRelay(
         GLES20.glEnableVertexAttribArray(texAttr)
         GLES20.glDrawArrays(GLES20.GL_TRIANGLE_STRIP, 0, 4)
         lastDrawNs = SystemClock.elapsedRealtimeNanos()
-        // timestamp кадра для энкодера: монотонное время, как у surface-источников
-        EGLExt.eglPresentationTimeANDROID(display, eglSurface, System.nanoTime())
+        // timestamp кадра для энкодера: для desktop - ровная сетка 30 fps, для AA - время отрисовки
+        EGLExt.eglPresentationTimeANDROID(display, eglSurface, presentationTimeNs(System.nanoTime()))
         EGL14.eglSwapBuffers(display, eglSurface)
+    }
+
+    /** Ровные PTS для desktop-пасера: 33,333 мс на кадр вместо дрожащего времени отрисовки. */
+    private fun presentationTimeNs(nowNs: Long): Long {
+        if (!fixedPacer) return nowNs
+        val fps = gate.targetFps.let { if (it > 0) it else 30 }
+        val period = 1_000_000_000L / fps
+        if (ptsNextNs == 0L) {
+            ptsNextNs = nowNs
+        } else {
+            ptsNextNs += period
+            if (nowNs - ptsNextNs > period) ptsNextNs = nowNs
+        }
+        return ptsNextNs
     }
 
     private fun buildProgram(vs: String, fs: String): Int {
