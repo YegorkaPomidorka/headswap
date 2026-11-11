@@ -14,6 +14,7 @@ import java.util.concurrent.Executors
  * h1007 (Android 13–15): тач рабочего стола при погашенном экране телефона. Пока телефон interactive, тач идёт как
  * раньше (injectInputEvent); на касание при погашенном экране жест целиком уходит в тачскрин shell-хоста
  * [UinputHostMain]. Путь выбирается на ACTION_DOWN и не меняется до конца жеста. Нет хоста - всё как раньше.
+ * Тачскрин есть у экрана рабочего стола и у каждого дочернего (h1081: приложение на весь экран).
  */
 internal object UinputTouch {
     const val METHOD = "uinput_host"

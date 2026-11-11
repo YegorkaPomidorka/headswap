@@ -57,7 +57,7 @@ internal class DelegatedInputGateway(context: Context) : IDelegatedInputGateway.
         registry.registerParent(displayId, token, width, height)
         liveDisplayIds = registry.registeredDisplayIds()
         holdAwake(displayId)
-        UinputTouch.want(context, displayId, width, height) // h1007: только экран рабочего стола, не дочерние
+        UinputTouch.want(context, displayId, width, height) // h1007
         localIme(registry.requireDisplay(displayId, token))
     }
 
@@ -66,6 +66,9 @@ internal class DelegatedInputGateway(context: Context) : IDelegatedInputGateway.
         registry.registerChild(parentId, displayId, token, width, height)
         liveDisplayIds = registry.registeredDisplayIds()
         holdAwake(displayId)
+        // h1081: приложение на весь экран живёт на дочернем дисплее, рабочий стол пересылает туда касания.
+        // Без своего тачскрина пересылка шла через inject, и Android 13–15 при погашенном экране её выбрасывал.
+        UinputTouch.want(context, displayId, width, height)
         localIme(registry.requireDisplay(displayId, token))
     }
 
@@ -100,7 +103,7 @@ internal class DelegatedInputGateway(context: Context) : IDelegatedInputGateway.
     @Synchronized override fun resizeDisplay(displayId: Int, token: IBinder, width: Int, height: Int) {
         requireActive(); requireTrustedDisplay(displayId)
         registry.resize(displayId, token, width, height)
-        if (registry.requireDisplay(displayId, token).parent == null) UinputTouch.want(context, displayId, width, height)
+        UinputTouch.want(context, displayId, width, height)
     }
 
     @Synchronized override fun unregisterDisplay(displayId: Int, token: IBinder) {
@@ -168,7 +171,7 @@ internal class DelegatedInputGateway(context: Context) : IDelegatedInputGateway.
                             FloatArray(event.pointerCount) { event.getX(it) },
                             FloatArray(event.pointerCount) { event.getY(it) })
                         // h1007: при погашенном экране телефона Android 13–15 выбрасывает inject - жест в тачскрин uinput.
-                        if (owned.parent == null && UinputTouch.route(displayId, event, owned.width, owned.height)) return
+                        if (UinputTouch.route(displayId, event, owned.width, owned.height)) return
                     }
                     require(actionButton == 0 || actionButton == MotionEvent.BUTTON_PRIMARY)
                     if (actionButton != 0) setActionButton.invoke(event, actionButton)
