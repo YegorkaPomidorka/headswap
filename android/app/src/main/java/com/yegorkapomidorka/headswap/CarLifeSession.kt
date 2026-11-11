@@ -386,7 +386,10 @@ class CarLifeSession(
                 for (c in reply.commands) sendCmd(c.type, c.body)
                 val mod = Handshake.moduleStatus(reply.major)
                 try {
-                    sched.schedule({ sendCmd(mod.type, mod.body) }, Handshake.MODULE_STATUS_DELAY_MS, TimeUnit.MILLISECONDS)
+                    sched.schedule({
+                        sendCmd(mod.type, mod.body)
+                        bridge.onModuleListSent()   // пачка всё обнулила: вернуть MUSIC/NAVI, если уже подняты (h1054)
+                    }, Handshake.MODULE_STATUS_DELAY_MS, TimeUnit.MILLISECONDS)
                 } catch (_: java.util.concurrent.RejectedExecutionException) {
                     // сессия уже закрывается
                 }

@@ -1858,6 +1858,23 @@ class AaBridgeCore(
         if (MODULE_MUSIC_ENABLED) link.sendModuleStatus(CarlifeAudio.MODULE_MUSIC, status)
     }
 
+    /**
+     * Стартовый MODULE_STATUS со всеми модулями = 0 уходит по таймеру через 500 мс после рукопожатия и перетирает
+     * MUSIC=1 / NAVI=1, поднятые раньше. h1054 (VW CNS3): музыка рабочего стола заиграла за 166 мс до пачки,
+     * ГУ всю поездку считала MUSIC=0 и трек на приборку не брала. Повторяем текущее состояние.
+     */
+    @Synchronized
+    fun onModuleListSent() {
+        if (audioInited[CarlifeAudio.CH_MEDIA] == true && MODULE_MUSIC_ENABLED) {
+            musicStatus(1)
+            log("BRIDGE CarLife MODULE_STATUS MUSIC=1 повторно: стартовая пачка его обнулила", true)
+        }
+        if (naviSent) {
+            link.sendModuleStatus(CarlifeAudio.MODULE_NAVI, 1)
+            log("BRIDGE CarLife MODULE_STATUS NAVI=1 повторно: стартовая пачка его обнулила", true)
+        }
+    }
+
     /** Плеер AA сменил состояние (ch9). MUSIC по нему - только когда звук не по USB: иначе им владеет MEDIA INIT/PAUSE. */
     private fun musicByState(playing: Boolean) {
         if (playing) releaseHuPause("AA заиграл")
@@ -1978,6 +1995,10 @@ class AaBridgeCore(
 
     @Synchronized
     override fun onMediaMetadata(m: AaMediaMetadata) = meta.onMediaMetadata(m)
+
+    /** Плеер телефона в режиме рабочего стола (DesktopMediaMeta): трек на приборку, MODULE_STATUS MUSIC и паузу ГУ не трогаем. */
+    @Synchronized
+    fun onDesktopMediaStatus(s: AaMediaStatus) = meta.onMediaStatus(s, notifyPlayer = false)
 
     @Synchronized
     override fun onNavCluster(start: Boolean) = meta.onNavCluster(start)

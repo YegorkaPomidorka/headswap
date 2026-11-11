@@ -1125,6 +1125,7 @@ class BridgeService : Service() {
             core.desktopInputEnabled = true
             core.volumeSwipeProvider = { aaPrefs.volumeSwipe }
             DesktopNavHints.target = core   // подсказки навигатора рабочего стола (свой хост Car App, теневая AA) в MetaRelay
+            com.yegorkapomidorka.headswap.dex.DesktopMediaMeta.start(this, core)   // трек плеера телефона на приборку (h1054)
             // в машине adb нет: стартуем вместе с рабочим столом; у навигатора выключены подсказки на приборке - AA не трогаем (h800).
             // Действующий навигатор как у лаунчера: сохранённый, пока установлен, иначе первый известный (LauncherModel.init
             // зовётся один раз на процесс - на вторую сессию рабочего стола его applyShadowNav не придёт)
@@ -1204,6 +1205,7 @@ class BridgeService : Service() {
         AaShadowNav.stop()
         CarAppHost.stop()
         DesktopNavHints.target = null
+        com.yegorkapomidorka.headswap.dex.DesktopMediaMeta.stop()
         val recovery = pendingDesktopRecovery
         if (recovery != null && recovery.owner === owner && desktopRecovery.isCurrent(recovery.attempt)) {
             // колбэк подтверждает закрытие и привилегированного производителя, и энкодера с Surface
