@@ -149,7 +149,8 @@ fun NavHostOverlay() {
     val look = (if (LocalPalette.current.light) LIGHT else DARK).withAccent(LocalAccent.current)
     // «Масштаб карты» меняет и наши карточки с кнопками - в одну меру с картой навигатора
     val scale = CarAppHost.pkg?.let { com.yegorkapomidorka.headswap.carapp.CarConfigMath.step(LauncherModel.mapScale(it)) } ?: 1f
-    val d = remember(m.spec, scale) { NavDims(m.spec.h / 720f * scale, m.spec.wide) }
+    // портрет 960x1152: по высоте карточки вышли бы в 1,6 раза, масштаб по T (96 - единица)
+    val d = remember(m.spec, scale) { NavDims((if (m.spec.portrait) m.spec.t / 96f else m.spec.h / 720f) * scale, m.spec.wide) }
     val w = r.width.roundToInt()
     val h = r.height.roundToInt()
     val current = ui

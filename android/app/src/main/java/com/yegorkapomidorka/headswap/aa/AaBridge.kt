@@ -441,6 +441,8 @@ class AaBridgeCore(
     @Volatile var volumeSwipeProvider: () -> Boolean = { false }
     /** Жест громкости включён: на Vezel всегда, иначе по настройке. Звук по USB тогда следует STREAM_MUSIC. */
     val volumeSwipeEnabled: Boolean get() = huHondaVezel || volumeSwipeProvider()
+    /** Программная громкость звука по USB: с жестом, а в портретном рабочем столе (h921) ещё и с кнопками «−»/«+» нижней рейки. */
+    val volumeGainEnabled: Boolean get() = volumeSwipeEnabled || videoMode.outH > videoMode.outW
     private val volumeSwipe = VolumeSwipe(
         onCancel = {
             log("BRIDGE тач: два пальца у правого края - жест громкости, касание отменяю", true)

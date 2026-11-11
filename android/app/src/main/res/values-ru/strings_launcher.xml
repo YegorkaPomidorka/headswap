@@ -7,6 +7,8 @@
     <string name="l_back">Назад</string>
     <string name="l_settings">Настройки</string>
     <string name="l_card_view">Сменить большую плашку</string>
+    <string name="l_volume_down">Тише</string>
+    <string name="l_volume_up">Громче</string>
     <string name="l_navigation">Навигация</string>
     <string name="l_add">Добавить</string>
     <string name="l_remove_q">Убрать?</string>

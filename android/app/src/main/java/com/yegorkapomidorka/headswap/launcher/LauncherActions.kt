@@ -46,6 +46,13 @@ object LauncherActions {
         PhoneController.dial(model.context, number)
     }
     fun cycleCardView() { model.nextCardView() }
+
+    /** «−»/«+» нижней рейки портрета: шаг громкости медиа, как жест двумя пальцами (мост пишет в лог и двигает STREAM_MUSIC). */
+    fun adjustVolume(steps: Int) {
+        val hook = com.yegorkapomidorka.headswap.dex.DesktopKeys.adjustVolume
+        if (hook == null) AppLog.i("LAUNCHER громкость ${if (steps > 0) "+" else ""}$steps: нет сессии рабочего стола", false)
+        else hook(steps)
+    }
     fun swapTiles() { model.swapTiles() }
 
     /** «Развернуть» плашку-приложение: то же окно на весь экран (ключ тот же - только смена размера, без перезапуска). */

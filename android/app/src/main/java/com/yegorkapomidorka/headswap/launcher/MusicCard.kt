@@ -5,9 +5,11 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -99,6 +101,10 @@ fun MusicCard(modifier: Modifier) {
     LaunchedEffect(st.pkg) { model.noteOnlinePlayer(st.pkg) }
     CardBox(modifier, background = Color.Transparent) {
         Box(Modifier.fillMaxSize().musicBackground())
+        if (s.portrait) {
+            MusicBodyPortrait(st, player)
+            return@CardBox
+        }
         if (st.art == null) {
             // нота лежит у золотого пятна фона, а оно нарисовано физически: Ltr, чтобы в RTL нота не уезжала от него
             Ltr {
@@ -160,6 +166,70 @@ fun MusicCard(modifier: Modifier) {
             }
         }
     }
+}
+
+/**
+ * Карточка музыки в портрете (h921, макет Main.dc.html): на всю ширину, обложка квадратом слева, справа название (F1),
+ * исполнитель (F2) и prev / play / next; чип плееров остаётся в правом верхнем углу.
+ */
+@Composable
+private fun BoxScope.MusicBodyPortrait(st: MusicState, player: String?) {
+    val model = LauncherModel
+    val m = LocalMetrics.current
+    val s = m.spec
+    val ctx = model.context
+    // тап по телу открывает приложение плеера, как в горизонтали
+    Pressable(Modifier.fillMaxSize(), description = stringResource(R.string.l_music_players), onTap = { LauncherActions.openMusicApp() }) {}
+    Row(Modifier.fillMaxSize().padding(m.dp(s.g)), horizontalArrangement = Arrangement.spacedBy(m.dp(s.g8 * 2))) {
+        Box(
+            Modifier.size(m.dp(s.musicCover)).clip(RoundedCornerShape(m.dp(s.radius * 3 / 4)))
+                .background(Brush.linearGradient(listOf(Color(0xFFE8C65A), Color(0xFFC45434)))),
+            contentAlignment = Alignment.Center,
+        ) {
+            val art = st.art
+            if (art != null) Image(art, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+            else SvgIcon(Ico.MUSIC, s.musicCover / 3, Color(0xFF201A05), stroke = 2.2f)
+        }
+        Column(Modifier.weight(1f).fillMaxHeight(), verticalArrangement = Arrangement.SpaceBetween) {
+            // справа от текста место под чип плееров
+            Column(Modifier.padding(end = m.dp(s.pcB + s.g8))) {
+                when {
+                    !st.access -> Txt(stringResource(R.string.l_music_no_access), s.fs, color = Pal.SEC2, maxLines = 3)
+                    st.hasSession -> {
+                        Txt(st.title, s.f1, weight = FontWeight.Bold)
+                        Txt(st.artist, s.f2, color = Color(0xFFD9DEF5))
+                    }
+                    else -> {
+                        Txt(stringResource(R.string.l_music_idle), s.f1, weight = FontWeight.Bold)
+                        player?.let { Txt(LauncherModel.packageLabel(it), s.f2, color = Color(0xFFD9DEF5)) }
+                    }
+                }
+            }
+            // prev / play / next всегда слева направо, как значки плеера
+            Ltr {
+                Row(Modifier.height(m.dp(s.t)), verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(m.dp(s.g * 7 / 5))) {
+                    if (st.hasSession) {
+                        RoundButton(s.tp, stringResource(R.string.l_prev), onTap = { MusicController.previous() }, background = Color(0x1FFFFFFF)) {
+                            SvgIcon(Ico.PREV, s.tpIc, Pal.WHITE, fill = true)
+                        }
+                    }
+                    if (st.hasSession || (st.access && player != null)) {
+                        RoundButton(s.t, stringResource(if (st.playing) R.string.l_pause else R.string.l_play),
+                            onTap = { MusicController.playPause(ctx, player) }, background = LocalAccent.current) {
+                            SvgIcon(if (st.playing) Ico.PAUSE else Ico.PLAY, s.ic, Pal.onAccent(LocalAccent.current), fill = true)
+                        }
+                    }
+                    if (st.hasSession) {
+                        RoundButton(s.tp, stringResource(R.string.l_next), onTap = { MusicController.next() }, background = Color(0x1FFFFFFF)) {
+                            SvgIcon(Ico.NEXT, s.tpIc, Pal.WHITE, fill = true)
+                        }
+                    }
+                }
+            }
+        }
+    }
+    PlayerChipColumn(Modifier.align(Alignment.TopEnd).padding(end = m.dp(s.g8), top = m.dp(s.g8)))
 }
 
 /**

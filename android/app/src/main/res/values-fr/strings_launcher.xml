@@ -7,6 +7,8 @@
     <string name="l_back">Retour</string>
     <string name="l_settings">Réglages</string>
     <string name="l_card_view">Changer la grande tuile</string>
+    <string name="l_volume_down">Volume moins</string>
+    <string name="l_volume_up">Volume plus</string>
     <string name="l_navigation">Navigation</string>
     <string name="l_add">Ajouter</string>
     <string name="l_remove_q">Supprimer ?</string>

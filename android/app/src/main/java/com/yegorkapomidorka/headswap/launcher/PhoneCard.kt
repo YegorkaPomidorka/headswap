@@ -96,7 +96,7 @@ private class PhoneView(
 
 /** Карточка «Телефон»: состояния А-Ж из PhoneStates.dc.html, полный и компактный вид. Тап по телу - экран «Вызовы». */
 @Composable
-fun PhoneCard(modifier: Modifier, shape: Shape? = null) {
+fun PhoneCard(modifier: Modifier, shape: Shape? = null, compact: Boolean = LocalMetrics.current.spec.phoneCompact) {
     val model = LauncherModel
     val m = LocalMetrics.current
     val s = m.spec
@@ -118,16 +118,16 @@ fun PhoneCard(modifier: Modifier, shape: Shape? = null) {
             verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(m.dp(s.g)),
         ) {
             val buttons = when {
-                s.phoneCompact -> v.compact
+                compact -> v.compact
                 s.wide || incoming -> v.full
                 else -> v.full.take(1)
             }
             when {
-                s.phoneCompact && v.ringIcon -> {
+                compact && v.ringIcon -> {
                     SvgIcon(Ico.PHONE_RING, (s.t * 0.65f).toInt(), accent)
                     Spacer(Modifier.weight(1f))
                 }
-                s.phoneCompact -> Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(m.dp(s.g4))) {
+                compact -> Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(m.dp(s.g4))) {
                     Txt(v.name, if (v.small) s.f2 else s.f1, color = v.nameColor ?: Pal.TEXT, weight = FontWeight.Bold, ellipsis = false)
                     if (v.line2.isNotEmpty()) Txt(v.line2, s.f2, color = v.line2Color ?: Pal.SEC, weight = FontWeight.SemiBold, mono = true, ellipsis = false)
                 }
@@ -202,7 +202,7 @@ fun CallsScreen() {
     val current = Pager.clamp(page, rows.size, perPage)
     val shown = Pager.slice(rows, current, perPage)
     Column(
-        Modifier.fillMaxSize().padding(start = m.dp(s.g), top = m.dp(s.g8), end = m.dp(s.m), bottom = m.dp(s.m)),
+        Modifier.fillMaxSize().padding(start = m.dp(s.g), top = m.dp(s.g8), end = m.dp(s.padEnd), bottom = m.dp(s.padBottom)),
         verticalArrangement = Arrangement.spacedBy(m.dp(s.g8)),
     ) {
         StatusBar()

@@ -7,6 +7,8 @@
     <string name="l_back">رجوع</string>
     <string name="l_settings">الإعدادات</string>
     <string name="l_card_view">تغيير البطاقة الكبيرة</string>
+    <string name="l_volume_down">خفض الصوت</string>
+    <string name="l_volume_up">رفع الصوت</string>
     <string name="l_navigation">الملاحة</string>
     <string name="l_add">إضافة</string>
     <string name="l_remove_q">حذف؟</string>

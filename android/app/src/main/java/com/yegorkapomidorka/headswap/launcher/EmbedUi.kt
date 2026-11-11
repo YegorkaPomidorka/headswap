@@ -310,7 +310,7 @@ fun HomeTileButtons() {
     val s = m.spec
     val big = model.bigTileRect
     val small = model.smallTileRect
-    if (model.homeLayout.two && big != null && small != null) {
+    if (model.layout.two && big != null && small != null) {
         val size = Math.round(s.t * 0.8f)
         val cx = Math.round(if (big.left < small.left) (big.right + small.left) / 2 else (small.right + big.left) / 2)
         val cy = Math.round(big.center.y)
