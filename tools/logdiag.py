@@ -269,6 +269,10 @@ def run(path, rules=None):
 
 
 def main(argv):
+    # консоль Windows (cp1251) падает на «×» из device.txt
+    for stream in (sys.stdout, sys.stderr):
+        if hasattr(stream, "reconfigure"):
+            stream.reconfigure(encoding="utf-8", errors="replace")
     args = [a for a in argv[1:] if not a.startswith("--")]
     if len(args) != 1:
         print(__doc__.strip(), file=sys.stderr)

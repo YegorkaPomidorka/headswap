@@ -30,6 +30,7 @@
     <string name="l_nav_hints_off">كما على الهاتف</string>
     <string name="l_nav_hints_off_plus">كما على الهاتف · لا يلزم اشتراك</string>
     <string name="l_nav_hints_off_aa">كما على الهاتف · Android Auto غير مشغّل</string>
+    <string name="l_nav_location_hint">امنح تطبيق الملاحة إذن الموقع «السماح طوال الوقت»، وإلا فلن يعمل GPS. اضغط لفتح الإعدادات</string>
     <string name="l_nav_aa_server_hint">افتح إعدادات Android Auto على الهاتف\n⋮ ← «بدء تشغيل خادم الوحدة الرئيسية»</string>
     <string name="l_view_navigator">الملاحة</string>
     <string name="l_view_clock">الساعة</string>
