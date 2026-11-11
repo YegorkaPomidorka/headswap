@@ -38,6 +38,29 @@ class CarAppLogicTest {
         assertEquals(Box(0, 0, 1136, 720), CarAreas.crop(1136, 720, 1500, 800))
     }
 
+    @Test fun tileCardsShrinkOrSpanNarrowTile() {
+        // 1280x720, 4 плашки: большая 712 px, карточка прибытия 540 - слева, уменьшенная до 55 % ширины
+        val (big, bigNarrow) = CarTileFit.scale(712, 540, 21)
+        assertFalse(bigNarrow)
+        assertEquals(0.725f, big, 0.001f)
+        // малая плашка 2:1 (356 px): слева вышло бы мельче 0,6 - на всю ширину, ровно с отступами
+        val (small, smallNarrow) = CarTileFit.scale(356, 540, 21)
+        assertTrue(smallNarrow)
+        assertEquals(356f, small * (540 + 2 * 21), 0.5f)
+        // широкая плашка 1920x720 и «Масштаб карты» помельче - без увеличения
+        assertEquals(1f to false, CarTileFit.scale(1318, 660, 21))
+        assertEquals(1f to false, CarTileFit.scale(712, 360, 14))
+        assertEquals(1f to false, CarTileFit.scale(0, 540, 21))
+    }
+
+    @Test fun touchInCardGoesToItsCrop() {
+        val crop = CarAreas.crop(1136, 720, 712, 501)
+        assertEquals(212f to 109f, CarAreas.touch(0f, 0f, 712, 501, 1136, 720, crop))
+        assertEquals(212f + 356f to 109f + 250f, CarAreas.touch(356f, 250f, 712, 501, 1136, 720, crop))
+        // на весь экран окно растягивает поверхность
+        assertEquals(568f to 360f, CarAreas.touch(500f, 300f, 1000, 600, 1136, 720, null))
+    }
+
     @Test fun emptySurfaceGivesEmptyAreas() {
         assertEquals(Box(0, 0, 0, 0), CarAreas.of(0, 720, 10, 10, 10).first)
     }

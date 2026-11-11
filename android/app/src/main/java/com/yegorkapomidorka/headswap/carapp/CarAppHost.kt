@@ -116,6 +116,12 @@ object CarAppHost {
     fun setCrop(crop: Box?) { h.post { if (this.crop != crop) { this.crop = crop; push() } } }
     private var crop: Box? = null
 
+    /** Наши карточки в карточке на главном: [leftPx] слева или [topPx] сверху, px вырезки. */
+    fun setCropAreas(leftPx: Int, topPx: Int) {
+        h.post { val v = leftPx to topPx; if (cropAreas != v) { cropAreas = v; push() } }
+    }
+    private var cropAreas = 0 to 0
+
     /** cmd car_night: true/false - ночь/день от хоста, null - как в настройках навигатора. */
     fun setNight(value: Boolean?) { h.post { if (night != value) { night = value; push() } } }
 
@@ -150,7 +156,7 @@ object CarAppHost {
     private fun view(): CarAppSession.View {
         val c = crop
         val (visible, stable) = when {
-            c != null -> CarAreas.of(c, 0, 0, 0) // в карточке поверх карты ничего своего
+            c != null -> CarAreas.of(c, cropAreas.first, 0, cropAreas.second) // в карточке - только манёвр и прибытие
             else -> areas?.let { (l, r, t) -> CarAreas.of(sw, sh, l, r, t) } ?: CarAreas.default(sw, sh)
         }
         return CarAppSession.View(surface, sw, sh, CarConfigMath.dpi(scale), night, visible, stable)

@@ -134,8 +134,10 @@ private class NavDims(private val k: Float, wide: Boolean) {
 fun NavHostOverlay() {
     val model = LauncherModel
     val slot = EmbedHost.nav
-    if (model.area != Area.Navigator || !slot.carHost || slot.status != EmbedStatus.READY) return
-    val r = model.areaRect ?: return
+    // плашка навигатора на главном (режимы 2 и 4 окон): в ней только манёвр и прибытие (h1045)
+    val tile = model.area == Area.Home && CardView.NAVIGATOR in listOf(model.tiles.big, model.tiles.small)
+    if ((model.area != Area.Navigator && !tile) || !slot.carHost || slot.status != EmbedStatus.READY) return
+    val r = (if (tile) model.navCardRect else model.areaRect) ?: return
     var ui by remember { mutableStateOf(CarAppHost.ui) }
     var toast by remember { mutableStateOf<CharSequence?>(null) }
     DisposableEffect(Unit) {
@@ -150,10 +152,15 @@ fun NavHostOverlay() {
     // «Масштаб карты» меняет и наши карточки с кнопками - в одну меру с картой навигатора
     val scale = CarAppHost.pkg?.let { com.yegorkapomidorka.headswap.carapp.CarConfigMath.step(LauncherModel.mapScale(it)) } ?: 1f
     // портрет 960x1152: по высоте карточки вышли бы в 1,6 раза, масштаб по T (96 - единица)
-    val d = remember(m.spec, scale) { NavDims((if (m.spec.portrait) m.spec.t / 96f else m.spec.h / 720f) * scale, m.spec.wide) }
+    val k = (if (m.spec.portrait) m.spec.t / 96f else m.spec.h / 720f) * scale
+    val d = remember(m.spec, scale) { NavDims(k, m.spec.wide) }
     val w = r.width.roundToInt()
     val h = r.height.roundToInt()
     val current = ui
+    if (tile) {
+        NavTileOverlay(current as? CarUi.Nav, look, k, m.spec.wide, d, r)
+        return
+    }
     // видимая и стабильная области для навигатора: карта без наших карточек и кнопок (CarAreas)
     val hasActions = (current as? CarUi.Nav)?.actions?.isNotEmpty() ?: (current as? CarUi.Panel)?.actions?.isNotEmpty() ?: false
     LaunchedEffect(current?.javaClass, current is CarUi.Nav && (current.maneuver != null || current.eta != null), hasActions, w) {
@@ -188,6 +195,39 @@ fun NavHostOverlay() {
                     Txt(t.toString(), d.rowText, color = look.fg, maxLines = 2)
                 }
             }
+        }
+    }
+}
+
+/**
+ * Плашка навигатора на главном: вырезка его карты 1:1 (CarAppHost.setCrop) и поверх неё манёвр слева вверху,
+ * прибытие слева внизу - уменьшенные карточки полного экрана (CarTileFit). Кнопок и панелей в плашке нет:
+ * на весь экран - кнопкой навигации на рейке. Видимая область навигатора уходит из-под карточек.
+ */
+@Composable
+private fun NavTileOverlay(n: CarUi.Nav?, look: NavLook, k: Float, wide: Boolean, full: NavDims, r: androidx.compose.ui.geometry.Rect) {
+    val m = LocalMetrics.current
+    val density = LocalDensity.current
+    val w = r.width.roundToInt()
+    val h = r.height.roundToInt()
+    val (f, narrow) = com.yegorkapomidorka.headswap.carapp.CarTileFit.scale(w, full.eta, full.gap)
+    val d = remember(k, wide, f) { NavDims(k * f, wide) }
+    val cards = n != null && (n.maneuver != null || n.eta != null)
+    LaunchedEffect(cards, narrow, n?.maneuver != null, d, w) {
+        when {
+            !cards -> CarAppHost.setCropAreas(0, 0)
+            narrow -> CarAppHost.setCropAreas(0, if (n?.maneuver != null) d.gap + d.manIc + 2 * d.cardPadV else 0)
+            else -> CarAppHost.setCropAreas(d.gap + maxOf(d.card, d.eta) + d.gap, 0)
+        }
+    }
+    if (n == null) return
+    Ltr {
+        Box(
+            Modifier.absoluteOffset { IntOffset(r.left.roundToInt(), r.top.roundToInt()) }
+                .size(with(density) { w.toDp() }, with(density) { h.toDp() }),
+        ) {
+            n.maneuver?.let { ManeuverCard(it, look, d, Modifier.align(Alignment.TopStart).padding(start = m.dp(d.gap), top = m.dp(d.gap))) }
+            n.eta?.let { ArrivalCard(it, n.end, look, d, Modifier.align(Alignment.BottomStart).padding(start = m.dp(d.gap), bottom = m.dp(d.gap))) }
         }
     }
 }
