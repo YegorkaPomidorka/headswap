@@ -5,6 +5,7 @@ import android.media.MediaCodecInfo
 import android.media.MediaFormat
 import android.os.Build
 import android.os.Bundle
+import android.os.Process
 import android.os.SystemClock
 import android.view.Surface
 import com.yegorkapomidorka.headswap.AnnexB
@@ -192,10 +193,10 @@ class AaTranscoder(
         dump = VideoDump.open(dumpTag ?: if (directSurface) "desktop" else "aa").also {
             it?.event("start ${width}x$height fps=$fps bitrate=$bitrate encoder=$encoderName direct=$directSurface")
         }
-        encThread = Thread({ encodeLoop(c) }, "aa-trans-enc").also { it.start() }
+        encThread = Thread({ runCatching { Process.setThreadPriority(Process.THREAD_PRIORITY_DISPLAY) }; encodeLoop(c) }, "aa-trans-enc").also { it.start() }
         if (threaded) {
             queue.clear()
-            feedThread = Thread({ feedLoop() }, "aa-trans-feed").also { it.start() }
+            feedThread = Thread({ runCatching { Process.setThreadPriority(Process.THREAD_PRIORITY_DISPLAY) }; feedLoop() }, "aa-trans-feed").also { it.start() }
         }
         val modeNote = when (bitrateMode) {
             MediaCodecInfo.EncoderCapabilities.BITRATE_MODE_CBR -> "CBR"
@@ -478,7 +479,7 @@ class AaTranscoder(
                 throw e
             }
             val d = Dec(c)
-            d.thread = Thread({ decodeLoop(d) }, "aa-trans-dec").also { it.start() }
+            d.thread = Thread({ runCatching { Process.setThreadPriority(Process.THREAD_PRIORITY_DISPLAY) }; decodeLoop(d) }, "aa-trans-dec").also { it.start() }
             decoder = d
             decoderCfg = s + p
             cfgStale = false

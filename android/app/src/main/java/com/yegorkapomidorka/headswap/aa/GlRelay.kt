@@ -13,6 +13,7 @@ import android.opengl.GLES20
 import android.opengl.GLUtils
 import android.os.Handler
 import android.os.HandlerThread
+import android.os.Process
 import android.os.SystemClock
 import android.view.Surface
 import java.nio.ByteBuffer
@@ -260,6 +261,7 @@ class GlRelay(
     }
 
     private fun init() {
+        runCatching { Process.setThreadPriority(Process.THREAD_PRIORITY_DISPLAY) }
         display = EGL14.eglGetDisplay(EGL14.EGL_DEFAULT_DISPLAY)
         val ver = IntArray(2)
         check(EGL14.eglInitialize(display, ver, 0, ver, 1)) { "eglInitialize" }

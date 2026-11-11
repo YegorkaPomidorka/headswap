@@ -172,6 +172,7 @@ class BridgeService : Service() {
     private var wifiOffShown = false
     private val btHintTick = Runnable { checkBtHint() }
     private var wakeLock: PowerManager.WakeLock? = null
+    private var screenWakeLock: PowerManager.WakeLock? = null
     private val audioDiag = AudioDiag()
     /** Ветка A, диагностика: RFCOMM `carlife` слушаем, пока ждём машину по Wi-Fi. Колбэки с bt-нити перекидываем на главную. */
     private val btProbe by lazy {
@@ -979,11 +980,7 @@ class BridgeService : Service() {
         h.core.carVwId = aaPrefs.carPreset == CarPreset.VW_ID_UNYX
         h.core.phoneAssistant = null   // режим AA: кнопка голоса идёт в AA
         DesktopKeys.voiceStatus = null
-        if (wakeLock == null) {
-            wakeLock = getSystemService(PowerManager::class.java)
-                .newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "headswap:session")
-                .apply { acquire(4 * 60 * 60 * 1000L) }
-        }
+        acquireSessionWakeLocks()
         CarLifeState.running = true
         stopRequested = false
 
@@ -1088,11 +1085,7 @@ class BridgeService : Service() {
         owner.core.spliceMs = 0L
         owner.core.carVwId = aaPrefs.carPreset == CarPreset.VW_ID_UNYX
         // кнопка голоса: системный помощник клавишей KEYCODE_ASSIST (как долгое нажатие питания), см. createDesktopHost
-        if (wakeLock == null) {
-            wakeLock = getSystemService(PowerManager::class.java)
-                .newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "headswap:session")
-                .apply { acquire(4 * 60 * 60 * 1000L) }
-        }
+        acquireSessionWakeLocks()
         CarLifeState.running = true
         stopRequested = false
 
@@ -1411,15 +1404,50 @@ class BridgeService : Service() {
         }
     }
 
-    private fun finish() {
-        if (desktopUsed) cancelDesktopRecovery()
-        stopCarNet(CarNetEvent.STOP, "finish")
-        CarLifeState.running = false
+    /**
+     * CarLife video flickers on the CR-V when the phone screen is off: the display/GPU pipeline
+     * drops into its low-power state even though the virtual display is held bright. Keep the
+     * physical screen on for the session; the user can dim/face it down.
+     */
+    private fun acquireSessionWakeLocks() {
+        if (wakeLock == null) {
+            wakeLock = getSystemService(PowerManager::class.java)
+                .newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "headswap:session")
+                .apply { setReferenceCounted(false); acquire(4 * 60 * 60 * 1000L) }
+        }
+        if (screenWakeLock == null) {
+            try {
+                screenWakeLock = getSystemService(PowerManager::class.java)
+                    .newWakeLock(
+                        PowerManager.SCREEN_BRIGHT_WAKE_LOCK or PowerManager.ACQUIRE_CAUSES_WAKEUP,
+                        "headswap:session-screen",
+                    )
+                    .apply { setReferenceCounted(false); acquire(4 * 60 * 60 * 1000L) }
+                AppLog.i("экран: удерживаю включённым на время CarLife-сессии", false)
+            } catch (e: Exception) {
+                AppLog.e("экран: wake lock не создан", e)
+            }
+        }
+    }
+
+    private fun releaseSessionWakeLocks() {
+        try {
+            screenWakeLock?.let { if (it.isHeld) it.release() }
+        } catch (_: Exception) {
+        }
+        screenWakeLock = null
         try {
             wakeLock?.let { if (it.isHeld) it.release() }
         } catch (_: Exception) {
         }
         wakeLock = null
+    }
+
+    private fun finish() {
+        if (desktopUsed) cancelDesktopRecovery()
+        stopCarNet(CarNetEvent.STOP, "finish")
+        CarLifeState.running = false
+        releaseSessionWakeLocks()
         stopForeground(STOP_FOREGROUND_REMOVE)
         stopSelf()
     }
@@ -1445,6 +1473,7 @@ class BridgeService : Service() {
         }
         session?.close("сервис уничтожен")
         host?.shutdown("сервис уничтожен")
+        releaseSessionWakeLocks()
         super.onDestroy()
     }
 
