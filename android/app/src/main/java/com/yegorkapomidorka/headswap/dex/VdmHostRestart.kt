@@ -80,7 +80,7 @@ internal object VdmHostRestart {
 
     /** null - можно перезапускать; иначе причина для лога. */
     private fun blocker(ctx: Context): String? = when {
-        !VdmDesktop.supported -> "Android ниже 17"
+        !VdmDesktop.supported -> "VDM-хост не нужен (Android ниже 17, не Samsung на 16)"
         !DelegatedDesktopAccess.isReady(ctx) -> "активация закончилась"
         !PhoneActivationState(ctx).paired || !PhoneAdb.hasIdentity(ctx) -> "активация не с телефона (нет пары adb)"
         Settings.Global.getInt(ctx.contentResolver, "adb_wifi_enabled", 0) != 1 &&

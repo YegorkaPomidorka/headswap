@@ -155,7 +155,7 @@ public final class ManualAccessLauncher {
      * запуска (setsid/nohup), живёт, пока жив проверенный выше процесс приложения. Не вышло - рабочий стол на обычном дисплее.
      */
     private static void startVdmHost(ManualAccessPolicy.Options options, int appPid) {
-        if (Build.VERSION.SDK_INT < VdmHostPolicy.MIN_SDK) return;
+        if (!VdmHostPolicy.supported(Build.VERSION.SDK_INT, Build.MANUFACTURER)) return;
         try {
             String apk = System.getProperty("java.class.path");
             String command = VdmHostPolicy.startCommand(apk, options.packageName, appPid);

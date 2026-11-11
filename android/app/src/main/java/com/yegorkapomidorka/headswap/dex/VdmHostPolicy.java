@@ -3,6 +3,13 @@ package com.yegorkapomidorka.headswap.dex;
 /** Чистые правила запуска shell-хоста VirtualDevice (этап B): команда и разбор аргументов, без shell-ввода извне. */
 public final class VdmHostPolicy {
     public static final int MIN_SDK = 37;
+    /** Samsung One UI на Android 16 тоже кладёт дисплей с OWN_DISPLAY_GROUP в группу 0 (h1091, SM-A536E). */
+    public static final int SAMSUNG_MIN_SDK = 36;
+
+    /** Нужен ли shell-хост VirtualDevice: Android 17 везде, Android 16 только на Samsung. */
+    public static boolean supported(int sdk, String manufacturer) {
+        return sdk >= MIN_SDK || (sdk >= SAMSUNG_MIN_SDK && "samsung".equalsIgnoreCase(manufacturer));
+    }
     public static final String ENTRY = ManualAccessPolicy.DEX_CLASS_PACKAGE + ".VdmHostMain";
     public static final String LOG = "/data/local/tmp/headswap-vdm-host.log";
 

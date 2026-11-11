@@ -16,8 +16,8 @@ import com.yegorkapomidorka.headswap.AppLog
  * отдельный shell-процесс [VdmHostMain], а сюда он отдаёт свой binder через [VdmHostProvider].
  */
 internal object VdmDesktop {
-    /** Только Android 17 (separate_timeouts); на 16 старый путь с OWN_DISPLAY_GROUP пока работает (Егор, 07.11). */
-    const val MIN_SDK = 37
+    /** Android 17 (separate_timeouts) везде; на 16 только Samsung (h1091), остальным старый путь с OWN_DISPLAY_GROUP. */
+    const val MIN_SDK = VdmHostPolicy.MIN_SDK
     const val METHOD = "vdm_host"
     const val METHOD_REPORT = "vdm_report"
     const val EXTRA_HOST = "host"
@@ -31,7 +31,7 @@ internal object VdmDesktop {
     const val FLAG_ALWAYS_UNLOCKED = 1 shl 12
     const val FLAG_DEVICE_DISPLAY_GROUP = 1 shl 15
 
-    val supported: Boolean get() = Build.VERSION.SDK_INT >= MIN_SDK
+    val supported: Boolean get() = VdmHostPolicy.supported(Build.VERSION.SDK_INT, Build.MANUFACTURER)
 
     /**
      * Отладка по USB выключена: без неё Samsung при подключении ГУ кабелем останавливает adbd, а с ним shell-хост

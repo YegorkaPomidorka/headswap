@@ -29,6 +29,15 @@ class VdmHostPolicyTest {
         assertThrows(IllegalArgumentException::class.java) { VdmHostPolicy.Args.parse(arrayOf("--pid", "4", "--x")) }
     }
 
+    @Test fun hostOnAndroid17EverywhereAndSamsungOn16() {
+        assertTrue(VdmHostPolicy.supported(37, "Google"))
+        assertTrue(VdmHostPolicy.supported(36, "samsung"))
+        assertTrue(VdmHostPolicy.supported(36, "Samsung"))
+        assertEquals(false, VdmHostPolicy.supported(36, "Xiaomi"))
+        assertEquals(false, VdmHostPolicy.supported(36, null))
+        assertEquals(false, VdmHostPolicy.supported(35, "samsung"))
+    }
+
     @Test fun hostFlagsSwapOwnGroupForDeviceGroup() {
         val flags = DesktopModePolicy.ANDROID_DISPLAY_FLAGS or VdmDesktop.FLAG_OWN_DISPLAY_GROUP or VdmDesktop.FLAG_ALWAYS_UNLOCKED
         val host = VdmDesktop.hostFlags(flags)
