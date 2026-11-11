@@ -1056,8 +1056,9 @@ class BridgeService : Service() {
         val screenOn = getSystemService(PowerManager::class.java).isInteractive
         val cfg = SessionConfig(
             screenOn, false, dexPrefs.desktopFps,
-            // ПРОБНИК: навигация из теневой AA-сессии (AaShadowNav), без неё подписку ГУ просто никто не кормит
-            metaMusic = false, metaNavi = aaPrefs.metaNavi, naviField6 = aaPrefs.naviField6, desktopVideo = desktopVideo,
+            // ПРОБНИК: навигация из теневой AA-сессии (AaShadowNav), без неё подписку ГУ просто никто не кормит.
+            // Музыку кормит DesktopMediaMeta из MediaSession (h1054); с false MEDIA_INFO резался в sendMediaInfo
+            metaMusic = aaPrefs.metaMusic, metaNavi = aaPrefs.metaNavi, naviField6 = aaPrefs.naviField6, desktopVideo = desktopVideo,
         )
         MetaRelay.PROGRESS_UNIT = if (aaPrefs.progressSeconds) 1 else 1000
 
