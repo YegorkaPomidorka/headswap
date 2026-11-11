@@ -15,7 +15,7 @@ internal object DexUserServicePolicy {
     const val DISPLAY_ALLOWS_CONTENT_MODE_SWITCH = 32768
     const val DISPLAY_TRUSTED = 128
 
-    fun requireDimensions(width: Int, height: Int) = DesktopGeometryPolicy.requireDimensions(width, height)
+    fun requireDimensions(width: Int, height: Int) = DesktopGeometryPolicy.requireNativeDimensions(width, height)
 
     fun requireDensity(density: Int) {
         DesktopGeometryPolicy.requireDensity(density)
