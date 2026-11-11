@@ -168,6 +168,7 @@
     <string name="l_nav_2gis">2GIS</string>
     <string name="l_nav_yandex_maps">Yandex Maps</string>
     <string name="l_nav_google_maps">Google 地图</string>
+    <string name="l_nav_amap" translatable="false">高德地图</string>
     <!-- 自有 Car App 宿主中的导航 -->
     <string name="l_u_m">米</string>
     <string name="l_u_km">公里</string>
