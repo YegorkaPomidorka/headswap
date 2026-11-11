@@ -7,6 +7,8 @@
     <string name="l_back">رجوع</string>
     <string name="l_settings">الإعدادات</string>
     <string name="l_card_view">تغيير البطاقة الكبيرة</string>
+    <string name="l_volume_down">خفض الصوت</string>
+    <string name="l_volume_up">رفع الصوت</string>
     <string name="l_navigation">الملاحة</string>
     <string name="l_add">إضافة</string>
     <string name="l_remove_q">حذف؟</string>
@@ -109,6 +111,9 @@
     <string name="l_s_theme_auto">تلقائي</string>
     <string name="l_s_theme_sub">يتبع الوضع التلقائي مصابيح السيارة الأمامية</string>
     <string name="l_s_rail">الشريط الجانبي</string>
+    <string name="l_s_rail_bottom">الشريط السفلي</string>
+    <string name="l_s_layout_tile_top">البطاقة في الأعلى</string>
+    <string name="l_s_layout_music_top">الموسيقى في الأعلى</string>
     <string name="l_s_rail_small">صغير</string>
     <string name="l_s_rail_medium">متوسط</string>
     <string name="l_s_rail_normal">عادي</string>

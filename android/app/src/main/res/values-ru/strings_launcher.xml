@@ -7,6 +7,8 @@
     <string name="l_back">Назад</string>
     <string name="l_settings">Настройки</string>
     <string name="l_card_view">Сменить большую плашку</string>
+    <string name="l_volume_down">Тише</string>
+    <string name="l_volume_up">Громче</string>
     <string name="l_navigation">Навигация</string>
     <string name="l_add">Добавить</string>
     <string name="l_remove_q">Убрать?</string>
@@ -127,6 +129,9 @@
     <string name="l_s_colors_bg_sat">Насыщенность фона</string>
     <string name="l_s_colors_hint">Пока открыт этот экран, стол показывает настраиваемые цвета. Ночные видны в тёмной теме, дневные — в светлой.</string>
     <string name="l_s_rail">Боковая панель</string>
+    <string name="l_s_rail_bottom">Нижняя панель</string>
+    <string name="l_s_layout_tile_top">Плитка сверху</string>
+    <string name="l_s_layout_music_top">Музыка сверху</string>
     <string name="l_s_rail_small">Маленькая</string>
     <string name="l_s_rail_medium">Средняя</string>
     <string name="l_s_rail_normal">Обычная</string>

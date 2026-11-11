@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -94,22 +95,48 @@ private class PhoneView(
     val number: String? = null,
 )
 
-/** Карточка «Телефон»: состояния А-Ж из PhoneStates.dc.html, полный и компактный вид. Тап по телу - экран «Вызовы». */
+/** Состояние карточки «Телефон» по текущим данным контроллера. */
 @Composable
-fun PhoneCard(modifier: Modifier, shape: Shape? = null) {
-    val model = LauncherModel
+fun currentPhoneModel(): PhoneCardModel = PhoneLogic.model(
+    PhoneController.logPermitted, PhoneController.callState, PhoneController.callTitle, PhoneController.ringed,
+    PhoneController.offhookSec, PhoneController.calls, LauncherModel.missedSeenMs,
+)
+
+/**
+ * Карточка «Телефон»: состояния А-Ж из PhoneStates.dc.html, полный и компактный вид. Тап по телу - экран «Вызовы».
+ * В портрете в покое - без текста: одна кнопка-иконка по центру (пропущенные - бейдж в углу); звонок там идёт
+ * полосой [PortraitCallBar] вместо всего нижнего ряда, а в карточке остаётся только на оверлее входящего.
+ */
+@Composable
+fun PhoneCard(modifier: Modifier, shape: Shape? = null, compact: Boolean = LocalMetrics.current.spec.phoneCompact) {
     val m = LocalMetrics.current
     val s = m.spec
-    val phone = PhoneLogic.model(
-        PhoneController.logPermitted, PhoneController.callState, PhoneController.callTitle, PhoneController.ringed,
-        PhoneController.offhookSec, PhoneController.calls, model.missedSeenMs,
-    )
+    val phone = currentPhoneModel()
     val accent = LocalAccent.current
     val incoming = phone is PhoneCardModel.Incoming
-    val ongoing = phone is PhoneCardModel.Incoming || phone is PhoneCardModel.InCall || phone is PhoneCardModel.Outgoing
+    val ongoing = phone.ongoing
     val cardShape = shape ?: RoundedCornerShape(m.dp(s.radius))
     val v = phoneView(phone, accent)
     CardBox(modifier, background = if (incoming) accent.copy(alpha = 0.14f) else Pal.SURFACE, shape = cardShape) {
+        if (s.portrait && !ongoing) {
+            val open = { LauncherActions.openCalls() }
+            Pressable(Modifier.fillMaxSize(), description = stringResource(R.string.l_phone), onTap = open) {}
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                RoundButton(s.t, stringResource(R.string.l_phone), open, background = Pal.GREEN) {
+                    SvgIcon(Ico.PHONE, s.ic, Pal.ON_GREEN, stroke = 2.4f)
+                }
+            }
+            if (phone is PhoneCardModel.Missed) {
+                val badge = m.dp((s.f2 * 1.4f).toInt())
+                Box(
+                    Modifier.align(Alignment.TopEnd).padding(top = m.dp(s.g4), end = m.dp(s.g4))
+                        .defaultMinSize(minWidth = badge, minHeight = badge).clip(RoundedCornerShape(badge / 2))
+                        .background(Pal.MISSED).padding(horizontal = m.dp(s.g4)),
+                    contentAlignment = Alignment.Center,
+                ) { Txt(phone.count.toString(), s.f2, color = Pal.WHITE, weight = FontWeight.Bold) }
+            }
+            return@CardBox
+        }
         if (!ongoing) Pressable(Modifier.fillMaxSize(), description = stringResource(R.string.l_phone), onTap = { LauncherActions.openCalls() }) {}
         // рамка входящего: inset 4px акцентом
         if (incoming) Box(Modifier.fillMaxSize().border(m.dp(4), accent, cardShape))
@@ -118,16 +145,16 @@ fun PhoneCard(modifier: Modifier, shape: Shape? = null) {
             verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(m.dp(s.g)),
         ) {
             val buttons = when {
-                s.phoneCompact -> v.compact
+                compact -> v.compact
                 s.wide || incoming -> v.full
                 else -> v.full.take(1)
             }
             when {
-                s.phoneCompact && v.ringIcon -> {
+                compact && v.ringIcon -> {
                     SvgIcon(Ico.PHONE_RING, (s.t * 0.65f).toInt(), accent)
                     Spacer(Modifier.weight(1f))
                 }
-                s.phoneCompact -> Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(m.dp(s.g4))) {
+                compact -> Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(m.dp(s.g4))) {
                     Txt(v.name, if (v.small) s.f2 else s.f1, color = v.nameColor ?: Pal.TEXT, weight = FontWeight.Bold, ellipsis = false)
                     if (v.line2.isNotEmpty()) Txt(v.line2, s.f2, color = v.line2Color ?: Pal.SEC, weight = FontWeight.SemiBold, mono = true, ellipsis = false)
                 }
@@ -139,6 +166,41 @@ fun PhoneCard(modifier: Modifier, shape: Shape? = null) {
                             weight = FontWeight.SemiBold, mono = true)
                     }
                 }
+            }
+            for (b in buttons) PhoneButton(b, v.number)
+        }
+    }
+}
+
+/**
+ * Полоса звонка портретного главного: заменяет весь нижний ряд (приложения и «Телефон»). Слева имя и состояние или таймер,
+ * справа кнопки; рамка 2 px цветом состояния. Данные и действия те же, что у [PhoneCard].
+ */
+@Composable
+fun PortraitCallBar(modifier: Modifier) {
+    val m = LocalMetrics.current
+    val s = m.spec
+    val accent = LocalAccent.current
+    val phone = currentPhoneModel()
+    val v = phoneView(phone, accent)
+    val ring = when (phone) {
+        is PhoneCardModel.Incoming -> accent
+        is PhoneCardModel.InCall -> Pal.GREEN
+        else -> Pal.SEC
+    }
+    val shape = RoundedCornerShape(m.dp(s.radius))
+    // входящий: «Отклонить» слева, «Принять» с краю под большой палец
+    val buttons = if (phone is PhoneCardModel.Incoming) listOf(PhoneBtn.DECLINE, PhoneBtn.ACCEPT) else v.full
+    CardBox(modifier, background = Pal.SURFACE, shape = shape) {
+        Box(Modifier.fillMaxSize().border(m.dp(2), ring, shape))
+        Row(
+            Modifier.fillMaxSize().padding(horizontal = m.dp(s.g)),
+            verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(m.dp(s.g)),
+        ) {
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(m.dp(s.g4))) {
+                Txt(v.name, s.f1, weight = FontWeight.Bold)
+                Txt(v.line2.ifEmpty { v.head }, s.f2, color = v.line2Color ?: v.headColor, weight = FontWeight.SemiBold,
+                    mono = phone is PhoneCardModel.InCall)
             }
             for (b in buttons) PhoneButton(b, v.number)
         }
@@ -202,7 +264,7 @@ fun CallsScreen() {
     val current = Pager.clamp(page, rows.size, perPage)
     val shown = Pager.slice(rows, current, perPage)
     Column(
-        Modifier.fillMaxSize().padding(start = m.dp(s.g), top = m.dp(s.g8), end = m.dp(s.m), bottom = m.dp(s.m)),
+        Modifier.fillMaxSize().padding(start = m.dp(s.g), top = m.dp(s.g8), end = m.dp(s.padEnd), bottom = m.dp(s.padBottom)),
         verticalArrangement = Arrangement.spacedBy(m.dp(s.g8)),
     ) {
         StatusBar()

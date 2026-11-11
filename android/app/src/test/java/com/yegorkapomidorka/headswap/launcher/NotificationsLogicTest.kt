@@ -161,6 +161,11 @@ class NotificationsLogicTest {
         assertTrue(min <= max)
     }
 
+    @Test fun portraitLineIsCenteredOnTheAreaWidth() {
+        assertEquals(480f, NotifGeom.portraitLineX(0f, 960f), 0.01f)
+        assertEquals(500f, NotifGeom.portraitLineX(40f, 960f), 0.01f)
+    }
+
     @Test fun listCapIsThreeQuartersOfScreen() {
         assertEquals(540 - 57 - 96 - 8, NotifGeom.listMaxHeight(720, 57, 96, 8))
         assertEquals(0, NotifGeom.listMaxHeight(100, 57, 96, 8))

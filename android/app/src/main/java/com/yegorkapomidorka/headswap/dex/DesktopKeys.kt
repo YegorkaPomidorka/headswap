@@ -23,6 +23,12 @@ object DesktopKeys {
      */
     @Volatile var injectKey: ((Int) -> Unit)? = null
 
+    /**
+     * Кнопки «−»/«+» громкости нижней рейки портретного лаунчера: тот же шаг STREAM_MUSIC, что у жеста двумя пальцами
+     * ([DesktopMediaControl.adjustVolume]). steps: +1 громче, -1 тише. null - сессии нет. Любой поток.
+     */
+    @Volatile var adjustVolume: ((Int) -> Unit)? = null
+
     /** Панель Алисы открылась (true) / закрылась: мост шлёт ГУ MODULE_STATUS VR. null - сессии нет. Любой поток. */
     @Volatile var voiceStatus: ((Boolean) -> Unit)? = null
 }

@@ -209,6 +209,9 @@ object Ico {
     val BT = listOf("m7 7 10 10-5 5V2l5 5L7 17")
     val WIFI = listOf("M2 8.5a16 16 0 0 1 20 0", "M5 12.5a11 11 0 0 1 14 0", "M8.5 16.5a6 6 0 0 1 7 0", circle(12, 20, 1))
     val VOLUME = listOf("M11 5 6 9H2v6h4l5 4z", "M15.5 8.5a5 5 0 0 1 0 7")
+    /** Громкость «−» и «+» нижней рейки портрета: динамик с чёрточкой и с плюсом. */
+    val VOLUME_DOWN = listOf("M3 9h3l4-4v14l-4-4H3z", "M14 12h7")
+    val VOLUME_UP = listOf("M3 9h3l4-4v14l-4-4H3z", "M14 12h7", "M17.5 8.5v7")
     val PHONE = listOf("M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2")
     val CONTACT = listOf(circle(12, 8, 4), "M4 21a8 8 0 0 1 16 0")
     /** Входящий в компактной карточке «Телефон»: трубка с волнами. */

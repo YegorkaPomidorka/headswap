@@ -161,7 +161,8 @@ private fun NotificationsOverlayBody(barBandH: Int, home: LauncherSpec) {
     // двигают. В арабском (RTL) рейка и плитки зеркальные - и пиксель зеркальный, у правой рейки (h1003).
     val fullscreenApp = model.area is Area.App && EmbedHost.app.fullscreen
     if (!fullscreenApp || shown.lineX == null) {
-        shown.lineX = NotifGeom.fixedLineX(area.left, area.right, home.g.toFloat(), home.music.toFloat(), localeRtl())
+        shown.lineX = if (home.portrait) NotifGeom.portraitLineX(area.left, area.right)
+        else NotifGeom.fixedLineX(area.left, area.right, home.g.toFloat(), home.music.toFloat(), localeRtl())
     }
     val centerX = shown.lineX!!
     val dragThr = px(30f).toFloat()

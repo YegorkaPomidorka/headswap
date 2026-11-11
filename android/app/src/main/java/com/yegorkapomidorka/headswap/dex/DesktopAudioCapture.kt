@@ -129,7 +129,7 @@ class DesktopAudioCapture(context: Context) {
 
     /** Жест громкости меняет STREAM_MUSIC, а захват его не видит: громкость накладываем сами. Без жеста звук как раньше. */
     private fun updateGain(current: AaBridgeCore) {
-        val next = if (!current.volumeSwipeEnabled) 1f else runCatching {
+        val next = if (!current.volumeGainEnabled) 1f else runCatching {
             DesktopVolumeGain.forIndex(audioManager.getStreamVolume(AudioManager.STREAM_MUSIC),
                 audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC))
         }.getOrDefault(1f)

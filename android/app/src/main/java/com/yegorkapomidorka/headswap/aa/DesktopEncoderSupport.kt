@@ -11,7 +11,7 @@ object DesktopEncoderSupport {
     internal data class Candidate(val name: String, val supports: (Int, Int, Int, Int) -> Boolean)
 
     internal fun select(candidates: List<Candidate>, width: Int, height: Int, fps: Int, bitrate: Int): String {
-        DesktopGeometryPolicy.requireDimensions(width, height)
+        DesktopGeometryPolicy.requireNativeDimensions(width, height)
         require(fps in 1..DesktopVideoQuality.MAX_FPS) { "Частота рабочего стола должна быть от 1 до 60 кадров/с" }
         require(bitrate > 0)
         return candidates.firstOrNull { runCatching { it.supports(width, height, fps, bitrate) }.getOrDefault(false) }?.name

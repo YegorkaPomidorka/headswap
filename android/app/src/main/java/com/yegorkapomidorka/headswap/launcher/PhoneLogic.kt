@@ -46,6 +46,10 @@ sealed interface PhoneCardModel {
     data class Outgoing(val title: String) : PhoneCardModel
 }
 
+/** Идёт звонок (Д, Е, Ж): карточка показывает имя, таймер и кнопки; в портрете звонок занимает весь нижний ряд. */
+val PhoneCardModel.ongoing: Boolean
+    get() = this is PhoneCardModel.Incoming || this is PhoneCardModel.InCall || this is PhoneCardModel.Outgoing
+
 object PhoneLogic {
     /** Исходящий без ответа показываем первые секунды: состояния «ответили» TelephonyManager не отдаёт. */
     const val OUTGOING_PHASE_SEC = 5

@@ -7,6 +7,8 @@
     <string name="l_back">Back</string>
     <string name="l_settings">Settings</string>
     <string name="l_card_view">Change big tile</string>
+    <string name="l_volume_down">Volume down</string>
+    <string name="l_volume_up">Volume up</string>
     <string name="l_navigation">Navigation</string>
     <string name="l_add">Add</string>
     <string name="l_remove_q">Remove?</string>
@@ -127,6 +129,9 @@
     <string name="l_s_colors_bg_sat">Background saturation</string>
     <string name="l_s_colors_hint">While this screen is open, the desktop shows the colors you are editing. Night colors show in the dark theme, day colors in the light one.</string>
     <string name="l_s_rail">Side panel</string>
+    <string name="l_s_rail_bottom">Bottom panel</string>
+    <string name="l_s_layout_tile_top">Tile on top</string>
+    <string name="l_s_layout_music_top">Music on top</string>
     <string name="l_s_rail_small">Small</string>
     <string name="l_s_rail_medium">Medium</string>
     <string name="l_s_rail_normal">Normal</string>

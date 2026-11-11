@@ -70,7 +70,8 @@ fun AliceVoicePill() {
     if (phase == AliceVoice.Phase.HIDDEN) return
     val r = model.areaRect ?: return
     val m = LocalMetrics.current
-    val k = m.spec.h / 720f
+    // в портрете высота экрана 1152+ растянула бы плашку на 1,6: масштаб по T, как у уведомлений
+    val k = if (m.spec.portrait) m.spec.t / 96f else m.spec.h / 720f
     fun px(v: Int) = (v * k).roundToInt()
     val left = if (model.area == Area.Navigator) AliceVoice.navLeftPx.coerceIn(0, (r.width / 2).roundToInt()) else 0
     val centerX = r.left + left + (r.width - left) / 2f

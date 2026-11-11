@@ -19,6 +19,8 @@ class LauncherSpec(
     val wide = w >= 1500
     /** Узкая лента вроде 1280x480: нижнего ряда нет, приложения сеткой справа. */
     val strip = w >= 1200 && h <= 500
+    /** Вертикальный экран (h921, Tucson NX4): рейка снизу, колонка плиток, настройки вкладками сверху. */
+    val portrait = h > w
     /** Экран высотой 480 (Mazda и т.п.): только на нём доступна «Обрезанная» панель. */
     val h480 = h <= 500
     private val k = t / 120.0
@@ -30,6 +32,10 @@ class LauncherSpec(
     val g8 = r(g * 0.6)
     val b4 = max(3, r(4 * k))
     val b6 = max(4, r(8 * k))
+    /** Поле у правого края экрана: в портрете рейки сбоку нет, поля с обеих сторон одинаковые (G). */
+    val padEnd = if (portrait) g else m
+    /** Поле под содержимым: в портрете под ним нижняя рейка. */
+    val padBottom = if (portrait) g else m
     /** Потолок размера кнопки рейки. */
     private val rbCap = when (rs) {
         RailSize.NORMAL -> t
@@ -42,12 +48,12 @@ class LauncherSpec(
         RailSize.MEDIUM -> r(t * 1.05)
         RailSize.SMALL, RailSize.CUT -> rbCap + 2 * max(4, r(g4 * 0.8))
     }
-    /** Часы в рейке одной строкой («Обычная»). */
-    val clockInRail = rs == RailSize.NORMAL
+    /** Часы в рейке одной строкой («Обычная»). В портрете часы всегда слева в строке статуса. */
+    val clockInRail = rs == RailSize.NORMAL && !portrait
     /** Часы в рейке столбиком: часы, золотая чёрточка, минуты («Средняя»). */
-    val clockStacked = rs == RailSize.MEDIUM
-    /** Часов в рейке нет, время - слева в строке статуса («Маленькая», «Обрезанная»). */
-    val clockInStatus = rs == RailSize.SMALL || rs == RailSize.CUT
+    val clockStacked = rs == RailSize.MEDIUM && !portrait
+    /** Часов в рейке нет, время - слева в строке статуса («Маленькая», «Обрезанная», любая в портрете). */
+    val clockInStatus = rs == RailSize.SMALL || rs == RailSize.CUT || portrait
     val clockHr = r(f1 * 1.1)
     val sepW = r(clockHr * 0.5)
     val sepH = max(3, b4)
@@ -70,8 +76,12 @@ class LauncherSpec(
     val statusBandH = statusH + g8 + g8 / 2
     /** Нижний ряд одной полосой: кнопка навигации, приложения и телефон высотой T плюс воздух по G сверху и снизу. */
     val bottomH = t + 2 * g
-    /** Блок навигации внизу рейки: в нижнем ряду той же высоты, что ряд; в ленте нижнего ряда нет. */
-    val navH = if (strip) r(t * 1.15) else bottomH
+    /** Нижняя рейка портрета: кнопки размера рейки и зазор G под ними (T + G = 116 при T 96). */
+    val bottomRailH = rbCap + g
+    /** Кнопка группы громкости «−»/«+» в капсуле нижней рейки: 0,92 от кнопки рейки. */
+    val volBtn = r(rbCap * 0.92)
+    /** Блок навигации внизу рейки: в нижнем ряду той же высоты, что ряд; в ленте нижнего ряда нет. В портрете - высота нижней рейки. */
+    val navH = if (portrait) bottomRailH else if (strip) r(t * 1.15) else bottomH
     /** Сетка 1:2 зеркально: узкая колонка - музыка сверху и телефон снизу, широкая - карта и приложения. */
     val narrow = r((w - rail - g - m - g) / 3.0)
     /** В ленте обложка кончается там же, где колонка разделов настроек (SettingsDims.catW = 290 при T 96), Егор 08.11. */
@@ -79,7 +89,11 @@ class LauncherSpec(
     /** Малая плашка раскладок 2:1 и 1:2: треть, но не шире 4,4T - на 1920x720 треть выходит слишком большой. */
     val tileSmall = min(narrow, r(t * 4.4))
     /** В ленте карточки нет, ширина нужна только оверлею входящего: 6T на широких, 5T - G на остальных. */
-    val phone = if (!strip) narrow else if (wide) r(t * 6.0) else r(t * 5.0 - g)
+    val phone = if (portrait) r(t * 2.3) else if (!strip) narrow else if (wide) r(t * 6.0) else r(t * 5.0 - g)
+    /** Портрет: карточка музыки на всю ширину (2,6T), обложка квадратом с полем G; нижний ряд приложений и «Телефона» (T + G). */
+    val musicH = r(t * 2.6)
+    val musicCover = musicH - 2 * g
+    val bottomRowH = t + g
     val cover = r(t * 1.6)
     val tag = max(14, r(f2 * 0.6))
     val appIc = r(t * 0.9)
@@ -92,7 +106,7 @@ class LauncherSpec(
     val cardViewInRail = !strip || clockInStatus
     val railButtons = if (clockInStatus) 4 else if (strip) 3 else 4
     private val railFree = h - navH - g - (g + g8) - clockH
-    val rb = max(1, min(rbCap, floor((railFree - railButtons * g4) / railButtons.toDouble()).toInt()))
+    val rb = if (portrait) rbCap else max(1, min(rbCap, floor((railFree - railButtons * g4) / railButtons.toDouble()).toInt()))
     val ric = min(ic, r(rb * 0.5))
     /** Панель «Назад / Домой / Недавние» под окном чужого лаунчера: высота как у круглой кнопки рейки (60-110 px по таблице). */
     val barH = rb
@@ -112,7 +126,7 @@ class LauncherSpec(
     /** Сколько приложений в быстром ряду (без плюса): в ленте сетка 2x3. */
     val quickApps = if (strip) 5 else 4
     /** Узкая карточка «Телефон»: имя цветом состояния, ниже время и счётчик, одна кнопка. */
-    val phoneCompact = phone - 2 * g - (if (wide) 2 * t + 2 * g else t + g) < 15 * f2 * 0.55
+    val phoneCompact = portrait || phone - 2 * g - (if (wide) 2 * t + 2 * g else t + g) < 15 * f2 * 0.55
 
     private fun r(v: Double) = v.roundToInt()
 
@@ -137,13 +151,23 @@ object LauncherSpecs {
         intArrayOf(800, 480, 62, 14, 18, 23, 19, 29),
     )
 
+    /**
+     * Вертикальные экраны (h > w), те же колонки. Отдельным списком: горизонтальный выбор по пропорции от них не зависит,
+     * а тесты по [TABLE] проверяют только горизонталь.
+     */
+    val PORTRAIT_TABLE: List<IntArray> = listOf(
+        intArrayOf(960, 1152, 96, 20, 28, 36, 30, 44),
+        intArrayOf(720, 1280, 80, 18, 24, 30, 26, 38),
+    )
+
     /** Точная строка таблицы либо ближайшая по высоте и пропорции, масштабированная линейно. */
     fun forSize(width: Int, height: Int, railSize: RailSize = RailSize.NORMAL): LauncherSpec {
         val w = max(1, width)
         val h = max(1, height)
-        TABLE.firstOrNull { it[0] == w && it[1] == h }?.let { return of(it, 1.0, railSize = railSize) }
+        val table = if (h > w) PORTRAIT_TABLE else TABLE
+        table.firstOrNull { it[0] == w && it[1] == h }?.let { return of(it, 1.0, railSize = railSize) }
         val aspect = w.toDouble() / h
-        val near = TABLE.minBy { row ->
+        val near = table.minBy { row ->
             abs(ln(h.toDouble() / row[1])) + abs(ln(aspect / (row[0].toDouble() / row[1])))
         }
         // линейно по меньшему из отношений, чтобы раскладка гарантированно влезала

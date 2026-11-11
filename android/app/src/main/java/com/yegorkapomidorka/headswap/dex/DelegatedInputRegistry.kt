@@ -63,6 +63,6 @@ internal class DelegatedInputRegistry {
     }
 
     private fun requireParentGeometry(id: Int, width: Int, height: Int) {
-        require(id > 0 && com.yegorkapomidorka.headswap.aa.DesktopGeometryPolicy.accepts(width, height)) { "Недопустимые размеры отдельного экрана" }
+        require(id > 0 && com.yegorkapomidorka.headswap.aa.DesktopGeometryPolicy.acceptsNative(width, height)) { "Недопустимые размеры отдельного экрана" }
     }
 }

@@ -7,6 +7,8 @@
     <string name="l_back">返回</string>
     <string name="l_settings">设置</string>
     <string name="l_card_view">更换大卡片</string>
+    <string name="l_volume_down">音量减小</string>
+    <string name="l_volume_up">音量增大</string>
     <string name="l_navigation">导航</string>
     <string name="l_add">添加</string>
     <string name="l_remove_q">要移除吗？</string>
@@ -127,6 +129,9 @@
     <string name="l_s_colors_bg_sat">背景饱和度</string>
     <string name="l_s_colors_hint">此页面打开期间，桌面会显示您正在编辑的颜色。夜间颜色用于深色主题，白天颜色用于浅色主题。</string>
     <string name="l_s_rail">侧边栏</string>
+    <string name="l_s_rail_bottom">底部栏</string>
+    <string name="l_s_layout_tile_top">卡片在上</string>
+    <string name="l_s_layout_music_top">音乐在上</string>
     <string name="l_s_rail_small">小</string>
     <string name="l_s_rail_medium">中</string>
     <string name="l_s_rail_normal">标准</string>
