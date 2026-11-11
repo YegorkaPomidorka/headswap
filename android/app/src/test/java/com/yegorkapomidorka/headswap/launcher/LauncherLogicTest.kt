@@ -35,6 +35,11 @@ class LauncherLogicTest {
         assertEquals(Press.TAP, PressLogic.classify(1000, 5000, false))
     }
 
+    @Test fun huExitLongPressNeedsOneSecond() {
+        assertEquals(Press.TAP, PressLogic.classify(1000, 1999, true, PressLogic.LONG_HU_EXIT_MS))
+        assertEquals(Press.LONG, PressLogic.classify(1000, 2000, true, PressLogic.LONG_HU_EXIT_MS))
+    }
+
     @Test fun debounceDropsSecondTapWithin400ms() {
         val d = Debounce()
         assertTrue(d.allow(10_000))
@@ -319,6 +324,22 @@ class LauncherLogicTest {
         }
     }
 
+    @Test fun settingsGridPortraitHasSevenRowsOnTheSameBorders() {
+        for (row in LauncherSpecs.PORTRAIT_TABLE) {
+            val s = LauncherSpecs.forSize(row[0], row[1])
+            val h = row[1] - s.bottomRailH - s.g8 - s.statusH - s.g8 - s.t - s.g8 - s.padBottom
+            val gap = s.g8
+            val rows = SettingsGrid.PORTRAIT_ROWS
+            assertEquals(0, SettingsGrid.top(0, h, gap, rows))
+            assertEquals(h, SettingsGrid.bottom(rows - 1, h, gap, rows))
+            for (i in 0 until rows - 1) {
+                assertEquals(gap, SettingsGrid.top(i + 1, h, gap, rows) - SettingsGrid.bottom(i, h, gap, rows))
+            }
+            // ряд не ниже цели касания: пилюли T помещаются, когда есть запас на поля
+            assertTrue("${row[0]}x${row[1]}", SettingsGrid.bottom(0, h, gap, rows) - SettingsGrid.top(0, h, gap, rows) >= s.t)
+        }
+    }
+
     @Test fun themeChoiceRestoresOldNamesAsDarkAndAutoFollowsHeadlights() {
         assertEquals(ThemeChoice.DARK, ThemeChoice.restore("GOLD_LIGHT"))
         assertEquals(ThemeChoice.DARK, ThemeChoice.restore("GOLD"))
@@ -388,9 +409,13 @@ class LauncherLogicTest {
         val hints = mapOf("com.google.android.apps.maps" to false, "ru.dublgis.dgismobile" to true)
         val of = { p: String -> hints[p] ?: true }
         assertFalse(NavigatorPick.shadowWanted(true, "com.google.android.apps.maps", of))
-        assertTrue(NavigatorPick.shadowWanted(true, "ru.dublgis.dgismobile", of))
-        assertTrue(NavigatorPick.shadowWanted(true, null, of))
-        assertFalse(NavigatorPick.shadowWanted(false, "ru.dublgis.dgismobile", of))
+        assertTrue(NavigatorPick.shadowWanted(true, "com.google.android.apps.maps") { true })
+        assertFalse(NavigatorPick.shadowWanted(false, "com.google.android.apps.maps") { true })
+    }
+
+    @Test fun shadowAaOnlyForGoogleMaps() {   // h1041: Яндекс и 2ГИС подсказки шлют через свой хост Car App
+        for (pkg in listOf(NavigatorPick.YANDEX_NAVI, NavigatorPick.YANDEX_MAPS, NavigatorPick.DGIS, NavigatorPick.WAZE, null))
+            assertFalse(pkg.toString(), NavigatorPick.shadowWanted(true, pkg) { true })
     }
 
     @Test fun needsPlusOnlyYandex() {

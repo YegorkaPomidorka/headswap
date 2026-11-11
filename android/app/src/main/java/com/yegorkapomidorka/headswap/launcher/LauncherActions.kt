@@ -2,6 +2,8 @@ package com.yegorkapomidorka.headswap.launcher
 
 import android.app.ActivityOptions
 import android.content.Intent
+import android.net.Uri
+import android.provider.Settings
 import android.view.Display
 import com.yegorkapomidorka.headswap.AppLog
 import com.yegorkapomidorka.headswap.MainActivity
@@ -44,6 +46,13 @@ object LauncherActions {
         PhoneController.dial(model.context, number)
     }
     fun cycleCardView() { model.nextCardView() }
+
+    /** «−»/«+» нижней рейки портрета: шаг громкости медиа, как жест двумя пальцами (мост пишет в лог и двигает STREAM_MUSIC). */
+    fun adjustVolume(steps: Int) {
+        val hook = com.yegorkapomidorka.headswap.dex.DesktopKeys.adjustVolume
+        if (hook == null) AppLog.i("LAUNCHER громкость ${if (steps > 0) "+" else ""}$steps: нет сессии рабочего стола", false)
+        else hook(steps)
+    }
     fun swapTiles() { model.swapTiles() }
 
     /** «Развернуть» плашку-приложение: то же окно на весь экран (ключ тот же - только смена размера, без перезапуска). */
@@ -59,6 +68,18 @@ object LauncherActions {
         runCatching { ctx.startActivity(intent, opts.toBundle()) }
             .onSuccess { AppLog.i("LAUNCHER запрос разрешений карточки «Телефон» открыт на телефоне", false) }
             .onFailure { AppLog.i("LAUNCHER запрос разрешений на телефоне: ${it.javaClass.simpleName}: ${it.message}", false) }
+    }
+
+    /** Настройки приложения [pkg] на телефоне (h1029: геолокация навигатора «в любом режиме»); лаунчер на экране ГУ. */
+    fun openAppSettings(pkg: String) {
+        if (!model.launchDebounce.allow(model.now())) return
+        val ctx = model.context
+        val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.fromParts("package", pkg, null))
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        val opts = ActivityOptions.makeBasic().setLaunchDisplayId(Display.DEFAULT_DISPLAY)
+        runCatching { ctx.startActivity(intent, opts.toBundle()) }
+            .onSuccess { AppLog.i("LAUNCHER настройки $pkg открыты на телефоне", false) }
+            .onFailure { AppLog.i("LAUNCHER настройки $pkg на телефоне: ${it.javaClass.simpleName}: ${it.message}", false) }
     }
 
     /** Выбор в Picker: приложение уходит в нижний ряд главного, туда же и возвращаемся. */

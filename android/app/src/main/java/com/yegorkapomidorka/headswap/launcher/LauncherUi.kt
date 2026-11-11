@@ -209,6 +209,9 @@ object Ico {
     val BT = listOf("m7 7 10 10-5 5V2l5 5L7 17")
     val WIFI = listOf("M2 8.5a16 16 0 0 1 20 0", "M5 12.5a11 11 0 0 1 14 0", "M8.5 16.5a6 6 0 0 1 7 0", circle(12, 20, 1))
     val VOLUME = listOf("M11 5 6 9H2v6h4l5 4z", "M15.5 8.5a5 5 0 0 1 0 7")
+    /** Громкость «−» и «+» нижней рейки портрета: динамик с чёрточкой и с плюсом. */
+    val VOLUME_DOWN = listOf("M3 9h3l4-4v14l-4-4H3z", "M14 12h7")
+    val VOLUME_UP = listOf("M3 9h3l4-4v14l-4-4H3z", "M14 12h7", "M17.5 8.5v7")
     val PHONE = listOf("M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2")
     val CONTACT = listOf(circle(12, 8, 4), "M4 21a8 8 0 0 1 16 0")
     /** Входящий в компактной карточке «Телефон»: трубка с волнами. */
@@ -269,6 +272,9 @@ object VIco {
         roundRectPath(2f, 16f, 4f, 5f, 1f), roundRectPath(7.5f, 12f, 4f, 9f, 1f),
         roundRectPath(13f, 8f, 4f, 13f, 1f), roundRectPath(18.5f, 3f, 4f, 18f, 1f),
     ).mapIndexed { i, d -> VPath(d, fill = true, alpha = if (i < level) 1f else 0.35f) }
+
+    /** Молния справа от батарейки: телефон на зарядке. */
+    val BOLT = listOf(VPath("M13 2 5 14h6l-1 8 8-12h-6z", fill = true, strokeW = 1.5f))
 
     /** Раздел «Вид»: круг, закрашенный наполовину. */
     val HALF_CIRCLE = listOf(
@@ -332,6 +338,7 @@ fun Pressable(
     enabled: Boolean = true,
     description: String? = null,
     onLong: (() -> Unit)? = null,
+    longMs: Long = PressLogic.LONG_MS,
     onPress: (() -> Unit)? = null,
     focusShape: Shape? = null,
     ringColor: Color? = null,
@@ -388,7 +395,7 @@ fun Pressable(
                     up?.let {
                         val d = it.position - down.position
                         if (swipe.value?.invoke(d.x, d.y) == true || scrolled) return@let
-                        val kind = PressLogic.classify(down.uptimeMillis, it.uptimeMillis, long.value != null)
+                        val kind = PressLogic.classify(down.uptimeMillis, it.uptimeMillis, long.value != null, longMs)
                         if (kind == Press.LONG) long.value?.invoke() else tap.value()
                     }
                 }
@@ -402,13 +409,13 @@ fun Pressable(
 fun RoundButton(
     sizePx: Int, description: String, onTap: () -> Unit, modifier: Modifier = Modifier,
     background: Color = Color.Transparent, enabled: Boolean = true, onLong: (() -> Unit)? = null,
-    onPress: (() -> Unit)? = null,
+    longMs: Long = PressLogic.LONG_MS, onPress: (() -> Unit)? = null,
     content: @Composable BoxScope.() -> Unit,
 ) {
     val m = LocalMetrics.current
     Pressable(
         modifier.size(m.dp(sizePx)).clip(CircleShape)
-            .background(background), enabled = enabled, description = description, onTap = onTap, onLong = onLong,
+            .background(background), enabled = enabled, description = description, onTap = onTap, onLong = onLong, longMs = longMs,
         onPress = onPress, focusShape = CircleShape,
     ) { pressed ->
         if (pressed) Box(Modifier.matchParentSize().background(Pal.SURFACE_PRESSED))

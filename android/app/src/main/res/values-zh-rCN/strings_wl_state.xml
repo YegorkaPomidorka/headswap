@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 无线模式（测试版，B 分支）：等待车机的状态，由 BridgeService 写入 CarLifeState.wireless -->
+<resources>
+    <string name="wl_state_waiting">正在通过 Wi-Fi 等待车机（%1$s）</string>
+    <string name="wl_state_no_hotspot">没有热点：请开启手机的 Wi-Fi 热点</string>
+    <string name="wl_state_p2p_busy">Wi-Fi Direct 被占用：请关闭手机热点</string>
+    <string name="wl_state_connected">车机已通过 Wi-Fi 连接</string>
+    <string name="wl_state_lost">连接已断开，正在重新等待车机</string>
+    <string name="wl_state_auto">车机已通过蓝牙发现，正在通过 Wi-Fi 等待（%1$s）</string>
+    <string name="wl_hint_title">车机就在附近，但尚未通过 Wi-Fi 连接</string>
+    <string name="wl_hint_text">请将手机连接到车机的 Wi-Fi，或开启热点。点按可打开 Wi-Fi 设置。</string>
+    <string name="wl_bt_hint_title">请重新连接车机蓝牙</string>
+    <string name="wl_bt_hint_text">车机已通过蓝牙连接，但尚未启动无线 CarLife。请在手机上关闭再重新开启蓝牙。</string>
+    <string name="wl_state_wifi_off">请开启手机 Wi-Fi（无需连接网络）并关闭热点</string>
+    <string name="wl_wifi_off_title">请开启手机 Wi-Fi</string>
+    <string name="wl_wifi_off_text">车机通过 Wi-Fi Direct 连接：请开启 Wi-Fi（无需连接网络）并关闭热点。点按可打开 Wi-Fi 设置。</string>
+    <string name="wl_usb_to_air_title">数据线已拔出</string>
+    <string name="wl_usb_to_air_text">车机已通过蓝牙发现，正在无线连接。</string>
+    <string name="wl_state_gave_up">车机在 %1$d 分钟内未连接</string>
+</resources>

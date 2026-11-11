@@ -439,6 +439,10 @@ class AaBridgeCore(
 
     /** Рабочий стол: громкость двумя пальцами у правого края (настройка; на Vezel всегда). */
     @Volatile var volumeSwipeProvider: () -> Boolean = { false }
+    /** Жест громкости включён: на Vezel всегда, иначе по настройке. Звук по USB тогда следует STREAM_MUSIC. */
+    val volumeSwipeEnabled: Boolean get() = huHondaVezel || volumeSwipeProvider()
+    /** Программная громкость звука по USB: с жестом, а в портретном рабочем столе (h921) ещё и с кнопками «−»/«+» нижней рейки. */
+    val volumeGainEnabled: Boolean get() = volumeSwipeEnabled || videoMode.outH > videoMode.outW
     private val volumeSwipe = VolumeSwipe(
         onCancel = {
             log("BRIDGE тач: два пальца у правого края - жест громкости, касание отменяю", true)
@@ -1076,7 +1080,7 @@ class AaBridgeCore(
     fun onCarlifeTouch(action: Int, x: Int, y: Int, px: Int = 0, py: Int = 0) {
         if (desktopInputEnabled) {
             val g = videoMode
-            if (volumeSwipe.onTouch(action, x, y, px, py, g.outW, g.outH, huHondaVezel || volumeSwipeProvider())) return
+            if (volumeSwipe.onTouch(action, x, y, px, py, g.outW, g.outH, volumeSwipeEnabled)) return
         }
         if (desktopInputEnabled && action and 0xFF == 3) {
             // Discard delayed MOVE events instead of replaying them into an already cancelled gesture.
@@ -1856,6 +1860,23 @@ class AaBridgeCore(
         if (MODULE_MUSIC_ENABLED) link.sendModuleStatus(CarlifeAudio.MODULE_MUSIC, status)
     }
 
+    /**
+     * Стартовый MODULE_STATUS со всеми модулями = 0 уходит по таймеру через 500 мс после рукопожатия и перетирает
+     * MUSIC=1 / NAVI=1, поднятые раньше. h1054 (VW CNS3): музыка рабочего стола заиграла за 166 мс до пачки,
+     * ГУ всю поездку считала MUSIC=0 и трек на приборку не брала. Повторяем текущее состояние.
+     */
+    @Synchronized
+    fun onModuleListSent() {
+        if (audioInited[CarlifeAudio.CH_MEDIA] == true && MODULE_MUSIC_ENABLED) {
+            musicStatus(1)
+            log("BRIDGE CarLife MODULE_STATUS MUSIC=1 повторно: стартовая пачка его обнулила", true)
+        }
+        if (naviSent) {
+            link.sendModuleStatus(CarlifeAudio.MODULE_NAVI, 1)
+            log("BRIDGE CarLife MODULE_STATUS NAVI=1 повторно: стартовая пачка его обнулила", true)
+        }
+    }
+
     /** Плеер AA сменил состояние (ch9). MUSIC по нему - только когда звук не по USB: иначе им владеет MEDIA INIT/PAUSE. */
     private fun musicByState(playing: Boolean) {
         if (playing) releaseHuPause("AA заиграл")
@@ -1976,6 +1997,10 @@ class AaBridgeCore(
 
     @Synchronized
     override fun onMediaMetadata(m: AaMediaMetadata) = meta.onMediaMetadata(m)
+
+    /** Плеер телефона в режиме рабочего стола (DesktopMediaMeta): трек на приборку, MODULE_STATUS MUSIC и паузу ГУ не трогаем. */
+    @Synchronized
+    fun onDesktopMediaStatus(s: AaMediaStatus) = meta.onMediaStatus(s, notifyPlayer = false)
 
     @Synchronized
     override fun onNavCluster(start: Boolean) = meta.onNavCluster(start)

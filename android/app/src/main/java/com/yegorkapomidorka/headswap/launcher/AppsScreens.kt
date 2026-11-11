@@ -90,8 +90,8 @@ internal fun <T> PagedApps(
     BoxWithConstraints(Modifier.fillMaxSize()) {
         val padStart = s.g
         val padTop = s.m
-        val padEnd = s.m
-        val padBottom = s.m
+        val padEnd = s.padEnd
+        val padBottom = s.padBottom
         val availW = constraints.maxWidth - padStart - padEnd
         val availH = constraints.maxHeight - padTop - padBottom - s.t - s.g
         // минимум два ряда: на низкой ленте 1280x480 при иконке T влезал один (Егор 09.11) - иконка мельче, но не меньше T/2

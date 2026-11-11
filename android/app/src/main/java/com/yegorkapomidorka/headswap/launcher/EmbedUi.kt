@@ -72,6 +72,7 @@ fun EmbedLayers() {
         CarAreas.crop(areaRect.width.roundToInt(), areaRect.height.roundToInt(), cardRect.width.roundToInt(), cardRect.height.roundToInt())
     else null
     LaunchedEffect(carNav, navCrop) { if (carNav) CarAppHost.setCrop(navCrop) }
+    SideEffect { EmbedHost.navCrop = navCrop }
     // приложение: одно окно на все приложения, смена приложения = launch в тот же дисплей.
     // Плашка-приложение на главном (YouTube или любое из «Слоёв») занимает это же окно размером с плашку: открыть
     // другое приложение - вытеснить его, вернуться на главный - запустить снова (слотов всего два, второй - навигатор).
@@ -96,12 +97,14 @@ fun EmbedLayers() {
 
     val navShown = navKey != null &&
         (area == Area.Navigator || (area == Area.Home && CardView.NAVIGATOR in listOf(tiles.big, tiles.small)))
-    // подпись окна навигатора в углу карточки (макет v2); на весь экран не нужна
+    // подпись окна навигатора в углу карточки (макет v2); на весь экран не нужна, у своего хоста там карточка прибытия
     val navPkg = model.navigatorPkg
-    val navTag = if (area != Area.Navigator && navPkg != null) remember(navPkg) { LauncherModel.packageLabel(navPkg) } else null
-    EmbedLayer(EmbedHost.nav, navTarget, shown = navShown, interactive = area == Area.Navigator,
+    val navTag = if (area != Area.Navigator && navPkg != null && !carNav) remember(navPkg) { LauncherModel.packageLabel(navPkg) } else null
+    // плашка навигатора живая, как плашка-приложение: касания идут в карту, на весь экран - кнопкой навигации
+    // на рейке или шайбой (Егор 11.11, h1045)
+    EmbedLayer(EmbedHost.nav, navTarget, shown = navShown, interactive = true,
         rounded = area != Area.Navigator, background = LocalPalette.current.mapBg,
-        starting = stringResource(R.string.l_nav_starting), onCardTap = { LauncherActions.openNavigator() }, tag = navTag,
+        starting = stringResource(R.string.l_nav_starting), onCardTap = null, tag = navTag,
         crop = navCrop, buffer = if (carNav && areaRect != null) areaRect.width.roundToInt() to areaRect.height.roundToInt() else null)
     if (appKey != null) {
         if (tileOnHome) {
@@ -310,7 +313,7 @@ fun HomeTileButtons() {
     val s = m.spec
     val big = model.bigTileRect
     val small = model.smallTileRect
-    if (model.homeLayout.two && big != null && small != null) {
+    if (model.layout.two && big != null && small != null) {
         val size = Math.round(s.t * 0.8f)
         val cx = Math.round(if (big.left < small.left) (big.right + small.left) / 2 else (small.right + big.left) / 2)
         val cy = Math.round(big.center.y)

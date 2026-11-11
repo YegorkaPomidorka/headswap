@@ -52,11 +52,13 @@ import com.yegorkapomidorka.headswap.CarLifeState
 import com.yegorkapomidorka.headswap.R
 import com.yegorkapomidorka.headswap.about.About
 import com.yegorkapomidorka.headswap.about.OpenSource
+import com.yegorkapomidorka.headswap.carapp.CarAppLocation
 import com.yegorkapomidorka.headswap.dex.DexPrefs
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToInt
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -117,41 +119,69 @@ fun LauncherSettingsScreen() {
     val s = m.spec
     val model = LauncherModel
     Column(
-        Modifier.fillMaxSize().padding(start = m.dp(s.g), top = m.dp(s.g8), end = m.dp(s.m), bottom = m.dp(s.m)),
+        Modifier.fillMaxSize().padding(start = m.dp(s.g), top = m.dp(s.g8), end = m.dp(s.padEnd), bottom = m.dp(s.padBottom)),
         verticalArrangement = Arrangement.spacedBy(m.dp(s.g8)),
     ) {
         StatusBar(title = stringResource(R.string.l_settings), showNet = false)
         BoxWithConstraints(Modifier.weight(1f).fillMaxWidth()) {
-            val h = constraints.maxHeight
             val gap = s.g8
-            val rowH = SettingsGrid.bottom(0, h, gap) - SettingsGrid.top(0, h, gap)
+            // портрет: вкладки разделов сверху (T и зазор), сетка рядов - на остаток высоты
+            val h = constraints.maxHeight - (if (s.portrait) s.t + gap else 0)
+            val rows = if (s.portrait) SettingsGrid.PORTRAIT_ROWS else SettingsGrid.ROWS
+            val rowH = SettingsGrid.bottom(0, h, gap, rows) - SettingsGrid.top(0, h, gap, rows)
             val d = SettingsDims(s, rowH)
             // карточка на span рядов: от верха первого ряда до низа последнего - границы совпадают слева и справа
-            fun cell(row: Int, span: Int = 1): Modifier {
-                val top = SettingsGrid.top(row, h, gap)
-                return Modifier.offset(y = m.dp(top)).height(m.dp(SettingsGrid.bottom(row + span - 1, h, gap) - top))
-            }
+            fun cellH(row: Int, span: Int = 1): Int = SettingsGrid.bottom(row + span - 1, h, gap, rows) - SettingsGrid.top(row, h, gap, rows)
+            fun cell(row: Int, span: Int = 1): Modifier =
+                Modifier.offset(y = m.dp(SettingsGrid.top(row, h, gap, rows))).height(m.dp(cellH(row, span)))
             // кнопку (Pressable) в ряд ставит обёртка: рамку шайбы Pressable рисует до своего modifier, и offset из cell()
             // её не сдвигал - рамки всех разделов рисовались поверх «Вид» (h737)
             @Composable
             fun Placed(row: Int, content: @Composable () -> Unit) =
                 Box(cell(row).fillMaxWidth(), propagateMinConstraints = true) { content() }
-            Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(m.dp(s.g))) {
-                Box(Modifier.width(m.dp(d.catW)).fillMaxHeight()) {
-                    for ((i, page) in SettingsPage.entries.filter { it != SettingsPage.ABOUT && it != SettingsPage.COLORS }.withIndex()) {
-                        val selected = model.settingsPage == page || (page == SettingsPage.SYSTEM && model.settingsPage == SettingsPage.ABOUT) ||
-                            (page == SettingsPage.LOOK && model.settingsPage == SettingsPage.COLORS)
-                        Placed(i) { CategoryButton(page, selected, d, Modifier) }
+            fun isSelected(page: SettingsPage) = model.settingsPage == page || (page == SettingsPage.SYSTEM && model.settingsPage == SettingsPage.ABOUT) ||
+                (page == SettingsPage.LOOK && model.settingsPage == SettingsPage.COLORS)
+            val pages = SettingsPage.entries.filter { it != SettingsPage.ABOUT && it != SettingsPage.COLORS }
+            // портрет: «Цвета» - блок прямо в «Виде», отдельной страницы нет
+            val shownPage = if (s.portrait && model.settingsPage == SettingsPage.COLORS) SettingsPage.LOOK else model.settingsPage
+            SettingsFrame(
+                portrait = s.portrait,
+                tabs = {
+                    Row(Modifier.fillMaxWidth().height(m.dp(s.t)), horizontalArrangement = Arrangement.spacedBy(m.dp(gap))) {
+                        for (page in pages) TabButton(page, isSelected(page), Modifier.weight(1f))
                     }
-                }
-                Box(Modifier.weight(1f).fillMaxHeight()) {
-                    when (model.settingsPage) {
-                        SettingsPage.LOOK -> {
+                },
+                categories = {
+                    Box(Modifier.width(m.dp(d.catW)).fillMaxHeight()) {
+                        for ((i, page) in pages.withIndex()) Placed(i) { CategoryButton(page, isSelected(page), d, Modifier) }
+                    }
+                },
+            ) {
+                    when (shownPage) {
+                        SettingsPage.LOOK -> if (s.portrait) {
+                            ThemeCard(d, cell(0).fillMaxWidth())
+                            ColorsBlock(d, cell(1, 3).fillMaxWidth())
+                            RailSizeCard(d, cell(4, 2).fillMaxWidth())
+                            Row(cell(6).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(m.dp(d.gap))) {
+                                SwitchCard(stringResource(R.string.l_s_anim), model.animations, d, Modifier.weight(1f).fillMaxHeight()) {
+                                    model.chooseAnimations(it)
+                                }
+                                SwitchCard(stringResource(R.string.l_s_battery), model.showBattery, d, Modifier.weight(1f).fillMaxHeight()) {
+                                    model.chooseShowBattery(it)
+                                }
+                            }
+                        } else {
                             ThemeCard(d, cell(0).fillMaxWidth())
                             Placed(1) { ColorsLinkCard(d, Modifier) }
                             RailSizeCard(d, cell(2, 2).fillMaxWidth())
-                            SwitchCard(stringResource(R.string.l_s_anim), model.animations, d, cell(4).fillMaxWidth()) {
-                                model.chooseAnimations(it)
+                            // ряд 4 пополам: анимации | заряд телефона в строке статуса (свободных рядов нет)
+                            Row(cell(4).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(m.dp(d.gap))) {
+                                SwitchCard(stringResource(R.string.l_s_anim), model.animations, d, Modifier.weight(1f).fillMaxHeight()) {
+                                    model.chooseAnimations(it)
+                                }
+                                SwitchCard(stringResource(R.string.l_s_battery), model.showBattery, d, Modifier.weight(1f).fillMaxHeight()) {
+                                    model.chooseShowBattery(it)
+                                }
                             }
                         }
                         SettingsPage.COLORS -> {
@@ -194,8 +224,13 @@ fun LauncherSettingsScreen() {
                                     model.chooseNavHints(navPkg, it)
                                 }
                                 var row = if (noHints) 2 else 3
+                                // h1029: свой хост Car App без геолокации «в любом режиме» - у навигатора нет GPS. Рядов пять и все
+                                // заняты (подсказки, масштаб, перезапуск), поэтому, пока разрешения нет, подсказка стоит на месте масштаба
+                                val carHost = EmbedHost.nav.carHost
+                                val noBgLocation = carHost && hints && !google && !noHints && !hasBackgroundLocation(navPkg)
                                 // масштаб - dpi своего хоста Car App; навигатору окном и через AA он не нужен
-                                if (EmbedHost.nav.carHost) MapScaleCard(navPkg, d, cell(row++).fillMaxWidth())
+                                if (noBgLocation) Placed(row++) { LocationHintCard(navPkg, d, Modifier) }
+                                else if (carHost) MapScaleCard(navPkg, d, cell(row++).fillMaxWidth())
                                 Placed(row++) { RestartNavCard(d, Modifier) } // кнопка - через обёртку, рамка шайбы (h737)
                                 // Google через AA: сервер ГУ живёт в Android Auto, перезапуск - в её настройках на телефоне
                                 if (hints && google) AaServerHintCard(d, cell(row).fillMaxWidth())
@@ -219,7 +254,13 @@ fun LauncherSettingsScreen() {
                                 model.chooseAutoplay(it)
                             }
                         }
-                        SettingsPage.HOME -> {
+                        SettingsPage.HOME -> if (s.portrait) {
+                            // «Раскладка» четыре ряда, «Слои» два; без прокрутки (семь рядов)
+                            Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(m.dp(gap))) {
+                                PortraitLayoutCard(d, Modifier.fillMaxWidth().height(m.dp(cellH(0, 4))))
+                                LayersCard(cellH(4, 2), Modifier.fillMaxWidth().height(m.dp(cellH(4, 2))))
+                            }
+                        } else {
                             // «Раскладка» ужата до 0,87 высоты, чтобы снизу выглядывала шапка «Слои» - видно, что есть
                             // куда листать (макет SettingsHomeLayers, Егор 06.11). «Слои» - два ряда в том же масштабе.
                             val layoutH = (h * HOME_SHRINK).roundToInt()
@@ -247,8 +288,50 @@ fun LauncherSettingsScreen() {
                         }
                         SettingsPage.ABOUT -> AboutPanel(d, rowH)
                     }
-                }
             }
+        }
+    }
+}
+
+/**
+ * Каркас настроек. Горизонталь: колонка разделов слева, страница справа. Портрет (h921): ряд вкладок сверху на всю ширину,
+ * страница ниже. Страница - слой карточек с offset по сетке рядов, рисуется в Box на остаток.
+ */
+@Composable
+private fun SettingsFrame(
+    portrait: Boolean, tabs: @Composable () -> Unit, categories: @Composable () -> Unit, page: @Composable () -> Unit,
+) {
+    val m = LocalMetrics.current
+    val s = m.spec
+    if (portrait) {
+        Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(m.dp(s.g8))) {
+            tabs()
+            Box(Modifier.weight(1f).fillMaxWidth()) { page() }
+        }
+    } else {
+        Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(m.dp(s.g))) {
+            categories()
+            Box(Modifier.weight(1f).fillMaxHeight()) { page() }
+        }
+    }
+}
+
+/** Вкладка раздела в портрете: только название, пилюля высотой T; выбранная - как [CategoryButton]. */
+@Composable
+private fun TabButton(page: SettingsPage, selected: Boolean, modifier: Modifier) {
+    val m = LocalMetrics.current
+    val s = m.spec
+    val label = stringResource(when (page) {
+        SettingsPage.LOOK, SettingsPage.COLORS -> R.string.l_sec_look
+        SettingsPage.NAVIGATOR -> R.string.l_sec_nav
+        SettingsPage.MUSIC -> R.string.l_sec_music
+        SettingsPage.HOME -> R.string.l_sec_home
+        SettingsPage.SYSTEM, SettingsPage.ABOUT -> R.string.l_sec_system
+    })
+    OptionBox(selected, modifier.fillMaxHeight(), RoundedCornerShape(m.dp(s.t / 2)), description = label, unselected = Pal.SURFACE,
+        onTap = { LauncherModel.settingsPage = page; LauncherModel.aboutLicense = null }) {
+        Box(Modifier.fillMaxSize().padding(horizontal = m.dp(s.g4)), contentAlignment = Alignment.Center) {
+            Txt(label, (s.f2 * 0.93f).roundToInt(), color = Pal.TEXT, weight = FontWeight.SemiBold, ellipsis = false)
         }
     }
 }
@@ -381,22 +464,54 @@ private fun ColorsSwatch(pal: LauncherPalette, d: SettingsDims) {
 @Composable
 private fun ColorsModeCard(d: SettingsDims, modifier: Modifier) {
     val m = LocalMetrics.current
+    Card(modifier) {
+        ColorsModeRow(d, Modifier.fillMaxSize().padding(start = m.dp(d.padStart), end = m.dp(d.padEnd)))
+    }
+}
+
+/** Пилюли «Ночные» / «Дневные» и «Сбросить»: общий ряд страницы «Цвета» и портретного блока «Вид». */
+@Composable
+private fun ColorsModeRow(d: SettingsDims, modifier: Modifier) {
+    val m = LocalMetrics.current
     val s = m.spec
     val model = LauncherModel
-    Card(modifier) {
-        Row(Modifier.fillMaxSize().padding(start = m.dp(d.padStart), end = m.dp(d.padEnd)), verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(m.dp(s.g8))) {
-            Pill(stringResource(R.string.l_s_colors_night), !model.colorsEditDay, d) { model.colorsEditDay = false }
-            Pill(stringResource(R.string.l_s_colors_day), model.colorsEditDay, d) { model.colorsEditDay = true }
-            Spacer(Modifier.weight(1f))
-            val reset = stringResource(R.string.l_s_colors_reset)
-            Pressable(Modifier.height(m.dp(d.ctl)).clip(RoundedCornerShape(m.dp(d.ctl / 2))).background(LocalPalette.current.btnSet),
-                description = reset, onTap = { model.resetColors() }) { pressed ->
-                if (pressed) Box(Modifier.matchParentSize().background(Pal.SURFACE_PRESSED))
-                Box(Modifier.fillMaxHeight().padding(horizontal = m.dp(d.pillPad)), contentAlignment = Alignment.Center) {
-                    Txt(reset, s.f2, weight = FontWeight.SemiBold, ellipsis = false)
-                }
+    Row(modifier, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(m.dp(s.g8))) {
+        Pill(stringResource(R.string.l_s_colors_night), !model.colorsEditDay, d) { model.colorsEditDay = false }
+        Pill(stringResource(R.string.l_s_colors_day), model.colorsEditDay, d) { model.colorsEditDay = true }
+        Spacer(Modifier.weight(1f))
+        val reset = stringResource(R.string.l_s_colors_reset)
+        Pressable(Modifier.height(m.dp(d.ctl)).clip(RoundedCornerShape(m.dp(d.ctl / 2))).background(LocalPalette.current.btnSet),
+            description = reset, onTap = { model.resetColors() }) { pressed ->
+            if (pressed) Box(Modifier.matchParentSize().background(Pal.SURFACE_PRESSED))
+            Box(Modifier.fillMaxHeight().padding(horizontal = m.dp(d.pillPad)), contentAlignment = Alignment.Center) {
+                Txt(reset, s.f2, weight = FontWeight.SemiBold, ellipsis = false)
             }
+        }
+    }
+}
+
+/**
+ * «Цвета» прямо в «Виде» портрета (Settings.dc.html): пилюли набора и три слайдера в одной карточке на три ряда.
+ * Пока блок на экране, весь стол показывает редактируемый набор ([LauncherModel.colorsOpen]); набор по умолчанию - текущей темы.
+ */
+@Composable
+private fun ColorsBlock(d: SettingsDims, modifier: Modifier) {
+    val m = LocalMetrics.current
+    val model = LauncherModel
+    // набор для правки следует теме (смена «Тёмная»/«Светлая» переключает и стол); «Ночные»/«Дневные» потом смотрят другой
+    LaunchedEffect(model.lightTheme) { model.colorsEditDay = model.lightTheme }
+    val set = if (model.colorsEditDay) model.dayColors else model.nightColors
+    val light = model.colorsEditDay
+    Card(modifier) {
+        Column(Modifier.fillMaxSize().padding(start = m.dp(d.padStart), end = m.dp(d.padEnd), top = m.dp(d.padV), bottom = m.dp(d.padV)),
+            verticalArrangement = Arrangement.spacedBy(m.dp(m.spec.g4))) {
+            ColorsModeRow(d, Modifier.fillMaxWidth())
+            ColorSliderRow(stringResource(R.string.l_s_colors_accent), set.accentHue, ColorSet.HUE_NEUTRAL, d, Modifier.weight(1f).fillMaxWidth(),
+                hueTrack(light, accent = true)) { model.editColors(set.copy(accentHue = it)) }
+            ColorSliderRow(stringResource(R.string.l_s_colors_bg_hue), set.bgHue, ColorSet.HUE_NEUTRAL, d, Modifier.weight(1f).fillMaxWidth(),
+                hueTrack(light, accent = false)) { model.editColors(set.copy(bgHue = it)) }
+            ColorSliderRow(stringResource(R.string.l_s_colors_bg_sat), set.bgSat, 100, d, Modifier.weight(1f).fillMaxWidth(),
+                satTrack(light, set.bgHue)) { model.editColors(set.copy(bgSat = it)) }
         }
     }
 }
@@ -430,13 +545,19 @@ private fun satTrack(light: Boolean, hue: Int): Brush {
 @Composable
 private fun ColorSliderCard(label: String, value: Int, top: Int, d: SettingsDims, modifier: Modifier, track: Brush, onChange: (Int) -> Unit) {
     val m = LocalMetrics.current
-    val s = m.spec
     Card(modifier) {
-        Row(Modifier.fillMaxSize().padding(start = m.dp(d.padStart), end = m.dp(d.padEnd)), verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(m.dp(s.g))) {
-            Txt(label, s.f2, Modifier.weight(0.34f), maxLines = 2, ellipsis = false)
-            ColorSlider(value, top, d, track, Modifier.weight(0.66f).fillMaxHeight(), onChange)
-        }
+        ColorSliderRow(label, value, top, d, Modifier.fillMaxSize().padding(start = m.dp(d.padStart), end = m.dp(d.padEnd)), track, onChange)
+    }
+}
+
+/** Название слева, трек справа: строка слайдера без подложки (карточка «Цветов» и блок «Вида» в портрете). */
+@Composable
+private fun ColorSliderRow(label: String, value: Int, top: Int, d: SettingsDims, modifier: Modifier, track: Brush, onChange: (Int) -> Unit) {
+    val m = LocalMetrics.current
+    val s = m.spec
+    Row(modifier, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(m.dp(s.g))) {
+        Txt(label, s.f2, Modifier.weight(0.34f), maxLines = 2, ellipsis = false)
+        ColorSlider(value, top, d, track, Modifier.weight(0.66f).fillMaxHeight(), onChange)
     }
 }
 
@@ -482,7 +603,8 @@ private fun RailSizeCard(d: SettingsDims, modifier: Modifier) {
             Modifier.fillMaxSize().padding(start = m.dp(d.padStart), end = m.dp(d.padEnd), top = m.dp(d.padV), bottom = m.dp(d.padV)),
             verticalArrangement = Arrangement.spacedBy(m.dp(s.g4)),
         ) {
-            Txt(stringResource(R.string.l_s_rail), s.f2)
+            // в портрете панель нижняя (h921): свой заголовок, миниатюра - полоска у низа, «Обрезанной» нет
+            Txt(stringResource(if (s.portrait) R.string.l_s_rail_bottom else R.string.l_s_rail), s.f2)
             Row(Modifier.weight(1f).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(m.dp(s.g8))) {
                 val options = listOfNotNull(
                     if (s.h480) RailSize.CUT to R.string.l_s_rail_cut else null,
@@ -490,19 +612,39 @@ private fun RailSizeCard(d: SettingsDims, modifier: Modifier) {
                     RailSize.MEDIUM to R.string.l_s_rail_medium,
                     RailSize.NORMAL to R.string.l_s_rail_normal,
                 )
+                // сохранённая «Обрезанная» в портрете работает как «Маленькая» ([LauncherSpec.rs])
+                val current = if (s.portrait) s.rs else model.railSize
                 for ((v, res) in options) {
                     val label = stringResource(res)
-                    OptionBox(model.railSize == v, Modifier.weight(1f).fillMaxHeight(), RoundedCornerShape(m.dp(s.radius)), label,
+                    OptionBox(current == v, Modifier.weight(1f).fillMaxHeight(), RoundedCornerShape(m.dp(s.radius)), label,
                         unselected = LocalPalette.current.btnSet, onTap = { model.chooseRailSize(v) }) {
                         Column(Modifier.fillMaxSize().padding(m.dp(s.g4)), horizontalAlignment = Alignment.CenterHorizontally,
                             verticalArrangement = Arrangement.spacedBy(m.dp(s.g4))) {
-                            RailMiniature(v, Modifier.weight(1f).fillMaxWidth())
+                            if (s.portrait) BottomRailMiniature(v, current == v, Modifier.weight(1f).fillMaxWidth())
+                            else RailMiniature(v, Modifier.weight(1f).fillMaxWidth())
                             Txt(label, (s.f2 * 0.85).roundToInt(), weight = FontWeight.SemiBold, ellipsis = false)
                         }
                     }
                 }
             }
         }
+    }
+}
+
+/** Нижняя панель портрета (Settings.dc.html): полоска с закруглением сверху у низа миниатюры, высота по размеру панели; выбранная - акцентом. */
+@Composable
+private fun BottomRailMiniature(size: RailSize, selected: Boolean, modifier: Modifier) {
+    val m = LocalMetrics.current
+    val k = m.spec.t / 96.0
+    val h = when (size) {
+        RailSize.NORMAL -> 38
+        RailSize.MEDIUM -> 28
+        RailSize.SMALL, RailSize.CUT -> 18
+    }
+    val corner = m.dp(max(1, (6 * k).roundToInt()))
+    Box(modifier, contentAlignment = Alignment.BottomCenter) {
+        Box(Modifier.fillMaxWidth(0.7f).height(m.dp(max(1, (h * k).roundToInt()))).clip(RoundedCornerShape(topStart = corner, topEnd = corner))
+            .background(if (selected) LocalAccent.current else LocalPalette.current.fg2.copy(alpha = 0.35f)))
     }
 }
 
@@ -611,6 +753,34 @@ private fun AaServerHintCard(d: SettingsDims, modifier: Modifier) {
     }
 }
 
+/** Есть ли у навигатора ACCESS_BACKGROUND_LOCATION («Разрешить в любом режиме»); перепроверка раз в 2 с, пока открыта страница. */
+@Composable
+private fun hasBackgroundLocation(pkg: String): Boolean {
+    val ctx = LauncherModel.context
+    val granted by produceState(true, pkg) {
+        while (true) {
+            value = withContext(Dispatchers.IO) { CarAppLocation.of(ctx, pkg).background }
+            delay(LOCATION_RECHECK_MS)
+        }
+    }
+    return granted
+}
+
+/**
+ * Подсказка с нажатием (свой хост Car App без «Разрешить в любом режиме»): тап открывает настройки приложения навигатора
+ * на телефоне. Pressable, как у кнопок, - через обёртку Placed.
+ */
+@Composable
+private fun LocationHintCard(pkg: String, d: SettingsDims, modifier: Modifier) {
+    val m = LocalMetrics.current
+    val text = stringResource(R.string.l_nav_location_hint)
+    ActionCard(text, modifier, onTap = { LauncherActions.openAppSettings(pkg) }) {
+        Box(Modifier.fillMaxSize().padding(start = m.dp(d.padStart), end = m.dp(d.padEnd)), contentAlignment = Alignment.CenterStart) {
+            Txt(text, d.sub, color = Pal.SEC, maxLines = 2, ellipsis = false)
+        }
+    }
+}
+
 /** Карточка с переключателем: трек 120x64, ручка 52, тач-зона 136x96 (на 1280x720). */
 @Composable
 private fun SwitchCard(label: String, on: Boolean, d: SettingsDims, modifier: Modifier, sub: String? = null, onChange: (Boolean) -> Unit) {
@@ -621,7 +791,8 @@ private fun SwitchCard(label: String, on: Boolean, d: SettingsDims, modifier: Mo
     Card(modifier) {
         Row(Modifier.fillMaxSize().padding(start = m.dp(d.padStart), end = m.dp(8)), verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(m.dp(s.g))) {
-            if (sub == null) Txt(label, s.f2, Modifier.weight(1f), ellipsis = false)
+            // два переключателя в половинной ширине: длинная подпись переносится, а не обрезается
+            if (sub == null) Txt(label, s.f2, Modifier.weight(1f), maxLines = 2, ellipsis = false)
             else Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(m.dp(4))) {
                 Txt(label, s.f2, ellipsis = false)
                 Txt(sub, d.sub, color = Pal.SEC, ellipsis = true)
@@ -779,6 +950,63 @@ private fun MapSideCard(d: SettingsDims, modifier: Modifier) {
         }
     }
 }
+
+/**
+ * «Раскладка» в портрете (h921): две плашки - «Плитка сверху» (RIGHT, QUAD без «карты слева») и «Музыка сверху» (LEFT).
+ * 2:1 и 1:2 в портрете ведут себя как «Плитка сверху», поэтому выбранной считается она же.
+ */
+@Composable
+private fun PortraitLayoutCard(d: SettingsDims, modifier: Modifier) {
+    val m = LocalMetrics.current
+    val s = m.spec
+    val k = s.t / 96.0
+    fun r(v: Int) = max(1, (v * k).roundToInt())
+    val model = LauncherModel
+    val musicTop = model.homeLayout == HomeLayout.QUAD && model.mapLeft
+    Card(modifier) {
+        Column(Modifier.fillMaxSize().padding(start = m.dp(r(24)), end = m.dp(r(24)), top = m.dp(r(14)), bottom = m.dp(r(20))),
+            verticalArrangement = Arrangement.spacedBy(m.dp(r(14)))) {
+            Txt(stringResource(R.string.l_s_layout), s.f2)
+            Row(Modifier.weight(1f).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(m.dp(r(20)))) {
+                for (top in listOf(false, true)) {
+                    val label = stringResource(if (top) R.string.l_s_layout_music_top else R.string.l_s_layout_tile_top)
+                    OptionBox(musicTop == top, Modifier.weight(1f).fillMaxHeight(), RoundedCornerShape(m.dp(s.radius)), label,
+                        unselected = LocalPalette.current.btnSet, onTap = { model.chooseHomeLayout(HomeLayout.QUAD, top) }) {
+                        Column(Modifier.fillMaxSize().padding(m.dp(r(10))), horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(m.dp(r(8)))) {
+                            PortraitMiniature(top, r(6), Modifier.weight(1f).fillMaxWidth(0.4f))
+                            Txt(label, s.f2, weight = FontWeight.SemiBold, ellipsis = false)
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+/** Миниатюра портретного главного: плитка (акцент), музыка и нижний ряд полосами 5 : 2 : 1; при [musicTop] музыка и плитка меняются. */
+@Composable
+private fun PortraitMiniature(musicTop: Boolean, gapPx: Int, modifier: Modifier) {
+    val m = LocalMetrics.current
+    val k = m.spec.t / 96.0
+    val pal = LocalPalette.current
+    val gap = m.dp(gapPx)
+    val small = RoundedCornerShape(gap)
+    Column(modifier.clip(RoundedCornerShape(m.dp(max(1, (10 * k).roundToInt())))).background(pal.mini).padding(gap),
+        verticalArrangement = Arrangement.spacedBy(gap)) {
+        val tile = @Composable { Box(Modifier.weight(5f).fillMaxWidth().clip(small).background(LocalAccent.current)) }
+        val music = @Composable {
+            Box(Modifier.weight(2f).fillMaxWidth().clip(small).background(Color(0xFF6B5520)), contentAlignment = Alignment.Center) {
+                SvgIcon(Ico.MUSIC, (22 * k).roundToInt(), Color(0xFFF2E2B0), stroke = 2.4f)
+            }
+        }
+        if (musicTop) { music(); tile() } else { tile(); music() }
+        Box(Modifier.weight(1f).fillMaxWidth().clip(small).background(pal.btn2))
+    }
+}
+
+/** Как часто перепроверять геолокацию навигатора, пока открыты его настройки. */
+private const val LOCATION_RECHECK_MS = 2_000L
 
 /** Доля высоты экрана настроек под «Раскладку» в разделе «Экран»: остаток - шапка «Слоёв» под прокрутку. */
 private const val HOME_SHRINK = 0.87
@@ -984,7 +1212,7 @@ private fun AboutPanel(d: SettingsDims, rowH: Int) {
             // две подписи («Авторы», «Открытый код») и зазоры между всеми рядами
             val fitH = (constraints.maxHeight - 2 * captionH - (rows + 1) * gap) / rows
             val minH = ((s.f2 + d.sub) * 1.35).roundToInt() + 2 * s.g8
-            val tileH = fitH.coerceIn(minH, rowH)
+            val tileH = fitH.coerceIn(minH, maxOf(minH, rowH)) // на 1280x480 rowH < minH
             Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(m.dp(gap))) {
                 Txt(stringResource(R.string.about_authors), d.sub, color = Pal.SEC, weight = FontWeight.SemiBold)
                 for (row in About.authors.chunked(cols)) {

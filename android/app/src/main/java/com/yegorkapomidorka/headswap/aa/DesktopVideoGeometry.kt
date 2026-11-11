@@ -24,6 +24,6 @@ object DesktopVideoGeometry : VideoGeometry {
     /** Reject a larger canvas cropped/scaled to the desktop, including AA custom geometries. */
     fun matchesNative(mode: VideoGeometry): Boolean =
         (mode === this || mode is NativeDesktopGeometry) &&
-            DesktopGeometryPolicy.accepts(mode.outW, mode.outH) && mode.aaW == mode.outW && mode.aaH == mode.outH &&
+            DesktopGeometryPolicy.acceptsNative(mode.outW, mode.outH) && mode.aaW == mode.outW && mode.aaH == mode.outH &&
             mode.marginW == 0 && mode.marginH == 0 && mode.crop.isNone
 }

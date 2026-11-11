@@ -20,7 +20,9 @@ import androidx.car.app.ICarHost
 import androidx.car.app.IOnDoneCallback
 import androidx.car.app.ISurfaceCallback
 import androidx.car.app.SurfaceContainer
+import androidx.car.app.model.Alert
 import androidx.car.app.model.CarText
+import androidx.car.app.model.MessageTemplate
 import androidx.car.app.model.TemplateWrapper
 import androidx.car.app.navigation.INavigationHost
 import androidx.car.app.navigation.model.Trip
@@ -31,6 +33,8 @@ import com.yegorkapomidorka.headswap.aa.AaMetaSink
 import com.yegorkapomidorka.headswap.aa.AaNavDistance
 import com.yegorkapomidorka.headswap.aa.AaNavTurn
 import com.yegorkapomidorka.headswap.aa.DesktopNavHints
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicBoolean
 
 /**
  * Одна сессия хоста с одним навигатором. Порядок как у хоста AA: bind -> getAppInfo -> onHandshakeCompleted ->
@@ -74,6 +78,11 @@ internal class CarAppSession(
     private val touch = CarTouch()
     /** Поколение бинда: ответы старого подключения после переподключения - мимо. */
     private var gen = 0
+    /** Последний залогированный шаблон (класс и текст сообщения) - в лог только смена. */
+    private var lastTemplateLog: String? = null
+    /** Что уже попало в лог из вызовов приложения с binder-потоков: по разу за сессию. */
+    private val hostTypesLogged = ConcurrentHashMap.newKeySet<String>()
+    private val locationLogged = AtomicBoolean(false)
 
     private data class SurfaceContainerKey(val surface: Surface, val w: Int, val h: Int, val dpi: Int)
 
@@ -103,6 +112,7 @@ internal class CarAppSession(
             log("bindService упал: ${e.javaClass.simpleName}: ${e.message}"); false
         }
         log("bindService ${target.service} -> $ok")
+        log("локация: ${CarAppLocation.of(app, target.pkg).describe()}")
         if (ok) conn = c else refuse(CarAppRefusal.BIND)
     }
 
@@ -174,7 +184,7 @@ internal class CarAppSession(
         val g = ++gen
         log("подключён")
         carApp = a; appManager = null; surfaceCb = null; delivered = null; sentVisible = null; sentStable = null
-        sentConfig = null; ready = false
+        sentConfig = null; ready = false; lastTemplateLog = null
         var answered = false
         h.postDelayed({ if (g == gen && !answered) { log("getAppInfo: нет ответа"); refuse(CarAppRefusal.NO_APP_INFO) } }, APP_INFO_TIMEOUT_MS)
         // рукопожатие или create/start/resume без ответа - иначе пустая карта навсегда и окно не откроется
@@ -300,8 +310,10 @@ internal class CarAppSession(
                 log("поверхность ${want.w}x${want.h} dpi=${want.dpi} отдана")
             }
             if (want != null) {
-                if (v.visible != sentVisible) { cb.onVisibleAreaChanged(v.visible.rect(), done("onVisibleAreaChanged")); sentVisible = v.visible }
-                if (v.stable != sentStable) { cb.onStableAreaChanged(v.stable.rect(), done("onStableAreaChanged")); sentStable = v.stable }
+                var areas = false
+                if (v.visible != sentVisible) { cb.onVisibleAreaChanged(v.visible.rect(), done("onVisibleAreaChanged")); sentVisible = v.visible; areas = true }
+                if (v.stable != sentStable) { cb.onStableAreaChanged(v.stable.rect(), done("onStableAreaChanged")); sentStable = v.stable; areas = true }
+                if (areas) log("области visible=${v.visible.rect().toShortString()} stable=${v.stable.rect().toShortString()}")
             }
         } catch (e: Exception) {
             log("поверхность не отдана: ${e.javaClass.simpleName}: ${e.message}")
@@ -311,6 +323,7 @@ internal class CarAppSession(
     private fun releaseSurface() {
         val d = delivered ?: return
         delivered = null
+        log("поверхность ${d.w}x${d.h} забрана")
         runCatching { surfaceCb?.onSurfaceDestroyed(Bundleable.create(SurfaceContainer(d.surface, d.w, d.h, d.dpi)), done("onSurfaceDestroyed")) }
     }
 
@@ -322,9 +335,23 @@ internal class CarAppSession(
         val m = appManager ?: return
         try {
             m.getTemplate(callback(g, "getTemplate", quiet = true) { r ->
-                events.onTemplate(this, runCatching { r?.get() as? TemplateWrapper }.getOrNull())
+                val t = runCatching { r?.get() as? TemplateWrapper }.getOrNull()
+                logTemplate(t)
+                events.onTemplate(this, t)
             })
         } catch (e: Exception) { log("getTemplate упал: ${e.javaClass.simpleName}") }
+    }
+
+    /** Класс шаблона в лог при смене (у MessageTemplate - и текст): видно, если навигатор застрял на «Нет доступа к местоположению». */
+    private fun logTemplate(t: TemplateWrapper?) {
+        val tpl = t?.template ?: return
+        val line = buildString {
+            append(tpl.javaClass.simpleName)
+            if (tpl is MessageTemplate) append(": \"").append(text(tpl.message).replace("\n", " ").take(MESSAGE_LOG_CHARS)).append('"')
+        }
+        if (line == lastTemplateLog) return
+        lastTemplateLog = line
+        log("шаблон $line")
     }
 
     // --- навигация -> подсказки на ГУ ---
@@ -370,7 +397,11 @@ internal class CarAppSession(
 
     private val host = object : ICarHost.Stub() {
         override fun startCarApp(intent: Intent?) { log("startCarApp $intent - не поддерживаем") }
-        override fun getHost(type: String?): IBinder? = when (type) {
+        override fun getHost(type: String?): IBinder? {
+            if (hostTypesLogged.add(type.toString())) log("getHost $type")
+            return hostFor(type)
+        }
+        private fun hostFor(type: String?): IBinder? = when (type) {
             "app" -> appHost
             "navigation" -> navHost
             else -> null
@@ -392,8 +423,14 @@ internal class CarAppSession(
                 deliverSurface()
             }
         }
-        override fun sendLocation(location: android.location.Location?) {}
-        override fun showAlert(alert: Bundleable?) { log("showAlert - пока не рисуем") }
+        override fun sendLocation(location: android.location.Location?) {
+            if (locationLogged.compareAndSet(false, true)) log("sendLocation")
+        }
+        override fun showAlert(alert: Bundleable?) {
+            val a = runCatching { alert?.get() as? Alert }.getOrNull()
+            val what = runCatching { a?.let { " id=${it.id} \"${text(it.title)}\"" } }.getOrNull().orEmpty()
+            log("showAlert$what - пока не рисуем")
+        }
         override fun dismissAlert(id: Int) {}
         override fun openMicrophone(request: Bundleable?): Bundleable? = null
     }
@@ -443,5 +480,6 @@ internal class CarAppSession(
         const val DEATH_WINDOW_MS = 60_000L
         const val MAX_DEATHS = 3
         const val TRIP_LOG_MS = 3_000L
+        const val MESSAGE_LOG_CHARS = 120
     }
 }

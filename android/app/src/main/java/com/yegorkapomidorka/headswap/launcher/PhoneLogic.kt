@@ -46,6 +46,10 @@ sealed interface PhoneCardModel {
     data class Outgoing(val title: String) : PhoneCardModel
 }
 
+/** Идёт звонок (Д, Е, Ж): карточка показывает имя, таймер и кнопки; в портрете звонок занимает весь нижний ряд. */
+val PhoneCardModel.ongoing: Boolean
+    get() = this is PhoneCardModel.Incoming || this is PhoneCardModel.InCall || this is PhoneCardModel.Outgoing
+
 object PhoneLogic {
     /** Исходящий без ответа показываем первые секунды: состояния «ответили» TelephonyManager не отдаёт. */
     const val OUTGOING_PHASE_SEC = 5
@@ -93,9 +97,9 @@ object PhoneLogic {
 object MusicLogic {
     data class Action(val id: String, val name: String)
 
-    private val LIKE = listOf("like", "love", "heart", "favorite", "favourite", "thumb", "нрав", "люб", "избран", "أعجبني", "مفضلة", "j'aime", "j’aime", "favori", "coup de cœur")
-    private val UNLIKE = listOf("unlike", "unfavorite", "unfavourite", "remove", "убрать", "удалить", "إزالة", "حذف", "retirer", "supprimer")
-    private val DISLIKE = listOf("dislike", "дизлайк", "не нрав", "لم يعجبني", "n'aime pas", "n’aime pas")
+    private val LIKE = listOf("like", "love", "heart", "favorite", "favourite", "thumb", "нрав", "люб", "избран", "أعجبني", "مفضلة", "j'aime", "j’aime", "favori", "coup de cœur", "喜欢", "收藏", "红心")
+    private val UNLIKE = listOf("unlike", "unfavorite", "unfavourite", "remove", "убрать", "удалить", "إزالة", "حذف", "retirer", "supprimer", "取消")
+    private val DISLIKE = listOf("dislike", "дизлайк", "не нрав", "لم يعجبني", "n'aime pas", "n’aime pas", "不喜欢")
 
     /** Действие «нравится» среди custom actions, если плеер его отдаёт. */
     fun findLike(actions: List<Action>): Action? = actions.firstOrNull { isLike(it) }

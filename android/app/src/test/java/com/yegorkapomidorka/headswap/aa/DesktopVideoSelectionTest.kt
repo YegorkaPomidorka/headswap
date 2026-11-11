@@ -15,7 +15,7 @@ class DesktopVideoSelectionTest {
         assertEquals(1280 to 720, next.outW to next.outH)
     }
     @Test fun invalidOrMissingInitLocksSafe720FallbackEvenIfValidInitArrivesLater() {
-        for ((w, h) in listOf(0 to 0, -2 to 720, 2560 to 1440, 1281 to 720, 720 to 1280, Int.MAX_VALUE to Int.MAX_VALUE)) {
+        for ((w, h) in listOf(0 to 0, -2 to 720, 2560 to 1440, 1281 to 720, 1082 to 1920, 720 to 1922, Int.MAX_VALUE to Int.MAX_VALUE)) {
             val selection = DesktopVideoSelection(DesktopResolution.AUTO, 0)
             val fallback = selection.resolve(w, h)
             assertEquals(1280 to 720, fallback.outW to fallback.outH)
@@ -65,7 +65,7 @@ class DesktopVideoSelectionTest {
     }
 
     @Test fun invalidCustomInputsAreRejectedRatherThanRoundedOrClamped() {
-        for ((w, h) in listOf(1921 to 1080, 1920 to 1081, 639 to 480, 640 to 479, 800 to 900)) {
+        for ((w, h) in listOf(1921 to 1080, 1920 to 1081, 639 to 480, 640 to 479, 1082 to 1920, 720 to 1922)) {
             assertThrows(IllegalArgumentException::class.java) { DesktopVideoSelection(DesktopResolution.CUSTOM, 160, w, h) }
         }
         for (dpi in listOf(-1, 95, 641, Int.MAX_VALUE)) {
@@ -89,5 +89,42 @@ class DesktopVideoSelectionTest {
         assertFalse(DesktopGeometryPolicy.accepts(480, 640))
         assertEquals(DesktopResolution.R1600_900, DesktopResolution.restore(null))
         assertEquals(DesktopResolution.R1600_900, DesktopResolution.restore("corrupt"))
+    }
+
+    @Test fun portraitGeometryIsAcceptedOnlyForTheOwnDesktop() {
+        assertTrue(DesktopGeometryPolicy.acceptsNative(960, 1152))
+        assertFalse(DesktopGeometryPolicy.accepts(960, 1152)) // DeX и отдельные экраны остаются горизонтальными
+        assertTrue(DesktopGeometryPolicy.acceptsNative(720, 1280))
+        assertTrue(DesktopGeometryPolicy.acceptsNative(960, 1138))
+        assertTrue(DesktopGeometryPolicy.acceptsNative(1280, 720)) // горизонталь как была
+        assertFalse(DesktopGeometryPolicy.acceptsNative(960, 1139))
+        assertFalse(DesktopGeometryPolicy.acceptsNative(1082, 1920))
+        assertFalse(DesktopGeometryPolicy.acceptsNative(720, 1922))
+    }
+
+    @Test fun portraitDensityFollowsTheShortSide() {
+        assertEquals(267, DesktopGeometryPolicy.density(960, 1152))
+        assertEquals(200, DesktopGeometryPolicy.density(1280, 720))
+        assertEquals(200, DesktopGeometryPolicy.density(720, 1280))
+        assertEquals(267, NativeDesktopGeometry(960, 1152).density)
+        assertEquals(200, NativeDesktopGeometry(1280, 720).density)
+    }
+
+    @Test fun portraitAaVideoModeGivesPortraitDesktop() {
+        val mode = DesktopVideoSelection.forAaVideo(VideoMode.PORTRAIT_1152, 0).resolve(1280, 720)
+        assertEquals(960 to 1152, mode.outW to mode.outH)
+        assertTrue(DesktopVideoGeometry.matchesNative(mode))
+        val portrait960 = DesktopVideoSelection.forAaVideo(VideoMode.PORTRAIT_960, 0).resolve()
+        assertEquals(960 to 1280, portrait960.outW to portrait960.outH)
+    }
+
+    @Test fun autoFollowsPortraitInitAndKeepsLandscapeAsBefore() {
+        val portrait = DesktopVideoSelection(DesktopResolution.AUTO, 0).resolve(960, 1138)
+        assertEquals(960 to 1138, portrait.outW to portrait.outH)
+        assertEquals(267, portrait.density)
+        assertTrue(DesktopVideoGeometry.matchesNative(portrait))
+        val landscape = DesktopVideoSelection(DesktopResolution.AUTO, 0).resolve(1138, 960)
+        assertEquals(1138 to 960, landscape.outW to landscape.outH)
+        assertEquals(267, landscape.density)
     }
 }

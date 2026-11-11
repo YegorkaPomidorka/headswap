@@ -5,6 +5,7 @@ import android.annotation.SuppressLint
 import android.content.Context
 import android.content.pm.PackageManager
 import android.media.AudioFormat
+import android.media.AudioManager
 import android.media.AudioRecord
 import android.media.MediaRecorder
 import android.os.Build
@@ -42,6 +43,9 @@ class DesktopAudioCapture(context: Context) {
     private var worker: Capture? = null
     private val sessions = DesktopAudioSessionGate()
     private var generation = 0L
+    private val audioManager = this.context.getSystemService(AudioManager::class.java)
+    /** Множитель PCM из STREAM_MUSIC (DesktopVolumeGain); 1 - без изменений. Пишет главный поток в reconcile. */
+    @Volatile private var gain = 1f
     private class Capture(val core: AaBridgeCore, val generation: Long) {
         val cancelled = AtomicBoolean()
     }
@@ -84,6 +88,7 @@ class DesktopAudioCapture(context: Context) {
 
     private fun reconcile() {
         val current = core ?: return
+        updateGain(current)
         val prefs = DexPrefs(context)
         val enabled = prefs.usbPlaybackAudio
         val delegated = true // PC-activated delegation is the only access backend here
@@ -119,6 +124,18 @@ class DesktopAudioCapture(context: Context) {
             DesktopAudioState.nonSilentBuffers = 0
             DesktopAudioState.status = "Подключаю звук по USB…"
             Thread({ runCapture(capture) }, "headswap-playback-audio").start()
+        }
+    }
+
+    /** Жест громкости меняет STREAM_MUSIC, а захват его не видит: громкость накладываем сами. Без жеста звук как раньше. */
+    private fun updateGain(current: AaBridgeCore) {
+        val next = if (!current.volumeGainEnabled) 1f else runCatching {
+            DesktopVolumeGain.forIndex(audioManager.getStreamVolume(AudioManager.STREAM_MUSIC),
+                audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC))
+        }.getOrDefault(1f)
+        if (next != gain) {
+            gain = next
+            AppLog.i("DESKTOP AUDIO: громкость по USB x${"%.3f".format(next)}", false)
         }
     }
 
@@ -203,7 +220,8 @@ class DesktopAudioCapture(context: Context) {
                 if (pcm.isEmpty() || capture.cancelled.get()) continue
                 DesktopAudioState.pcmBytes += pcm.size
                 if (pcm.any { it != 0.toByte() }) DesktopAudioState.nonSilentBuffers++
-                DesktopAudioState.level = peak(pcm)
+                DesktopAudioState.level = peak(pcm) // до громкости: волны «Говорю» не гаснут на тихой
+                DesktopVolumeGain.apply(pcm, gain)
                 sessions.runIfCurrent(capture.generation) {
                     if (!capture.cancelled.get()) capture.core.onAudioData(DesktopAudioPolicy.MEDIA_CHANNEL, pcm,
                         SystemClock.elapsedRealtimeNanos() / 1000)

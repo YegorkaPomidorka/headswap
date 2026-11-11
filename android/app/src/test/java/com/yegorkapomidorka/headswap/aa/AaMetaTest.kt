@@ -1709,4 +1709,37 @@ class AaMetaTest {
         r.core.onAudioData(M.CH_AUDIO_MEDIA, ByteArray(640), 0)
         assertEquals(0, r.link.audio.count { it == CarlifeAudio.MEDIA_DATA })
     }
+
+    @Test
+    fun desktopPlayerShowsTrackWithoutMusicModuleStatus() {
+        // h1054: трек плеера рабочего стола -> MEDIA_INFO, но MODULE_STATUS MUSIC им не управляем (его ведёт звук рабочего стола)
+        val r = Rig()
+        r.core.usbAudioEnabled = false
+        r.start()
+        r.core.onDesktopMediaStatus(AaMediaStatus(null, "ru.yandex.music", null, null, null, null))
+        r.core.onMediaMetadata(AaMediaMetadata("Song", "Artist", null, null, null, 200, null))
+        assertTrue("на паузе трек не показываем", r.link.infos.isEmpty())
+        r.core.onDesktopMediaStatus(AaMediaStatus(AaMeta.STATE_PLAYING, "ru.yandex.music", 5, null, null, null))
+        assertEquals(1, r.link.infos.size)
+        assertEquals("Song", r.link.infos[0].song)
+        assertEquals("ru.yandex.music#1", r.link.infos[0].source)
+        assertTrue(r.link.progress.isNotEmpty())
+        r.core.onDesktopMediaStatus(AaMediaStatus(AaMeta.STATE_PAUSED, "ru.yandex.music", 6, null, null, null))
+        assertTrue("MUSIC от плеера рабочего стола не шлём", r.link.modules.none { it.first == CarlifeAudio.MODULE_MUSIC })
+    }
+
+    @Test
+    fun moduleListResetIsFollowedByCurrentMusicAndNavi() {
+        // h1054: стартовая пачка MODULE_STATUS (все 0) уходит через 500 мс и затирала MUSIC=1 заигравшей раньше музыки
+        val r = Rig()
+        r.start()
+        r.core.onModuleListSent()
+        assertTrue("ничего не играет - повторять нечего", r.link.modules.isEmpty())
+        r.core.onAudioStart(M.CH_AUDIO_MEDIA)
+        r.core.onAudioData(M.CH_AUDIO_MEDIA, ByteArray(640), 0)
+        assertEquals(listOf(CarlifeAudio.MODULE_MUSIC to 1), r.link.modules.toList())
+        r.link.modules.clear()
+        r.core.onModuleListSent()
+        assertEquals(listOf(CarlifeAudio.MODULE_MUSIC to 1), r.link.modules.toList())
+    }
 }

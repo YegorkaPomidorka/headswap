@@ -7,6 +7,8 @@
     <string name="l_back">Retour</string>
     <string name="l_settings">Réglages</string>
     <string name="l_card_view">Changer la grande tuile</string>
+    <string name="l_volume_down">Volume moins</string>
+    <string name="l_volume_up">Volume plus</string>
     <string name="l_navigation">Navigation</string>
     <string name="l_add">Ajouter</string>
     <string name="l_remove_q">Supprimer ?</string>
@@ -37,6 +39,7 @@
     <string name="l_nav_hints_off">Comme sur le téléphone</string>
     <string name="l_nav_hints_off_plus">Comme sur le téléphone · sans abonnement</string>
     <string name="l_nav_hints_off_aa">Comme sur le téléphone · Android Auto n\'est pas lancé</string>
+    <string name="l_nav_location_hint">Donnez au navigateur la localisation « Toujours autoriser », sinon pas de GPS. Touchez pour ouvrir les réglages</string>
     <string name="l_nav_aa_server_hint">Ouvrez les réglages d\'AA sur le téléphone\n⋮ → Démarrer le serveur de l\'unité principale</string>
     <string name="l_view_navigator">Navigation</string>
     <string name="l_view_clock">Horloge</string>
@@ -126,11 +129,15 @@
     <string name="l_s_colors_bg_sat">Saturation du fond</string>
     <string name="l_s_colors_hint">Tant que cet écran est ouvert, le bureau affiche les couleurs que vous modifiez. Les couleurs de nuit s\'affichent avec le thème sombre, celles de jour avec le thème clair.</string>
     <string name="l_s_rail">Panneau latéral</string>
+    <string name="l_s_rail_bottom">Panneau du bas</string>
+    <string name="l_s_layout_tile_top">Tuile en haut</string>
+    <string name="l_s_layout_music_top">Musique en haut</string>
     <string name="l_s_rail_small">Petit</string>
     <string name="l_s_rail_medium">Moyen</string>
     <string name="l_s_rail_normal">Normal</string>
     <string name="l_s_rail_cut">Compact</string>
     <string name="l_s_anim">Animations des boutons</string>
+    <string name="l_s_battery">Batterie du téléphone</string>
     <string name="l_s_map_scale">Échelle</string>
     <string name="l_s_map_scale_sub">Uniquement pour %1$s · s\'applique immédiatement</string>
     <string name="l_s_scale_smaller">Plus petite</string>

@@ -31,9 +31,11 @@ object PressLogic {
     const val LONG_MS = 600L
     const val DEBOUNCE_MS = 400L
     const val COLD_START_MS = 8000L
+    /** Долгое «Домой» - выход в меню ГУ: затянутый тап с ГУ (UP +200-500 мс) не должен выкидывать из рабочего стола. */
+    const val LONG_HU_EXIT_MS = 1000L
 
-    fun classify(downMs: Long, upMs: Long, allowLong: Boolean): Press =
-        if (allowLong && upMs - downMs >= LONG_MS) Press.LONG else Press.TAP
+    fun classify(downMs: Long, upMs: Long, allowLong: Boolean, longMs: Long = LONG_MS): Press =
+        if (allowLong && upMs - downMs >= longMs) Press.LONG else Press.TAP
 }
 
 /** Антидребезг кнопок запуска: второй тап ближе gapMs к первому игнорируется. */
@@ -137,9 +139,13 @@ object NavigatorPick {
      */
     fun noHints(pkg: String?): Boolean = pkg == WAZE
 
-    /** Теневую AA держим, пока у выбранного навигатора подсказки включены; навигатора нет - как раньше, держим. */
+    /**
+     * Теневая AA нужна только Google Картам с включёнными подсказками: свой хост Car App они не пускают, а манёвры AA
+     * отдаёт лишь своему навигатору. Яндекс и 2ГИС шлют подсказки через наш хост, им теневая AA только стучится в 5277
+     * (h1041: 39 таймаутов за 10 минут). Навигатор не выбран - не держим.
+     */
     fun shadowWanted(metaNavi: Boolean, navPkg: String?, hints: (String) -> Boolean): Boolean =
-        metaNavi && (navPkg == null || (!noHints(navPkg) && hints(navPkg)))
+        metaNavi && navPkg == GOOGLE_MAPS && hints(navPkg)
 
     fun defaultFor(installed: Set<String>, arabic: Boolean = false): String? = known(arabic).firstOrNull { it in installed }
 
@@ -325,8 +331,10 @@ object PlayerChip {
  */
 object SettingsGrid {
     const val ROWS = 5
-    fun top(row: Int, height: Int, gap: Int): Int = Math.round(row * (height + gap).toDouble() / ROWS).toInt()
-    fun bottom(row: Int, height: Int, gap: Int): Int = top(row + 1, height, gap) - gap
+    /** Рядов в портрете (h921): вкладки сверху съедают высоту, остаётся ~850 px - семь рядов по ~110 (макет: 116). */
+    const val PORTRAIT_ROWS = 7
+    fun top(row: Int, height: Int, gap: Int, rows: Int = ROWS): Int = Math.round(row * (height + gap).toDouble() / rows).toInt()
+    fun bottom(row: Int, height: Int, gap: Int, rows: Int = ROWS): Int = top(row + 1, height, gap, rows) - gap
 }
 
 /** Подпись типа сети в рейке. Типы - константы TelephonyManager.NETWORK_TYPE_*. */

@@ -277,7 +277,12 @@ class DelegatedDexConnector(context: Context, private val core: AaBridgeCore,
     }
 
     private val keyHook: (Int) -> Unit = { inject(it) }
-    init { DesktopKeys.injectKey = keyHook }
+    private val volumeHook: (Int) -> Unit = { steps ->
+        val media = core.desktopMedia
+        if (media == null) AppLog.i("DESKTOP громкость ${if (steps > 0) "+" else ""}$steps: плеера рабочего стола нет", false)
+        else AppLog.i("DESKTOP громкость ${if (steps > 0) "+" else ""}$steps -> ${media.adjustVolume(steps)}", false)
+    }
+    init { DesktopKeys.injectKey = keyHook; DesktopKeys.adjustVolume = volumeHook }
 
     override fun requestKeyFrame() { /* CarLife requests its own encoder's IDR directly. */ }
 
@@ -332,6 +337,7 @@ class DelegatedDexConnector(context: Context, private val core: AaBridgeCore,
                 EmbeddedSessionRegistry.deactivate(this)
                 inputGateway.deactivate()
                 if (DesktopKeys.injectKey === keyHook) DesktopKeys.injectKey = null
+                if (DesktopKeys.adjustVolume === volumeHook) DesktopKeys.adjustVolume = null
             } }
         }
         if (firstStop) {

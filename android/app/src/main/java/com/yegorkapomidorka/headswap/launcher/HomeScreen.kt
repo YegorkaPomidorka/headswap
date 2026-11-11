@@ -56,6 +56,10 @@ fun HomeScreen() {
     val m = LocalMetrics.current
     val s = m.spec
     val model = LauncherModel
+    if (s.portrait) {
+        PortraitHome()
+        return
+    }
     val layout = model.homeLayout
     val tiles = model.tiles
     // «Карта слева» и «2 : 1» - физические стороны экрана при любом языке: в RTL Row кладёт первую плашку справа
@@ -104,6 +108,36 @@ fun HomeScreen() {
 }
 
 /**
+ * Главный в портрете (h921, Main.dc.html): строка статуса, колонка с зазором G - большая плитка на остаток высоты,
+ * карточка музыки на всю ширину (2,6T) и нижний ряд из быстрых приложений и «Телефона» (на время звонка - полоса звонка). «Справа» - плитка сверху,
+ * «Слева» - музыка сверху; 2:1 и 1:2 здесь не бывает ([LauncherModel.layout]). Нижняя рейка рисуется корнем.
+ */
+@Composable
+private fun PortraitHome() {
+    val m = LocalMetrics.current
+    val s = m.spec
+    val model = LauncherModel
+    val full = RoundedCornerShape(m.dp(s.radius))
+    Column(Modifier.fillMaxSize().padding(start = m.dp(s.g), top = m.dp(s.g8), end = m.dp(s.padEnd), bottom = m.dp(s.padBottom))) {
+        StatusBar()
+        if (!model.hideStatusBar) Spacer(Modifier.height(m.dp(s.statusGap)))
+        Column(Modifier.weight(1f).fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(m.dp(s.g))) {
+            val music = @Composable { MusicCard(Modifier.fillMaxWidth().height(m.dp(s.musicH))) }
+            if (model.mapLeft) music()
+            TileCard(model.tiles.big, Modifier.fillMaxWidth().weight(1f).onGloballyPositioned { model.bigTileRect = it.boundsInRoot() })
+            if (!model.mapLeft) music()
+            if (currentPhoneModel().ongoing) {
+                // звонок: полоса вместо всего нижнего ряда
+                PortraitCallBar(Modifier.fillMaxWidth().height(m.dp(s.bottomRowH)))
+            } else Row(Modifier.fillMaxWidth().height(m.dp(s.bottomRowH)), horizontalArrangement = Arrangement.spacedBy(m.dp(s.g))) {
+                CardBox(Modifier.weight(1f).fillMaxHeight(), shape = full) { QuickAppsRow() }
+                PhoneCard(Modifier.width(m.dp(s.phone)).fillMaxHeight(), full)
+            }
+        }
+    }
+}
+
+/**
  * Слоты быстрого ряда, всего n+1: приложения и «+» сразу за ними. Когда приложений n+1 и больше, «+» уступает место
  * последнему из них (Егор 04.11: пятое приложение добавлялось, но пряталось за закреплённым «+»).
  */
@@ -130,7 +164,8 @@ private fun QuickAppsRow() {
     val s = m.spec
     val slots = quickSlots(LauncherModel.visibleApps, s.quickApps)
     Row(
-        Modifier.fillMaxSize().padding(horizontal = m.dp(s.g), vertical = m.dp(s.g8)),
+        // в портрете ряд ниже (T + G): иконка с полями почти во всю высоту, без вертикальных отступов
+        Modifier.fillMaxSize().padding(horizontal = m.dp(s.g), vertical = m.dp(if (s.portrait) 0 else s.g8)),
         horizontalArrangement = Arrangement.spacedBy(m.dp(s.g4)), verticalAlignment = Alignment.CenterVertically,
     ) {
         for (slot in slots) {

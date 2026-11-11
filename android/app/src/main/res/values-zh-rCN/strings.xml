@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="action_stop">停止</string>
+    <string name="action_open_aa">打开 Android Auto</string>
+
+    <string name="lang_title">语言</string>
+    <string name="lang_system">跟随系统</string>
+</resources>

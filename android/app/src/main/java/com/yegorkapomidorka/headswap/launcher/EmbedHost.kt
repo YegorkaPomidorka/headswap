@@ -235,6 +235,8 @@ internal object EmbedHost {
     @Volatile private var projCar = false
     @Volatile private var projW = 0
     @Volatile private var projH = 0
+    /** Вырезка поверхности своего хоста, которую показывает карточка на главном; null - на весь экран. */
+    @Volatile var navCrop: com.yegorkapomidorka.headswap.carapp.Box? = null
 
     @Volatile var appContext: Context? = null
 
@@ -304,7 +306,10 @@ internal object EmbedHost {
         if (slot === nav && projCar) {
             val w = projW
             val h = projH
-            if (w > 0 && h > 0 && slot.interactive) CarAppHost.touch(action, ev.x * w / viewW, ev.y * h / viewH)
+            if (w > 0 && h > 0 && slot.interactive) {
+                val (x, y) = com.yegorkapomidorka.headswap.carapp.CarAreas.touch(ev.x, ev.y, viewW, viewH, w, h, navCrop)
+                CarAppHost.touch(action, x, y)
+            }
             return
         }
         if (slot === nav && AaShadowNav.projection) {

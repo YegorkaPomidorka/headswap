@@ -56,6 +56,8 @@ internal object LauncherModel {
     var railSize by mutableStateOf(RailSize.NORMAL)
     var mapLeft by mutableStateOf(false)
     var animations by mutableStateOf(true)
+    /** Заряд телефона в строке статуса ([LauncherPrefs.showBattery]). */
+    var showBattery by mutableStateOf(true)
     var autoplay by mutableStateOf(true)
     /** «Уведомления» телефона на экране ГУ (слушатель - [NotificationsRepo]). */
     var notifications by mutableStateOf(true)
@@ -74,7 +76,9 @@ internal object LauncherModel {
     var dayColors by mutableStateOf(ColorSet.DAY)
     /** На экране «Цвета» настраиваются дневные (иначе ночные); пока он открыт, весь стол показывает этот набор. */
     var colorsEditDay by mutableStateOf(false)
-    private val colorsOpen: Boolean get() = area == Area.Settings && settingsPage == SettingsPage.COLORS
+    /** Страница «Цвета» открыта; в портрете «Цвета» - блок «Вида», он правит набор, пока открыт сам «Вид» (h921). */
+    private val colorsOpen: Boolean
+        get() = area == Area.Settings && (settingsPage == SettingsPage.COLORS || (portrait && settingsPage == SettingsPage.LOOK))
     /** Светлая ли палитра на экране: на «Цветах» - редактируемый набор, иначе [lightTheme]. */
     val shownLight: Boolean get() = if (colorsOpen) colorsEditDay else lightTheme
     val palette: LauncherPalette
@@ -83,6 +87,10 @@ internal object LauncherModel {
     var cardView by mutableStateOf(CardView.NAVIGATOR)
     var smallView by mutableStateOf(CardView.MUSIC)
     var homeLayout by mutableStateOf(HomeLayout.QUAD)
+    /** Экран вертикальный (h921): ставит [LauncherRoot] по спеке. */
+    var portrait by mutableStateOf(false)
+    /** Раскладка, по которой живут плашки: в портрете 2:1 и 1:2 не бывает (вся колонка - как «Справа»), сохранённая [homeLayout] не меняется. */
+    val layout: HomeLayout get() = if (portrait) HomeLayout.QUAD else homeLayout
     /** Что листают «Слои» и в каком порядке ([LayerList]). */
     var layers by mutableStateOf(LayerList.DEFAULT)
     /** Пакет приложения плашки-приложения ([CardView.APP]); по умолчанию YouTube. */
@@ -93,7 +101,7 @@ internal object LauncherModel {
     fun installed(pkg: String): Boolean = pkg != navigatorPkg && (!catalogLoaded || catalog.any { it.packageName == pkg })
     /** Плашки с учётом правил. */
     val tiles: HomeTiles
-        get() = HomeTilesLogic.normalize(HomeTiles(cardView, smallView, tileApp), homeLayout, installed(tileApp))
+        get() = HomeTilesLogic.normalize(HomeTiles(cardView, smallView, tileApp), layout, installed(tileApp))
     /** Где на экране большая и малая плашки (корень): по ним стоят ⇄ на стыке и «Слои» ленты поверх живых окон. */
     var bigTileRect by mutableStateOf<Rect?>(null)
     var smallTileRect by mutableStateOf<Rect?>(null)
@@ -178,6 +186,7 @@ internal object LauncherModel {
         railSize = prefs.railSize
         mapLeft = prefs.mapLeft
         animations = prefs.animations
+        showBattery = prefs.showBattery
         autoplay = prefs.autoplay
         notifications = prefs.notifications
         NotificationsRepo.setEnabled(notifications)
@@ -210,11 +219,13 @@ internal object LauncherModel {
             val pm = appCtx.packageManager
             val query = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER)
             val found = runCatching {
+                // выключенные компоненты запрос и так не вернёт; ActivityInfo.enabled - значение из манифеста, у
+                // activity-alias, включённого на ходу (сменённая иконка Телеграма), там false
                 pm.queryIntentActivities(query, 0).mapNotNull { info ->
                     val a = info.activityInfo ?: return@mapNotNull null
                     DesktopAppCatalog.Entry(a.packageName, a.name,
                         runCatching { info.loadLabel(pm).toString() }.getOrDefault(a.packageName),
-                        enabled = a.enabled && a.applicationInfo.enabled, exported = a.exported)
+                        enabled = a.applicationInfo.enabled, exported = a.exported)
                 }
             }.getOrElse { AppLog.i("Launcher catalog: ${it.javaClass.simpleName}", false); emptyList() }
             val selected = DesktopAppCatalog.select(found, appCtx.packageName)
@@ -259,6 +270,7 @@ internal object LauncherModel {
     fun chooseRailSize(value: RailSize) { railSize = value; prefs.railSize = value }
     fun chooseMapLeft(left: Boolean) { mapLeft = left; prefs.mapLeft = left }
     fun chooseAnimations(on: Boolean) { animations = on; prefs.animations = on }
+    fun chooseShowBattery(on: Boolean) { showBattery = on; prefs.showBattery = on }
     fun chooseAutoplay(on: Boolean) { autoplay = on; prefs.autoplay = on }
     /** Из «Для разработчиков» на телефоне: лаунчер мог ещё не стартовать, поэтому префы — своим экземпляром. */
     fun chooseHideStatusBar(ctx: Context, on: Boolean) { hideStatusBar = on; LauncherPrefs(ctx.applicationContext).hideStatusBar = on }
@@ -276,12 +288,12 @@ internal object LauncherModel {
         if (t.app != tileApp) { tileApp = t.app; prefs.tileApp = t.app }
     }
     /** «Слои»: следующее содержимое большой плашки. */
-    fun nextCardView() = setTiles(HomeTilesLogic.nextBig(currentTiles, homeLayout, ::installed, layers))
+    fun nextCardView() = setTiles(HomeTilesLogic.nextBig(currentTiles, layout, ::installed, layers))
     /** Блок «Слои» в настройках «Экран»: что листает кнопка, по порядку. */
     fun addLayer(l: Layer) { layers = LayerList.add(layers, l).also { prefs.layers = it } }
     fun removeLayer(l: Layer) { layers = LayerList.remove(layers, l).also { prefs.layers = it } }
     /** ⇄: поменять плашки местами (только в двух плашках). */
-    fun swapTiles() = setTiles(HomeTilesLogic.swap(currentTiles, homeLayout, installed(tileApp)))
+    fun swapTiles() = setTiles(HomeTilesLogic.swap(currentTiles, layout, installed(tileApp)))
     /** «Раскладка» в настройках: четыре плашки с картой справа/слева или две плашки. */
     fun chooseHomeLayout(layout: HomeLayout, left: Boolean = mapLeft) {
         homeLayout = layout; prefs.homeLayout = layout

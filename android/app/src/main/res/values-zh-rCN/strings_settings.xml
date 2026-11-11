@@ -1,0 +1,295 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 设置界面 -->
+    <string name="set_title">设置</string>
+    <string name="set_back">返回</string>
+
+    <string name="theme_title">主题</string>
+    <string name="theme_system">跟随系统</string>
+    <string name="theme_light">浅色</string>
+    <string name="theme_medium">中等</string>
+    <string name="theme_dark">深色</string>
+
+    <string name="set_sound">声音</string>
+    <string name="set_usb_audio_title">通过 Headswap 播放声音</string>
+    <string name="set_usb_audio_sub">通过数据线或 Wi-Fi 输出到车载扬声器。关闭后：通过蓝牙播放</string>
+    <string name="set_usb_audio_desktop">要在桌面模式下通过 Headswap 播放声音，请重新激活访问权限。在此之前，声音通过蓝牙播放</string>
+    <string name="set_calls_title">向车机通报通话</string>
+    <string name="set_calls_sub">需要“电话”权限：Headswap 会获知来电并通知车机，通话期间音乐会静音</string>
+
+    <string name="eq_title">均衡器</string>
+    <string name="eq_presets">预设</string>
+    <string name="eq_preset_flat">关闭</string>
+    <string name="eq_preset_bass">低音</string>
+    <string name="eq_preset_vocal">人声</string>
+    <string name="eq_preset_rock">摇滚</string>
+    <string name="eq_preset_electronic">电子</string>
+    <string name="eq_preset_custom">自定义</string>
+    <string name="eq_bands">频段</string>
+    <string name="eq_preamp">前置放大</string>
+    <string name="eq_reset">重置</string>
+    <string name="eq_db">%1$s dB</string>
+    <string name="eq_hz">%1$s Hz</string>
+    <string name="eq_khz">%1$s kHz</string>
+    <string name="eq_note">仅对音乐生效：导航提示音和语音不会被处理。通过数据线和 Wi-Fi 均可使用，即时生效。</string>
+    <string name="eq_usb_only">仅在通过 Headswap 播放声音时有效；当前声音通过蓝牙播放</string>
+    <string name="eq_sum_usb_only">仅在通过 Headswap 播放声音时有效</string>
+    <string name="eq_sum">均衡器：%1$s</string>
+
+    <string name="set_video">视频</string>
+    <string name="set_transcode_title">重新编码</string>
+    <string name="set_transcode_desc">手机会针对车机屏幕重新编码视频：支持任意分辨率和帧率。</string>
+    <string name="set_transcode_plus">+ 更稳定，兼容任何车机</string>
+    <string name="set_transcode_minus">− 增加手机负载、耗电，延迟增加约 60 毫秒</string>
+    <string name="set_direct_title">直通</string>
+    <string name="set_direct_desc">Android Auto 的视频原样传给车机。宽屏画面由车机自行裁切。</string>
+    <string name="set_direct_plus">+ 延迟更低，发热和耗电更少</string>
+    <string name="set_direct_minus">− 无法调整帧率</string>
+    <string name="set_direct_desktop_desc">在“自带桌面”模式下，手机只对自己的屏幕编码一次，并将现成的 H.264 码流交给车机，无需转码。</string>
+
+    <string name="set_resolution">视频分辨率</string>
+    <string name="set_res_pick">选择分辨率</string>
+    <string name="set_res_group_standard">常规屏幕</string>
+    <string name="set_res_group_wide">宽屏</string>
+    <string name="set_res_group_portrait">竖屏</string>
+    <string name="set_res_ratio_wide_976">2.3:1</string>
+    <string name="set_apply_next">下次连接时生效。</string>
+    <string name="set_needs_transcode">需要重新编码</string>
+    <string name="set_custom_res_active">自定义分辨率 %1$s 已生效（%2$s）</string>
+
+    <string name="set_music_rate">音乐采样率</string>
+    <string name="set_music_rate_note">采样率越低，USB 链路和性能较弱的车机负担越小，但音质也越低。自动：48 kHz，现代 CN7 车机使用 32 kHz。下次连接时生效。</string>
+    <string name="set_fps">帧率</string>
+    <string name="set_fps_note">下次连接时生效。直通模式下无法更改帧率。</string>
+    <string name="set_fps_direct">直通模式下，帧率由 Android Auto 决定</string>
+    <string name="set_aa_density">Android Auto 界面缩放</string>
+    <string name="set_aa_density_auto">自动 · %1$d dpi</string>
+    <string name="set_aa_density_manual">%1$d dpi</string>
+    <string name="set_aa_density_auto_sub">按分辨率自动设置</string>
+    <string name="set_aa_density_manual_sub">手动设置，此分辨率的自动值：%1$d</string>
+    <string name="set_aa_density_reset">自动</string>
+    <string name="set_aa_density_smaller">更小</string>
+    <string name="set_aa_density_larger">更大</string>
+    <string name="set_aa_density_note">dpi 越高，界面越大。下次连接时生效。dpi 过高时，Android Auto 可能会切换布局：由分屏变为单列。</string>
+    <string name="set_sum_density">%1$d dpi</string>
+
+    <string name="set_cert">车机证书</string>
+    <string name="set_cert_hint">如果 Android Auto 无法连接，请更换证书</string>
+
+    <string name="set_car_make">汽车品牌</string>
+    <string name="set_car_make_default">不选品牌（可通过 Fermata 播放视频和 YouTube）</string>
+    <string name="set_car_make_default_short">不选品牌</string>
+    <string name="set_car_make_note">汽车品牌标志会显示在 Android Auto 的退出按钮上。选择品牌后，Android Auto 会隐藏第三方视频应用（Fermata Auto）。下次连接时生效。</string>
+
+    <string name="set_mic">麦克风</string>
+    <string name="mic_car_title">车机</string>
+    <string name="mic_car_sub">车机麦克风</string>
+    <string name="mic_phone_title">手机</string>
+    <string name="mic_phone_sub">手机麦克风，需要录音权限</string>
+    <string name="mic_auto_title">自动</string>
+    <string name="mic_auto_sub">优先使用车机，静音 2 秒后切换到手机</string>
+    <string name="mic_no_permission">没有录音权限：手机麦克风将无法使用。</string>
+
+    <string name="set_report_title">反馈问题</string>
+    <string name="set_report_note">日志 + 报告</string>
+    <string name="set_rerun_setup">重新运行设置向导</string>
+    <string name="set_check_ready">检查就绪状态</string>
+    <string name="set_for_devs">面向开发者</string>
+    <string name="set_support">支持 Yegor</string>
+    <string name="set_support_url">https://yegorkapomidorka.com/headswap/en/#donate</string>
+    <string name="set_sec_appearance">外观</string>
+    <string name="set_sec_sound">声音和麦克风</string>
+    <string name="set_sec_headunit">车机</string>
+    <string name="set_sec_apps">车机应用</string>
+    <string name="set_sum_apps">已找到：%1$d</string>
+    <string name="apps_warn_banner">视频仅限停车时使用。行车时请注意路况，风险自负。</string>
+    <string name="apps_warn_title">视频与驾驶</string>
+    <string name="apps_warn_text">Headswap 不会在车辆行驶时屏蔽视频。安全由驾驶员负责：请勿在驾驶时观看视频，仅在停车时使用。</string>
+    <string name="apps_warn_ok">知道了</string>
+    <string name="apps_installed_title">已安装在此手机上</string>
+    <string name="apps_installed_note">非 Google Play 来源：仅在开启“未知来源”后才会显示在 Android Auto 中</string>
+    <string name="apps_installed_empty">暂未找到。请从下方列表安装应用，或安装任意其他 Android Auto 应用。</string>
+    <string name="apps_recommended_title">推荐</string>
+    <string name="apps_download">下载</string>
+    <string name="apps_open">打开</string>
+    <string name="apps_fermata_desc">手机视频、YouTube、投屏</string>
+    <string name="apps_parkedtube_desc">在车机上全屏观看 YouTube，支持俄语键盘</string>
+    <string name="apps_aabrowser_desc">在车机上全屏使用浏览器</string>
+    <string name="apps_aabrowser_req">需要 Android 15 及以上</string>
+    <string name="apps_unsupported">此手机无法使用：需要 Android 15 或更高版本。</string>
+    <string name="apps_hint_title">在 Android Auto 中看不到该应用</string>
+    <string name="apps_hint_text">请确认 Android Auto 中已勾选“未知来源”，并且“汽车品牌”设置为“不选品牌”：选择品牌后，Android Auto 会隐藏视频应用。然后重启车机服务。Android Auto 更新后，应用有时会消失，这是 Google 方面的问题。</string>
+    <string name="set_mode">模式</string>
+    <string name="set_help">帮助</string>
+    <string name="set_sum_appearance">语言：%1$s · 主题：%2$s</string>
+    <string name="set_sum_mic">麦克风：%1$s</string>
+    <string name="set_sum_headunit">证书 %1$s</string>
+    <string name="set_footer">Headswap %1$s</string>
+
+    <!-- 视频模式（VideoMode） -->
+    <string name="video_r800_title">800×480</string>
+    <string name="video_r800_sub">适用于小屏幕</string>
+    <string name="video_r1024_title">1024×600</string>
+    <string name="video_r1024_sub">适用于 1024×600 的车机屏幕，不拉伸</string>
+    <string name="video_r720_title">1280×720（标准）</string>
+    <string name="video_r720_sub">适用于大多数车机</string>
+    <string name="video_r1080_title">1920×1080</string>
+    <string name="video_r1080_sub">更清晰，但对手机和车机负担更重</string>
+    <string name="video_wide_title">宽屏 8:3（裁切）</string>
+    <string name="video_wide_sub">适用于宽屏：1280×480，显示更大</string>
+    <string name="video_wide_mid_title">宽屏 8:3 中等（马自达 CX-5）</string>
+    <string name="video_wide_mid_sub">1728×648：马自达屏幕的原生分辨率</string>
+    <string name="video_wide_hd_title">宽屏 8:3 高清（裁切）</string>
+    <string name="video_wide_hd_sub">1920×720：更清晰、元素更小，屏幕上能容纳更多内容</string>
+    <string name="video_wide_640_title">宽屏 3:1（雪铁龙 C5 X）</string>
+    <string name="video_wide_640_sub">1920×640：雪铁龙 C5 X 屏幕的原生分辨率，两侧无黑边</string>
+    <string name="video_wide_2_1_title">宽屏 2:1（明锐 Pro、大众 Discover Pro 9.2）</string>
+    <string name="video_wide_2_1_sub">1280×640：明锐 Pro 和大众 Discover Pro 9.2 屏幕的原生分辨率，不拉伸</string>
+    <string name="video_wide_976_title">宽屏 2240×976（大众 途观L Pro）</string>
+    <string name="video_wide_976_sub">将宽屏裁切后缩放到大众 CNS3 车机的 CarLife 窗口大小</string>
+    <string name="video_wide_836_title">宽屏 1920×836（大众 途观L Pro，直通）</string>
+    <string name="video_wide_836_sub">与 2240×976 窗口相同的宽高比，手机端不缩放：由车机缩放。用于无需转码的裁切</string>
+    <string name="video_portrait_960_title">竖屏 3:4</string>
+    <string name="video_portrait_960_sub">960×1280：整块竖屏</string>
+    <string name="video_portrait_1152_title">竖屏 5:6（现代 途胜 NX4c）</string>
+    <string name="video_portrait_1152_sub">960×1152：去掉底部空调栏的 960×1280 屏幕，不拉伸</string>
+
+    <!-- 音乐采样率（MusicRate） -->
+    <string name="mrate_auto">自动</string>
+    <string name="mrate_48">48 kHz</string>
+    <string name="mrate_44">44.1 kHz</string>
+    <string name="mrate_32">32 kHz</string>
+    <string name="mrate_24">24 kHz</string>
+    <string name="mrate_22">22 kHz</string>
+
+    <!-- 音乐数据包大小（MediaChunk） -->
+    <string name="mchunk_auto">与 Android Auto 发送的一致</string>
+    <string name="mchunk_4096">4096 B</string>
+    <string name="mchunk_2560">2560 B（与百度一致）</string>
+    <string name="mchunk_2048">2048 B</string>
+    <string name="mchunk_1024">1024 B</string>
+
+    <!-- 语音数据包大小（VoiceChunk） -->
+    <string name="vchunk_auto">自动</string>
+    <string name="vchunk_2048">2048 B</string>
+    <string name="vchunk_1024">1024 B</string>
+    <string name="vchunk_512">512 B</string>
+
+    <!-- 提示音前的静音（TtsPreroll） -->
+    <string name="tpreroll_auto">自动</string>
+    <string name="tpreroll_0">关闭</string>
+    <string name="tpreroll_100">100 毫秒</string>
+    <string name="tpreroll_200">200 毫秒</string>
+    <string name="tpreroll_400">400 毫秒</string>
+
+    <!-- 触摸抽样（TouchDecimation） -->
+    <string name="tdec_off">关闭</string>
+    <string name="tdec_x2">×2</string>
+
+    <!-- 车机重复触摸（DupDownFilter） -->
+    <string name="dup_down_auto">自动（150 毫秒内重复）</string>
+    <string name="dup_down_on">始终过滤</string>
+    <string name="dup_down_off">不过滤</string>
+
+    <!-- 帧率（FpsSetting） -->
+    <string name="fps_auto_title">自动</string>
+    <string name="fps_auto_sub">按车机请求</string>
+    <string name="fps_15_title">15 帧/秒</string>
+    <string name="fps_15_sub">对性能较弱的车机和链路更轻松</string>
+    <string name="fps_30_title">30 帧/秒</string>
+    <string name="fps_30_sub">更流畅，但负载更高</string>
+    <string name="fps_60_title">60 帧/秒</string>
+    <string name="fps_60_sub">更高的帧率目标；需要手机和车机性能足够强</string>
+
+    <!-- 无线（B 分支） -->
+    <string name="wl_title">无线</string>
+    <string name="wl_note">适用于支持无线 CarLife 的车型。请在手机上开启热点，让车机连接该热点（车机菜单：Wi-Fi），在车机上打开 CarLife，然后点按下方按钮。无需数据线；如果插上数据线，则优先使用 USB。</string>
+    <string name="wl_start">通过 Wi-Fi 等待车机</string>
+    <string name="wl_status_line">状态：%1$s</string>
+    <string name="wl_off">已关闭</string>
+    <string name="wl_no_permission">没有“附近的设备”权限，车机将无法通过 Wi-Fi 连接</string>
+    <string name="wl_report">发送无线报告</string>
+    <string name="wl_car_line">车辆：%1$s</string>
+    <string name="wl_car_none">未选择</string>
+    <string name="wl_car_note">手机通过蓝牙连接到这辆车时，Headswap 会自动开始通过 Wi-Fi 等待连接</string>
+    <string name="wl_car_pick">选择车辆</string>
+    <string name="wl_car_forget">忽略此车辆</string>
+    <string name="wl_car_no_permission">没有“附近的设备”权限，将收不到车机的蓝牙事件</string>
+    <string name="wl_car_unavailable">此手机无法配对车辆（不支持配套设备设置）</string>
+    <string name="wl_cw_note">如果手机保持连接在其他 Wi-Fi 上（例如在家中），Headswap 可以自动加入车机热点：网络仍使用您的主网络。请输入车机显示的名称和密码。</string>
+    <string name="wl_cw_line">车机 Wi-Fi：%1$s</string>
+    <string name="wl_cw_none">未设置</string>
+    <string name="wl_cw_set">已设置：%1$s</string>
+    <string name="wl_cw_ssid_hint">网络名称（SSID）</string>
+    <string name="wl_cw_pass_hint">密码（留空表示开放网络）</string>
+    <string name="wl_cw_save">保存并检查</string>
+    <string name="wl_cw_forget">删除</string>
+    <string name="wl_cw_need_ssid">请输入网络名称</string>
+    <string name="wl_cw_checking">正在连接车机 Wi-Fi…请在系统提示中确认</string>
+    <string name="wl_cw_ok">已连接到车机 Wi-Fi</string>
+    <string name="wl_cw_fail">连接失败：车机不在范围内、密码错误或已拒绝系统提示</string>
+
+    <!-- 我的车（CarPreset） -->
+    <string name="car_title">我的车</string>
+    <string name="car_other_title">列表中没有我的车</string>
+    <string name="car_citroen_c5_x">雪铁龙 C5 X</string>
+    <string name="car_dongfeng_df6_2023">东风 DF6 2023款</string>
+    <string name="car_peugeot_5008_2024">东风标致 5008 2024款</string>
+    <string name="car_honda_breeze_2">本田 皓影（Breeze），第二代</string>
+    <string name="car_honda_crv_6">本田 CR-V，第六代，改款前</string>
+    <string name="car_honda_crv_2026">本田 CR-V 2026款 1.5T</string>
+    <string name="car_honda_crv_2026_hybrid">本田 CR-V 2026款 混动</string>
+    <string name="car_honda_vezel_2022">本田 缤智（Vezel）2022–2024款（广汽本田）</string>
+    <string name="car_hyundai_elantra_7">现代 伊兰特，第七代，改款前</string>
+    <string name="car_hyundai_ix35_2021">现代 ix35 2021款</string>
+    <string name="car_hyundai_tucson_nx4c">现代 途胜 NX4c</string>
+    <string name="car_jetta_vs">捷达 VS5/VS7（仅支持百度 CarLife，不支持 J-Link）</string>
+    <string name="car_kia_k3_2023">起亚 K3 2023款</string>
+    <string name="car_kia_sportage_ace">起亚 智跑 Ace</string>
+    <string name="car_mazda_3_cn_2025">马自达 3 昂克赛拉 2025款（中国）</string>
+    <string name="car_mazda_cx5_2025">马自达 CX-5 2025–2026款</string>
+    <string name="car_mazda_cx50">马自达 CX-50</string>
+    <string name="car_mitsubishi_outlander_4">三菱 欧蓝德 第四代 2022款</string>
+    <string name="car_skoda_kamiq_gt_2021">斯柯达 柯米克 GT 2021款</string>
+    <string name="car_skoda_octavia_pro">斯柯达 明锐 Pro</string>
+    <string name="car_toyota_corolla_cross_2024">丰田 锋兰达 2024–2025款</string>
+    <string name="car_toyota_levin">丰田 雷凌</string>
+    <string name="car_toyota_rav4_2025">丰田 RAV4荣放 2025款</string>
+    <string name="car_vw_bora_2021">大众 宝来 2021款</string>
+    <string name="car_vw_discover_pro_9_2">大众 Discover Pro 9.2（1280×640）</string>
+    <string name="car_vw_golf_8_pro">大众 高尔夫 8 Pro 2021款</string>
+    <string name="car_vw_golf_8_r_line">大众 高尔夫 8 R-Line</string>
+    <string name="car_vw_id_unyx">大众 ID.与众</string>
+    <string name="car_vw_lamando_l">大众 凌渡 L</string>
+    <string name="car_vw_sagitar_2021">大众 速腾 2021–2022款，改款前</string>
+    <string name="car_vw_tayron_gte_2020">大众 探岳 GTE 2020款（MIB 2.5）</string>
+    <string name="car_vw_troc_2026">大众 探歌 2026款 改款</string>
+    <string name="car_vw_tharu_xr">大众 途岳新锐 2025–2026款</string>
+    <string name="car_vw_tiguan_l_pro">大众 途观L Pro / 途昂 Pro</string>
+    <string name="car_field">车型</string>
+    <string name="car_pick_hint">选择您的车型</string>
+    <string name="car_will_apply">将应用的设置</string>
+    <string name="car_label_mode">视频模式</string>
+    <string name="car_auto">自动</string>
+    <string name="car_value_keep">保持不变</string>
+    <string name="car_apply">应用</string>
+
+    <!-- 桥接模式：Android Auto / Headswap Desktop（SettingsSection.MODE） -->
+    <string name="bm_title">模式</string>
+    <string name="bm_aa_note">车机显示手机上的 Android Auto。</string>
+    <string name="bm_own_launcher">自带桌面</string>
+    <string name="bm_launcher_title">桌面</string>
+    <string name="bm_need_13">需要 Android 13 及以上</string>
+    <string name="bm_sum_state">%1$s · %2$s</string>
+    <string name="bm_act_on">已激活</string>
+    <string name="bm_act_off">未激活</string>
+    <string name="bm_act_lost">访问权限已失效，请重新激活</string>
+    <string name="about_title">关于</string>
+    <string name="about_note">作者和许可证</string>
+    <string name="about_authors">作者</string>
+    <string name="about_opensource">开源</string>
+    <string name="about_author_yegor">Yegor</string>
+    <string name="about_author_ildar">Ildar Sadykov</string>
+    <string name="about_open_project">项目主页</string>
+    <string name="about_license_unavailable">许可证文本不可用。请查看项目主页。</string>
+</resources>

@@ -85,6 +85,7 @@ internal object VdmHostLink {
             runCatching { binder.linkToDeath({ onHostDied(next) }, 0) }
         }
         AppLog.i("VDM хост подключён: $status", false)
+        VdmHostRestart.onHostConnected(appContext)
         return Bundle().apply { putBoolean(VdmDesktop.EXTRA_ACCEPTED, true); putBinder(VdmDesktop.EXTRA_CLIENT, client) }
     }
 

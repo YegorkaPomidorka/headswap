@@ -11,12 +11,32 @@ object DesktopGeometryPolicy {
     const val MAX_HEIGHT = 1080
     const val MIN_DENSITY = 96
     const val MAX_DENSITY = 640
+    /** Портретный рабочий стол (h921: Tucson NX4 HSAE с прошивкой на весь экран просит 960×1138). */
+    const val PORTRAIT_MIN_WIDTH = 480
+    const val PORTRAIT_MAX_WIDTH = 1080
+    const val PORTRAIT_MAX_HEIGHT = 1920
+
+    /** Горизонтальный размер. DeX и отдельные экраны пускают только его. */
     fun accepts(width: Int, height: Int): Boolean =
         width in MIN_WIDTH..MAX_WIDTH && height in MIN_HEIGHT..MAX_HEIGHT &&
             width >= height && width % 2 == 0 && height % 2 == 0
+
+    fun acceptsPortrait(width: Int, height: Int): Boolean =
+        width in PORTRAIT_MIN_WIDTH..PORTRAIT_MAX_WIDTH && height in (width + 2)..PORTRAIT_MAX_HEIGHT &&
+            width % 2 == 0 && height % 2 == 0
+
+    /** Свой рабочий стол на виртуальном дисплее: горизонталь или портрет. */
+    fun acceptsNative(width: Int, height: Int): Boolean = accepts(width, height) || acceptsPortrait(width, height)
+
     fun requireDimensions(width: Int, height: Int) {
         require(accepts(width, height)) {
             "Нужен горизонтальный размер ${MIN_WIDTH}–${MAX_WIDTH} × ${MIN_HEIGHT}–${MAX_HEIGHT} с чётными сторонами"
+        }
+    }
+    fun requireNativeDimensions(width: Int, height: Int) {
+        require(acceptsNative(width, height)) {
+            "Нужен размер ${MIN_WIDTH}–${MAX_WIDTH} × ${MIN_HEIGHT}–${MAX_HEIGHT} или вертикальный " +
+                "${PORTRAIT_MIN_WIDTH}–${PORTRAIT_MAX_WIDTH} × до ${PORTRAIT_MAX_HEIGHT}, стороны чётные"
         }
     }
     fun requireDensity(density: Int) {
@@ -29,6 +49,9 @@ object DesktopGeometryPolicy {
      * в пикселях и от плотности не зависит; крупнее становятся клавиатура, системные окна и чужие приложения.
      */
     fun density(height: Int): Int = (160.0 * height / 576).roundToInt().coerceIn(160, MAX_DENSITY)
+
+    /** По короткой стороне: у портрета это ширина (960×1152 -> 267, как 960 по высоте). */
+    fun density(width: Int, height: Int): Int = density(minOf(width, height))
 }
 
 enum class DesktopResolution(val title: String, val width: Int, val height: Int) {
@@ -44,13 +67,13 @@ enum class DesktopResolution(val title: String, val width: Int, val height: Int)
 
 /** Raw Surface, encoded pixels and touch space have identical dimensions. */
 data class NativeDesktopGeometry(override val outW: Int, override val outH: Int) : VideoGeometry {
-    init { DesktopGeometryPolicy.requireDimensions(outW, outH) }
+    init { DesktopGeometryPolicy.requireNativeDimensions(outW, outH) }
     override val aaW = outW
     override val aaH = outH
     override val aaResolution = "${outW}x$outH"
     override val marginW = 0
     override val marginH = 0
-    override val density = DesktopGeometryPolicy.density(outH)
+    override val density = DesktopGeometryPolicy.density(outW, outH)
     override val bitrate = DesktopVideoQuality.BITRATE_CEILING_BPS
     override val label = "Desktop ${outW}x$outH"
     override fun describe(densityOverride: Int): String =
@@ -62,13 +85,13 @@ class DesktopVideoSelection(val resolution: DesktopResolution, val densityOverri
     val customWidth: Int = 1600, val customHeight: Int = 900) {
     init {
         if (densityOverride != 0) DesktopGeometryPolicy.requireDensity(densityOverride)
-        if (resolution == DesktopResolution.CUSTOM) DesktopGeometryPolicy.requireDimensions(customWidth, customHeight)
+        if (resolution == DesktopResolution.CUSTOM) DesktopGeometryPolicy.requireNativeDimensions(customWidth, customHeight)
     }
     private var selected: NativeDesktopGeometry? = null
     fun initialGeometry() = if (resolution == DesktopResolution.CUSTOM) NativeDesktopGeometry(customWidth, customHeight)
         else NativeDesktopGeometry(resolution.width, resolution.height)
     @Synchronized fun resolve(width: Int = 0, height: Int = 0): NativeDesktopGeometry = selected ?: run {
-        val result = if (resolution == DesktopResolution.AUTO && DesktopGeometryPolicy.accepts(width, height))
+        val result = if (resolution == DesktopResolution.AUTO && DesktopGeometryPolicy.acceptsNative(width, height))
             NativeDesktopGeometry(width, height) else initialGeometry()
         selected = result
         result
@@ -82,7 +105,7 @@ class DesktopVideoSelection(val resolution: DesktopResolution, val densityOverri
          * как просит магнитола, при невалидном INIT 1280×720.
          */
         fun forAaVideo(video: VideoGeometry, densityOverride: Int): DesktopVideoSelection =
-            if (DesktopGeometryPolicy.accepts(video.outW, video.outH))
+            if (DesktopGeometryPolicy.acceptsNative(video.outW, video.outH))
                 DesktopVideoSelection(DesktopResolution.CUSTOM, densityOverride, video.outW, video.outH)
             else DesktopVideoSelection(DesktopResolution.AUTO, densityOverride)
     }

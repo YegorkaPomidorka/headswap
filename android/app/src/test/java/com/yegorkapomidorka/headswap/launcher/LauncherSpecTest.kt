@@ -144,7 +144,7 @@ class LauncherSpecTest {
         assertTrue(LauncherSpecs.forSize(1280, 480).strip)
         assertFalse(LauncherSpecs.forSize(800, 480).strip)
         assertFalse(LauncherSpecs.forSize(1280, 640).strip)
-        assertEquals(313, LauncherSpecs.forSize(1280, 480).music)
+        assertEquals(278, LauncherSpecs.forSize(1280, 480).music) // 290/96 T при T 92: обложка по колонке настроек (08.11)
         assertEquals(92 * 5 - 21, LauncherSpecs.forSize(1280, 480).phone) // только для оверлея входящего
     }
 
@@ -152,6 +152,47 @@ class LauncherSpecTest {
         assertEquals(4, LauncherSpecs.forSize(800, 480).quickApps)
         assertEquals(4, LauncherSpecs.forSize(1920, 720).quickApps)
         assertEquals(5, LauncherSpecs.forSize(1280, 480).quickApps)
+    }
+
+    @Test fun portraitOnlyForTallScreens() {
+        for (row in LauncherSpecs.PORTRAIT_TABLE) {
+            val s = LauncherSpecs.forSize(row[0], row[1])
+            assertTrue("${row[0]}x${row[1]}", s.portrait)
+            assertEquals(listOf(row[0], row[1], row[2], row[3], row[4], row[5], row[6], row[7]),
+                listOf(s.w, s.h, s.t, s.g, s.m, s.f1, s.f2, s.f3))
+        }
+        assertTrue(LauncherSpecs.forSize(960, 1152).portrait)
+        assertTrue(LauncherSpecs.forSize(720, 1280).portrait)
+        for (row in LauncherSpecs.TABLE) assertFalse("${row[0]}x${row[1]}", LauncherSpecs.forSize(row[0], row[1]).portrait)
+        // почти квадратная горизонталь остаётся горизонталью и берёт строку из горизонтальной таблицы
+        assertFalse(LauncherSpecs.forSize(1138, 960).portrait)
+    }
+
+    @Test fun portraitSizesFollowMockup() {
+        val s = LauncherSpecs.forSize(960, 1152)
+        assertEquals(96, s.t)
+        assertEquals(116, s.bottomRailH) // T + G
+        assertEquals(144, s.rail) // блок навигации
+        assertEquals(250, s.musicH)
+        assertEquals(210, s.musicCover)
+        assertEquals(116, s.bottomRowH)
+        assertEquals(221, s.phone)
+        assertEquals(88, s.volBtn)
+        assertEquals(96, s.rb)
+        assertTrue(s.clockInStatus)
+        assertFalse(s.clockInRail)
+        assertFalse(s.clockStacked)
+        assertTrue(s.cardViewInRail)
+        assertTrue(s.phoneCompact)
+        assertEquals(s.g, s.padEnd)
+        // 960x1138 (запрос ГУ) берёт ту же строку, масштабированную по высоте
+        val hu = LauncherSpecs.forSize(960, 1138)
+        assertTrue(hu.portrait)
+        assertTrue(hu.t in 95..96)
+        // горизонталь не меняется
+        val land = LauncherSpecs.forSize(1280, 720)
+        assertEquals(land.m, land.padEnd)
+        assertEquals(land.m, land.padBottom)
     }
 
     @Test fun unknownSizeScalesFromNearest() {

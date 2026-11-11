@@ -7,6 +7,8 @@
     <string name="l_back">Назад</string>
     <string name="l_settings">Настройки</string>
     <string name="l_card_view">Сменить большую плашку</string>
+    <string name="l_volume_down">Тише</string>
+    <string name="l_volume_up">Громче</string>
     <string name="l_navigation">Навигация</string>
     <string name="l_add">Добавить</string>
     <string name="l_remove_q">Убрать?</string>
@@ -37,6 +39,7 @@
     <string name="l_nav_hints_off">Как на телефоне</string>
     <string name="l_nav_hints_off_plus">Как на телефоне · подписка не нужна</string>
     <string name="l_nav_hints_off_aa">Как на телефоне · Android Auto не запускаем</string>
+    <string name="l_nav_location_hint">Дайте навигатору геолокацию «Разрешить в любом режиме» — без неё не будет GPS. Нажмите, чтобы открыть настройки</string>
     <string name="l_nav_aa_server_hint">Откройте настройки AA на телефоне\n⋮ → Вкл. сервер головного устройства</string>
     <string name="l_view_navigator">Навигатор</string>
     <string name="l_view_clock">Часы</string>
@@ -126,11 +129,15 @@
     <string name="l_s_colors_bg_sat">Насыщенность фона</string>
     <string name="l_s_colors_hint">Пока открыт этот экран, стол показывает настраиваемые цвета. Ночные видны в тёмной теме, дневные — в светлой.</string>
     <string name="l_s_rail">Боковая панель</string>
+    <string name="l_s_rail_bottom">Нижняя панель</string>
+    <string name="l_s_layout_tile_top">Плитка сверху</string>
+    <string name="l_s_layout_music_top">Музыка сверху</string>
     <string name="l_s_rail_small">Маленькая</string>
     <string name="l_s_rail_medium">Средняя</string>
     <string name="l_s_rail_normal">Обычная</string>
     <string name="l_s_rail_cut">Обрезанная</string>
     <string name="l_s_anim">Анимации кнопок</string>
+    <string name="l_s_battery">Заряд телефона</string>
     <string name="l_s_map_scale">Масштаб карты</string>
     <string name="l_s_map_scale_sub">Только для %1$s · меняется сразу</string>
     <string name="l_s_scale_smaller">Мельче</string>

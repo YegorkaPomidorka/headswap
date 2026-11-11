@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 升级到 4.0 后仅显示一次的窗口：“自带桌面”模式 -->
+<resources>
+    <string name="u40_title">在车机屏幕上使用自己的桌面</string>
+    <string name="u40_lead">新模式：在车机屏幕上显示自己的桌面，代替 Android Auto。默认仍是 Android Auto，您的使用方式不会有任何变化。</string>
+    <string name="u40_pros">您可以做什么</string>
+    <string name="u40_pro_1">Headswap 桌面：音乐、导航和您的应用</string>
+    <string name="u40_pro_2">使用手机上任意车机桌面，例如 CarDash</string>
+    <string name="u40_pro_3">直接在车机屏幕上运行手机应用</string>
+    <string name="u40_needs">使用条件</string>
+    <string name="u40_need_1">需要开启“开发者选项”和“无线调试”。这些设置存在风险，请自行承担后果</string>
+    <string name="u40_need_2">手机重启后需要重新激活，只需半分钟</string>
+    <string name="u40_need_3">目前声音只能通过车机蓝牙播放</string>
+    <string name="u40_where">设置 → 模式</string>
+    <string name="u40_ok">知道了</string>
+    <string name="u40_try">试用自带桌面</string>
+</resources>
