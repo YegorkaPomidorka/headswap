@@ -41,7 +41,7 @@ class DexPrefs(context: Context) {
         set(value) { prefs.edit().putString("desktop_fps", value.name).apply() }
     /** Insert an intermediate H.264 encode/decode stage, matching the AA transcode path. */
     var desktopTranscode: Boolean
-        get() = prefs.getBoolean("desktop_transcode", true)
+        get() = prefs.getBoolean("desktop_transcode", false)
         set(value) { prefs.edit().putBoolean("desktop_transcode", value).apply() }
 }
 
