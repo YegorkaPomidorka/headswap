@@ -439,6 +439,8 @@ class AaBridgeCore(
 
     /** Рабочий стол: громкость двумя пальцами у правого края (настройка; на Vezel всегда). */
     @Volatile var volumeSwipeProvider: () -> Boolean = { false }
+    /** Жест громкости включён: на Vezel всегда, иначе по настройке. Звук по USB тогда следует STREAM_MUSIC. */
+    val volumeSwipeEnabled: Boolean get() = huHondaVezel || volumeSwipeProvider()
     private val volumeSwipe = VolumeSwipe(
         onCancel = {
             log("BRIDGE тач: два пальца у правого края - жест громкости, касание отменяю", true)
@@ -1076,7 +1078,7 @@ class AaBridgeCore(
     fun onCarlifeTouch(action: Int, x: Int, y: Int, px: Int = 0, py: Int = 0) {
         if (desktopInputEnabled) {
             val g = videoMode
-            if (volumeSwipe.onTouch(action, x, y, px, py, g.outW, g.outH, huHondaVezel || volumeSwipeProvider())) return
+            if (volumeSwipe.onTouch(action, x, y, px, py, g.outW, g.outH, volumeSwipeEnabled)) return
         }
         if (desktopInputEnabled && action and 0xFF == 3) {
             // Discard delayed MOVE events instead of replaying them into an already cancelled gesture.
