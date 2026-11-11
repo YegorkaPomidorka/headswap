@@ -338,6 +338,7 @@ fun Pressable(
     enabled: Boolean = true,
     description: String? = null,
     onLong: (() -> Unit)? = null,
+    longMs: Long = PressLogic.LONG_MS,
     onPress: (() -> Unit)? = null,
     focusShape: Shape? = null,
     ringColor: Color? = null,
@@ -394,7 +395,7 @@ fun Pressable(
                     up?.let {
                         val d = it.position - down.position
                         if (swipe.value?.invoke(d.x, d.y) == true || scrolled) return@let
-                        val kind = PressLogic.classify(down.uptimeMillis, it.uptimeMillis, long.value != null)
+                        val kind = PressLogic.classify(down.uptimeMillis, it.uptimeMillis, long.value != null, longMs)
                         if (kind == Press.LONG) long.value?.invoke() else tap.value()
                     }
                 }
@@ -408,13 +409,13 @@ fun Pressable(
 fun RoundButton(
     sizePx: Int, description: String, onTap: () -> Unit, modifier: Modifier = Modifier,
     background: Color = Color.Transparent, enabled: Boolean = true, onLong: (() -> Unit)? = null,
-    onPress: (() -> Unit)? = null,
+    longMs: Long = PressLogic.LONG_MS, onPress: (() -> Unit)? = null,
     content: @Composable BoxScope.() -> Unit,
 ) {
     val m = LocalMetrics.current
     Pressable(
         modifier.size(m.dp(sizePx)).clip(CircleShape)
-            .background(background), enabled = enabled, description = description, onTap = onTap, onLong = onLong,
+            .background(background), enabled = enabled, description = description, onTap = onTap, onLong = onLong, longMs = longMs,
         onPress = onPress, focusShape = CircleShape,
     ) { pressed ->
         if (pressed) Box(Modifier.matchParentSize().background(Pal.SURFACE_PRESSED))

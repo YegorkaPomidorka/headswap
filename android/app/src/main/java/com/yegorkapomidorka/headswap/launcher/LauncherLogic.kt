@@ -31,9 +31,11 @@ object PressLogic {
     const val LONG_MS = 600L
     const val DEBOUNCE_MS = 400L
     const val COLD_START_MS = 8000L
+    /** Долгое «Домой» - выход в меню ГУ: затянутый тап с ГУ (UP +200-500 мс) не должен выкидывать из рабочего стола. */
+    const val LONG_HU_EXIT_MS = 1000L
 
-    fun classify(downMs: Long, upMs: Long, allowLong: Boolean): Press =
-        if (allowLong && upMs - downMs >= LONG_MS) Press.LONG else Press.TAP
+    fun classify(downMs: Long, upMs: Long, allowLong: Boolean, longMs: Long = LONG_MS): Press =
+        if (allowLong && upMs - downMs >= longMs) Press.LONG else Press.TAP
 }
 
 /** Антидребезг кнопок запуска: второй тап ближе gapMs к первому игнорируется. */

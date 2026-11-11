@@ -248,7 +248,7 @@ private fun RailLogoButton() {
     val home = LauncherModel.area == Area.Home
     val ctx = LocalContext.current
     RoundButton(s.rb, stringResource(if (home) R.string.l_all_apps else R.string.l_home), onTap = { LauncherActions.logo() },
-        onLong = { BridgeService.requestHuDesktop(ctx) }, onPress = logo::play) {
+        onLong = { BridgeService.requestHuDesktop(ctx) }, longMs = PressLogic.LONG_HU_EXIT_MS, onPress = logo::play) {
         Box(Modifier.matchParentSize().drawBehind {
             // как CSS circle farthest-corner: радиус 0.707 стороны, стопы 0 / 40% / 70%
             drawCircle(Brush.radialGradient(
