@@ -59,7 +59,7 @@ internal object ForeignActions {
         ).any {
             val a = it.activityInfo
             a != null && ComponentName(a.packageName, a.name).flattenToString() == ComponentName(ref.pkg, ref.cls).flattenToString() &&
-                a.enabled && a.exported && a.applicationInfo.enabled
+                a.exported && a.applicationInfo.enabled // a.enabled - из манифеста, у включённого на ходу alias false
         }
     }.getOrDefault(false)
 

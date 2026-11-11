@@ -111,8 +111,14 @@ object NavigatorPick {
     const val YANDEX_NAVI = "ru.yandex.yandexnavi"
     const val YANDEX_MAPS = "ru.yandex.yandexmaps"
     const val GOOGLE_MAPS = "com.google.android.apps.maps"
-    val KNOWN = listOf(YANDEX_NAVI, YANDEX_MAPS, "ru.dublgis.dgismobile",
-        GOOGLE_MAPS, "com.waze", "app.organicmaps")
+    const val DGIS = "ru.dublgis.dgismobile"
+    const val WAZE = "com.waze"
+    val KNOWN = listOf(YANDEX_NAVI, YANDEX_MAPS, DGIS,
+        GOOGLE_MAPS, WAZE, "app.organicmaps")
+    /** Арабский интерфейс (h1003): только Google Карты и Waze, Яндекса и 2ГИС нет ни в выборе, ни по умолчанию. */
+    val KNOWN_AR = listOf(GOOGLE_MAPS, WAZE)
+
+    fun known(arabic: Boolean): List<String> = if (arabic) KNOWN_AR else KNOWN
 
     /** Машинная часть только с подпиской Яндекс Плюс (у Карт тот же NavigationCarAppService, что у Навигатора). */
     fun needsPlus(pkg: String?): Boolean = pkg == YANDEX_NAVI || pkg == YANDEX_MAPS
@@ -124,15 +130,22 @@ object NavigatorPick {
     @Suppress("UNUSED_PARAMETER")
     fun hintsDefault(pkg: String): Boolean = false
 
+    /**
+     * Подсказок на приборке нет совсем - только окно (h1003, стенд 09.11). Waze: свой хост Car App не пускает (HostValidator
+     * со списком подписей gearhead, TEMPLATE_RENDERER засчитывает лишь на AAOS), а при теневой AA телефонный Waze уходит
+     * в режим «на экране машины» - список манёвров без карты, и манёвров в AA не шлёт (навигатор AA - Google Карты).
+     */
+    fun noHints(pkg: String?): Boolean = pkg == WAZE
+
     /** Теневую AA держим, пока у выбранного навигатора подсказки включены; навигатора нет - как раньше, держим. */
     fun shadowWanted(metaNavi: Boolean, navPkg: String?, hints: (String) -> Boolean): Boolean =
-        metaNavi && (navPkg == null || hints(navPkg))
+        metaNavi && (navPkg == null || (!noHints(navPkg) && hints(navPkg)))
 
-    fun defaultFor(installed: Set<String>): String? = KNOWN.firstOrNull { it in installed }
+    fun defaultFor(installed: Set<String>, arabic: Boolean = false): String? = known(arabic).firstOrNull { it in installed }
 
-    /** Сохранённый, пока он установлен; иначе по умолчанию. null - выбрать нечего. */
-    fun effective(saved: String?, installed: Set<String>): String? =
-        saved?.takeIf { it in installed } ?: defaultFor(installed)
+    /** Сохранённый, пока он установлен (в арабском - только из [KNOWN_AR]); иначе по умолчанию. null - выбрать нечего. */
+    fun effective(saved: String?, installed: Set<String>, arabic: Boolean = false): String? =
+        saved?.takeIf { it in installed && (!arabic || it in KNOWN_AR) } ?: defaultFor(installed, arabic)
 }
 
 /** Ответы taskState дочернего дисплея и решения по ним (EmbedHost): что делать после Back и при повторном показе. */
@@ -243,7 +256,7 @@ object FullscreenApp {
 /**
  * Чип плееров на карточке музыки: два слота - свой плеер телефона (любая активная сессия) и последний онлайн-плеер
  * (Я.Музыка, YouTube Music, VK Музыка - что слушали последним, иначе первый установленный). Остальные медиаприложения -
- * долгий тап по «ноте» (список плееров).
+ * долгий тап по «ноте» (список плееров). В настройках в оба слота можно закрепить любой плеер телефона (жалобы юзеров 09.11).
  */
 object PlayerChip {
     const val YANDEX = "ru.yandex.music"
@@ -252,33 +265,52 @@ object PlayerChip {
     /** Онлайн-плееры второго слота; порядок - выбор по умолчанию, пока ничего не слушали. */
     val ONLINE = listOf(YANDEX, YT_MUSIC, VK)
 
-    enum class Kind { PHONE, YANDEX, YT_MUSIC, VK }
+    /** Онлайн-плееры для языка интерфейса: в арабском без Я.Музыки (h1003). */
+    fun online(arabic: Boolean): List<String> = if (arabic) ONLINE - YANDEX else ONLINE
+
+    /** APP - любой другой плеер, закреплённый во втором слоте: подпись и иконка - самого приложения. */
+    enum class Kind { PHONE, YANDEX, YT_MUSIC, VK, APP }
     data class Slot(val kind: Kind, val pkg: String?, val selected: Boolean)
 
     private fun kindOf(pkg: String): Kind = when (pkg) {
         YANDEX -> Kind.YANDEX
         YT_MUSIC -> Kind.YT_MUSIC
-        else -> Kind.VK
+        VK -> Kind.VK
+        else -> Kind.APP
     }
 
     /**
      * @param local первый слот из настроек (свой плеер); null - любая активная сессия
      * @param fixedOnline второй слот из настроек; null - «Последний»
      */
-    fun slots(installed: Set<String>, chosen: String?, lastOnline: String?, local: String? = null, fixedOnline: String? = null): List<Slot> =
+    fun slots(installed: Set<String>, chosen: String?, lastOnline: String?, local: String? = null, fixedOnline: String? = null,
+              online: List<String> = ONLINE): List<Slot> =
         buildList {
-            add(Slot(Kind.PHONE, local, chosen == null || (local != null && chosen == local)))
-            val online = onlineSlot(installed, lastOnline, fixedOnline)
-            if (online != null) add(Slot(kindOf(online), online, chosen == online))
+            val hidden = ONLINE - online.toSet()
+            val mine = local?.takeIf { it !in hidden }
+            add(Slot(Kind.PHONE, mine, chosen == null || chosen in hidden || (mine != null && chosen == mine)))
+            val second = onlineSlot(installed, lastOnline, fixedOnline, exclude = mine, online = online)
+            if (second != null) add(Slot(kindOf(second), second, chosen == second))
         }
 
-    /** Пакет второго слота: закреплённый в настройках, иначе последний услышанный, иначе первый установленный. */
-    fun onlineSlot(installed: Set<String>, lastOnline: String?, fixedOnline: String?): String? =
-        fixedOnline?.takeIf { it in installed && it in ONLINE }
-            ?: lastOnline?.takeIf { it in installed && it in ONLINE } ?: ONLINE.firstOrNull { it in installed }
+    /**
+     * Пакет второго слота: закреплённый в настройках (любой плеер), иначе последний услышанный онлайн, иначе первый
+     * установленный. [exclude] - плеер первого слота: второй его не дублирует. Онлайн-сервисы вне [online] не берём.
+     */
+    fun onlineSlot(installed: Set<String>, lastOnline: String?, fixedOnline: String?, exclude: String? = null,
+                   online: List<String> = ONLINE): String? {
+        val hidden = ONLINE - online.toSet()
+        fun ok(pkg: String?) = pkg != null && pkg in installed && pkg != exclude && pkg !in hidden
+        return fixedOnline?.takeIf(::ok) ?: lastOnline?.takeIf { ok(it) && it in online } ?: online.firstOrNull(::ok)
+    }
 
-    /** Свои плееры для первого слота: всё найденное на телефоне, кроме онлайн-сервисов второго. */
-    fun localPlayers(players: List<String>): List<String> = players.filter { it !in ONLINE }
+    /** Плееры для слотов в настройках: всё найденное на телефоне плюс установленные онлайн-сервисы, без повторов. */
+    fun allPlayers(found: List<String>, installed: Set<String>, online: List<String> = ONLINE): List<String> =
+        (found + online.filter { it in installed }).distinct() - (ONLINE - online.toSet())
+
+    /** Список второго слота: онлайн-сервисы первыми (это его основное назначение), за ними остальные плееры. */
+    fun secondSlotPlayers(players: List<String>, online: List<String> = ONLINE): List<String> =
+        online.filter { it in players } + players.filter { it !in ONLINE }
 
     /** Последний онлайн-плеер после того, как выбрали или услышали [pkg]: меняется, только если это онлайн-плеер. */
     fun lastOnline(previous: String?, pkg: String?): String? = pkg?.takeIf { it in ONLINE } ?: previous

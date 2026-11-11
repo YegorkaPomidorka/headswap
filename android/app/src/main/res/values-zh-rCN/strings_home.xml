@@ -1,0 +1,112 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 主屏幕：主标题 -->
+    <string name="home_title_no_bridge">桥接未启动</string>
+    <string name="home_title_reconnecting">正在恢复连接</string>
+    <string name="home_title_ok">一切正常</string>
+    <string name="home_title_off">请启动车机服务</string>
+    <string name="home_title_connecting">正在连接</string>
+    <string name="home_title_parked">车机已断开</string>
+    <string name="home_title_server_down">车机服务无响应</string>
+    <string name="home_title_ready">已准备好出发</string>
+    <string name="home_title_unknown">请检查车机服务</string>
+    <string name="home_title_checking">正在检查车机服务</string>
+
+    <!-- 主屏幕：副标题 -->
+    <string name="home_err_no_cert">应用安装包中没有车机证书。</string>
+    <string name="home_sub_start_chain">只需开启一次：之后服务会在后台持续运行，连接时无需解锁手机。</string>
+    <string name="home_sub_reconnecting">USB 已断开。Android Auto 会话最多等待 %1$d 秒。</string>
+    <string name="home_sub_ok">Android Auto 已显示在车机屏幕上，可以收起手机了。</string>
+    <string name="home_sub_ok_wifi">Android Auto 已通过 Wi-Fi 显示在车机屏幕上，无需数据线，可以收起手机了。</string>
+    <string name="home_sub_refused">USB 数据线已连接，但车机服务没有响应。%1$s</string>
+    <string name="home_sub_aa_dropped">Android Auto 已断开。请重新开启车机服务。</string>
+    <string name="home_sub_cable_ok">USB 数据线已连接，正在等待 Android Auto。</string>
+    <string name="home_sub_parked">车机服务一直在后台运行。下次出行时，只需连接数据线。</string>
+    <string name="home_sub_server_down">Android 关闭了车机服务。请重新开启：Android Auto → ⋮ →“启动车机服务”。</string>
+    <string name="home_sub_ready">请用 USB 数据线将手机连接到车机。</string>
+    <string name="home_sub_unknown">Headswap 无法检查服务状态。请打开 Android Auto → ⋮：如果看到“停止车机服务”，说明服务正在运行；如果看到“启动车机服务”，请将其开启。</string>
+    <string name="home_sub_checking">需要几秒钟：Headswap 会短暂连接 Android Auto。</string>
+    <string name="home_sub_parked_unknown">下次出行：连接数据线即可。如果没有出现 Android Auto，请检查车机服务：Android Auto → ⋮。</string>
+
+    <!-- 主屏幕：如何启动车机服务（粗体 = 需要点按的内容） -->
+    <string name="home_chain_label">如何启动车机服务</string>
+    <string name="home_chain_1">点按<b>“打开 Android Auto”</b></string>
+    <string name="home_chain_2">右上角的三个点 <b>⋮</b></string>
+    <string name="home_chain_3"><b>“启动车机服务”</b></string>
+
+    <!-- 主屏幕：阶段名称 -->
+    <string name="home_stage_server">车机服务</string>
+    <string name="home_stage_headunit">车机</string>
+    <string name="home_stage_video">视频</string>
+    <string name="home_stage_audio">音频</string>
+
+    <!-- 主屏幕：阶段详情 -->
+    <string name="home_stage_no_cert">无证书</string>
+    <string name="home_stage_holds">保持会话</string>
+    <string name="home_stage_reconnecting">正在重连</string>
+    <string name="home_stage_paused">已暂停</string>
+    <string name="home_stage_working">运行中</string>
+    <string name="home_stage_connected">已连接</string>
+    <string name="home_stage_off">已关闭</string>
+    <string name="home_stage_not_started">请启动</string>
+    <string name="home_stage_connecting">正在连接</string>
+    <string name="home_stage_handshake">握手中</string>
+    <string name="home_stage_hu_parked">已断开</string>
+    <string name="home_stage_no_answer">无响应</string>
+    <string name="home_stage_started">已启动</string>
+    <string name="home_stage_wait_cable">等待数据线</string>
+    <string name="home_stage_unknown">未检查</string>
+    <string name="home_stage_checking">检查中</string>
+
+    <!-- 主屏幕：控件 -->
+    <string name="home_settings">设置</string>
+    <string name="home_btn_open_aa">打开 Android Auto 设置</string>
+    <string name="home_grace_waiting">等待重新连接</string>
+    <string name="home_grace_left">剩余 %1$d 秒</string>
+
+    <!-- 通知 -->
+    <string name="notif_reconnecting">USB 已断开 · 剩余 %1$d 秒</string>
+    <string name="notif_video_usb">视频 · 音频通过 USB</string>
+    <string name="notif_video_wifi">视频 · 音频通过 Wi-Fi</string>
+    <string name="notif_video">视频</string>
+    <string name="notif_server_off">车机服务未启动</string>
+    <string name="notif_cable_waiting">USB 数据线已连接 · 正在等待 Android Auto</string>
+    <string name="notif_parked">车机服务正在后台运行</string>
+    <string name="notif_server_down">Android 关闭了车机服务 · 请重新开启</string>
+    <string name="notif_server_started">车机服务已启动</string>
+    <string name="notif_parked_unknown">车机已断开</string>
+    <string name="notif_server_unknown">请确认车机服务正在运行</string>
+
+    <!-- 引导页示意图（手绘的系统界面） -->
+    <string name="mock_aa_version">版本</string>
+    <string name="mock_aadev_title">开发者设置</string>
+    <string name="mock_aadev_unknown">未知来源</string>
+    <string name="mock_menu_help">帮助和反馈</string>
+    <string name="mock_menu_start">启动车机服务</string>
+    <string name="mock_menu_exit">退出开发者模式</string>
+    <string name="mock_notif_now">Headswap · 现在</string>
+    <string name="mock_bg_activity">电池优化</string>
+    <string name="mock_bg_no_limits">无限制</string>
+    <string name="mock_bg_no_limits_sub">省电模式不会限制该应用的后台运行</string>
+    <string name="mock_bg_autostart">自启动</string>
+    <string name="mock_mic_question">允许 Headswap 录音吗？</string>
+    <string name="mock_mic_while_using">仅在使用该应用时允许</string>
+    <string name="mock_mic_once">仅限这一次</string>
+    <string name="mock_mic_deny">不允许</string>
+    <string name="mock_bt_headunit">车机</string>
+    <string name="mock_bt_connected">已连接</string>
+    <string name="mock_loc_use">使用位置信息</string>
+    <string name="mock_loc_use_sub">拥有此权限的应用可以获取您的位置信息。</string>
+    <string name="mock_usb_question">要打开 Headswap 来处理此 USB 配件吗？</string>
+    <string name="mock_usb_default">默认情况下用于该 USB 配件</string>
+    <string name="mock_dev_title">开发者选项</string>
+    <string name="mock_dev_wifi">无线调试</string>
+    <string name="mock_dev_pair">使用配对码配对设备</string>
+    <string name="mock_about_title">关于手机</string>
+    <string name="mock_about_build">版本号</string>
+    <string name="mock_about_build_sub">小米手机：“OS 版本”</string>
+    <string name="mock_cancel">取消</string>
+    <string name="mock_ok">确定</string>
+
+    <string name="home_wireless">无线：%1$s</string>
+</resources>

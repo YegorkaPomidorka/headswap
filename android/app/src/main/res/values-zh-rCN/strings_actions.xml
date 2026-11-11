@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- ui/Actions.kt -->
+    <string name="act_open_aa_failed">无法打开 Android Auto 设置：%1$s</string>
+    <string name="act_open">打开</string>
+    <string name="act_cancel">取消</string>
+
+    <!-- ui/LogShare.kt -->
+    <string name="share_failed">无法打开分享：%1$s</string>
+    <string name="share_no_log">暂无日志文件</string>
+    <string name="share_subject_log">Headswap：日志 %1$s</string>
+    <string name="share_report_failed">无法生成报告：%1$s</string>
+    <string name="share_subject_report">Headswap：问题报告</string>
+    <string name="share_zip_failed">无法生成压缩包：%1$s</string>
+    <string name="share_saved">已保存到“下载”：%1$s</string>
+    <string name="share_subject_archive">Headswap：日志压缩包</string>
+    <string name="share_size_mib">%1$s MiB</string>
+    <string name="share_size_kib">%1$d KiB</string>
+
+    <!-- BridgeService.kt -->
+    <string name="svc_bridge_failed">桥接服务启动失败：%1$s</string>
+</resources>

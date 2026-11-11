@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- “自带桌面”模式下的主屏幕 -->
+<resources>
+    <string name="home_desk_stage_activation">激活</string>
+    <string name="home_desk_stage_headunit">车机</string>
+    <string name="home_desk_stage_desktop">桌面</string>
+    <string name="home_desk_stage_video">视频</string>
+    <string name="home_desk_stage_audio">声音</string>
+
+    <string name="home_desk_st_active">已激活</string>
+    <string name="home_desk_st_needed">需要激活</string>
+    <string name="home_desk_st_needed_again">需要重新激活</string>
+    <string name="home_desk_st_error">错误</string>
+
+    <string name="home_desk_title_activate">激活 Headswap</string>
+    <string name="home_desk_title_error">桌面未能启动</string>
+
+    <string name="home_desk_sub_activate">需要通过“无线调试”进行一次性激活。</string>
+    <string name="home_desk_sub_activate_paired">手机重启后激活会失效。请通过“无线调试”重新激活，只需半分钟。</string>
+    <string name="home_desk_sub_ok">%1$s 已显示在车机屏幕上，可以收起手机了。</string>
+    <string name="home_desk_sub_starting">正在启动桌面。</string>
+
+    <string name="home_desk_btn_activate">激活</string>
+    <string name="home_desk_btn_stop">停止</string>
+    <string name="home_desk_sub_usb_debug">请在“开发者选项”中开启“USB 调试”：在 Android 17 上，未开启时车机屏幕会随手机一起黑屏。</string>
+</resources>

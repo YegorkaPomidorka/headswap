@@ -120,7 +120,8 @@ object NotifGeom {
     /** Язычок по ширине текста: от 480 до 900 при T 96, но не шире области за вычетом «ушей» и полей. */
     fun tongueWidth(t: Int, areaW: Int, ear: Int, margin: Int): Pair<Int, Int> {
         val room = max(1, areaW - 2 * ear - 2 * margin)
-        val maxW = min(Math.round(900 * t / 96f), room)
+        // на широких экранах 900T/96 - едва половина области; там не уже 60% области (Егор 08.11, 1920x836)
+        val maxW = min(max(Math.round(900 * t / 96f), Math.round(areaW * 0.6f)), room)
         val minW = min(Math.round(480 * t / 96f), maxW)
         return minW to maxW
     }
@@ -128,4 +129,28 @@ object NotifGeom {
     /** Список в шторке: не выше 75% высоты экрана за вычетом верха шторки и нижней кромки с полоской. */
     fun listMaxHeight(screenH: Int, top: Int, footer: Int, pad: Int): Int =
         max(0, Math.round(screenH * 0.75f) - top - footer - pad)
+
+    /**
+     * X полоски уведомлений - фиксированный для разрешения: стык музыки и карты в стандартной раскладке главного (музыка
+     * у рейки шириной [music], поле [g] у рейки и между плитками). От текущих плиток не зависит (Егор 08.11, 09.11).
+     * [rtl] - арабский: рейка справа, всё зеркально.
+     */
+    fun fixedLineX(areaLeft: Float, areaRight: Float, g: Float, music: Float, rtl: Boolean): Float =
+        if (rtl) areaRight - g - music - g / 2f else areaLeft + g + music + g / 2f
+
+    /**
+     * Полоска на строке статуса не лезет на текст (Vezel 08.11: с большой плиткой часов стык плиток ушёл под дату).
+     * Центр [x] полоски шириной 2*[half]; если она задевает занятый отрезок [busy] (с зазором [gap]), отодвигается
+     * к той его стороне, где больше места в [minX]..[maxX]. Свободное место между отрезками ищется по очереди.
+     */
+    fun lineAvoiding(x: Float, half: Float, gap: Float, busy: List<ClosedFloatingPointRange<Float>>, minX: Float, maxX: Float): Float {
+        var cx = x
+        repeat(busy.size) {
+            val hit = busy.firstOrNull { cx + half + gap > it.start && cx - half - gap < it.endInclusive } ?: return cx
+            val leftRoom = hit.start - minX
+            val rightRoom = maxX - hit.endInclusive
+            cx = if (leftRoom >= rightRoom) hit.start - gap - half else hit.endInclusive + gap + half
+        }
+        return cx
+    }
 }

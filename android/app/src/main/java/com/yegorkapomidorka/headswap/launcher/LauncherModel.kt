@@ -56,6 +56,8 @@ internal object LauncherModel {
     var railSize by mutableStateOf(RailSize.NORMAL)
     var mapLeft by mutableStateOf(false)
     var animations by mutableStateOf(true)
+    /** Заряд телефона в строке статуса ([LauncherPrefs.showBattery]). */
+    var showBattery by mutableStateOf(true)
     var autoplay by mutableStateOf(true)
     /** «Уведомления» телефона на экране ГУ (слушатель - [NotificationsRepo]). */
     var notifications by mutableStateOf(true)
@@ -118,6 +120,8 @@ internal object LauncherModel {
     var navCardRect by mutableStateOf<Rect?>(null)
     /** Нижний край сплошной строки статуса в координатах корня; null - на этом экране строки нет (оверлей уведомлений вешается на верх области). */
     var statusBottom by mutableStateOf<Float?>(null)
+    /** Что занято текстом на строке статуса (дата и значки, часы в узкой рейке) - [left, right] в координатах корня; полоска уведомлений их объезжает. */
+    var statusBusyX by mutableStateOf<List<ClosedFloatingPointRange<Float>>>(emptyList())
     /** «Скрыть строку статуса» (Для разработчиков): полосы нет, уведомления висят чёлкой от верхнего края ([NotificationsOverlay]). */
     var hideStatusBar by mutableStateOf(false)
     /** На экране стоит скрытая строка статуса: там, где была бы полоска, висит чёлка уведомлений. */
@@ -176,6 +180,7 @@ internal object LauncherModel {
         railSize = prefs.railSize
         mapLeft = prefs.mapLeft
         animations = prefs.animations
+        showBattery = prefs.showBattery
         autoplay = prefs.autoplay
         notifications = prefs.notifications
         NotificationsRepo.setEnabled(notifications)
@@ -197,7 +202,7 @@ internal object LauncherModel {
         EmbedHost.onGone = { LauncherActions.embedGone(it) }
         EmbedHost.onAssistantOpened = { LauncherActions.assistantOpened(it) }
         CarAppHost.scaleFor = { pkg -> CarConfigMath.step(prefs.mapScale(pkg)) }
-        CarAppHost.allowFor = { pkg -> prefs.navHints(pkg) }
+        CarAppHost.allowFor = { pkg -> prefs.navHints(pkg) && !NavigatorPick.noHints(pkg) }
         LauncherActions.startRouteCatcher(context.applicationContext)
         ready = true
         reloadCatalog()
@@ -208,11 +213,13 @@ internal object LauncherModel {
             val pm = appCtx.packageManager
             val query = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER)
             val found = runCatching {
+                // выключенные компоненты запрос и так не вернёт; ActivityInfo.enabled - значение из манифеста, у
+                // activity-alias, включённого на ходу (сменённая иконка Телеграма), там false
                 pm.queryIntentActivities(query, 0).mapNotNull { info ->
                     val a = info.activityInfo ?: return@mapNotNull null
                     DesktopAppCatalog.Entry(a.packageName, a.name,
                         runCatching { info.loadLabel(pm).toString() }.getOrDefault(a.packageName),
-                        enabled = a.enabled && a.applicationInfo.enabled, exported = a.exported)
+                        enabled = a.applicationInfo.enabled, exported = a.exported)
                 }
             }.getOrElse { AppLog.i("Launcher catalog: ${it.javaClass.simpleName}", false); emptyList() }
             val selected = DesktopAppCatalog.select(found, appCtx.packageName)
@@ -257,6 +264,7 @@ internal object LauncherModel {
     fun chooseRailSize(value: RailSize) { railSize = value; prefs.railSize = value }
     fun chooseMapLeft(left: Boolean) { mapLeft = left; prefs.mapLeft = left }
     fun chooseAnimations(on: Boolean) { animations = on; prefs.animations = on }
+    fun chooseShowBattery(on: Boolean) { showBattery = on; prefs.showBattery = on }
     fun chooseAutoplay(on: Boolean) { autoplay = on; prefs.autoplay = on }
     /** Из «Для разработчиков» на телефоне: лаунчер мог ещё не стартовать, поэтому префы — своим экземпляром. */
     fun chooseHideStatusBar(ctx: Context, on: Boolean) { hideStatusBar = on; LauncherPrefs(ctx.applicationContext).hideStatusBar = on }
@@ -342,8 +350,11 @@ internal object LauncherModel {
 
     /** Установленные известные навигаторы (по каталогу приложений с лаунчерным входом). */
     val installedPackages: Set<String> get() = catalog.mapTo(HashSet()) { it.packageName }
-    val navigatorPkg: String? get() = NavigatorPick.effective(savedNavigator, installedPackages)
-    val installedNavigators: List<String> get() = NavigatorPick.KNOWN.filter { it in installedPackages }
+    /** Интерфейс на арабском или французском (h1003): навигаторы - Google Карты и Waze, без Я.Музыки. */
+    val arabic: Boolean get() = com.yegorkapomidorka.headswap.AppLocale.usesGlobalApps(appCtx)
+    val onlinePlayers: List<String> get() = PlayerChip.online(arabic)
+    val navigatorPkg: String? get() = NavigatorPick.effective(savedNavigator, installedPackages, arabic)
+    val installedNavigators: List<String> get() = NavigatorPick.known(arabic).filter { it in installedPackages }
 
     /** Предыдущий экран лаунчера для «Назад»; после самого «Назад» пуст, чтобы не ходить по кругу. */
     var previous: Area? = null

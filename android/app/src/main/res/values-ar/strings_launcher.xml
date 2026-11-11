@@ -113,6 +113,7 @@
     <string name="l_s_rail_normal">عادي</string>
     <string name="l_s_rail_cut">مضغوط</string>
     <string name="l_s_anim">حركات الأزرار</string>
+    <string name="l_s_battery">بطارية الهاتف</string>
     <string name="l_s_map_scale">مقياس الخريطة</string>
     <string name="l_s_map_scale_sub">لـ %1$s فقط · يُطبَّق فورًا</string>
     <string name="l_s_scale_smaller">أصغر</string>
@@ -136,7 +137,6 @@
     <string name="l_s_hu">شاشة السيارة</string>
     <string name="l_s_link">الاتصال</string>
     <string name="l_s_video">الفيديو</string>
-    <string name="l_s_res">الدقة والمعدل</string>
     <string name="l_s_version">الإصدار</string>
     <string name="l_s_hu_channel">القناة %1$s</string>
     <string name="l_s_fps">%1$s · %2$d FPS</string>

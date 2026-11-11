@@ -19,8 +19,8 @@ android {
         applicationId = "com.yegorkapomidorka.headswap"
         minSdk = 29
         targetSdk = 37
-        versionCode = 71
-        versionName = "4.0.1"
+        versionCode = 73
+        versionName = "4.1.1"
         // «По воздуху» (беспровод): с 2.0.0 включён во всех сборках; выключить для проверки: gradlew assembleRelease -Pwlbeta=false
         buildConfigField("boolean", "WIRELESS_BETA", (project.findProperty("wlbeta") != "false").toString())
     }
@@ -60,10 +60,9 @@ android {
     }
 
     sourceSets {
-        // debug-транспорт для эмулятора ГУ (DebugTransport) и exported BridgeService; в smoke берём debug-набор целиком
+        // debug-транспорт для эмулятора ГУ (DebugTransport); манифест свой: exported BridgeService как в debug и без <permission> TEMPLATE_RENDERER
         getByName("smoke") {
             kotlin.srcDir("src/debug/java")
-            manifest.srcFile("src/debug/AndroidManifest.xml")
         }
     }
 

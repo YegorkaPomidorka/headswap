@@ -50,6 +50,7 @@ class VdmHostMain private constructor(private val args: VdmHostPolicy.Args) {
         note("привязка id=${if (associationId > 0) associationId else "нет"}")
         runCatching { note("ppid=${ppidOf(Process.myPid())} adbd=${adbdPid() ?: "нет"} cgroup=${File("/proc/self/cgroup").readText().trim().replace('\n', '|').take(200)}") }
         if (!deliver()) exitProcess(2)
+        reportTcpPort()
         watchForDeath()
         Looper.loop()
     }
@@ -272,6 +273,20 @@ class VdmHostMain private constructor(private val args: VdmHostPolicy.Args) {
             }
         }, "vdm-watch").apply { isDaemon = true }.start()
     }
+
+    /**
+     * h768: TCP-порт adbd ставит сам adbd по просьбе приложения ([VdmHostRestart] шлёт tcpip:5555);
+     * setprop из-под shell на Samsung A17 запрещён. Здесь только отчёт о состоянии в лог приложения.
+     */
+    private fun reportTcpPort() {
+        val port = getprop("service.adb.tcp.port").ifEmpty { "нет" }
+        note("tcp.port=$port")
+        report("tcp.port=$port")
+    }
+
+    private fun getprop(name: String): String = runCatching {
+        Class.forName("android.os.SystemProperties").getMethod("get", String::class.java).invoke(null, name) as String
+    }.getOrDefault("").trim()
 
     private fun adbdPid(): Int? = File("/proc").listFiles()?.firstNotNullOfOrNull { dir ->
         dir.name.toIntOrNull()?.takeIf { runCatching { File(dir, "comm").readText().trim() == "adbd" }.getOrDefault(false) }

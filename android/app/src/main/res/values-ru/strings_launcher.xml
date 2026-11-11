@@ -131,6 +131,7 @@
     <string name="l_s_rail_normal">Обычная</string>
     <string name="l_s_rail_cut">Обрезанная</string>
     <string name="l_s_anim">Анимации кнопок</string>
+    <string name="l_s_battery">Заряд телефона</string>
     <string name="l_s_map_scale">Масштаб карты</string>
     <string name="l_s_map_scale_sub">Только для %1$s · меняется сразу</string>
     <string name="l_s_scale_smaller">Мельче</string>
@@ -154,7 +155,6 @@
     <string name="l_s_hu">Головное устройство</string>
     <string name="l_s_link">Подключение</string>
     <string name="l_s_video">Видео</string>
-    <string name="l_s_res">Разрешение и частота</string>
     <string name="l_s_version">Версия</string>
     <string name="l_s_hu_channel">Канал %1$s</string>
     <string name="l_s_fps">%1$s · %2$d к/с</string>

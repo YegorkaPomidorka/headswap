@@ -22,6 +22,9 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -30,7 +33,6 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.platform.LocalDensity
@@ -219,20 +221,16 @@ private fun Rail() {
             // «Вид карточки» в рейке; в ленте с обычной рейкой - стеклянная кнопка в углу большой плашки (HomeTileButtons)
             if (s.cardViewInRail) CardViewButton(s.rb, s.ric, Color.Transparent, Pal.SEC2)
         }
-        // стрелка навигации: 2 оборота и стоп в случайной другой стороне света
-        val spin = rememberNavSpin()
         Pressable(
             Modifier.width(m.dp(s.rail)).height(m.dp(s.navH))
                 .clip(RoundedCornerShape(topEnd = m.dp(s.radius))).background(accent),
             description = stringResource(R.string.l_navigation), onTap = { LauncherActions.openNavigator() },
-            onPress = spin::play,
             // на золоте золотая рамка не видна
             focusShape = RoundedCornerShape(topEnd = m.dp(s.radius)), ringColor = Color.White,
         ) { pressed ->
             if (pressed) Box(Modifier.matchParentSize().background(Color(0x33000000)))
             Box(Modifier.matchParentSize(), contentAlignment = Alignment.Center) {
-                SvgIcon(Ico.NAV, s.icBig, Pal.onAccent(accent), fill = true,
-                    modifier = Modifier.graphicsLayer { rotationZ = spin.degrees })
+                SvgIcon(Ico.NAV, s.icBig, Pal.onAccent(accent), fill = true)
             }
         }
     }
@@ -265,11 +263,18 @@ fun StatusBar(title: String? = null, showNet: Boolean = true) {
         // строка скрыта (Для разработчиков): полосы и значков нет, остаётся только заголовок экрана; чёлка уведомлений - от верха экрана
         DisposableEffect(Unit) { model.statusBottom = null; model.statusSlot = true; onDispose { model.statusSlot = false } }
         if (title != null) Row(Modifier.fillMaxWidth().height(m.dp(s.statusH)), verticalAlignment = Alignment.CenterVertically) {
-            Txt(title, s.fs, Modifier.weight(1f), color = Pal.TEXT, weight = FontWeight.SemiBold)
+            Txt(title, s.statusFs, Modifier.weight(1f), color = Pal.TEXT, weight = FontWeight.SemiBold)
         }
         return
     }
-    DisposableEffect(Unit) { onDispose { model.statusBottom = null } }
+    DisposableEffect(Unit) { onDispose { model.statusBottom = null; model.statusBusyX = emptyList() } }
+    // где на строке текст: полоска уведомлений встаёт над стыком плиток и наезжала на дату (Vezel, 08.11)
+    var timeX by remember { mutableStateOf<ClosedFloatingPointRange<Float>?>(null) }
+    var iconsX by remember { mutableStateOf<ClosedFloatingPointRange<Float>?>(null) }
+    var titleX by remember { mutableStateOf<ClosedFloatingPointRange<Float>?>(null) }
+    LaunchedEffect(timeX, iconsX, titleX) { model.statusBusyX = listOfNotNull(timeX, titleX, iconsX) }
+    fun Modifier.busy(set: (ClosedFloatingPointRange<Float>) -> Unit) =
+        onGloballyPositioned { val b = it.boundsInRoot(); set(b.left..b.right) }
     Row(
         Modifier.fillMaxWidth().height(m.dp(s.statusH))
             .onGloballyPositioned { model.statusBottom = it.boundsInRoot().top - s.g8 + s.statusBandH }
@@ -285,32 +290,64 @@ fun StatusBar(title: String? = null, showNet: Boolean = true) {
     ) {
         // в узкой рейке часов нет: время слева, прижато к краю (перед заголовком, если он есть)
         if (s.clockInStatus) {
-            Txt(st.time, s.fs, color = Pal.TEXT, weight = FontWeight.SemiBold, mono = true)
+            Txt(st.time, s.statusFs, Modifier.busy { timeX = it }, color = Pal.TEXT, weight = FontWeight.SemiBold, mono = true)
             if (title == null) Spacer(Modifier.weight(1f))
         }
         // заголовок экрана у начала (слева; в RTL справа), статус у конца; сам ряд значков всегда слева направо (создан внутри Ltr)
-        if (title != null) Txt(title, s.fs, Modifier.weight(1f), color = Pal.TEXT, weight = FontWeight.SemiBold)
-        Ltr { StatusIcons(st, showNet) }
+        // ширину самого текста заголовка - в занятое: на экранах без стыка (настройки) полоска уведомлений встаёт к левому краю
+        if (title != null) Box(Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
+            Txt(title, s.statusFs, Modifier.busy { titleX = it }, color = Pal.TEXT, weight = FontWeight.SemiBold)
+        }
+        Ltr { Box(Modifier.busy { iconsX = it }) { StatusIcons(st, showNet, model.showBattery) } }
     }
 }
 
-/** Дата, Bluetooth, Wi-Fi, сеть и громкость: порядок слева направо при любом языке ([Ltr] снаружи, чтобы ряд создался в нём). */
+/** Дата, Bluetooth, Wi-Fi, сеть, громкость и заряд телефона: порядок слева направо при любом языке ([Ltr] снаружи, чтобы ряд создался в нём). */
 @Composable
-private fun StatusIcons(st: StatusInfo, showNet: Boolean) {
+private fun StatusIcons(st: StatusInfo, showNet: Boolean, showBattery: Boolean) {
     val m = LocalMetrics.current
     val s = m.spec
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(m.dp(s.g))) {
-        Txt(st.date, s.fs, color = Pal.SEC2)
-        SvgIcon(Ico.BT, s.fs, if (st.bluetooth) Pal.SEC2 else Pal.SEC2.copy(alpha = 0.3f))
-        SvgIcon(Ico.WIFI, s.fs, if (st.wifi) Pal.SEC2 else Pal.SEC2.copy(alpha = 0.3f))
+        Txt(st.date, s.statusFs, color = Pal.SEC2)
+        SvgIcon(Ico.BT, s.statusFs, if (st.bluetooth) Pal.SEC2 else Pal.SEC2.copy(alpha = 0.3f))
+        SvgIcon(Ico.WIFI, s.statusFs, if (st.wifi) Pal.SEC2 else Pal.SEC2.copy(alpha = 0.3f))
         // сеть с уровнем сигнала - здесь, рядом с Wi-Fi, а не в рейке
         if (showNet && st.signal >= 0) Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(m.dp(s.g4))) {
-            VectorIcon(VIco.signal(st.signal), 24f, s.fs, Pal.SEC2)
-            Txt(st.net, s.fs, color = Pal.SEC2)
+            VectorIcon(VIco.signal(st.signal), 24f, s.statusFs, Pal.SEC2)
+            Txt(st.net, s.statusFs, color = Pal.SEC2)
         }
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(m.dp(s.g4))) {
-            SvgIcon(Ico.VOLUME, s.fs, Pal.SEC2)
-            Txt(st.volume.toString(), s.fs, color = Pal.SEC2)
+            SvgIcon(Ico.VOLUME, s.statusFs, Pal.SEC2)
+            Txt(st.volume.toString(), s.statusFs, color = Pal.SEC2)
         }
+        // заряд телефона в конце ряда: цифра внутри батарейки, молния справа - на зарядке.
+        // Нет данных или выключено в «Вид» - ничего не рисуем
+        if (showBattery && st.battery >= 0) Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(m.dp(s.g4))) {
+            BatteryBadge(st.battery, s.statusFs, Pal.SEC2)
+            if (st.charging) VectorIcon(VIco.BOLT, 24f, s.statusFs, Pal.SEC2)
+        }
+    }
+}
+
+/** Батарейка с цифрой заряда внутри (без «%»): контур со скруглением и «носик» справа. Высота - [fs], ширина - 2·fs. */
+@Composable
+private fun BatteryBadge(percent: Int, fs: Int, color: Color) {
+    val m = LocalMetrics.current
+    val nub = maxOf(2, fs / 9)
+    Box(
+        Modifier.width(m.dp(fs * 2)).height(m.dp(fs)).drawBehind {
+            val sw = maxOf(1.5f, size.height / 11f)
+            val nubW = nub * size.width / (fs * 2)
+            val bodyW = size.width - nubW - sw
+            drawRoundRect(color, Offset(sw / 2, sw / 2), Size(bodyW - sw / 2, size.height - sw),
+                androidx.compose.ui.geometry.CornerRadius(size.height * 0.25f),
+                style = androidx.compose.ui.graphics.drawscope.Stroke(sw))
+            val nubH = size.height * 0.36f
+            drawRoundRect(color, Offset(bodyW + sw * 0.5f, (size.height - nubH) / 2), Size(nubW, nubH),
+                androidx.compose.ui.geometry.CornerRadius(nubW / 2))
+        }.padding(end = m.dp(nub)),
+        contentAlignment = Alignment.Center,
+    ) {
+        Txt(percent.toString(), (fs * 0.68f).toInt(), color = color, weight = FontWeight.SemiBold)
     }
 }

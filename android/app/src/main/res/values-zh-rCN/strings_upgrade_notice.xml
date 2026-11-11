@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 升级到 2.6.0 后仅显示一次的窗口：已移除无障碍服务，车机服务需手动启动 -->
+<resources>
+    <string name="upg_title">不再需要无障碍服务！！！</string>
+    <string name="upg_lead">Headswap 不再申请无障碍权限，也不会再自动重启车机服务。</string>
+    <string name="upg_pros">优点</string>
+    <string name="upg_pro_1">连接时无需解锁手机</string>
+    <string name="upg_pro_2">无需开启有风险的无障碍设置</string>
+    <string name="upg_pro_3">AA 服务在后台几乎不耗电</string>
+    <string name="upg_cons">缺点</string>
+    <string name="upg_con_1">需要手动启动一次车机服务</string>
+    <string name="upg_con_2">如果被 Android 关闭（比如每周一次），请重新启动</string>
+    <string name="upg_con_3">通知会一直留在通知栏，您<b>直接</b>划掉即可</string>
+    <string name="upg_notif_when">27 分钟</string>
+    <string name="upg_notif_text">车机服务正在运行</string>
+    <string name="upg_ok">知道了</string>
+</resources>

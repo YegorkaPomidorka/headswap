@@ -131,6 +131,7 @@
     <string name="l_s_rail_normal">Normal</string>
     <string name="l_s_rail_cut">Compact</string>
     <string name="l_s_anim">Button animations</string>
+    <string name="l_s_battery">Phone battery</string>
     <string name="l_s_map_scale">Map scale</string>
     <string name="l_s_map_scale_sub">Only for %1$s · applies immediately</string>
     <string name="l_s_scale_smaller">Smaller</string>
@@ -154,7 +155,6 @@
     <string name="l_s_hu">Head unit</string>
     <string name="l_s_link">Connection</string>
     <string name="l_s_video">Video</string>
-    <string name="l_s_res">Resolution and rate</string>
     <string name="l_s_version">Version</string>
     <string name="l_s_hu_channel">Channel %1$s</string>
     <string name="l_s_fps">%1$s · %2$d fps</string>
@@ -162,6 +162,7 @@
     <string name="l_nav_2gis">2GIS</string>
     <string name="l_nav_yandex_maps">Yandex Maps</string>
     <string name="l_nav_google_maps">Google Maps</string>
+    <string name="l_nav_waze" translatable="false">Waze</string>
     <!-- навигатор на своём хосте Car App -->
     <string name="l_u_m">m</string>
     <string name="l_u_km">km</string>

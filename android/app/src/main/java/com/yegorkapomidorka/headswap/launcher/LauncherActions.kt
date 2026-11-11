@@ -190,7 +190,7 @@ object LauncherActions {
     private fun musicFromGemini(t: android.app.ActivityManager.RunningTaskInfo) {
         val ytm = com.yegorkapomidorka.headswap.dex.PhoneAssistant.YOUTUBE_MUSIC
         // плеер не выбран («Плеер телефона») - Яндекс Музыка, если стоит: ради неё перехват и затеян
-        val player = model.musicPlayer ?: model.localPlayer ?: YANDEX_MUSIC.takeIf(::installed)
+        val player = model.musicPlayer ?: model.localPlayer ?: YANDEX_MUSIC.takeIf { installed(it) && !model.arabic }
         if (android.os.SystemClock.uptimeMillis() - geminiAt > GEMINI_MUSIC_MS || player == null || player == ytm) {
             AppLog.i("ASSIST YouTube Music не трогаем (Gemini не звали или плеер ${player ?: "не выбран"})", false)
             return
@@ -301,8 +301,8 @@ object LauncherActions {
     /** Выбранный плеер запоминается и становится текущим: играет сразу, если у него есть сессия или MediaBrowserService. */
     fun choosePlayer(pkg: String) {
         model.chooseMusicPlayer(pkg)
-        // свой плеер из списка всех плееров становится первым слотом чипа
-        if (pkg !in PlayerChip.ONLINE) model.chooseLocalPlayer(pkg)
+        // свой плеер из списка всех плееров становится первым слотом чипа; закреплённый во втором слоте остаётся там
+        if (pkg !in PlayerChip.ONLINE && pkg != model.onlinePlayer) model.chooseLocalPlayer(pkg)
         MusicController.startPlayer(model.context, pkg) // главный поток: MediaBrowser создаёт Handler, connect асинхронный
         home()
     }

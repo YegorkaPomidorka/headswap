@@ -119,15 +119,19 @@ fun MusicCard(modifier: Modifier) {
             Modifier.align(Alignment.BottomStart).fillMaxWidth().padding(start = m.dp(s.g), end = m.dp(s.g), bottom = m.dp(s.titleB)),
             verticalArrangement = Arrangement.spacedBy(m.dp(s.g4)),
         ) {
+            // лента 1280x480: обложка узкая (290T/96), крупный шрифт резал «Ничего не играет» (Егор 09.11) - на ступень мельче
+            val titleFs = if (s.strip) s.f2 else s.f1
+            val subFs = if (s.strip) s.appLbl else s.f2
+            val titleLines = if (s.strip) 2 else 1
             when {
                 !st.access -> Txt(stringResource(R.string.l_music_no_access), s.fs, color = Pal.SEC2, maxLines = 4)
                 st.hasSession -> {
-                    Txt(st.title, s.f1, weight = FontWeight.Bold)
-                    Txt(st.artist, s.f2, color = Color(0xFFD9DEF5))
+                    Txt(st.title, titleFs, weight = FontWeight.Bold, maxLines = titleLines)
+                    Txt(st.artist, subFs, color = Color(0xFFD9DEF5))
                 }
                 else -> {
-                    Txt(stringResource(R.string.l_music_idle), s.f1, weight = FontWeight.Bold)
-                    player?.let { Txt(LauncherModel.packageLabel(it), s.f2, color = Color(0xFFD9DEF5)) }
+                    Txt(stringResource(R.string.l_music_idle), titleFs, weight = FontWeight.Bold, maxLines = titleLines)
+                    player?.let { Txt(LauncherModel.packageLabel(it), subFs, color = Color(0xFFD9DEF5)) }
                 }
             }
         }
@@ -168,7 +172,8 @@ private fun PlayerChipColumn(modifier: Modifier) {
     val m = LocalMetrics.current
     val s = m.spec
     val accent = LocalAccent.current
-    val slots = PlayerChip.slots(model.installedPackages, model.musicPlayer, model.lastOnlinePlayer, model.localPlayer, model.onlinePlayer)
+    val slots = PlayerChip.slots(model.installedPackages, model.musicPlayer, model.lastOnlinePlayer, model.localPlayer, model.onlinePlayer,
+        model.onlinePlayers)
     val shape = RoundedCornerShape(m.dp(s.pcB))
     // backdrop-blur макета в Compose не повторить (blur размывает своё содержимое, а не фон) - только стекло и обводка
     Column(
@@ -178,12 +183,13 @@ private fun PlayerChipColumn(modifier: Modifier) {
         for (slot in slots) {
             val fg = Pal.WHITE.copy(alpha = if (slot.selected) 0.9f else 0.55f)
             val bg = if (slot.selected) accent.copy(alpha = 0.32f) else Color.Transparent
-            val desc = stringResource(when (slot.kind) {
-                PlayerChip.Kind.PHONE -> R.string.l_player_mine
-                PlayerChip.Kind.YANDEX -> R.string.l_player_yandex
-                PlayerChip.Kind.YT_MUSIC -> R.string.l_player_ytm
-                PlayerChip.Kind.VK -> R.string.l_player_vk
-            })
+            val desc = when (slot.kind) {
+                PlayerChip.Kind.PHONE -> stringResource(R.string.l_player_mine)
+                PlayerChip.Kind.YANDEX -> stringResource(R.string.l_player_yandex)
+                PlayerChip.Kind.YT_MUSIC -> stringResource(R.string.l_player_ytm)
+                PlayerChip.Kind.VK -> stringResource(R.string.l_player_vk)
+                PlayerChip.Kind.APP -> LauncherModel.packageLabel(slot.pkg!!)
+            }
             RoundButton(
                 s.pcB, desc, background = bg,
                 onTap = { if (slot.pkg == null) LauncherActions.choosePhonePlayer() else LauncherActions.choosePlayer(slot.pkg) },
@@ -195,7 +201,7 @@ private fun PlayerChipColumn(modifier: Modifier) {
                 if (icon != null) {
                     Image(icon, null, Modifier.size(m.dp(s.pcApp)).clip(CircleShape).alpha(if (slot.selected) 1f else 0.55f))
                 } else when (slot.kind) {
-                    PlayerChip.Kind.PHONE -> SvgIcon(Ico.MUSIC, s.pcIc, fg, stroke = 2.4f)
+                    PlayerChip.Kind.PHONE, PlayerChip.Kind.APP -> SvgIcon(Ico.MUSIC, s.pcIc, fg, stroke = 2.4f)
                     PlayerChip.Kind.YANDEX -> Txt("Я", s.pcIc, color = fg, weight = FontWeight.Bold)
                     PlayerChip.Kind.YT_MUSIC -> VectorIcon(VIco.YT_MUSIC, 24f, s.pcIc, fg)
                     PlayerChip.Kind.VK -> Txt("VK", s.pcVk, color = fg, weight = FontWeight.Bold)

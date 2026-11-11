@@ -275,7 +275,17 @@ class LauncherLogicTest {
         val local = PlayerChip.slots(all, "com.aimp", null, local = "com.aimp")
         assertEquals("com.aimp", local[0].pkg)
         assertTrue(local[0].selected)
-        assertEquals(listOf("com.aimp", "x"), PlayerChip.localPlayers(listOf(PlayerChip.YANDEX, "com.aimp", PlayerChip.VK, "x")))
+        // во второй слот можно закрепить любой плеер, не только онлайн-сервис
+        val aimp2 = PlayerChip.slots(all, null, PlayerChip.VK, fixedOnline = "com.aimp")[1]
+        assertEquals(PlayerChip.Slot(PlayerChip.Kind.APP, "com.aimp", false), aimp2)
+        // в первый - онлайн-сервис; второй тогда его не дублирует
+        val ya = PlayerChip.slots(all, null, PlayerChip.YANDEX, local = PlayerChip.YANDEX)
+        assertEquals(listOf(PlayerChip.YANDEX, PlayerChip.YT_MUSIC), ya.map { it.pkg })
+        assertEquals(PlayerChip.YT_MUSIC, PlayerChip.slots(all, null, null, local = PlayerChip.YANDEX, fixedOnline = PlayerChip.YANDEX)[1].pkg)
+        // списки настроек: найденные плееры плюс установленные онлайн; во втором онлайн первыми
+        val players = PlayerChip.allPlayers(listOf("com.aimp", PlayerChip.VK), setOf(PlayerChip.YANDEX, PlayerChip.VK))
+        assertEquals(listOf("com.aimp", PlayerChip.VK, PlayerChip.YANDEX), players)
+        assertEquals(listOf(PlayerChip.YANDEX, PlayerChip.VK, "com.aimp"), PlayerChip.secondSlotPlayers(players))
     }
 
     @Test fun lastOnlineChangesOnlyOnOnlinePlayers() {
@@ -338,17 +348,40 @@ class LauncherLogicTest {
         assertFalse(u.update(-1, 5_000))
     }
 
-    @Test fun navArrowStopsInAnotherDirection() {
-        for (k in 1..7) {
-            val next = NavSpinLogic.next(90f, k)
-            assertTrue(next - 90f >= 720f + 45f)
-            assertTrue((next - 90f) % 360f != 0f)
-            assertEquals(0f, (next - 90f) % 45f)
-        }
-    }
-
     @Test fun hintsDefaultOffForAll() {
         for (pkg in NavigatorPick.KNOWN) assertFalse(pkg, NavigatorPick.hintsDefault(pkg))
+    }
+
+    @Test fun wazeWithoutHintsAndShadowAa() {
+        assertTrue(NavigatorPick.noHints(NavigatorPick.WAZE))
+        assertFalse(NavigatorPick.noHints(NavigatorPick.GOOGLE_MAPS))
+        assertFalse(NavigatorPick.shadowWanted(true, NavigatorPick.WAZE) { true })
+        assertTrue(NavigatorPick.shadowWanted(true, NavigatorPick.GOOGLE_MAPS) { true })
+    }
+
+    @Test fun arabicNavigatorsGoogleAndWaze() {
+        val all = setOf(NavigatorPick.YANDEX_NAVI, NavigatorPick.DGIS, NavigatorPick.GOOGLE_MAPS, NavigatorPick.WAZE)
+        assertEquals(NavigatorPick.GOOGLE_MAPS, NavigatorPick.defaultFor(all, arabic = true))
+        assertEquals(NavigatorPick.YANDEX_NAVI, NavigatorPick.defaultFor(all))
+        assertEquals(NavigatorPick.WAZE, NavigatorPick.defaultFor(setOf(NavigatorPick.DGIS, NavigatorPick.WAZE), arabic = true))
+        assertNull(NavigatorPick.defaultFor(setOf(NavigatorPick.DGIS), arabic = true))
+        // сохранённый 2ГИС в арабском не действует, Waze - действует
+        assertEquals(NavigatorPick.GOOGLE_MAPS, NavigatorPick.effective(NavigatorPick.DGIS, all, arabic = true))
+        assertEquals(NavigatorPick.WAZE, NavigatorPick.effective(NavigatorPick.WAZE, all, arabic = true))
+        assertEquals(NavigatorPick.DGIS, NavigatorPick.effective(NavigatorPick.DGIS, all))
+    }
+
+    @Test fun arabicHidesYandexMusic() {
+        val ar = PlayerChip.online(true)
+        val inst = setOf(PlayerChip.YANDEX, PlayerChip.VK)
+        assertEquals(PlayerChip.VK, PlayerChip.onlineSlot(inst, PlayerChip.YANDEX, null, online = ar))
+        assertEquals(PlayerChip.VK, PlayerChip.onlineSlot(inst, null, PlayerChip.YANDEX, online = ar))
+        assertEquals(PlayerChip.YANDEX, PlayerChip.onlineSlot(inst, null, null))
+        assertEquals(listOf("x", PlayerChip.VK), PlayerChip.allPlayers(listOf("x", PlayerChip.YANDEX), inst, ar))
+        val slots = PlayerChip.slots(inst, PlayerChip.YANDEX, null, local = PlayerChip.YANDEX, online = ar)
+        assertNull(slots[0].pkg)
+        assertTrue(slots[0].selected)
+        assertEquals(PlayerChip.VK, slots[1].pkg)
     }
 
     @Test fun shadowAaFollowsNavigatorHints() {

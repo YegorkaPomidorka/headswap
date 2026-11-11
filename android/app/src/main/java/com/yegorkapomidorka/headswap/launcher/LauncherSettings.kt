@@ -64,12 +64,17 @@ import kotlinx.coroutines.withContext
 /** Разделы настроек; [COLORS] и [ABOUT] - вложенные страницы «Вида» и «Системы», своей кнопки слева у них нет. */
 enum class SettingsPage { LOOK, NAVIGATOR, MUSIC, HOME, SYSTEM, ABOUT, COLORS }
 
-/** Навигаторы раздела «Навигатор», плитки 2x2 в порядке макета. */
+/** Навигаторы раздела «Навигатор», плитки по две в ряд в порядке макета. */
 private val NAV_TILES = listOf(
     NavigatorPick.YANDEX_NAVI to R.string.l_nav_yandex_navi,
-    "ru.dublgis.dgismobile" to R.string.l_nav_2gis,
+    NavigatorPick.DGIS to R.string.l_nav_2gis,
     NavigatorPick.YANDEX_MAPS to R.string.l_nav_yandex_maps,
-    "com.google.android.apps.maps" to R.string.l_nav_google_maps,
+    NavigatorPick.GOOGLE_MAPS to R.string.l_nav_google_maps,
+)
+/** Арабский интерфейс (h1003): Google Карты и Waze, один ряд. */
+private val NAV_TILES_AR = listOf(
+    NavigatorPick.GOOGLE_MAPS to R.string.l_nav_google_maps,
+    NavigatorPick.WAZE to R.string.l_nav_waze,
 )
 
 /**
@@ -145,17 +150,23 @@ fun LauncherSettingsScreen() {
                             ThemeCard(d, cell(0).fillMaxWidth())
                             Placed(1) { ColorsLinkCard(d, Modifier) }
                             RailSizeCard(d, cell(2, 2).fillMaxWidth())
-                            SwitchCard(stringResource(R.string.l_s_anim), model.animations, d, cell(4).fillMaxWidth()) {
-                                model.chooseAnimations(it)
+                            // ряд 4 пополам: анимации | заряд телефона в строке статуса (свободных рядов нет)
+                            Row(cell(4).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(m.dp(d.gap))) {
+                                SwitchCard(stringResource(R.string.l_s_anim), model.animations, d, Modifier.weight(1f).fillMaxHeight()) {
+                                    model.chooseAnimations(it)
+                                }
+                                SwitchCard(stringResource(R.string.l_s_battery), model.showBattery, d, Modifier.weight(1f).fillMaxHeight()) {
+                                    model.chooseShowBattery(it)
+                                }
                             }
                         }
                         SettingsPage.COLORS -> {
                             ColorsModeCard(d, cell(0).fillMaxWidth())
                             val set = if (model.colorsEditDay) model.dayColors else model.nightColors
                             val light = model.colorsEditDay
-                            ColorSliderCard(stringResource(R.string.l_s_colors_accent), set.accentHue, 360, d, cell(1).fillMaxWidth(),
+                            ColorSliderCard(stringResource(R.string.l_s_colors_accent), set.accentHue, ColorSet.HUE_NEUTRAL, d, cell(1).fillMaxWidth(),
                                 hueTrack(light, accent = true)) { model.editColors(set.copy(accentHue = it)) }
-                            ColorSliderCard(stringResource(R.string.l_s_colors_bg_hue), set.bgHue, 360, d, cell(2).fillMaxWidth(),
+                            ColorSliderCard(stringResource(R.string.l_s_colors_bg_hue), set.bgHue, ColorSet.HUE_NEUTRAL, d, cell(2).fillMaxWidth(),
                                 hueTrack(light, accent = false)) { model.editColors(set.copy(bgHue = it)) }
                             ColorSliderCard(stringResource(R.string.l_s_colors_bg_sat), set.bgSat, 100, d, cell(3).fillMaxWidth(),
                                 satTrack(light, set.bgHue)) { model.editColors(set.copy(bgSat = it)) }
@@ -183,10 +194,12 @@ fun LauncherSettingsScreen() {
                                 })
                                 // низкий ряд (экраны высотой 480): подпись не влезает под название - без неё
                                 val subFits = rowH >= ((s.f2 + d.sub) * 1.25).roundToInt() + 4 + 2 * d.padV
-                                SwitchCard(stringResource(R.string.l_nav_hints), hints, d, cell(2).fillMaxWidth(), sub = sub.takeIf { subFits }) {
+                                // Waze - только окно, подсказок нет вовсе (h1003): тумблер не показываем
+                                val noHints = NavigatorPick.noHints(navPkg)
+                                if (!noHints) SwitchCard(stringResource(R.string.l_nav_hints), hints, d, cell(2).fillMaxWidth(), sub = sub.takeIf { subFits }) {
                                     model.chooseNavHints(navPkg, it)
                                 }
-                                var row = 3
+                                var row = if (noHints) 2 else 3
                                 // масштаб - dpi своего хоста Car App; навигатору окном и через AA он не нужен
                                 if (EmbedHost.nav.carHost) MapScaleCard(navPkg, d, cell(row++).fillMaxWidth())
                                 Placed(row++) { RestartNavCard(d, Modifier) } // кнопка - через обёртку, рамка шайбы (h737)
@@ -195,15 +208,17 @@ fun LauncherSettingsScreen() {
                             }
                         }
                         SettingsPage.MUSIC -> {
-                            val players by produceState(emptyList<String>()) {
-                                value = withContext(Dispatchers.IO) { PlayerChip.localPlayers(MusicController.players(model.context)) }
+                            // в оба слота - любой плеер телефона, онлайн-сервисы тоже (жалобы юзеров 09.11)
+                            val found by produceState(emptyList<String>()) {
+                                value = withContext(Dispatchers.IO) { MusicController.players(model.context) }
                             }
+                            val players = PlayerChip.allPlayers(found, model.installedPackages, model.onlinePlayers)
                             val local = model.localPlayer?.takeIf { it in players } ?: players.firstOrNull()
                             PlayersCard(stringResource(R.string.l_s_slot1), players.map { PlayerOpt.App(it) },
                                 local?.let { PlayerOpt.App(it) }, d, cell(0).fillMaxWidth()) { model.chooseLocalPlayer((it as PlayerOpt.App).pkg) }
-                            val online = PlayerChip.ONLINE.filter { it in model.installedPackages }
-                            PlayersCard(stringResource(R.string.l_s_slot2), listOf(PlayerOpt.Last) + online.map { PlayerOpt.App(it) },
-                                model.onlinePlayer?.takeIf { it in online }?.let { PlayerOpt.App(it) } ?: PlayerOpt.Last, d, cell(1).fillMaxWidth()) {
+                            val second = PlayerChip.secondSlotPlayers(players, model.onlinePlayers)
+                            PlayersCard(stringResource(R.string.l_s_slot2), listOf(PlayerOpt.Last) + second.map { PlayerOpt.App(it) },
+                                model.onlinePlayer?.takeIf { it in second }?.let { PlayerOpt.App(it) } ?: PlayerOpt.Last, d, cell(1).fillMaxWidth()) {
                                 model.chooseOnlinePlayer((it as? PlayerOpt.App)?.pkg)
                             }
                             SwitchCard(stringResource(R.string.l_s_autoplay), model.autoplay, d, cell(2).fillMaxWidth()) {
@@ -392,17 +407,25 @@ private fun ColorsModeCard(d: SettingsDims, modifier: Modifier) {
     }
 }
 
-/** Радуга оттенков для слайдера: акцент - как он будет на экране, фон - приглушённый. */
-private fun hueTrack(light: Boolean, accent: Boolean): Brush = Brush.horizontalGradient(
-    (0..360 step 60).map { h ->
-        if (accent) LauncherColors.accent(light, h)
+/**
+ * Радуга оттенков для слайдера: акцент - как он будет на экране, фон - приглушённый. Хвост после 360° -
+ * «без цвета» ([ColorSet.HUE_NEUTRAL]): чёрный или белый, резкой границей.
+ */
+private fun hueTrack(light: Boolean, accent: Boolean): Brush {
+    val end = 360f / ColorSet.HUE_NEUTRAL
+    val rainbow = (0..360 step 60).map { h ->
+        h / 360f * end to if (accent) LauncherColors.accent(light, h)
         else Color.hsl((h % 360).toFloat(), if (light) 0.5f else 0.35f, if (light) 0.85f else 0.24f)
-    },
-)
+    }
+    val none = if (accent) LauncherColors.accent(light, ColorSet.HUE_NEUTRAL) else if (light) Color.White else Color.Black
+    return Brush.horizontalGradient(*(rainbow + listOf(end + 0.001f to none, 1f to none)).toTypedArray())
+}
 
 /** Насыщенность фона: от серого до цветного того же оттенка. */
 private fun satTrack(light: Boolean, hue: Int): Brush {
     val l = if (light) 0.86f else 0.2f
+    // фон без цвета: насыщенность ни на что не влияет - дорожка серая
+    if (ColorSet.neutral(hue)) return Brush.horizontalGradient(listOf(Color.hsl(0f, 0f, l), Color.hsl(0f, 0f, l)))
     return Brush.horizontalGradient(listOf(Color.hsl(hue.toFloat() % 360f, 0f, l), Color.hsl(hue.toFloat() % 360f, if (light) 0.6f else 0.45f, l)))
 }
 
@@ -604,7 +627,8 @@ private fun SwitchCard(label: String, on: Boolean, d: SettingsDims, modifier: Mo
     Card(modifier) {
         Row(Modifier.fillMaxSize().padding(start = m.dp(d.padStart), end = m.dp(8)), verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(m.dp(s.g))) {
-            if (sub == null) Txt(label, s.f2, Modifier.weight(1f), ellipsis = false)
+            // два переключателя в половинной ширине: длинная подпись переносится, а не обрезается
+            if (sub == null) Txt(label, s.f2, Modifier.weight(1f), maxLines = 2, ellipsis = false)
             else Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(m.dp(4))) {
                 Txt(label, s.f2, ellipsis = false)
                 Txt(sub, d.sub, color = Pal.SEC, ellipsis = true)
@@ -632,10 +656,9 @@ private fun NavigatorTiles(d: SettingsDims, rowH: Int, modifier: Modifier) {
     val model = LauncherModel
     val installed = model.installedPackages
     Column(modifier, verticalArrangement = Arrangement.spacedBy(m.dp(d.gap))) {
-        for (r in 0 until 2) {
+        for (row in (if (model.arabic) NAV_TILES_AR else NAV_TILES).chunked(2)) {
             Row(Modifier.height(m.dp(rowH)).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(m.dp(d.gap))) {
-                for (c in 0 until 2) {
-                    val (pkg, res) = NAV_TILES[r * 2 + c]
+                for ((pkg, res) in row) {
                     val has = pkg in installed
                     val label = stringResource(res)
                     OptionBox(has && model.navigatorPkg == pkg, Modifier.weight(1f).fillMaxHeight().alpha(if (has) 1f else 0.4f),
@@ -812,6 +835,22 @@ private fun HomeMiniature(left: Boolean, gapPx: Int, modifier: Modifier) {
     val gap = m.dp(gapPx)
     val small = RoundedCornerShape(m.dp(gapPx))
     Row(modifier.clip(RoundedCornerShape(m.dp(max(1, (10 * k).roundToInt())))).background(pal.mini)) {
+        // лента 1280x480: на главном один ряд - обложка, большая плашка и сетка приложений, нижнего ряда нет (Егор 09.11)
+        if (m.spec.strip) {
+            Row(Modifier.fillMaxSize().padding(gap), horizontalArrangement = Arrangement.spacedBy(gap)) {
+                val cells = listOf<@Composable RowScope.() -> Unit>(
+                    { MusicMiniCell(0.25f, small) },
+                    { BigMiniCell(0.5f, small) },
+                    {
+                        Box(Modifier.weight(0.25f).fillMaxHeight().clip(small).background(pal.btn2), contentAlignment = Alignment.Center) {
+                            SvgIcon(Ico.PLUS, (22 * k).roundToInt(), pal.fg2, stroke = 2.4f)
+                        }
+                    },
+                )
+                for (c in if (left) cells.asReversed() else cells) c(this)
+            }
+            return@Row
+        }
         Column(Modifier.weight(1f).fillMaxHeight().padding(gap), verticalArrangement = Arrangement.spacedBy(gap)) {
             Row(Modifier.weight(2f).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(gap)) {
                 if (left) { BigMiniCell(0.67f, small); MusicMiniCell(0.33f, small) } else { MusicMiniCell(0.33f, small); BigMiniCell(0.67f, small) }
@@ -857,12 +896,12 @@ private fun systemInfo(): List<Pair<String, String>> {
     val hu = name?.let { n -> version?.let { "$n · CarLife $it" } ?: n } ?: dash
     val link = if (!CarLifeState.running) dash else if (CarLifeState.wirelessSession) "Wi-Fi" else "USB"
     val fps = DexPrefs(LauncherModel.context).desktopFps.fixed ?: 30
-    val res = CarLifeState.videoMode?.let { stringResource(R.string.l_s_fps, "${it.outW}×${it.outH}", fps) } ?: dash
+    val res = CarLifeState.videoMode?.let { stringResource(R.string.l_s_fps, "${it.outW}×${it.outH}", fps) }
     return listOf(
         stringResource(R.string.l_s_hu) to hu,
-        stringResource(R.string.l_s_link) to link,
-        // строка «Видео: прямой проброс» убрана: в пятирядной сетке место понадобилось переключателю «Уведомления»
-        stringResource(R.string.l_s_res) to res,
+        // «Подключение» и «Разрешение и частота» - одна строка: в пятирядной сетке без прокрутки иначе «О приложении»
+        // уезжала за край после «Алиса только голосом». Раньше так же ушла строка «Видео: прямой проброс».
+        stringResource(R.string.l_s_link) to (if (link == dash || res == null) link else "$link · $res"),
     )
 }
 

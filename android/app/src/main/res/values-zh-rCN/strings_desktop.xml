@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- BridgeService，Headswap Desktop 模式 -->
+    <string name="desk_not_activated">Headswap Desktop 尚未激活：请打开“设置 > 模式”并点按“激活”</string>
+    <string name="desk_cert_na">无需证书（桌面模式）</string>
+    <string name="desk_connecting">正在启动桌面…</string>
+    <string name="desk_waiting_frame">桌面：正在等待画面…</string>
+    <string name="desk_disconnected">桌面已断开。请先停止，然后重新连接。</string>
+    <string name="desk_recovering">正在恢复桌面（%1$d/2）…</string>
+    <string name="desk_recovery_stopped">恢复已停止。请检查 USB、桌面访问权限，并解锁手机</string>
+    <string name="desk_recovery_screen_busy">上一个屏幕尚未释放，已取消自动恢复</string>
+
+    <!-- 在手机上自行激活（无线调试），设置 - 模式 -->
+    <string name="pa_title">激活 Headswap</string>
+    <string name="pa_step_1">打开“开发者选项” → “无线调试”并开启。</string>
+    <string name="pa_step_2">点按“使用配对码配对设备”。</string>
+    <string name="pa_step_3">在 Headswap 的通知中输入配对码。</string>
+    <string name="pa_step_paired">点按“激活”。手机已完成配对，无需再输入配对码。</string>
+    <string name="pa_hint">手机重启后需要重新激活。</string>
+    <string name="pa_button">激活</string>
+    <string name="pa_button_again">重新激活</string>
+    <string name="pa_cancel">取消</string>
+    <string name="pa_manual_toggle">手动输入端口和配对码</string>
+    <string name="pa_manual_hint">端口和配对码见配对对话框。配对完成后，只需填写调试端口。</string>
+    <string name="pa_field_pair_port">配对端口</string>
+    <string name="pa_field_code">六位配对码</string>
+    <string name="pa_field_connect_port">无线调试端口</string>
+    <string name="pa_manual_go">使用这些值激活</string>
+    <string name="pa_forget">重新配对</string>
+    <string name="pa_forget_done">已清除配对信息。下次 Headswap 会要求输入新的配对码。</string>
+    <string name="pa_need_notif">请允许 Headswap 发送通知：配对码需要在通知中输入。也可以手动输入端口和配对码。</string>
+    <string name="pa_need_wifi_debug">请在“开发者选项”中开启“无线调试”（任意 Wi-Fi 网络均可，无需联网），然后再次点按“激活”。</string>
+    <string name="pa_field_bad_port">端口：1 至 65535</string>
+    <string name="pa_field_bad_code">请输入六位数字</string>
+
+    <string name="pa_s_searching">正在查找无线调试…</string>
+    <string name="pa_s_wait_code">正在等待配对码：请在 Headswap 的通知中输入。</string>
+    <string name="pa_s_pairing">正在配对…</string>
+    <string name="pa_s_connecting">正在连接无线调试…</string>
+    <string name="pa_s_starting">正在开启桌面，Headswap 可能会重启。</string>
+    <string name="pa_s_pending">正在等待重启后的 Headswap 确认访问权限…</string>
+    <string name="pa_s_failed">激活失败：%1$s</string>
+    <string name="pa_s_expired">激活未完成。请打开“设置 > 模式”并再次点按“激活”。</string>
+    <string name="pa_s_expired_why">激活未完成：%1$s</string>
+
+    <string name="pa_notif_channel_progress">在手机上激活</string>
+    <string name="pa_notif_channel_code">配对码</string>
+    <string name="pa_notif_title">Headswap Desktop 激活</string>
+    <string name="pa_notif_cancel">取消</string>
+    <string name="pa_notif_code_title">输入配对码</string>
+    <string name="pa_notif_code_text">在“无线调试”中点按“使用配对码配对设备”，然后在此输入六位数字。</string>
+    <string name="pa_notif_code_error">%1$s请重新输入配对码。</string>
+    <string name="pa_notif_code_label">六位配对码</string>
+    <string name="pa_notif_reply">输入配对码</string>
+    <string name="pa_notif_done">Headswap Desktop 已激活</string>
+
+    <string name="pa_err_no_wifi">未连接 Wi-Fi。无线调试只能通过 Wi-Fi 使用：请连接网络后重试。</string>
+    <string name="pa_err_port">端口必须是 1 至 65535 之间的数字。</string>
+    <string name="pa_err_code">配对码是系统配对对话框中显示的六位数字。</string>
+    <string name="pa_err_no_pair_port">未找到配对对话框。输入配对码期间，请保持“使用配对码配对设备”页面打开。在 Android 17 上，请允许 Headswap 访问本地网络，或手动输入端口。</string>
+    <string name="pa_err_no_connect_port">无线调试未开启或未找到。请在“开发者选项”中开启“无线调试”（需要先开启 Wi-Fi），或手动输入端口。</string>
+    <string name="pa_err_refused">端口已关闭：无线调试未开启，或端口已更改。请查看“无线调试”页面。</string>
+    <string name="pa_err_timeout">等待响应超时。请检查 Wi-Fi，并确认已开启无线调试。</string>
+    <string name="pa_err_permission">Android 阻止了网络连接。请允许 Headswap 访问本地网络，然后重试。</string>
+    <string name="pa_err_pair_rejected">配对码错误，或配对对话框已关闭。请重新打开对话框，并使用新的配对码。</string>
+    <string name="pa_err_not_paired">手机已不再识别此设备。请使用新的配对码重新配对。</string>
+    <string name="pa_err_tls">安全连接被拒绝。请检查无线调试，必要时重新配对。</string>
+    <string name="pa_err_tls_provider">系统 TLS 组件出错。请保存日志并反馈。</string>
+    <string name="pa_err_closed">手机关闭了连接。请在“无线调试”页面检查端口。</string>
+    <string name="pa_err_identity">无法读取已保存的 ADB 密钥。请重新配对。</string>
+    <string name="pa_err_shell">无线调试未授予 shell 权限。请检查已配对设备列表。</string>
+    <string name="pa_err_package">已安装的 Headswap 发生了变化。请重新打开应用并重试。</string>
+    <string name="pa_err_unsupported">此系统固件无法在手机上自行完成激活。</string>
+    <string name="pa_err_dispatch">启动未得到确认。请打开“设置 > 模式”并再次点按“激活”。</string>
+    <string name="pa_err_io">与无线调试通信失败。请保存日志并重试。</string>
+    <string name="pa_err_internal">准备连接时发生内部错误。请保存日志并重试。</string>
+    <string name="pa_need_usb_debug">在 Android 17 上，还需要在“开发者选项”中开启“USB 调试”（并保持“无线调试”开启）：否则车机屏幕可能会随手机一起黑屏。然后再次点按“激活”。</string>
+</resources>

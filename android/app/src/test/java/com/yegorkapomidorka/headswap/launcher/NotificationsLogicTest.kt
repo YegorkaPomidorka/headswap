@@ -39,6 +39,25 @@ class NotificationsLogicTest {
         assertTrue(accept(raw(title = "Звонок пропущен", text = "")))
     }
 
+    @Test fun fixedLineXPerResolution() {
+        // рейка слева 0..120, музыка 400, поле 16: полоска на стыке музыки и карты, x = 120 + 16 + 400 + 8
+        assertEquals(544f, NotifGeom.fixedLineX(120f, 1280f, 16f, 400f, rtl = false), 0.01f)
+        // арабский: рейка справа, область 0..1160 - зеркально, у правой рейки
+        assertEquals(736f, NotifGeom.fixedLineX(0f, 1160f, 16f, 400f, rtl = true), 0.01f)
+    }
+
+    @Test fun lineAvoidsStatusText() {
+        val icons = 900f..1260f
+        // стык левее даты - полоска не двигается
+        assertEquals(700f, NotifGeom.lineAvoiding(700f, 48f, 16f, listOf(icons), 120f, 1280f), 0.01f)
+        // стык под датой (большая плитка часов) - встаёт левее даты с зазором
+        assertEquals(836f, NotifGeom.lineAvoiding(950f, 48f, 16f, listOf(icons), 120f, 1280f), 0.01f)
+        // RTL: значки слева - отъезжает вправо
+        assertEquals(484f, NotifGeom.lineAvoiding(400f, 48f, 16f, listOf(60f..420f), 0f, 1160f), 0.01f)
+        // часы слева и значки справа: остаётся между ними
+        assertEquals(836f, NotifGeom.lineAvoiding(950f, 48f, 16f, listOf(130f..220f, icons), 120f, 1280f), 0.01f)
+    }
+
     @Test fun composePlainUsesTitleAndText() {
         assertEquals("Т-Банк" to "Покупка 1 240 ₽", NotificationsLogic.compose("Т-Банк", "Т-Банк", "Покупка 1 240 ₽", null, null, null))
     }
@@ -129,6 +148,11 @@ class NotificationsLogicTest {
         val (min, max) = NotifGeom.tongueWidth(62, 707, 21, 14)
         assertEquals(310, min)
         assertEquals(581, max)
+    }
+
+    @Test fun tongueWidthWiderOnWideArea() {
+        // 1920x836: область ~1700, 900T/96 вышло бы ~880
+        assertEquals(1020, NotifGeom.tongueWidth(94, 1700, 32, 20).second)
     }
 
     @Test fun tongueWidthNeverExceedsArea() {

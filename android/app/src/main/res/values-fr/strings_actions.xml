@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- ui/Actions.kt -->
+    <string name="act_open_aa_failed">Impossible d\'ouvrir les réglages d\'Android Auto : %1$s</string>
+    <string name="act_open">Ouvrir</string>
+    <string name="act_cancel">Annuler</string>
+
+    <!-- ui/LogShare.kt -->
+    <string name="share_failed">Impossible d\'ouvrir le partage : %1$s</string>
+    <string name="share_no_log">Aucun fichier journal pour le moment</string>
+    <string name="share_subject_log">Headswap : journal %1$s</string>
+    <string name="share_report_failed">Impossible de créer le rapport : %1$s</string>
+    <string name="share_subject_report">Headswap : rapport de problème</string>
+    <string name="share_zip_failed">Impossible de créer l\'archive : %1$s</string>
+    <string name="share_saved">Enregistré dans Téléchargements : %1$s</string>
+    <string name="share_subject_archive">Headswap : archive des journaux</string>
+    <string name="share_size_mib">%1$s Mio</string>
+    <string name="share_size_kib">%1$d Kio</string>
+
+    <!-- BridgeService.kt -->
+    <string name="svc_bridge_failed">Le pont n\'a pas pu démarrer : %1$s</string>
+</resources>

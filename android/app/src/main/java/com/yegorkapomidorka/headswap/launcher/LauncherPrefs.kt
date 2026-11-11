@@ -70,6 +70,11 @@ class LauncherPrefs(private val context: Context) {
         get() = prefs.getBoolean("animations", true)
         set(value) { prefs.edit().putBoolean("animations", value).apply() }
 
+    /** «Заряд телефона» в строке статуса. */
+    var showBattery: Boolean
+        get() = prefs.getBoolean("show_battery", true)
+        set(value) { prefs.edit().putBoolean("show_battery", value).apply() }
+
     /** «Включать музыку автоматически»: при старте сессии сразу играет, как в Android Auto. */
     var autoplay: Boolean
         get() = prefs.getBoolean("autoplay", true)
