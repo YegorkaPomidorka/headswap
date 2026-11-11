@@ -127,6 +127,7 @@ internal object DesktopMediaMeta {
 
     private fun art(md: MediaMetadata): Bitmap? =
         md.getBitmap(MediaMetadata.METADATA_KEY_ALBUM_ART) ?: md.getBitmap(MediaMetadata.METADATA_KEY_ART)
+            ?: md.getBitmap(MediaMetadata.METADATA_KEY_DISPLAY_ICON)
 
     private fun png(bmp: Bitmap?): ByteArray? {
         if (bmp == null) return null
