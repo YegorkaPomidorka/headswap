@@ -129,6 +129,9 @@
     <string name="l_s_colors_bg_sat">Background saturation</string>
     <string name="l_s_colors_hint">While this screen is open, the desktop shows the colors you are editing. Night colors show in the dark theme, day colors in the light one.</string>
     <string name="l_s_rail">Side panel</string>
+    <string name="l_s_rail_bottom">Bottom panel</string>
+    <string name="l_s_layout_tile_top">Tile on top</string>
+    <string name="l_s_layout_music_top">Music on top</string>
     <string name="l_s_rail_small">Small</string>
     <string name="l_s_rail_medium">Medium</string>
     <string name="l_s_rail_normal">Normal</string>

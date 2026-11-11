@@ -329,8 +329,10 @@ object PlayerChip {
  */
 object SettingsGrid {
     const val ROWS = 5
-    fun top(row: Int, height: Int, gap: Int): Int = Math.round(row * (height + gap).toDouble() / ROWS).toInt()
-    fun bottom(row: Int, height: Int, gap: Int): Int = top(row + 1, height, gap) - gap
+    /** Рядов в портрете (h921): вкладки сверху съедают высоту, остаётся ~850 px - семь рядов по ~110 (макет: 116). */
+    const val PORTRAIT_ROWS = 7
+    fun top(row: Int, height: Int, gap: Int, rows: Int = ROWS): Int = Math.round(row * (height + gap).toDouble() / rows).toInt()
+    fun bottom(row: Int, height: Int, gap: Int, rows: Int = ROWS): Int = top(row + 1, height, gap, rows) - gap
 }
 
 /** Подпись типа сети в рейке. Типы - константы TelephonyManager.NETWORK_TYPE_*. */

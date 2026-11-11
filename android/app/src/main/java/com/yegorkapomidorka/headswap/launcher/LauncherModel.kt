@@ -76,7 +76,9 @@ internal object LauncherModel {
     var dayColors by mutableStateOf(ColorSet.DAY)
     /** На экране «Цвета» настраиваются дневные (иначе ночные); пока он открыт, весь стол показывает этот набор. */
     var colorsEditDay by mutableStateOf(false)
-    private val colorsOpen: Boolean get() = area == Area.Settings && settingsPage == SettingsPage.COLORS
+    /** Страница «Цвета» открыта; в портрете «Цвета» - блок «Вида», он правит набор, пока открыт сам «Вид» (h921). */
+    private val colorsOpen: Boolean
+        get() = area == Area.Settings && (settingsPage == SettingsPage.COLORS || (portrait && settingsPage == SettingsPage.LOOK))
     /** Светлая ли палитра на экране: на «Цветах» - редактируемый набор, иначе [lightTheme]. */
     val shownLight: Boolean get() = if (colorsOpen) colorsEditDay else lightTheme
     val palette: LauncherPalette

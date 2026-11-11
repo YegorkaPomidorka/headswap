@@ -129,6 +129,9 @@
     <string name="l_s_colors_bg_sat">Saturation du fond</string>
     <string name="l_s_colors_hint">Tant que cet écran est ouvert, le bureau affiche les couleurs que vous modifiez. Les couleurs de nuit s\'affichent avec le thème sombre, celles de jour avec le thème clair.</string>
     <string name="l_s_rail">Panneau latéral</string>
+    <string name="l_s_rail_bottom">Panneau du bas</string>
+    <string name="l_s_layout_tile_top">Tuile en haut</string>
+    <string name="l_s_layout_music_top">Musique en haut</string>
     <string name="l_s_rail_small">Petit</string>
     <string name="l_s_rail_medium">Moyen</string>
     <string name="l_s_rail_normal">Normal</string>

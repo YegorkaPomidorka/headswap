@@ -319,6 +319,22 @@ class LauncherLogicTest {
         }
     }
 
+    @Test fun settingsGridPortraitHasSevenRowsOnTheSameBorders() {
+        for (row in LauncherSpecs.PORTRAIT_TABLE) {
+            val s = LauncherSpecs.forSize(row[0], row[1])
+            val h = row[1] - s.bottomRailH - s.g8 - s.statusH - s.g8 - s.t - s.g8 - s.padBottom
+            val gap = s.g8
+            val rows = SettingsGrid.PORTRAIT_ROWS
+            assertEquals(0, SettingsGrid.top(0, h, gap, rows))
+            assertEquals(h, SettingsGrid.bottom(rows - 1, h, gap, rows))
+            for (i in 0 until rows - 1) {
+                assertEquals(gap, SettingsGrid.top(i + 1, h, gap, rows) - SettingsGrid.bottom(i, h, gap, rows))
+            }
+            // ряд не ниже цели касания: пилюли T помещаются, когда есть запас на поля
+            assertTrue("${row[0]}x${row[1]}", SettingsGrid.bottom(0, h, gap, rows) - SettingsGrid.top(0, h, gap, rows) >= s.t)
+        }
+    }
+
     @Test fun themeChoiceRestoresOldNamesAsDarkAndAutoFollowsHeadlights() {
         assertEquals(ThemeChoice.DARK, ThemeChoice.restore("GOLD_LIGHT"))
         assertEquals(ThemeChoice.DARK, ThemeChoice.restore("GOLD"))
