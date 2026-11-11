@@ -2,8 +2,12 @@
 package com.yegorkapomidorka.headswap.dex
 
 import android.content.Context
+import com.yegorkapomidorka.headswap.aa.CarPreset
 import com.yegorkapomidorka.headswap.aa.DesktopGeometryPolicy
 import com.yegorkapomidorka.headswap.aa.FpsSetting
+
+/** AUTO = по пресету машины; LIMITED/FULL - ручной выбор, работает на любой машине. */
+enum class VideoRangeMode { AUTO, LIMITED, FULL }
 
 /** Desktop preferences are separate from the AA / bridge settings. */
 class DexPrefs(context: Context) {
@@ -45,13 +49,21 @@ class DexPrefs(context: Context) {
         set(value) { prefs.edit().putBoolean("desktop_transcode", value).apply() }
 
     /**
-     * Tag the final H.264 as limited range (16-235). The CR-V 2026 head unit alternates between
-     * two composition paths that treat full-range streams differently, which shows up as ~1.7 Hz
-     * brightness pulsing; a limited-range stream looks identical on both paths.
+     * Final H.264 color range. AUTO follows the selected car preset: the CR-V 2026 head unit
+     * alternates between two composition paths that treat full-range streams differently
+     * (~1.7 Hz brightness pulsing), so only those presets switch to limited range.
+     * A manual LIMITED/FULL choice still applies to any car.
      */
-    var videoLimitedRange: Boolean
-        get() = prefs.getBoolean("video_limited_range", true)
-        set(value) { prefs.edit().putBoolean("video_limited_range", value).apply() }
+    var videoRangeMode: VideoRangeMode
+        get() = VideoRangeMode.entries.firstOrNull { it.name == prefs.getString("video_range_mode", null) }
+            ?: VideoRangeMode.AUTO
+        set(value) { prefs.edit().putString("video_range_mode", value.name).apply() }
+
+    fun effectiveLimitedRange(car: CarPreset?): Boolean = when (videoRangeMode) {
+        VideoRangeMode.AUTO -> car?.settings?.limitedRange == true
+        VideoRangeMode.LIMITED -> true
+        VideoRangeMode.FULL -> false
+    }
 }
 
 object DexState {

@@ -22,9 +22,11 @@ class CarPresetTest {
         assertEquals(VideoMode.WIDE, CarPreset.MAZDA_3_CN_2025.settings.videoMode)
         assertEquals(VideoMode.WIDE_976, CarPreset.VW_TIGUAN_L_PRO.settings.videoMode)
         assertEquals(CarSettings(transcode = true, videoMode = VideoMode.WIDE_HD,
-            fps = FpsSetting.FPS30, desktopFps = FpsSetting.FPS30), CarPreset.HONDA_CRV_2026.settings)
+            fps = FpsSetting.FPS30, desktopFps = FpsSetting.FPS30,
+            limitedRange = true, crvDesktopPacing = true), CarPreset.HONDA_CRV_2026.settings)
         assertEquals(CarSettings(transcode = true, videoMode = VideoMode.WIDE_HD,
-            fps = FpsSetting.FPS30, desktopFps = FpsSetting.FPS30), CarPreset.HONDA_CRV_2026_HYBRID.settings)
+            fps = FpsSetting.FPS30, desktopFps = FpsSetting.FPS30,
+            limitedRange = true, crvDesktopPacing = true), CarPreset.HONDA_CRV_2026_HYBRID.settings)
         assertEquals(CarSettings(videoMode = VideoMode.R1080), CarPreset.HONDA_VEZEL_2022.settings)
         assertEquals(CarSettings(), CarPreset.VW_THARU_XR.settings)
         assertEquals(CarSettings(musicRate = MusicRate.HZ32), CarPreset.KIA_K3_2023.settings)
@@ -52,7 +54,19 @@ class CarPresetTest {
                 assertEquals(p.name, FpsSetting.FPS30, fps)
                 assertEquals(p.name, FpsSetting.FPS30, desktopFps)
                 assertEquals(p.name, VideoMode.WIDE_HD, videoMode)
+                assertEquals(p.name, true, limitedRange)
+                assertEquals(p.name, true, crvDesktopPacing)
             }
+        }
+    }
+
+    @Test
+    fun crvDesktopTweaksStayOnCrvOnly() {
+        for (p in CarPreset.values()) {
+            val crv = p == CarPreset.HONDA_CRV_2026 || p == CarPreset.HONDA_CRV_2026_HYBRID
+            assertEquals(p.name, crv, p.settings.limitedRange)
+            assertEquals(p.name, crv, p.settings.crvDesktopPacing)
+            assertEquals(p.name, crv, p.settings.desktopFps != null)
         }
     }
 

@@ -20,6 +20,7 @@ class DesktopTranscodeTranscoder(
     private val capabilityFps: Int = fps,
     private val baidu: Boolean = false,
     private val limitedRange: Boolean = false,
+    private val pacer30: Boolean = false,
 ) : VideoTranscoder {
     private val finalTranscoder = AaTranscoder(
         width, height, fps, bitrate, out, log,
@@ -27,6 +28,7 @@ class DesktopTranscodeTranscoder(
         baidu = baidu, directSurface = false,
         capabilityFps = capabilityFps, dumpTag = "desktop-final",
         limitedRange = limitedRange,
+        pacer30 = pacer30,
     )
 
     private lateinit var intermediateTranscoder: AaTranscoder
@@ -61,6 +63,7 @@ class DesktopTranscodeTranscoder(
             srcWidth = width, srcHeight = height, crop = VideoCrop.NONE,
             baidu = false, directSurface = true,
             capabilityFps = capabilityFps, dumpTag = "desktop-mid",
+            pacer30 = pacer30,
         )
     }
 

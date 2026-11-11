@@ -48,8 +48,8 @@ class DesktopVideoQualityTest {
         assertEquals(1_500_000, policy.current)
         assertEquals(1_500_000, policy.ceilingBps)
     }
-    @Test fun desktopWifiStartsAtSixAndNeverClimbsToEight() {
-        val policy = DesktopVideoQuality.bitratePolicy(BitrateProfile.WIFI, 6_000_000)
+    @Test fun crvWifiStartsAtSixAndNeverClimbsToEight() {
+        val policy = DesktopVideoQuality.bitratePolicy(BitrateProfile.WIFI, 6_000_000, crv = true)
         assertEquals(6_000_000, policy.startBps)
         assertEquals(6_000_000, policy.current)
         for (now in 0L..180_000L step 100) policy.update(now, 0.0, 2_000_000.0)
@@ -57,9 +57,15 @@ class DesktopVideoQualityTest {
         assertEquals(6_000_000, policy.ceilingBps)
     }
 
-    @Test fun sixtyFpsSurvivesSelectionWhileAutoAndKnownHuCapsRemainExplicit() {
+    @Test fun otherCarsKeepTheGenericEightMegabitCeiling() {
+        val policy = DesktopVideoQuality.bitratePolicy(BitrateProfile.WIFI, 6_000_000)
+        assertEquals(8_000_000, policy.ceilingBps)
+    }
+
+    @Test fun autoFollowsTheHuUpToSixtyUnlessCrvCapsIt() {
         assertEquals(60, DesktopVideoQuality.chooseFps(FpsSetting.FPS60, 30))
-        assertEquals(30, DesktopVideoQuality.chooseFps(FpsSetting.AUTO, 60))
+        assertEquals(60, DesktopVideoQuality.chooseFps(FpsSetting.AUTO, 60))
+        assertEquals(30, DesktopVideoQuality.chooseFps(FpsSetting.AUTO, 60, cap30 = true))
         assertEquals(30, DesktopVideoQuality.chooseFps(FpsSetting.AUTO, 30))
         assertEquals(30, DesktopVideoQuality.chooseFps(FpsSetting.AUTO, 120))
         assertEquals(30, DesktopVideoQuality.chooseFps(FpsSetting.AUTO, 0))

@@ -57,6 +57,7 @@ import com.yegorkapomidorka.headswap.dex.DelegatedDesktopAccess
 import com.yegorkapomidorka.headswap.dex.DesktopAudioAccess
 import com.yegorkapomidorka.headswap.dex.DesktopPick
 import com.yegorkapomidorka.headswap.dex.DexPrefs
+import com.yegorkapomidorka.headswap.dex.VideoRangeMode
 import com.yegorkapomidorka.headswap.link.car.CarNetwork
 import com.yegorkapomidorka.headswap.link.car.CarPairing
 import com.yegorkapomidorka.headswap.link.car.CarProfile
@@ -906,9 +907,10 @@ class SettingsSectionScreen(host: MainActivity, val section: SettingsSection) : 
 
         body.addView(c.sectionTitle(c.getString(R.string.set_video_range_title)))
         val rangeSeg = Segmented(c, listOf(
+            c.getString(R.string.set_video_range_auto),
             c.getString(R.string.set_video_range_limited),
             c.getString(R.string.set_video_range_full),
-        ), 15f) { setVideoLimitedRange(it == 0) }
+        ), 15f) { setVideoRangeMode(VideoRangeMode.entries[it]) }
         videoRangeSeg = rangeSeg
         body.addView(rangeSeg.view, lp(MATCH, WRAP))
         note(c.getString(R.string.set_video_range_note))
@@ -1259,13 +1261,13 @@ class SettingsSectionScreen(host: MainActivity, val section: SettingsSection) : 
         desktopTranscodeSeg?.setSelected(if (DexPrefs(ctx).desktopTranscode) 1 else 0)
     }
 
-    private fun setVideoLimitedRange(limited: Boolean) {
-        DexPrefs(ctx).videoLimitedRange = limited
+    private fun setVideoRangeMode(mode: VideoRangeMode) {
+        DexPrefs(ctx).videoRangeMode = mode
         refreshVideoRange()
     }
 
     private fun refreshVideoRange() {
-        videoRangeSeg?.setSelected(if (DexPrefs(ctx).videoLimitedRange) 0 else 1)
+        videoRangeSeg?.setSelected(DexPrefs(ctx).videoRangeMode.ordinal)
     }
 
     private fun refreshDesktopFps() {

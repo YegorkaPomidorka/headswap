@@ -9,7 +9,12 @@ data class CarSettings(
     val aaDensity: Int = AaDensity.AUTO,
     val fps: FpsSetting = FpsSetting.DEFAULT,
     val musicRate: MusicRate = MusicRate.DEFAULT,
-    val desktopFps: FpsSetting = FpsSetting.FPS30,
+    /** null = пресет не задаёт частоту рабочего стола, ручную настройку не трогаем. */
+    val desktopFps: FpsSetting? = null,
+    /** CR-V 2026: финальный H.264 в limited range — иначе ГУ мерцает яркостью. */
+    val limitedRange: Boolean = false,
+    /** CR-V 2026: фиксированный пейсер 30 fps, «Авто» до 30 и потолок 6 Мбит/с на Wi-Fi без роста. */
+    val crvDesktopPacing: Boolean = false,
 )
 
 /** Корейские ГУ слабые: на 30 кадрах и 48 кГц рвут USB, советуем 32 кГц (h139, h218, h260); кадры «Авто» как у всех. */
@@ -38,9 +43,11 @@ enum class CarPreset(val titleRes: Int, val settings: CarSettings = CarSettings(
      * 8 Мбит/с на Wi-Fi и own IDR в passthrough дают мерцание, transcode + 30 стабилен.
      */
     HONDA_CRV_2026(R.string.car_honda_crv_2026, CarSettings(
-        transcode = true, videoMode = VideoMode.WIDE_HD, fps = FpsSetting.FPS30, desktopFps = FpsSetting.FPS30)),
+        transcode = true, videoMode = VideoMode.WIDE_HD, fps = FpsSetting.FPS30, desktopFps = FpsSetting.FPS30,
+        limitedRange = true, crvDesktopPacing = true)),
     HONDA_CRV_2026_HYBRID(R.string.car_honda_crv_2026_hybrid, CarSettings(
-        transcode = true, videoMode = VideoMode.WIDE_HD, fps = FpsSetting.FPS30, desktopFps = FpsSetting.FPS30)),
+        transcode = true, videoMode = VideoMode.WIDE_HD, fps = FpsSetting.FPS30, desktopFps = FpsSetting.FPS30,
+        limitedRange = true, crvDesktopPacing = true)),
     /** Машина Егора: 1920×1080, 30 кадров. */
     HONDA_VEZEL_2022(R.string.car_honda_vezel_2022, CarSettings(videoMode = VideoMode.R1080)),
     /** ГУ CN7: прямой проброс моргает и гаснет (h638), канал слабый - перекодирование 1280×480 на 15 кадрах. */

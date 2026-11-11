@@ -85,7 +85,7 @@ class CarLifeSession(
     private val air = transport.caps == TransportCaps.TCP6
     private val bitrateProfile = if (air) BitrateProfile.WIFI else BitrateProfile.USB
     private val legacyBitratePolicy = BitratePolicy(mode.bitrate, profile = bitrateProfile)
-    private val surfaceBitratePolicy: BitratePolicy by lazy { DesktopVideoQuality.bitratePolicy(bitrateProfile, mode.bitrate) }
+    private val surfaceBitratePolicy: BitratePolicy by lazy { DesktopVideoQuality.bitratePolicy(bitrateProfile, mode.bitrate, crv = bridge.crvDesktopPacing) }
     @Volatile private var encodingSurface = false
     // The source starts after this session is constructed. Select its independent policy
     // only when the direct Surface encoder is requested, never from an early source flag.
@@ -612,7 +612,7 @@ class CarLifeSession(
     }
 
     private fun chooseVideoFps(requested: Int): Int = if (cfg.desktopVideo != null)
-        DesktopVideoQuality.chooseFps(cfg.fpsSetting, requested, huMaxFps())
+        DesktopVideoQuality.chooseFps(cfg.fpsSetting, requested, huMaxFps(), cap30 = bridge.crvDesktopPacing)
         else Handshake.chooseFps(cfg.fpsSetting, requested, huMaxFps())
 
     @Synchronized private fun onVideoInit(m: CmdMsg) {
@@ -1176,6 +1176,7 @@ class CarLifeSession(
                     capabilityFps = if (mobis) AaBridgeCore.MOBIS_FPS else targetFps,
                     baidu = mobis,
                     limitedRange = bridge.videoLimitedRange,
+                    pacer30 = bridge.crvDesktopPacing,
                 ).also { it.start() }
             } catch (e: Exception) {
                 AppLog.e("BRIDGE desktop transcode не создан, fallback на прямое кодирование", e)
@@ -1190,6 +1191,7 @@ class CarLifeSession(
             baidu = mobis, directSurface = directSurface,
             capabilityFps = if (mobis) AaBridgeCore.MOBIS_FPS else targetFps,
             limitedRange = bridge.videoLimitedRange,
+            pacer30 = bridge.crvDesktopPacing,
         ).also { it.start() }
     } catch (e: Exception) {
         AppLog.e("BRIDGE транскодер не создан", e)

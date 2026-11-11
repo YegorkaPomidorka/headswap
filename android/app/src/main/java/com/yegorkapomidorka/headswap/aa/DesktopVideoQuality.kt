@@ -12,22 +12,25 @@ object DesktopVideoQuality {
     const val MAX_FPS = 60
 
     /**
-     * Desktop AUTO follows the HU only up to 30 fps. 60 fps is still available via an explicit FPS60 setting,
-     * but is not selected silently: on the CR-V/SEMIDRIVE it caused the same brightness pumping as 8 Mbit/s.
+     * Desktop AUTO follows the HU request. With [cap30] (CR-V 2026 preset) it stops at 30 fps:
+     * 60 fps caused the same brightness pumping as 8 Mbit/s. FPS60 stays available explicitly.
      */
-    fun chooseFps(setting: FpsSetting, requested: Int, huMaxFps: Int? = null): Int {
-        val selected = setting.fixed ?: requested.takeIf { it in 1..30 } ?: 30
+    fun chooseFps(setting: FpsSetting, requested: Int, huMaxFps: Int? = null, cap30: Boolean = false): Int {
+        val max = if (cap30) 30 else MAX_FPS
+        val selected = setting.fixed ?: requested.takeIf { it in 1..max } ?: 30
         return huMaxFps?.let { minOf(selected, it) } ?: selected
     }
 
     fun frameRateChangeAllowed(fps: Int): Boolean = fps in 3..MAX_FPS
 
     /**
-     * Desktop encoder policy. The ceiling comes from the selected video mode (WIDE_HD = 6 Mbit/s, R1080 = 8),
-     * not from a hard 8 Mbit/s. On Wi-Fi start at the ceiling and never climb above it: the 6 -> 8 Mbit/s step
-     * after 60 s was the flicker trigger (CR-V 2026 Hybrid). Down steps are softer than the generic WIFI profile.
+     * Desktop encoder policy. Off the CR-V preset this is the generic 8 Mbit/s policy.
+     * With [crv] the ceiling comes from the selected video mode (WIDE_HD = 6 Mbit/s) and Wi-Fi
+     * starts at the ceiling and never climbs above it: the 6 -> 8 Mbit/s step after 60 s was
+     * the flicker trigger (CR-V 2026 Hybrid). Down steps are softer than the generic WIFI profile.
      */
-    fun bitratePolicy(profile: BitrateProfile, ceilingBps: Int = DEFAULT_BITRATE_BPS): BitratePolicy {
+    fun bitratePolicy(profile: BitrateProfile, ceilingBps: Int = DEFAULT_BITRATE_BPS, crv: Boolean = false): BitratePolicy {
+        if (!crv) return BitratePolicy(BITRATE_CEILING_BPS, profile = profile)
         val ceiling = ceilingBps.coerceIn(1, BITRATE_CEILING_BPS)
         val desktopProfile = if (profile == BitrateProfile.WIFI) profile.copy(
             startFraction = 1.0,

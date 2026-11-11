@@ -50,11 +50,16 @@ class AaTranscoder(
     /** Diagnostic dump tag; null = desktop/aa by input type. */
     private val dumpTag: String? = null,
     /**
-     * Ask the encoder for limited-range (16-235) BT.709 output. The CR-V 2026 head unit has two
-     * composition paths that disagree on full-range streams, which pulses the backlight ~1.7 Hz;
-     * limited range renders the same on both.
+     * Ask the encoder for limited-range (16-235) output in its natural BT.601 matrix. The CR-V 2026
+     * head unit has two composition paths that disagree on full-range streams, which pulses the
+     * backlight ~1.7 Hz; limited range renders the same on both.
      */
     private val limitedRange: Boolean = false,
+    /**
+     * CR-V 2026 only: fixed 30-fps pacer on the VirtualDisplay input surface instead of the
+     * generic high-fps gate. Other cars keep the previous desktop pacing.
+     */
+    private val pacer30: Boolean = false,
 ) : VideoTranscoder {
     private var encoder: MediaCodec? = null
     private var surface: Surface? = null
@@ -177,10 +182,10 @@ class AaTranscoder(
         if (directSurface || !tuning.contains("nogl")) {
             // декодер -> GL-реле -> Surface энкодера: реле перерисовывает последний кадр на статике (>= 10 fps)
             try {
-                relay = GlRelay(surface!!, width, height, REDRAW_IDLE_MS, log, srcWidth, srcHeight, crop, target, limitHighFps = directSurface, fixedPacer = directSurface).also { it.start() }
-                // VirtualDisplay/Compose рендерит в эту поверхность: просим композитор отдавать кадры
+                relay = GlRelay(surface!!, width, height, REDRAW_IDLE_MS, log, srcWidth, srcHeight, crop, target, limitHighFps = directSurface, fixedPacer = directSurface && pacer30).also { it.start() }
+                // VirtualDisplay/Compose рендерит в эту поверхность: для CR-V просим композитор отдавать кадры
                 // в темпе target fps, как ровный поток декодера AA, а не 60 Гц с дроблением гейтом.
-                relay?.let { applyInputFrameRate(it, target) }
+                if (pacer30) relay?.let { applyInputFrameRate(it, target) }
             } catch (e: Exception) {
                 if (directSurface) {
                     // Direct input depends on GL for pacing and idle redraw. Never silently
@@ -232,7 +237,7 @@ class AaTranscoder(
         val r = relay
         if (r != null) {
             r.setTargetFps(fps)
-            applyInputFrameRate(r, fps)
+            if (pacer30) applyInputFrameRate(r, fps)
         } else {
             log("транскодер: без GL-реле частоту не ограничить, целевой fps $fps только в статистике")
         }

@@ -289,7 +289,7 @@ class OnboardingScreen(host: MainActivity, private val showAll: Boolean, startAt
         applyBtn.setOnClickListener {
             val p = carChoice ?: return@setOnClickListener
             aa.applyCar(p)
-            DexPrefs(c).desktopFps = p.settings.desktopFps
+            p.settings.desktopFps?.let { DexPrefs(c).desktopFps = it }
             AppLog.i("онбординг, мой автомобиль: ${p.name}, применены ${p.settings}")
             next()
         }

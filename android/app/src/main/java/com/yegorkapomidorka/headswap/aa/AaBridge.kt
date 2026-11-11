@@ -153,8 +153,11 @@ class AaBridgeCore(
     /** Desktop only: insert an intermediate H.264 encode/decode stage before the CarLife encoder. */
     @Volatile var desktopTranscode = false
 
-    /** Encode the final stream as limited range (16-235) to avoid head-unit brightness pulsing. */
-    @Volatile var videoLimitedRange = true
+    /** Encode the final stream as limited range (16-235). Set per session from the car preset / manual choice. */
+    @Volatile var videoLimitedRange = false
+
+    /** CR-V 2026 desktop pacing: fixed 30 fps pacer, AUTO up to 30, 6 Mbit/s Wi-Fi ceiling without growth. */
+    @Volatile var crvDesktopPacing = false
 
     /**
      * Разрешение видео, снятое один раз при создании хоста (уже с учётом passthrough): им построена AA (SDR),
@@ -2256,7 +2259,6 @@ class AaBridgeCore(
     private var spliceBackoffs = 0                     // сколько таких пауз за AA-сессию
     private var spliceSendFails = 0                    // свой IDR не принят CarLife, подряд
     private var spliceSendBackoffUntil = NEVER         // пауза после отказа sendVideo: до этого момента свой IDR не пробуем
-    private var spliceSendBackoffs = 0                 // сколько таких пауз за AA-сессию
     private var refLagSince = NEVER                    // с какого момента декодер отстаёт от кадров AA больше чем на 2 и не двигается
     private var refLagOutSeq = 0L                      // refOutSeq в начале этого отставания: сдвинулся - декодер жив
     private var spliceDisabled: String? = null          // вставка невозможна до конца AA-сессии (причина)
@@ -2516,13 +2518,8 @@ class AaBridgeCore(
             val delay = minOf(SPLICE_SEND_BACKOFF_MS * spliceSendFails, SPLICE_SEND_BACKOFF_MAX_MS)
             spliceSendBackoffUntil = now + delay
             spliceNotBefore = spliceSendBackoffUntil
-            if (spliceSendFails >= SPLICE_MAX_SEND_FAILS) {
-                spliceSendBackoffs++
-                log("BRIDGE свой IDR: $spliceSendFails отказов CarLife подряд, выключаю до конца AA-сессии", true)
-                spliceDisable("свой IDR не принят CarLife $spliceSendFails раз подряд")
-                return
-            }
-            log("BRIDGE свой IDR ${payload.size} Б не принят CarLife (очередь/закрыто), пауза $delay мс", true)
+            log("BRIDGE свой IDR ${payload.size} Б не принят CarLife (очередь/закрыто), пауза $delay мс " +
+                "(отказов подряд $spliceSendFails), потом снова", true)
             return
         }
         spliceSendFails = 0
@@ -2583,7 +2580,6 @@ class AaBridgeCore(
         spliceBackoffs = 0
         spliceSendFails = 0
         spliceSendBackoffUntil = NEVER
-        spliceSendBackoffs = 0
         refLagSince = NEVER
         spliceLastSentAt = NEVER
         spliceLastSeq = 0
@@ -3292,8 +3288,7 @@ class AaBridgeCore(
         const val SPLICE_BACKOFF_MS = 5000L      // пауза своего IDR после [SPLICE_MAX_MISSES] пропусков (spliceWorks в ней false)
         const val SPLICE_BACKLOG_MAX_MS = 200L   // при таком бэклоге свой IDR не отправляем: очередь и так забита
         const val SPLICE_QUEUE_MAX_FRAMES = 10   // то же по числу кадров в очереди
-        const val SPLICE_MAX_SEND_FAILS = 3      // столько отказов sendVideo подряд - выключить свой IDR до конца AA-сессии
-        const val SPLICE_SEND_BACKOFF_MS = 10_000L
+        const val SPLICE_SEND_BACKOFF_MS = 10_000L   // пауза растёт с каждым отказом подряд: 10, 20, 30 с (свой IDR не выключаем)
         const val SPLICE_SEND_BACKOFF_MAX_MS = 30_000L
         const val SPLICE_STALL_MS = 3000L        // декодер опорных картинок не двигается при идущих кадрах AA дольше - перезапуск
         const val SPLICE_STALL_IDLE_MS = 1000L   // AA молчит дольше - кадров нет, декодер вставшим не считаем
