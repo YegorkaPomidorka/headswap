@@ -6,9 +6,12 @@ import android.os.Binder
 import android.os.Build
 import android.os.Bundle
 import android.os.PowerManager
+import android.provider.Settings
 import android.view.MotionEvent
 import com.yegorkapomidorka.headswap.AppLog
 import java.util.concurrent.Executors
+import java.util.concurrent.atomic.AtomicBoolean
+import kotlin.concurrent.thread
 
 /**
  * h1007 (Android 13–15): тач рабочего стола при погашенном экране телефона. Пока телефон interactive, тач идёт как
@@ -63,9 +66,43 @@ internal object UinputTouch {
         if (!supported) return
         appContext = context.applicationContext
         synchronized(this) { wanted[displayId] = width to height; opened.remove(displayId) }
-        if (host == null) log("дисплей $displayId ${width}x$height: жду хост")
+        if (host == null) { log("дисплей $displayId ${width}x$height: жду хост"); watchdog() }
         openAsync(displayId)
     }
+
+    private val watchdogStarted = AtomicBoolean(false)
+
+    /**
+     * h1044 (Xiaomi A15): хост запущен активацией с телефона, но приложению так и не отозвался, причина осталась в
+     * его логе под shell. Через [HOST_WAIT_MS] без хоста один раз за процесс читаем этот лог через свою беспроводную
+     * отладку (если активация была с телефона) и пишем в наш лог.
+     */
+    private fun watchdog() {
+        if (!watchdogStarted.compareAndSet(false, true)) return
+        thread(name = "headswap-uinput-watchdog", isDaemon = true) {
+            Thread.sleep(HOST_WAIT_MS)
+            if (host != null) return@thread
+            val ctx = appContext ?: return@thread
+            val state = PhoneActivationState(ctx)
+            log("хост не подключился за ${HOST_WAIT_MS / 1000} с (${screenState()}); активация с телефона=${state.paired && PhoneAdb.hasIdentity(ctx)} " +
+                "порт=${state.connectPort} adb_wifi=${Settings.Global.getInt(ctx.contentResolver, "adb_wifi_enabled", 0)}")
+            if (!state.paired || !PhoneAdb.hasIdentity(ctx) || state.connectPort !in 1..65535) return@thread
+            val out = runCatching {
+                PhoneAdb.session(ctx, LocalAddressPolicy.LOOPBACK, state.connectPort) { adb ->
+                    adb.shell(HOST_REPORT).output
+                }
+            }
+            out.onSuccess { text ->
+                text.lineSequence().map { it.trim() }.filter { it.isNotEmpty() }.take(40).forEach { log("лог хоста| $it") }
+            }.onFailure { e ->
+                log("лог хоста не прочитан: ${(e as? AdbAccessException)?.reason?.name ?: "${e.javaClass.simpleName}: ${e.message}"}")
+            }
+        }
+    }
+
+    private const val HOST_WAIT_MS = 10_000L
+    private val HOST_REPORT = "ls -l ${VdmHostPolicy.UINPUT_LOG} 2>&1; tail -c 2000 ${VdmHostPolicy.UINPUT_LOG} 2>&1; " +
+        "echo procs:; ps -A -o PID,USER,NAME 2>/dev/null | grep app_process"
 
     fun drop(displayId: Int) {
         if (!supported) return

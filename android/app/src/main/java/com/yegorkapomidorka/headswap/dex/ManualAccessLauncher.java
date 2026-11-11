@@ -164,8 +164,34 @@ public final class ManualAccessLauncher {
             java.lang.Process process = new ProcessBuilder("/system/bin/sh", "-c", command).redirectErrorStream(true).start();
             process.getOutputStream().close();
             if (!process.waitFor(5, TimeUnit.SECONDS)) process.destroyForcibly();
+            reportUinputHost();
         } catch (Exception error) {
             System.out.println("Хост тачскрина не запущен: " + safe(error.getMessage()));
+        }
+    }
+
+    /** h1044: хост тачскрина не отозвался приложению; его лог виден только shell. Печатаем хвост в вывод запуска. */
+    private static void reportUinputHost() throws InterruptedException {
+        java.io.File log = new java.io.File(VdmHostPolicy.UINPUT_LOG);
+        String text = "";
+        long until = SystemClock.elapsedRealtime() + 4_000;
+        while (SystemClock.elapsedRealtime() < until) {
+            Thread.sleep(250);
+            text = readTail(log);
+            if (text.contains("binder отдан") || text.contains("ошибка") || text.contains("не удалась")
+                || text.contains("отказало") || text.contains("завершён")) break;
+        }
+        System.out.println("Хост тачскрина: " + (text.isEmpty() ? "лог пуст" : text));
+    }
+
+    private static String readTail(java.io.File file) {
+        try {
+            byte[] data = java.nio.file.Files.readAllBytes(file.toPath());
+            int from = Math.max(0, data.length - 1500);
+            return new String(data, from, data.length - from, java.nio.charset.StandardCharsets.UTF_8)
+                .replace("\r", "").replace("\n", " | ").trim();
+        } catch (Exception e) {
+            return "";
         }
     }
 
