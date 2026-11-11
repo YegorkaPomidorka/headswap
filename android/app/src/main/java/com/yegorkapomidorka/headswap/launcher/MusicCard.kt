@@ -48,23 +48,22 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 
-private val MusicBase = Color(0xFF211C10)
 /** Стеклянная подложка чипа плееров (и кнопки «Вид карточки» на карте в ленте): rgba(14,20,26,.33), обводка белым .16. */
 val GlassBg = Color(14, 20, 26, 84)
 val GlassBorder = Color(1f, 1f, 1f, 0.16f)
 
-/** Фон без обложки (макет v2): диагональный градиент 150deg, поверх золотое и красно-оранжевое пятна. */
-private fun Modifier.musicBackground(): Modifier = drawBehind {
+/** Фон без обложки (макет v2): диагональный градиент 150deg, поверх светлое и красно-оранжевое пятна; цвета следуют акценту ([MusicColors]). */
+private fun Modifier.musicBackground(mc: MusicColors): Modifier = drawBehind {
     val w = size.width
     val h = size.height
-    drawRect(MusicBase)
+    drawRect(mc.base)
     val rad = Math.toRadians(150.0)
     val dx = sin(rad).toFloat()
     val dy = (-cos(rad)).toFloat()
     val len = abs(w * dx) + abs(h * dy)
     val c = Offset(w / 2, h / 2)
     drawRect(Brush.linearGradient(
-        0f to Color(0xFF6B5420), 1f to Color(0xFF3A2440),
+        0f to mc.gradFrom, 1f to mc.gradTo,
         start = Offset(c.x - dx * len / 2, c.y - dy * len / 2), end = Offset(c.x + dx * len / 2, c.y + dy * len / 2)))
     // CSS circle: радиус до дальнего угла, пятно гаснет на stop этого радиуса
     fun spot(fx: Float, fy: Float, color: Color, alpha: Float, stop: Float) {
@@ -75,8 +74,8 @@ private fun Modifier.musicBackground(): Modifier = drawBehind {
             0f to color.copy(alpha = alpha), stop to color.copy(alpha = 0f), 1f to color.copy(alpha = 0f),
             center = Offset(cx, cy), radius = r))
     }
-    spot(0.28f, 0.22f, Color(0xFFE8C65A), 0.9f, 0.42f)
-    spot(0.82f, 0.68f, Color(0xFFC45434), 0.85f, 0.48f)
+    spot(0.28f, 0.22f, mc.spotA, 0.9f, 0.42f)
+    spot(0.82f, 0.68f, mc.spotB, 0.85f, 0.48f)
 }
 
 /**
@@ -99,10 +98,11 @@ fun MusicCard(modifier: Modifier) {
     val player = st.pkg ?: model.musicPlayer
     // играет онлайн-плеер - он и становится вторым слотом чипа
     LaunchedEffect(st.pkg) { model.noteOnlinePlayer(st.pkg) }
+    val colors = MusicColors.of(LocalAccent.current)
     CardBox(modifier, background = Color.Transparent) {
-        Box(Modifier.fillMaxSize().musicBackground())
+        Box(Modifier.fillMaxSize().musicBackground(colors))
         if (s.portrait) {
-            MusicBodyPortrait(st, player)
+            MusicBodyPortrait(st, player, colors)
             return@CardBox
         }
         if (st.art == null) {
@@ -173,7 +173,7 @@ fun MusicCard(modifier: Modifier) {
  * исполнитель (F2) и prev / play / next; чип плееров остаётся в правом верхнем углу.
  */
 @Composable
-private fun BoxScope.MusicBodyPortrait(st: MusicState, player: String?) {
+private fun BoxScope.MusicBodyPortrait(st: MusicState, player: String?, colors: MusicColors) {
     val model = LauncherModel
     val m = LocalMetrics.current
     val s = m.spec
@@ -183,12 +183,12 @@ private fun BoxScope.MusicBodyPortrait(st: MusicState, player: String?) {
     Row(Modifier.fillMaxSize().padding(m.dp(s.g)), horizontalArrangement = Arrangement.spacedBy(m.dp(s.g8 * 2))) {
         Box(
             Modifier.size(m.dp(s.musicCover)).clip(RoundedCornerShape(m.dp(s.radius * 3 / 4)))
-                .background(Brush.linearGradient(listOf(Color(0xFFE8C65A), Color(0xFFC45434)))),
+                .background(Brush.linearGradient(listOf(colors.spotA, colors.spotB))),
             contentAlignment = Alignment.Center,
         ) {
             val art = st.art
             if (art != null) Image(art, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
-            else SvgIcon(Ico.MUSIC, s.musicCover / 3, Color(0xFF201A05), stroke = 2.2f)
+            else SvgIcon(Ico.MUSIC, s.musicCover / 3, colors.noteInk, stroke = 2.2f)
         }
         Column(Modifier.weight(1f).fillMaxHeight(), verticalArrangement = Arrangement.SpaceBetween) {
             // справа от текста место под чип плееров
