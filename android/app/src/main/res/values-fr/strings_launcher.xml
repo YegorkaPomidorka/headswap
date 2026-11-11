@@ -37,6 +37,7 @@
     <string name="l_nav_hints_off">Comme sur le téléphone</string>
     <string name="l_nav_hints_off_plus">Comme sur le téléphone · sans abonnement</string>
     <string name="l_nav_hints_off_aa">Comme sur le téléphone · Android Auto n\'est pas lancé</string>
+    <string name="l_nav_location_hint">Donnez au navigateur la localisation « Toujours autoriser », sinon pas de GPS. Touchez pour ouvrir les réglages</string>
     <string name="l_nav_aa_server_hint">Ouvrez les réglages d\'AA sur le téléphone\n⋮ → Démarrer le serveur de l\'unité principale</string>
     <string name="l_view_navigator">Navigation</string>
     <string name="l_view_clock">Horloge</string>

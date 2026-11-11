@@ -52,11 +52,13 @@ import com.yegorkapomidorka.headswap.CarLifeState
 import com.yegorkapomidorka.headswap.R
 import com.yegorkapomidorka.headswap.about.About
 import com.yegorkapomidorka.headswap.about.OpenSource
+import com.yegorkapomidorka.headswap.carapp.CarAppLocation
 import com.yegorkapomidorka.headswap.dex.DexPrefs
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToInt
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -200,8 +202,13 @@ fun LauncherSettingsScreen() {
                                     model.chooseNavHints(navPkg, it)
                                 }
                                 var row = if (noHints) 2 else 3
+                                // h1029: свой хост Car App без геолокации «в любом режиме» - у навигатора нет GPS. Рядов пять и все
+                                // заняты (подсказки, масштаб, перезапуск), поэтому, пока разрешения нет, подсказка стоит на месте масштаба
+                                val carHost = EmbedHost.nav.carHost
+                                val noBgLocation = carHost && hints && !google && !noHints && !hasBackgroundLocation(navPkg)
                                 // масштаб - dpi своего хоста Car App; навигатору окном и через AA он не нужен
-                                if (EmbedHost.nav.carHost) MapScaleCard(navPkg, d, cell(row++).fillMaxWidth())
+                                if (noBgLocation) Placed(row++) { LocationHintCard(navPkg, d, Modifier) }
+                                else if (carHost) MapScaleCard(navPkg, d, cell(row++).fillMaxWidth())
                                 Placed(row++) { RestartNavCard(d, Modifier) } // кнопка - через обёртку, рамка шайбы (h737)
                                 // Google через AA: сервер ГУ живёт в Android Auto, перезапуск - в её настройках на телефоне
                                 if (hints && google) AaServerHintCard(d, cell(row).fillMaxWidth())
@@ -617,6 +624,34 @@ private fun AaServerHintCard(d: SettingsDims, modifier: Modifier) {
     }
 }
 
+/** Есть ли у навигатора ACCESS_BACKGROUND_LOCATION («Разрешить в любом режиме»); перепроверка раз в 2 с, пока открыта страница. */
+@Composable
+private fun hasBackgroundLocation(pkg: String): Boolean {
+    val ctx = LauncherModel.context
+    val granted by produceState(true, pkg) {
+        while (true) {
+            value = withContext(Dispatchers.IO) { CarAppLocation.of(ctx, pkg).background }
+            delay(LOCATION_RECHECK_MS)
+        }
+    }
+    return granted
+}
+
+/**
+ * Подсказка с нажатием (свой хост Car App без «Разрешить в любом режиме»): тап открывает настройки приложения навигатора
+ * на телефоне. Pressable, как у кнопок, - через обёртку Placed.
+ */
+@Composable
+private fun LocationHintCard(pkg: String, d: SettingsDims, modifier: Modifier) {
+    val m = LocalMetrics.current
+    val text = stringResource(R.string.l_nav_location_hint)
+    ActionCard(text, modifier, onTap = { LauncherActions.openAppSettings(pkg) }) {
+        Box(Modifier.fillMaxSize().padding(start = m.dp(d.padStart), end = m.dp(d.padEnd)), contentAlignment = Alignment.CenterStart) {
+            Txt(text, d.sub, color = Pal.SEC, maxLines = 2, ellipsis = false)
+        }
+    }
+}
+
 /** Карточка с переключателем: трек 120x64, ручка 52, тач-зона 136x96 (на 1280x720). */
 @Composable
 private fun SwitchCard(label: String, on: Boolean, d: SettingsDims, modifier: Modifier, sub: String? = null, onChange: (Boolean) -> Unit) {
@@ -786,6 +821,9 @@ private fun MapSideCard(d: SettingsDims, modifier: Modifier) {
         }
     }
 }
+
+/** Как часто перепроверять геолокацию навигатора, пока открыты его настройки. */
+private const val LOCATION_RECHECK_MS = 2_000L
 
 /** Доля высоты экрана настроек под «Раскладку» в разделе «Экран»: остаток - шапка «Слоёв» под прокрутку. */
 private const val HOME_SHRINK = 0.87
@@ -991,7 +1029,7 @@ private fun AboutPanel(d: SettingsDims, rowH: Int) {
             // две подписи («Авторы», «Открытый код») и зазоры между всеми рядами
             val fitH = (constraints.maxHeight - 2 * captionH - (rows + 1) * gap) / rows
             val minH = ((s.f2 + d.sub) * 1.35).roundToInt() + 2 * s.g8
-            val tileH = fitH.coerceIn(minH, rowH)
+            val tileH = fitH.coerceIn(minH, maxOf(minH, rowH)) // на 1280x480 rowH < minH
             Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(m.dp(gap))) {
                 Txt(stringResource(R.string.about_authors), d.sub, color = Pal.SEC, weight = FontWeight.SemiBold)
                 for (row in About.authors.chunked(cols)) {

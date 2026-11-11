@@ -37,6 +37,7 @@
     <string name="l_nav_hints_off">与手机上一致</string>
     <string name="l_nav_hints_off_plus">与手机上一致 · 无需订阅</string>
     <string name="l_nav_hints_off_aa">与手机上一致 · Android Auto 未启动</string>
+    <string name="l_nav_location_hint">请将导航应用的位置权限设为“始终允许”，否则没有 GPS。点按打开设置</string>
     <string name="l_nav_aa_server_hint">请在手机上打开 AA 设置\n⋮ → 启动车机服务</string>
     <string name="l_view_navigator">导航</string>
     <string name="l_view_clock">时钟</string>

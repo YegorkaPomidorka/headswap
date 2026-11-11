@@ -2,6 +2,8 @@ package com.yegorkapomidorka.headswap.launcher
 
 import android.app.ActivityOptions
 import android.content.Intent
+import android.net.Uri
+import android.provider.Settings
 import android.view.Display
 import com.yegorkapomidorka.headswap.AppLog
 import com.yegorkapomidorka.headswap.MainActivity
@@ -59,6 +61,18 @@ object LauncherActions {
         runCatching { ctx.startActivity(intent, opts.toBundle()) }
             .onSuccess { AppLog.i("LAUNCHER запрос разрешений карточки «Телефон» открыт на телефоне", false) }
             .onFailure { AppLog.i("LAUNCHER запрос разрешений на телефоне: ${it.javaClass.simpleName}: ${it.message}", false) }
+    }
+
+    /** Настройки приложения [pkg] на телефоне (h1029: геолокация навигатора «в любом режиме»); лаунчер на экране ГУ. */
+    fun openAppSettings(pkg: String) {
+        if (!model.launchDebounce.allow(model.now())) return
+        val ctx = model.context
+        val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.fromParts("package", pkg, null))
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        val opts = ActivityOptions.makeBasic().setLaunchDisplayId(Display.DEFAULT_DISPLAY)
+        runCatching { ctx.startActivity(intent, opts.toBundle()) }
+            .onSuccess { AppLog.i("LAUNCHER настройки $pkg открыты на телефоне", false) }
+            .onFailure { AppLog.i("LAUNCHER настройки $pkg на телефоне: ${it.javaClass.simpleName}: ${it.message}", false) }
     }
 
     /** Выбор в Picker: приложение уходит в нижний ряд главного, туда же и возвращаемся. */
