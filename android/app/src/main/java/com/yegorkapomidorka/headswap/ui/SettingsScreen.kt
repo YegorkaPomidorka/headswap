@@ -408,6 +408,7 @@ class SettingsSectionScreen(host: MainActivity, val section: SettingsSection) : 
     private var fpsSeg: Segmented? = null
     private var desktopFpsSeg: Segmented? = null
     private var desktopFpsNote: TextView? = null
+    private var desktopTranscodeSeg: Segmented? = null
     private var densityValue: TextView? = null
     private var densitySub: TextView? = null
     private var densityMinus: View? = null
@@ -885,11 +886,16 @@ class SettingsSectionScreen(host: MainActivity, val section: SettingsSection) : 
         body.addView(c.sectionTitle(c.getString(R.string.set_mode)))
         val desktop = BridgeMode.effective(aa.bridgeMode, Build.VERSION.SDK_INT) == BridgeMode.DESKTOP
         if (desktop) {
-            // «Свой лаунчер»: телефон кодирует экран один раз и отдаёт ГУ готовый H.264 - выбирать нечего, это и есть проброс.
-            // Настройку AA (aa.transcode) не трогаем: она снова работает при возврате в режим Android Auto.
-            body.addView(Segmented(c, listOf(c.getString(R.string.set_desktop_single_encode_title)), 15f) {}.apply { setSelected(0) }.view, lp(MATCH, WRAP))
-            body.addView(c.text(c.getString(R.string.set_direct_desktop_desc), 13f, 400, c.clr(R.color.on2)).apply { setLineSpacing(0f, 1.4f) },
+            // «Свой лаунчер»: по умолчанию промежуточный H.264, как в AA transcode.
+            val dt = Segmented(c, listOf(
+                c.getString(R.string.set_desktop_direct_title),
+                c.getString(R.string.set_desktop_transcode_title),
+            ), 15f) { setDesktopTranscode(it == 1) }
+            desktopTranscodeSeg = dt
+            body.addView(dt.view, lp(MATCH, WRAP))
+            body.addView(c.text(c.getString(R.string.set_desktop_transcode_note), 13f, 400, c.clr(R.color.on2)).apply { setLineSpacing(0f, 1.4f) },
                 lp(MATCH, WRAP).margins(c, 8, 4, 8, 0))
+            refreshDesktopTranscode()
         } else {
             val seg = Segmented(c, listOf(c.getString(R.string.set_transcode_title), c.getString(R.string.set_direct_title)), 15f) { setTranscode(it == 0) }
             transcodeSeg = seg
@@ -1231,6 +1237,15 @@ class SettingsSectionScreen(host: MainActivity, val section: SettingsSection) : 
     private fun setDesktopFps(f: FpsSetting) {
         DexPrefs(ctx).desktopFps = f
         refreshDesktopFps()
+    }
+
+    private fun setDesktopTranscode(on: Boolean) {
+        DexPrefs(ctx).desktopTranscode = on
+        refreshDesktopTranscode()
+    }
+
+    private fun refreshDesktopTranscode() {
+        desktopTranscodeSeg?.setSelected(if (DexPrefs(ctx).desktopTranscode) 1 else 0)
     }
 
     private fun refreshDesktopFps() {

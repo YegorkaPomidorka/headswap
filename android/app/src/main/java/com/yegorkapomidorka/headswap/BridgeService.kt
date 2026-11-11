@@ -1084,6 +1084,7 @@ class BridgeService : Service() {
         val owner: BridgeHost = h
         // темп кадров CarLife, повтор статичных кадров и энкодер остаются как в основном видеоконвейере
         owner.core.transcodeEnabled = true
+        owner.core.desktopTranscode = dexPrefs.desktopTranscode
         owner.core.spliceMs = 0L
         owner.core.carVwId = aaPrefs.carPreset == CarPreset.VW_ID_UNYX
         // кнопка голоса: системный помощник клавишей KEYCODE_ASSIST (как долгое нажатие питания), см. createDesktopHost

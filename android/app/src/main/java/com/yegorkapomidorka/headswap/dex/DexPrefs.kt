@@ -39,6 +39,10 @@ class DexPrefs(context: Context) {
     var desktopFps: FpsSetting
         get() = prefs.getString("desktop_fps", null).let { name -> FpsSetting.entries.firstOrNull { it.name == name } ?: FpsSetting.FPS30 }
         set(value) { prefs.edit().putString("desktop_fps", value.name).apply() }
+    /** Insert an intermediate H.264 encode/decode stage, matching the AA transcode path. */
+    var desktopTranscode: Boolean
+        get() = prefs.getBoolean("desktop_transcode", true)
+        set(value) { prefs.edit().putBoolean("desktop_transcode", value).apply() }
 }
 
 object DexState {

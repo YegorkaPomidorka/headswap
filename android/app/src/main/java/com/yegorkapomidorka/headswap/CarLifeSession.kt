@@ -8,6 +8,7 @@ import com.yegorkapomidorka.headswap.aa.CarlifeAudio
 import com.yegorkapomidorka.headswap.aa.AaTranscoder
 import com.yegorkapomidorka.headswap.aa.BitratePolicy
 import com.yegorkapomidorka.headswap.aa.BitrateProfile
+import com.yegorkapomidorka.headswap.aa.DesktopTranscodeTranscoder
 import com.yegorkapomidorka.headswap.aa.DesktopVideoQuality
 import com.yegorkapomidorka.headswap.aa.DupDownFilter
 import com.yegorkapomidorka.headswap.aa.DesktopVideoSelection
@@ -1160,14 +1161,28 @@ class CarLifeSession(
             // was active. Apply that same level to the newly selected Surface policy.
             bitratePolicy.setThermalCap(if (thermalThrottle.level == ThermalLevel.NORMAL) Int.MAX_VALUE
                 else thermalThrottle.capBitrate(bitratePolicy.ceilingBps))
-            val actualBps = if (mobis) mobisAaCeiling.current else bitratePolicy.current
+        }
+        val actualBps = if (mobis) mobisAaCeiling.current else bitratePolicy.current
+        if (directSurface) {
             AppLog.i("DEX video quality native=${mode.outW}x${mode.outH} singleEncode=true " +
                 "targetKbps=${actualBps / 1000} ceilingKbps=${bitratePolicy.ceilingBps / 1000} " +
                 "profile=${bitratePolicy.profile.name} adaptive=true", false)
         }
-        AaTranscoder(
-            mode.outW, mode.outH, thermalThrottle.capFps(if (mobis) AaBridgeCore.MOBIS_FPS else targetFps),
-            if (mobis) mobisAaCeiling.current else bitratePolicy.current, out, { AppLog.i(it, false) },
+        val fps = thermalThrottle.capFps(if (mobis) AaBridgeCore.MOBIS_FPS else targetFps)
+        val transcode = if (directSurface && bridge.desktopTranscode) {
+            try {
+                DesktopTranscodeTranscoder(
+                    mode.outW, mode.outH, fps, actualBps, out, { AppLog.i(it, false) },
+                    capabilityFps = if (mobis) AaBridgeCore.MOBIS_FPS else targetFps,
+                    baidu = mobis,
+                ).also { it.start() }
+            } catch (e: Exception) {
+                AppLog.e("BRIDGE desktop transcode не создан, fallback на прямое кодирование", e)
+                null
+            }
+        } else null
+        transcode ?: AaTranscoder(
+            mode.outW, mode.outH, fps, actualBps, out, { AppLog.i(it, false) },
             srcWidth = if (directSurface) mode.outW else mode.aaW,
             srcHeight = if (directSurface) mode.outH else mode.aaH,
             crop = if (directSurface) com.yegorkapomidorka.headswap.aa.VideoCrop.NONE else mode.cropFor(bridge.marginsAtBottom),

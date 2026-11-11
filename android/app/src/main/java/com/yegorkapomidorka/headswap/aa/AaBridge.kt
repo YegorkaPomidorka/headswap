@@ -150,6 +150,8 @@ class AaBridgeCore(
     // --- видео: перекодирование (по умолчанию в приложении) или passthrough ---
     /** Режим видео моста: true = AA -> декодер -> энкодер (кадры повторяются на статике), false = H.264 как есть. */
     @Volatile var transcodeEnabled = false
+    /** Desktop only: insert an intermediate H.264 encode/decode stage before the CarLife encoder. */
+    @Volatile var desktopTranscode = false
 
     /**
      * Разрешение видео, снятое один раз при создании хоста (уже с учётом passthrough): им построена AA (SDR),

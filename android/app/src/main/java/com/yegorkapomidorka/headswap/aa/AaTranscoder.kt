@@ -46,6 +46,8 @@ class AaTranscoder(
     private val directSurface: Boolean = false,
     /** Validate the requested ceiling even when thermal protection starts the encoder at a lower rate. */
     private val capabilityFps: Int = fps,
+    /** Diagnostic dump tag; null = desktop/aa by input type. */
+    private val dumpTag: String? = null,
 ) : VideoTranscoder {
     private var encoder: MediaCodec? = null
     private var surface: Surface? = null
@@ -187,7 +189,7 @@ class AaTranscoder(
         running = true
         // Диагностика CR-V 2026: пишем ровно выход энкодера (Annex-B) и PTS, если включён маркер.
         dump?.close()
-        dump = VideoDump.open(if (directSurface) "desktop" else "aa").also {
+        dump = VideoDump.open(dumpTag ?: if (directSurface) "desktop" else "aa").also {
             it?.event("start ${width}x$height fps=$fps bitrate=$bitrate encoder=$encoderName direct=$directSurface")
         }
         encThread = Thread({ encodeLoop(c) }, "aa-trans-enc").also { it.start() }
@@ -579,7 +581,7 @@ class AaTranscoder(
                             totalOut.incrementAndGet()
                             val key = info.flags and MediaCodec.BUFFER_FLAG_KEY_FRAME != 0
                             dump?.frame(data, info.presentationTimeUs, key)
-                            out.onEncoderFrame(data, key)
+                            out.onEncoderFrame(data, key, info.presentationTimeUs)
                         }
                     }
                     c.releaseOutputBuffer(idx, false)

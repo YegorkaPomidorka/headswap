@@ -47,6 +47,9 @@
     <string name="set_direct_minus">− Частота кадров не регулируется</string>
     <string name="set_direct_desktop_desc">В режиме «Свой лаунчер» телефон захватывает рабочий стол и кодирует его один раз; это не перекодирование Android Auto.</string>
     <string name="set_desktop_single_encode_title">Одно кодирование экрана</string>
+    <string name="set_desktop_direct_title">Прямое</string>
+    <string name="set_desktop_transcode_title">Транскодирование</string>
+    <string name="set_desktop_transcode_note">Применится при следующем подключении. Транскодирование добавляет промежуточный H.264, как в Android Auto: больше задержки и нагрева, но стабильнее на некоторых ГУ.</string>
     <string name="set_desktop_fps_title">Частота кадров рабочего стола</string>
     <string name="set_desktop_fps_note">Применится при следующем подключении. «Авто» выбирает 30 fps, если ГУ не просит меньше.</string>
 
