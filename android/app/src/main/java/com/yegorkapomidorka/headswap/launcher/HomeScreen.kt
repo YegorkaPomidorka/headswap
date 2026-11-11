@@ -109,7 +109,7 @@ fun HomeScreen() {
 
 /**
  * Главный в портрете (h921, Main.dc.html): строка статуса, колонка с зазором G - большая плитка на остаток высоты,
- * карточка музыки на всю ширину (2,6T) и нижний ряд из быстрых приложений и «Телефона». «Справа» - плитка сверху,
+ * карточка музыки на всю ширину (2,6T) и нижний ряд из быстрых приложений и «Телефона» (на время звонка - полоса звонка). «Справа» - плитка сверху,
  * «Слева» - музыка сверху; 2:1 и 1:2 здесь не бывает ([LauncherModel.layout]). Нижняя рейка рисуется корнем.
  */
 @Composable
@@ -126,7 +126,10 @@ private fun PortraitHome() {
             if (model.mapLeft) music()
             TileCard(model.tiles.big, Modifier.fillMaxWidth().weight(1f).onGloballyPositioned { model.bigTileRect = it.boundsInRoot() })
             if (!model.mapLeft) music()
-            Row(Modifier.fillMaxWidth().height(m.dp(s.bottomRowH)), horizontalArrangement = Arrangement.spacedBy(m.dp(s.g))) {
+            if (currentPhoneModel().ongoing) {
+                // звонок: полоса вместо всего нижнего ряда
+                PortraitCallBar(Modifier.fillMaxWidth().height(m.dp(s.bottomRowH)))
+            } else Row(Modifier.fillMaxWidth().height(m.dp(s.bottomRowH)), horizontalArrangement = Arrangement.spacedBy(m.dp(s.g))) {
                 CardBox(Modifier.weight(1f).fillMaxHeight(), shape = full) { QuickAppsRow() }
                 PhoneCard(Modifier.width(m.dp(s.phone)).fillMaxHeight(), full)
             }

@@ -134,11 +134,11 @@ fun LauncherRoot(connected: Boolean) {
                                 NotificationsOverlay() // язычок и шторка уведомлений телефона из-под строки статуса; касания берёт только сам
                                 AliceVoicePill() // скрытая Алиса: слушаю / думаю / говорю / маршрут - снизу по центру
                                 // входящий звонок поверх чужого приложения или экрана без карточки «Телефон»
-                                if (PhoneController.callState == CallState.RINGING && (model.area != Area.Home || spec.strip || model.layout.two || spec.portrait)) {
+                                if (PhoneController.callState == CallState.RINGING && (model.area != Area.Home || spec.strip || model.layout.two)) {
                                     val r = metrics.dp(spec.radius)
                                     if (spec.portrait) {
-                                        // над нижней рейкой, по ширине области, полный вид карточки: в карточке нижнего ряда (221 px)
-                                        // входящему не хватает места на две кнопки, поэтому и на главном звонок идёт оверлеем
+                                        // над нижней рейкой, по ширине области, полный вид карточки; на главном звонок идёт
+                                        // полосой вместо нижнего ряда (PortraitCallBar), сюда попадают остальные экраны
                                         Box(Modifier.fillMaxSize().padding(start = metrics.dp(spec.g), end = metrics.dp(spec.g),
                                             bottom = metrics.dp(spec.bottomRailH + spec.padBottom)),
                                             contentAlignment = Alignment.BottomCenter) {

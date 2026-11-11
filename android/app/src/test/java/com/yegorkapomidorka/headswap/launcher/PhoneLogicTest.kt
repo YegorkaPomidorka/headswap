@@ -2,6 +2,7 @@ package com.yegorkapomidorka.headswap.launcher
 
 import java.time.ZoneId
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -55,6 +56,17 @@ class PhoneLogicTest {
     @Test fun outgoingShowsStateEThenTimer() {
         assertEquals(PhoneCardModel.Outgoing("Сергей"), model(state = CallState.OFFHOOK, offhook = 2))
         assertEquals(PhoneCardModel.InCall("Сергей", 3), model(state = CallState.OFFHOOK, offhook = 8))
+    }
+
+    @Test fun callBarReplacesBottomRowOnlyDuringCall() {
+        // в портрете звонок (входящий, разговор, исходящий) занимает нижний ряд, остальные состояния - карточка в ряду
+        assertTrue(model(state = CallState.RINGING).ongoing)
+        assertTrue(model(state = CallState.OFFHOOK, ringed = true, offhook = 12).ongoing)
+        assertTrue(model(state = CallState.OFFHOOK, offhook = 2).ongoing)
+        assertFalse(model(permitted = false).ongoing)
+        assertFalse(model().ongoing)
+        assertFalse(model(calls = listOf(rec(CallType.MISSED, 5))).ongoing)
+        assertFalse(model(calls = listOf(rec(CallType.INCOMING, 5))).ongoing)
     }
 
     @Test fun whenLabelTodayYesterdayDate() {
