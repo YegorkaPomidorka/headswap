@@ -1106,16 +1106,14 @@ class CarLifeSession(
                 }
             }
             sendCmd(Msg.MEDIA_INFO, Msgs.mediaInfo(info, jpeg))
-            if (cfg.desktopVideo != null) {
-                // Desktop: this HU refreshes the cluster icon only when CarLife is resumed, not on
-                // MEDIA_INFO. A second identical copy ~0.7 s later mimics the AA art update and makes
-                // the head unit re-read the media info without a manual screen switch.
-                try {
-                    sched.schedule({
-                        if (!closed.get()) sendCmd(Msg.MEDIA_INFO, Msgs.mediaInfo(info, jpeg))
-                    }, MEDIA_INFO_REPEAT_MS, TimeUnit.MILLISECONDS)
-                } catch (_: java.util.concurrent.RejectedExecutionException) {
-                }
+            // This head unit refreshes the cluster icon only when it re-reads the media session;
+            // one MEDIA_INFO is not enough. A second identical copy ~0.7 s later works in both
+            // desktop and AA (the AA art update used to provide that second copy only by chance).
+            try {
+                sched.schedule({
+                    if (!closed.get()) sendCmd(Msg.MEDIA_INFO, Msgs.mediaInfo(info, jpeg))
+                }, MEDIA_INFO_REPEAT_MS, TimeUnit.MILLISECONDS)
+            } catch (_: java.util.concurrent.RejectedExecutionException) {
             }
         }
     }
@@ -1586,7 +1584,7 @@ class CarLifeSession(
         private const val TTS_TX_LOGGED = 8           // TTS_DATA после INIT с временем записи в транспорт (h222)
         private const val MAX_AUDIO_QUEUE = 180       // звук не принимается, если в общей очереди больше пакетов
         private const val BITRATE_POLL_MS = 100L
-        /** Desktop: вторая копия MEDIA_INFO - некоторые ГУ обновляют иконку на приборке только при перечитывании медиасессии. */
+        /** Вторая копия MEDIA_INFO: ГУ обновляет иконку на приборке только при перечитывании медиасессии. */
         private const val MEDIA_INFO_REPEAT_MS = 700L
         private const val VW_20082138_CEILING_BPS = 2_000_000
         private const val VW_20082138_MIN_BPS = 1_500_000
