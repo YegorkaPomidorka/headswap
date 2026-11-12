@@ -18,7 +18,9 @@ import kotlin.math.sin
  * манёвров телефон не шлёт, рисуем сами по nextTurn.
  */
 object MetaImages {
-    const val MAX_BYTES = 30720
+    // Baidu's limit is 30720, but this Honda cluster refused 25 KB covers and kept the source icon;
+    // 16 KB is the size that still renders there (Mazda uses the same limit for a different reason).
+    const val MAX_BYTES = 16_384
     private const val ART_SIDE = 256
     private const val ART_SMALL = 160
     private const val ICON = 128
