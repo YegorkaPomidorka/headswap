@@ -45,7 +45,18 @@
     <string name="set_direct_desc">Android Auto video goes to the head unit as is. Wide screens are cropped by the head unit itself.</string>
     <string name="set_direct_plus">+ Lower latency, heat and battery drain</string>
     <string name="set_direct_minus">− Frame rate is not adjustable</string>
-    <string name="set_direct_desktop_desc">In Own launcher mode the phone encodes its own screen once and hands the head unit a ready H.264 stream, no transcoding.</string>
+    <string name="set_direct_desktop_desc">In Own launcher mode the phone captures the desktop and encodes it once; this is not Android Auto transcoding.</string>
+    <string name="set_desktop_single_encode_title">Single screen encode</string>
+    <string name="set_desktop_direct_title">Direct</string>
+    <string name="set_desktop_transcode_title">Transcode</string>
+    <string name="set_desktop_transcode_note">Applies on the next connection. Transcode inserts an intermediate H.264 stage, like Android Auto: more latency and heat, but steadier on some head units.</string>
+    <string name="set_desktop_fps_title">Desktop frame rate</string>
+    <string name="set_desktop_fps_note">Applies on the next connection. Auto picks 30 fps unless the head unit asks for less.</string>
+    <string name="set_video_range_title">Color range</string>
+    <string name="set_video_range_auto">Auto</string>
+    <string name="set_video_range_limited">Limited</string>
+    <string name="set_video_range_full">Full</string>
+    <string name="set_video_range_note">Auto uses limited range (16–235) for the Honda CR-V 2026 / CR-V 2026 Hybrid presets and keeps the previous stream for other cars. A manual choice applies to any car. Applies on the next connection.</string>
 
     <string name="set_resolution">Video resolution</string>
     <string name="set_res_pick">Choose resolution</string>

@@ -45,7 +45,10 @@
     <string name="set_direct_desc">Android Auto 的视频原样传给车机。宽屏画面由车机自行裁切。</string>
     <string name="set_direct_plus">+ 延迟更低，发热和耗电更少</string>
     <string name="set_direct_minus">− 无法调整帧率</string>
-    <string name="set_direct_desktop_desc">在“自带桌面”模式下，手机只对自己的屏幕编码一次，并将现成的 H.264 码流交给车机，无需转码。</string>
+    <string name="set_direct_desktop_desc">在“自带桌面”模式下，手机只捕获并编码一次桌面；这不是 Android Auto 转码。</string>
+    <string name="set_desktop_single_encode_title">单次屏幕编码</string>
+    <string name="set_desktop_fps_title">桌面帧率</string>
+    <string name="set_desktop_fps_note">下次连接时生效。“自动”会选择 30 fps，除非车机要求更低。</string>
 
     <string name="set_resolution">视频分辨率</string>
     <string name="set_res_pick">选择分辨率</string>
