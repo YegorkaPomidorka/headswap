@@ -57,6 +57,7 @@ import com.yegorkapomidorka.headswap.dex.DelegatedDesktopAccess
 import com.yegorkapomidorka.headswap.dex.DesktopAudioAccess
 import com.yegorkapomidorka.headswap.dex.DesktopPick
 import com.yegorkapomidorka.headswap.dex.DexPrefs
+import com.yegorkapomidorka.headswap.dex.VideoRangeMode
 import com.yegorkapomidorka.headswap.link.car.CarNetwork
 import com.yegorkapomidorka.headswap.link.car.CarPairing
 import com.yegorkapomidorka.headswap.link.car.CarProfile
@@ -406,6 +407,10 @@ class SettingsSectionScreen(host: MainActivity, val section: SettingsSection) : 
     private var resChevron: ImageView? = null
     private var resPopup: PopupWindow? = null
     private var fpsSeg: Segmented? = null
+    private var desktopFpsSeg: Segmented? = null
+    private var desktopFpsNote: TextView? = null
+    private var desktopTranscodeSeg: Segmented? = null
+    private var videoRangeSeg: Segmented? = null
     private var densityValue: TextView? = null
     private var densitySub: TextView? = null
     private var densityMinus: View? = null
@@ -881,18 +886,35 @@ class SettingsSectionScreen(host: MainActivity, val section: SettingsSection) : 
     private fun buildVideo() {
         val c = ctx
         body.addView(c.sectionTitle(c.getString(R.string.set_mode)))
-        if (BridgeMode.effective(aa.bridgeMode, Build.VERSION.SDK_INT) == BridgeMode.DESKTOP) {
-            // «Свой лаунчер»: телефон кодирует экран один раз и отдаёт ГУ готовый H.264 - выбирать нечего, это и есть проброс.
-            // Настройку AA (aa.transcode) не трогаем: она снова работает при возврате в режим Android Auto.
-            body.addView(Segmented(c, listOf(c.getString(R.string.set_direct_title)), 15f) {}.apply { setSelected(0) }.view, lp(MATCH, WRAP))
-            body.addView(c.text(c.getString(R.string.set_direct_desktop_desc), 13f, 400, c.clr(R.color.on2)).apply { setLineSpacing(0f, 1.4f) },
+        val desktop = BridgeMode.effective(aa.bridgeMode, Build.VERSION.SDK_INT) == BridgeMode.DESKTOP
+        if (desktop) {
+            // «Свой лаунчер»: по умолчанию промежуточный H.264, как в AA transcode.
+            val dt = Segmented(c, listOf(
+                c.getString(R.string.set_desktop_direct_title),
+                c.getString(R.string.set_desktop_transcode_title),
+            ), 15f) { setDesktopTranscode(it == 1) }
+            desktopTranscodeSeg = dt
+            body.addView(dt.view, lp(MATCH, WRAP))
+            body.addView(c.text(c.getString(R.string.set_desktop_transcode_note), 13f, 400, c.clr(R.color.on2)).apply { setLineSpacing(0f, 1.4f) },
                 lp(MATCH, WRAP).margins(c, 8, 4, 8, 0))
+            refreshDesktopTranscode()
         } else {
             val seg = Segmented(c, listOf(c.getString(R.string.set_transcode_title), c.getString(R.string.set_direct_title)), 15f) { setTranscode(it == 0) }
             transcodeSeg = seg
             body.addView(seg.view, lp(MATCH, WRAP))
             body.addView(modeDescription(), lp(MATCH, WRAP).margins(c, 8, 4, 8, 0))
         }
+
+        body.addView(c.sectionTitle(c.getString(R.string.set_video_range_title)))
+        val rangeSeg = Segmented(c, listOf(
+            c.getString(R.string.set_video_range_auto),
+            c.getString(R.string.set_video_range_limited),
+            c.getString(R.string.set_video_range_full),
+        ), 15f) { setVideoRangeMode(VideoRangeMode.entries[it]) }
+        videoRangeSeg = rangeSeg
+        body.addView(rangeSeg.view, lp(MATCH, WRAP))
+        note(c.getString(R.string.set_video_range_note))
+        refreshVideoRange()
 
         body.addView(c.sectionTitle(c.getString(R.string.set_resolution)))
         customResNote = note("").apply { visibility = View.GONE }
@@ -903,13 +925,24 @@ class SettingsSectionScreen(host: MainActivity, val section: SettingsSection) : 
         body.addView(densityCard(), lp(MATCH, WRAP))
         note(c.getString(R.string.set_aa_density_note))
 
-        body.addView(c.sectionTitle(c.getString(R.string.set_fps)))
-        val fps = FpsSetting.values().filter { it != FpsSetting.FPS60 }
-        val fSeg = Segmented(c, fps.map { c.getString(it.titleRes) }, 15f) { setFps(fps[it]) }
-        fpsSeg = fSeg
-        body.addView(fSeg.view, lp(MATCH, WRAP))
-        fpsNote = note("")
-        note(c.getString(R.string.set_fps_note))
+        if (desktop) {
+            body.addView(c.sectionTitle(c.getString(R.string.set_desktop_fps_title)))
+            val dFps = FpsSetting.values().filter { it != FpsSetting.FPS60 }
+            val dSeg = Segmented(c, dFps.map { c.getString(it.titleRes) }, 15f) { setDesktopFps(dFps[it]) }
+            desktopFpsSeg = dSeg
+            body.addView(dSeg.view, lp(MATCH, WRAP))
+            desktopFpsNote = note("")
+            note(c.getString(R.string.set_desktop_fps_note))
+            refreshDesktopFps()
+        } else {
+            body.addView(c.sectionTitle(c.getString(R.string.set_fps)))
+            val fps = FpsSetting.values().filter { it != FpsSetting.FPS60 }
+            val fSeg = Segmented(c, fps.map { c.getString(it.titleRes) }, 15f) { setFps(fps[it]) }
+            fpsSeg = fSeg
+            body.addView(fSeg.view, lp(MATCH, WRAP))
+            fpsNote = note("")
+            note(c.getString(R.string.set_fps_note))
+        }
 
         setTranscode(aa.transcode, save = false)
         refreshFps()
@@ -1212,6 +1245,36 @@ class SettingsSectionScreen(host: MainActivity, val section: SettingsSection) : 
     private fun setFps(f: FpsSetting) {
         aa.fpsSetting = f
         refreshFps()
+    }
+
+    private fun setDesktopFps(f: FpsSetting) {
+        DexPrefs(ctx).desktopFps = f
+        refreshDesktopFps()
+    }
+
+    private fun setDesktopTranscode(on: Boolean) {
+        DexPrefs(ctx).desktopTranscode = on
+        refreshDesktopTranscode()
+    }
+
+    private fun refreshDesktopTranscode() {
+        desktopTranscodeSeg?.setSelected(if (DexPrefs(ctx).desktopTranscode) 1 else 0)
+    }
+
+    private fun setVideoRangeMode(mode: VideoRangeMode) {
+        DexPrefs(ctx).videoRangeMode = mode
+        refreshVideoRange()
+    }
+
+    private fun refreshVideoRange() {
+        videoRangeSeg?.setSelected(DexPrefs(ctx).videoRangeMode.ordinal)
+    }
+
+    private fun refreshDesktopFps() {
+        val cur = DexPrefs(ctx).desktopFps
+        val options = FpsSetting.values().filter { it != FpsSetting.FPS60 }
+        desktopFpsSeg?.setSelected(options.indexOf(cur).coerceAtLeast(0))
+        desktopFpsNote?.text = ctx.getString(cur.subRes)
     }
 
     /** В прямом пробросе частоту задаёт AA: переключатель затемнён и не нажимается, выбор в prefs остаётся. */

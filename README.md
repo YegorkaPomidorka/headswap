@@ -55,6 +55,9 @@
 | Volkswagen Tharu XR 2025–2026 | 2.1 |
 | Volkswagen Tiguan L Pro / Teramont Pro | — |
 
+Для Honda CR-V 2026 / CR-V 2026 Hybrid на SEMIDRIVE X9 пресет машины включает transcode + 30 fps,
+limited range и потолок 6 Мбит/с на Wi-Fi: 8 Мбит/с даёт мерцание яркости/контраста.
+
 Актуальный список — на [странице проекта](https://yegorkapomidorka.com/headswap/).
 
 Отчёты о других машинах приветствуются (Telegram и 4PDA ниже). Минимальная версия Android: 10 (API 29).

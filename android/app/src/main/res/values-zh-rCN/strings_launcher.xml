@@ -163,7 +163,7 @@
     <string name="l_s_video">视频</string>
     <string name="l_s_version">版本</string>
     <string name="l_s_hu_channel">通道 %1$s</string>
-    <string name="l_s_fps">%1$s · %2$d 帧/秒</string>
+    <string name="l_s_fps">%1$s · %2$s 帧/秒</string>
     <string name="l_nav_yandex_navi">Ya.Navigator</string>
     <string name="l_nav_2gis">2GIS</string>
     <string name="l_nav_yandex_maps">Yandex Maps</string>
