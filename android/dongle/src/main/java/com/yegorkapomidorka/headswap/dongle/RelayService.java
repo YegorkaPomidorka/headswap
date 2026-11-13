@@ -55,6 +55,7 @@ public class RelayService extends Service {
         wakeLock.setReferenceCounted(false);
         wakeLock.acquire();
         Log.i("сервис создан, wifi high-perf, wakelock");
+        startMonitor();
         // Прошлый процесс могли убить посреди передёргивания — гаджет остался выключенным
         if ("0".equals(readSys(USB_ENABLE))) {
             try { writeSys(USB_ENABLE, "1"); Log.i("USB был выключен, включила"); } catch (IOException ignored) { }
@@ -130,7 +131,7 @@ public class RelayService extends Service {
                 }
                 if (n <= 0) throw new IOException("ГУ: пустое первое чтение " + n);
                 silentReplugDone = false;
-                Log.i("ГУ заговорило, первые " + n + " Б");
+                Log.i("ГУ заговорило, первые " + n + " Б: " + hex(buf, Math.min(n, 32)));
                 sock = connectPhone();
                 if (sock == null) throw new IOException("нет телефона");
                 OutputStream net = sock.getOutputStream();
@@ -219,6 +220,7 @@ public class RelayService extends Service {
             if (n == 0) continue;
             net.write(buf, 0, n);
             total += n;
+            upBytes.addAndGet(n);
         }
     }
 
@@ -233,6 +235,7 @@ public class RelayService extends Service {
                 in.readFully(head);
                 int len = ((head[4] & 0xff) << 24) | ((head[5] & 0xff) << 16) | ((head[6] & 0xff) << 8) | (head[7] & 0xff);
                 if (len < 0 || len > MAX_FRAME) throw new IOException("кривая длина кадра " + len);
+                long t0 = android.os.SystemClock.uptimeMillis();
                 usbOut.write(head);
                 int left = len;
                 while (left > 0) {
@@ -241,7 +244,15 @@ public class RelayService extends Service {
                     usbOut.write(body, 0, n);
                     left -= n;
                 }
+                long dt = android.os.SystemClock.uptimeMillis() - t0;
+                if (dt > maxWriteMs.get()) maxWriteMs.set(dt);
+                if (frames < 8) {
+                    int chan = ((head[0] & 0xff) << 24) | ((head[1] & 0xff) << 16) | ((head[2] & 0xff) << 8) | (head[3] & 0xff);
+                    Log.i("вниз кадр #" + frames + ": канал " + chan + ", " + len + " Б, запись в USB " + dt + " мс");
+                }
                 frames++;
+                downFrames.incrementAndGet();
+                downBytes.addAndGet(8 + len);
             }
         } catch (IOException e) {
             Log.i("вниз остановлено после " + frames + " кадров: " + e);
@@ -253,6 +264,36 @@ public class RelayService extends Service {
     }
 
     private static final java.io.File USB_ENABLE = new java.io.File("/sys/class/android_usb/android0/enable");
+    private static final java.io.File USB_FUNCTIONS = new java.io.File("/sys/class/android_usb/android0/functions");
+
+    // Счётчики для лога: ГУ→телефон байты, телефон→ГУ байты и кадры, самая долгая запись в USB
+    private static final java.util.concurrent.atomic.AtomicLong upBytes = new java.util.concurrent.atomic.AtomicLong();
+    private static final java.util.concurrent.atomic.AtomicLong downBytes = new java.util.concurrent.atomic.AtomicLong();
+    private static final java.util.concurrent.atomic.AtomicLong downFrames = new java.util.concurrent.atomic.AtomicLong();
+    private static final java.util.concurrent.atomic.AtomicLong maxWriteMs = new java.util.concurrent.atomic.AtomicLong();
+
+    /** Раз в 0,5 с смотрим состояние USB (пишем смены), раз в 5 с — трафик, если он шёл. */
+    private void startMonitor() {
+        Thread t = new Thread(() -> {
+            String lastUsb = "";
+            long lastUp = 0, lastDown = 0, tick = 0;
+            while (true) {
+                String usb = readSys(USB_STATE) + " en=" + readSys(USB_ENABLE) + " fn=" + readSys(USB_FUNCTIONS);
+                if (!usb.equals(lastUsb)) { Log.i("USB: " + usb); lastUsb = usb; }
+                if (++tick % 10 == 0) {
+                    long up = upBytes.get(), down = downBytes.get();
+                    if (up != lastUp || down != lastDown) {
+                        Log.i("трафик 5 с: ГУ→тел " + (up - lastUp) + " Б, тел→ГУ " + (down - lastDown) + " Б, кадров вниз всего "
+                                + downFrames.get() + ", макс запись в USB " + maxWriteMs.getAndSet(0) + " мс");
+                        lastUp = up; lastDown = down;
+                    }
+                }
+                android.os.SystemClock.sleep(500);
+            }
+        }, "monitor");
+        t.setDaemon(true);
+        t.start();
+    }
 
     /** Отключить USB-гаджет на секунду: хост видит отсоединение и при возврате начинает сессию с нуля. */
     private static void replugUsb() {
@@ -273,6 +314,12 @@ public class RelayService extends Service {
     }
 
     private static final java.io.File USB_STATE = new java.io.File("/sys/class/android_usb/android0/state");
+
+    private static String hex(byte[] b, int n) {
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < n; i++) sb.append(String.format("%02X ", b[i] & 0xff));
+        return sb.toString().trim();
+    }
 
     private static String readSys(java.io.File f) {
         try {

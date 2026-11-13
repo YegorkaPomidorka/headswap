@@ -486,8 +486,13 @@ class BridgeService : Service() {
     }
 
     /** Стик подключился (нить main). Занято или режим уже выключен: сокет закрываем. */
-    private fun onDongleSocket(from: DongleListener, sock: java.net.Socket) {
+    private fun onDongleSocket(from: DongleListener, sock: java.net.Socket, attempt: Int = 0) {
         val peer = sock.inetAddress?.hostAddress ?: "?"
+        // Слушатель только что закрыл старый сокет свистка: даём старой сессии до 3 с закрыться
+        if (session != null && dongle === from && !stopRequested && attempt < DONGLE_REPLACE_TRIES) {
+            main.postDelayed({ onDongleSocket(from, sock, attempt + 1) }, DONGLE_REPLACE_STEP_MS)
+            return
+        }
         if (dongle !== from || stopRequested || session != null) {
             AppLog.i("сервис: свисток $peer отклонён (сессия ${if (session != null) "идёт" else "не нужна"}, режим ${if (dongle === from) "включён" else "выключен"})")
             WLog.ev(WLog.TCP, "dongle-reject", "peer" to peer, "why" to if (session != null) "session" else "off")
@@ -1551,6 +1556,9 @@ class BridgeService : Service() {
         const val ACTION_WIFI_B = "com.yegorkapomidorka.headswap.WIFI_B"
         /** Свисток: слушать :7250, стик в USB ГУ подключается по Wi-Fi и несёт поток аксессуара. Выключается общим [ACTION_STOP]. */
         const val ACTION_DONGLE = "com.yegorkapomidorka.headswap.DONGLE"
+        /** Новый сокет свистка ждёт закрытия старой сессии: 15 × 200 мс. */
+        private const val DONGLE_REPLACE_TRIES = 15
+        private const val DONGLE_REPLACE_STEP_MS = 200L
         /** Выбранная машина подключилась по Bluetooth (ACL_CONNECTED): ждать по Wi-Fi, пока она рядом. */
         const val ACTION_WIFI_B_AUTO = "com.yegorkapomidorka.headswap.WIFI_B_AUTO"
         /** Машина отключилась по Bluetooth (ACL_DISCONNECTED): через debounce снять ожидание. */

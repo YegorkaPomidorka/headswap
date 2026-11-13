@@ -47,21 +47,22 @@ class DongleListenerTest {
     }
 
     @Test
-    fun secondSocketIsRejectedWhileFirstLives() {
+    fun secondSocketReplacesFirst() {
         val l = up()
-        connect(l)
+        val firstClient = connect(l)
         val first = accepted.poll(3, TimeUnit.SECONDS)
         assertNotNull(first)
-        val second = connect(l)
-        // сервер закрывает лишнего клиента: чтение даёт EOF (или reset), в колбэк он не попадает
+        connect(l)
+        // стик перезагрузился: новый сокет уходит в колбэк, старый сервер закрывает (у клиента EOF/reset)
+        assertNotNull(accepted.poll(3, TimeUnit.SECONDS))
+        assertTrue(first!!.isClosed)
         val eof = try {
-            second.soTimeout = 3000
-            second.getInputStream().read() == -1
+            firstClient.soTimeout = 3000
+            firstClient.getInputStream().read() == -1
         } catch (e: java.io.IOException) {
             true
         }
         assertTrue(eof)
-        assertEquals(null, accepted.poll(300, TimeUnit.MILLISECONDS))
     }
 
     @Test

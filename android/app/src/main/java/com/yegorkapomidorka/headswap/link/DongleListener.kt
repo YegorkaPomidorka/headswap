@@ -66,14 +66,22 @@ class DongleListener(
                 return
             }
             val peer = sock.inetAddress?.hostAddress
-            val busy = synchronized(lock) { closed || current?.isClosed == false }
-            if (busy) {
-                WLog.ev(WLog.TCP, "dongle-reject", "peer" to peer, "why" to "уже подключён свисток")
+            if (synchronized(lock) { closed }) {
                 try {
                     sock.close()
                 } catch (_: IOException) {
                 }
                 continue
+            }
+            // Свисток один. Новое подключение при живом старом = стик перезагрузился (ГУ передёрнуло питание USB),
+            // а старый сокет полуоткрыт и FIN не придёт. Побеждает новый: старый закрываем, сессия на нём кончится.
+            val old = synchronized(lock) { current?.takeIf { !it.isClosed } }
+            if (old != null) {
+                WLog.ev(WLog.TCP, "dongle-replace", "old" to old.inetAddress?.hostAddress, "new" to peer)
+                try {
+                    old.close()
+                } catch (_: IOException) {
+                }
             }
             try {
                 // буфер ядра маленький: противодавление видно в очереди Headswap, а не прячется в ядре

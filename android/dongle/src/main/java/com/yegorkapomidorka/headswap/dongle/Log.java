@@ -10,14 +10,17 @@ import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.Locale;
 
-/** Лог в logcat и в /mnt/sdcard/headswap-dongle.log, чтобы после поездки было что читать без adb. */
+/**
+ * Лог в logcat и во внутреннюю память приложения (/data/data/…/files/dongle.log): карта в машине бывает
+ * не смонтирована, и в поездке 13.11 на неё не записалось ни строки. Забирать root-adb: adb pull …/files/dongle.log.
+ */
 final class Log {
     private static final String TAG = "HsDongle";
-    private static final long MAX_BYTES = 2L * 1024 * 1024;
+    private static final long MAX_BYTES = 4L * 1024 * 1024;
     private static File file;
 
     static synchronized void init(Context ctx) {
-        if (file == null) file = new File(Environment.getExternalStorageDirectory(), "headswap-dongle.log");
+        if (file == null) file = new File(ctx.getFilesDir(), "dongle.log");
     }
 
     static synchronized void i(String msg) {
