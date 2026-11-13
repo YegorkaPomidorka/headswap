@@ -8,10 +8,12 @@ import android.hardware.input.InputManager
 import android.os.Binder
 import android.os.Build
 import android.os.IBinder
+import android.os.PowerManager
 import android.os.Process
 import android.os.SystemClock
 import android.view.InputDevice
 import android.view.InputEvent
+import android.view.KeyCharacterMap
 import android.view.KeyEvent
 import android.view.MotionEvent
 import com.yegorkapomidorka.headswap.AppLog
@@ -172,6 +174,8 @@ internal class DelegatedInputGateway(context: Context) : IDelegatedInputGateway.
                             FloatArray(event.pointerCount) { event.getY(it) })
                         // h1007: при погашенном экране телефона Android 13–15 выбрасывает inject - жест в тачскрин uinput.
                         if (UinputTouch.route(displayId, event, owned.width, owned.height)) return
+                        // h1151: тачскрина uinput нет (A13) - будим телефон, иначе inject ниже выбросится.
+                        wakeForTouch(displayId, event.actionMasked == MotionEvent.ACTION_DOWN)
                     }
                     require(actionButton == 0 || actionButton == MotionEvent.BUTTON_PRIMARY)
                     if (actionButton != 0) setActionButton.invoke(event, actionButton)
@@ -183,6 +187,28 @@ internal class DelegatedInputGateway(context: Context) : IDelegatedInputGateway.
             displayEvents.setDisplayId(event, displayId)
             check(inject.invoke(inputManager, event, 0) == true) { "Android отклонил ввод на отдельный экран" }
         } finally { (event as? MotionEvent)?.recycle() }
+    }
+
+    /** [TouchWakePolicy]: KEYCODE_WAKEUP на телефон и ожидание пробуждения; жест держим, следующие события ждут монитор. */
+    private fun wakeForTouch(displayId: Int, isDown: Boolean) {
+        val power = context.getSystemService(PowerManager::class.java) ?: return
+        val interactive = runCatching { power.isInteractive }.getOrNull()
+        if (!TouchWakePolicy.shouldWake(Build.VERSION.SDK_INT, isDown, interactive)) return
+        val start = SystemClock.uptimeMillis()
+        val sent = runCatching {
+            for (action in intArrayOf(KeyEvent.ACTION_DOWN, KeyEvent.ACTION_UP)) {
+                val now = SystemClock.uptimeMillis()
+                val key = KeyEvent(now, now, action, KeyEvent.KEYCODE_WAKEUP, 0, 0,
+                    KeyCharacterMap.VIRTUAL_KEYBOARD, 0, 0, InputDevice.SOURCE_KEYBOARD)
+                check(inject.invoke(inputManager, key, 0) == true) { "отклонён" }
+            }
+        }
+        while (!power.isInteractive && SystemClock.uptimeMillis() - start < TouchWakePolicy.WAIT_MS) SystemClock.sleep(20)
+        val awake = power.isInteractive
+        if (awake) SystemClock.sleep(TouchWakePolicy.SETTLE_MS)
+        AppLog.i("WAKE тач при погашенном экране телефона, дисплей $displayId: KEYCODE_WAKEUP " +
+            "${sent.exceptionOrNull()?.let { "не отправлен (${it.javaClass.simpleName}: ${it.message})" } ?: "отправлен"}, " +
+            "экран ${if (awake) "вкл" else "выкл"} через ${SystemClock.uptimeMillis() - start} мс", false)
     }
 
     @Synchronized override fun childTaskState(displayId: Int, token: IBinder, packageName: String): Int {
