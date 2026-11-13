@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Те же строки AOA, что ловит Headswap на телефоне (app/src/main/res/xml/accessory_filter.xml) -->
+<resources>
+    <usb-accessory manufacturer="Baidu" model="CarLife" />
+</resources>

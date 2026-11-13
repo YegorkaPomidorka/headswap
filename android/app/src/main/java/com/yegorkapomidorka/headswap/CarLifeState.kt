@@ -36,6 +36,9 @@ object CarLifeState {
     /** Беспровод (бета, ветка B): что сейчас происходит, для экрана; null - режим не включён. */
     @Volatile var wireless: String? = null
 
+    /** Режим «свисток» включён: сервис слушает :7250 (пишет BridgeService). Статус идёт в [wireless]. */
+    @Volatile var dongle: Boolean = false
+
     /** Bluetooth-проба ветки A: что прислала ГУ по RFCOMM `carlife`; null - проба не запускалась. */
     @Volatile var btProbe: String? = null
 

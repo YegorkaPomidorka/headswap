@@ -434,6 +434,9 @@ class SettingsSectionScreen(host: MainActivity, val section: SettingsSection) : 
     private var wlStatus: TextView? = null
     private var wlNoPermission: TextView? = null
     private var wlAwaitingPermission = false
+    /** Запрос разрешений был от кнопки свистка, а не «Ждать машину по Wi-Fi». */
+    private var wlAwaitingDongle = false
+    private var wlDongleBtn: LinearLayout? = null
     private var wlCarLine: TextView? = null
     private var wlCarWarn: TextView? = null
     private var wlCarForget: View? = null
@@ -496,7 +499,11 @@ class SettingsSectionScreen(host: MainActivity, val section: SettingsSection) : 
         if (wlAwaitingPermission) {
             wlAwaitingPermission = false
             val lan = Build.VERSION.SDK_INT < 37 || NetProbe.localNetworkGranted(ctx) == "granted"
-            if (lan) startWireless() else wlNoPermission?.visibility = View.VISIBLE
+            val dongle = wlAwaitingDongle
+            wlAwaitingDongle = false
+            if (!lan) wlNoPermission?.visibility = View.VISIBLE
+            else if (dongle) startDongle()
+            else startWireless()
         }
         if (wlAwaitingCarPermission) {
             wlAwaitingCarPermission = false
@@ -521,6 +528,10 @@ class SettingsSectionScreen(host: MainActivity, val section: SettingsSection) : 
         // высота кнопок задаётся явно (как на других экранах): pill с WRAP сжимается до высоты текста
         card.addView(c.primaryButton(c.getString(R.string.wl_start), heightDp = 60, sp = 17f).apply { setOnClickListener { onWirelessStart() } },
             lp(MATCH, c.dp(60)).apply { topMargin = c.dp(4) })
+        // свисток: стик в USB машины гонит поток аксессуара по Wi-Fi на :7250, телефон раздаёт точку доступа
+        wlDongleBtn = c.outlineButton(c.getString(R.string.dongle_start), heightDp = 56, sp = 16f).apply { setOnClickListener { onDongleToggle() } }
+            .also { card.addView(it, lp(MATCH, c.dp(56))) }
+        card.addView(c.text(c.getString(R.string.dongle_note), 13f, 400, c.clr(R.color.on2)), lp(MATCH, WRAP))
         // выбор машины: дальше при её Bluetooth-подключении ожидание по Wi-Fi стартует само
         wlCarLine = c.text("", 15f, 500).also { card.addView(it, lp(MATCH, WRAP).apply { topMargin = c.dp(8) }) }
         card.addView(c.text(c.getString(R.string.wl_car_note), 13f, 400, c.clr(R.color.on2)), lp(MATCH, WRAP))
@@ -559,6 +570,10 @@ class SettingsSectionScreen(host: MainActivity, val section: SettingsSection) : 
         val carText = c.getString(R.string.wl_car_line, if (car.isSet) car.btName ?: car.btMac ?: "" else c.getString(R.string.wl_car_none))
         wlCarLine?.let { if (it.text.toString() != carText) it.text = carText }
         wlCarForget?.visibility = if (car.isSet) View.VISIBLE else View.GONE
+        (wlDongleBtn?.getChildAt(0) as? TextView)?.let {
+            val label = c.getString(if (CarLifeState.dongle) R.string.dongle_stop else R.string.dongle_start)
+            if (it.text.toString() != label) it.text = label
+        }
         // без BLUETOOTH_CONNECT (31+) система не доставляет ACL выбранной машины: триггер молчит
         val warn = when {
             !CarPairing.available(c) -> c.getString(R.string.wl_car_unavailable)
@@ -679,6 +694,7 @@ class SettingsSectionScreen(host: MainActivity, val section: SettingsSection) : 
         }
         if (ask.isNotEmpty()) {
             wlAwaitingPermission = true
+            wlAwaitingDongle = false
             host.requestPermissions(ask.toTypedArray(), REQ_LOCAL_NETWORK)
             return
         }
@@ -688,6 +704,28 @@ class SettingsSectionScreen(host: MainActivity, val section: SettingsSection) : 
     private fun startWireless() {
         AppLog.i("кнопка «Ждать машину по Wi-Fi»")
         ctx.startForegroundService(Intent(ctx, BridgeService::class.java).setAction(BridgeService.ACTION_WIFI_B))
+    }
+
+    /** Свисток: включить (нужен ACCESS_LOCAL_NETWORK на Android 17+, как у Wi-Fi) или остановить общим Стопом сервиса. */
+    private fun onDongleToggle() {
+        if (CarLifeState.dongle) {
+            AppLog.i("кнопка «Остановить свисток»")
+            Actions.stopBridge(ctx)
+            return
+        }
+        wlNoPermission?.visibility = View.GONE
+        if (Build.VERSION.SDK_INT >= 37 && NetProbe.localNetworkGranted(ctx) != "granted") {
+            wlAwaitingPermission = true
+            wlAwaitingDongle = true
+            host.requestPermissions(arrayOf(Manifest.permission.ACCESS_LOCAL_NETWORK), REQ_LOCAL_NETWORK)
+            return
+        }
+        startDongle()
+    }
+
+    private fun startDongle() {
+        AppLog.i("кнопка «Ждать свисток»")
+        ctx.startForegroundService(Intent(ctx, BridgeService::class.java).setAction(BridgeService.ACTION_DONGLE))
     }
 
     private companion object {
