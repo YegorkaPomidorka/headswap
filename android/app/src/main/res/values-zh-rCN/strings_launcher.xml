@@ -191,4 +191,26 @@
     <string name="l_notif_clear_all">全部清除</string>
     <string name="l_notif_dismiss">清除</string>
     <string name="l_notif_open_in">在%1$s中打开</string>
+    <string name="l_s_lyrics">桌面歌词</string>
+    <string name="l_s_lyrics_sub">歌词浮在所有应用之上</string>
+    <string name="l_s_lyrics_lock">锁定位置</string>
+    <string name="l_s_lyrics_lock_sub">仍然可以调颜色和字号</string>
+    <string name="l_s_lyrics_style">歌词样式</string>
+    <string name="l_s_lyrics_color">颜色</string>
+    <string name="l_s_lyrics_size">字号</string>
+    <string name="l_s_lyrics_x">水平位置</string>
+    <string name="l_s_lyrics_y">垂直位置</string>
+    <string name="l_s_lyrics_gap">行间距</string>
+    <string name="l_s_lyrics_ov">重叠</string>
+    <string name="l_s_lyrics_alpha">透明度</string>
+    <string name="l_s_lyrics_hue">色相</string>
+    <string name="l_s_lyrics_sat">饱和度</string>
+    <string name="l_s_lyrics_val">亮度</string>
+    <string name="l_s_lyrics_title">歌词开关与调整</string>
+    <string name="l_s_lyrics_rainbow">彩虹渐变</string>
+    <string name="l_s_lyrics_dir_h">横向</string>
+    <string name="l_s_lyrics_dir_v">纵向</string>
+    <string name="l_s_lyrics_dir_d">斜向</string>
+    <string name="l_s_lyrics_hint1">请打开所使用播放器的车载歌词</string>
+    <string name="l_s_lyrics_hint2">或打开车载蓝牙歌词</string>
 </resources>

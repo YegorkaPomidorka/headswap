@@ -39,6 +39,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
@@ -244,15 +245,24 @@ fun LauncherSettingsScreen() {
                             }
                             val players = PlayerChip.allPlayers(found, model.installedPackages, model.onlinePlayers)
                             val local = model.localPlayer?.takeIf { it in players } ?: players.firstOrNull()
-                            PlayersCard(stringResource(R.string.l_s_slot1), players.map { PlayerOpt.App(it) },
-                                local?.let { PlayerOpt.App(it) }, d, cell(0).fillMaxWidth()) { model.chooseLocalPlayer((it as PlayerOpt.App).pkg) }
                             val second = PlayerChip.secondSlotPlayers(players, model.onlinePlayers)
-                            PlayersCard(stringResource(R.string.l_s_slot2), listOf(PlayerOpt.Last) + second.map { PlayerOpt.App(it) },
-                                model.onlinePlayer?.takeIf { it in second }?.let { PlayerOpt.App(it) } ?: PlayerOpt.Last, d, cell(1).fillMaxWidth()) {
-                                model.chooseOnlinePlayer((it as? PlayerOpt.App)?.pkg)
-                            }
-                            SwitchCard(stringResource(R.string.l_s_autoplay), model.autoplay, d, cell(2).fillMaxWidth()) {
-                                model.chooseAutoplay(it)
+                            // прокрутка: под тремя прежними карточками появились «текст песни» и «оформление»
+                            Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()),
+                                verticalArrangement = Arrangement.spacedBy(m.dp(gap))) {
+                                PlayersCard(stringResource(R.string.l_s_slot1), players.map { PlayerOpt.App(it) },
+                                    local?.let { PlayerOpt.App(it) }, d, Modifier.fillMaxWidth().height(m.dp(rowH))) {
+                                    model.chooseLocalPlayer((it as PlayerOpt.App).pkg)
+                                }
+                                PlayersCard(stringResource(R.string.l_s_slot2), listOf(PlayerOpt.Last) + second.map { PlayerOpt.App(it) },
+                                    model.onlinePlayer?.takeIf { it in second }?.let { PlayerOpt.App(it) } ?: PlayerOpt.Last, d,
+                                    Modifier.fillMaxWidth().height(m.dp(rowH))) {
+                                    model.chooseOnlinePlayer((it as? PlayerOpt.App)?.pkg)
+                                }
+                                SwitchCard(stringResource(R.string.l_s_autoplay), model.autoplay, d,
+                                    Modifier.fillMaxWidth().height(m.dp(rowH))) {
+                                    model.chooseAutoplay(it)
+                                }
+                                LyricsDrawerCard(d, Modifier.fillMaxWidth())
                             }
                         }
                         SettingsPage.HOME -> if (s.portrait) {
@@ -1264,6 +1274,162 @@ private fun LicenseCard(lic: OpenSource, d: SettingsDims, modifier: Modifier, on
         Column(Modifier.fillMaxSize().padding(start = m.dp(d.padStart), end = m.dp(d.padEnd)), verticalArrangement = Arrangement.Center) {
             Txt(lic.title, s.f2, weight = FontWeight.SemiBold)
             Txt("${lic.license} · ${lic.holder}", d.sub, color = Pal.SEC)
+        }
+    }
+}
+
+/** Палитра для текста песни: обычные «безопасные» цвета, любой из них читается на любом фоне плёнки. */
+/** Радуга для слайдера цвета: любой оттенок, как в «Виде › Цвета». */
+private fun lyricHueTrack(): Brush = Brush.horizontalGradient(
+    (0..360 step 15).map { h -> Color.hsl((h % 360).toFloat(), 1f, 0.5f) }
+)
+
+/** Насыщенность: от серого того же тона до чистого. */
+private fun lyricSatTrack(hue: Float, v: Float): Brush = Brush.horizontalGradient(
+    listOf(Color.hsl(hue % 360f, 0f, (v * 0.5f).coerceIn(0.05f, 0.95f)), Color.hsl(hue % 360f, 1f, (v * 0.5f).coerceIn(0.05f, 0.95f)))
+)
+
+/** Яркость: от почти чёрного до чистого тона. */
+private fun lyricValTrack(hue: Float, sat: Float): Brush = Brush.horizontalGradient(
+    listOf(Color.hsl(hue % 360f, sat, 0.06f), Color.hsl(hue % 360f, sat, 1f))
+)
+
+/** Маленький переключатель внутри выдвижного блока: тот же вид, что у [SwitchCard], без своей подложки. */
+@Composable
+private fun SwitchInline(on: Boolean, d: SettingsDims, onChange: (Boolean) -> Unit) {
+    val m = LocalMetrics.current
+    val accent = LocalAccent.current
+    val pal = LocalPalette.current
+    Pressable(Modifier.width(m.dp(d.switchW)).height(m.dp(d.ctl)), description = null, onTap = { onChange(!on) }) {
+        Box(Modifier.matchParentSize(), contentAlignment = Alignment.Center) {
+            Box(
+                Modifier.width(m.dp(d.trackW)).height(m.dp(d.trackH)).clip(RoundedCornerShape(m.dp(d.trackH / 2)))
+                    .background(if (on) accent else pal.btnSet).padding(m.dp(d.knobPad)),
+                contentAlignment = if (on) Alignment.CenterEnd else Alignment.CenterStart,
+            ) {
+                Box(Modifier.size(m.dp(d.knob)).clip(CircleShape).background(if (on) Pal.WHITE else pal.fg3))
+            }
+        }
+    }
+}
+
+/**
+ * «Текст песни: включение и настройка» - один выдвижной блок в «Музыке»: заголовок всегда на месте,
+ * содержимое (включатель, замок, цвет, размер, перекрытие, прозрачность) раскрывается по тапу.
+ */
+@Composable
+private fun LyricsDrawerCard(d: SettingsDims, modifier: Modifier) {
+    val m = LocalMetrics.current
+    val s = m.spec
+    val model = LauncherModel
+    val on = model.lyricsOn
+    val title = stringResource(R.string.l_s_lyrics_title)
+    Card(modifier) {
+        Column(Modifier.fillMaxWidth()) {
+            // включатель прямо в заголовке: включил - блок раскрылся, выключил - свернулся
+            Row(Modifier.fillMaxWidth().height(m.dp(d.ctl + 2 * d.padV)).padding(start = m.dp(d.padStart), end = m.dp(d.padEnd)),
+                verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(m.dp(s.g))) {
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(m.dp(4))) {
+                    Txt(title, s.f2, ellipsis = false)
+                    Txt(stringResource(R.string.l_s_lyrics_sub), d.sub, color = Pal.SEC, ellipsis = true)
+                }
+                SwitchInline(on, d) { model.chooseLyricsOn(it) }
+            }
+            if (!on) return@Column
+            Column(
+                Modifier.fillMaxWidth().padding(start = m.dp(d.padStart), end = m.dp(d.padEnd), bottom = m.dp(d.padV)),
+                verticalArrangement = Arrangement.spacedBy(m.dp(s.g8)),
+            ) {
+                // замок держит только позицию
+                Row(Modifier.fillMaxWidth().height(m.dp(d.ctl)), verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(m.dp(s.g))) {
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(m.dp(4))) {
+                        Txt(stringResource(R.string.l_s_lyrics_lock), d.sub, ellipsis = false)
+                        Txt(stringResource(R.string.l_s_lyrics_lock_sub), d.sub, color = Pal.SEC, ellipsis = true)
+                    }
+                    Pill(stringResource(R.string.l_s_lyrics_lock), model.lyricsLocked, d) {
+                        model.chooseLyricsLocked(!model.lyricsLocked)
+                    }
+                }
+                // цвет: радуга с направлением, либо три слайдера для одного цвета
+                Row(Modifier.fillMaxWidth().height(m.dp(d.ctl)), verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(m.dp(s.g))) {
+                    Txt(stringResource(R.string.l_s_lyrics_color), d.sub, Modifier.weight(1f), ellipsis = false)
+                    Pill(stringResource(R.string.l_s_lyrics_rainbow), model.lyricsRainbow, d) {
+                        model.editLyricsStyle(rainbow = !model.lyricsRainbow)
+                    }
+                }
+                if (model.lyricsRainbow) {
+                    Row(Modifier.fillMaxWidth().height(m.dp(d.ctl)), verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(m.dp(s.g))) {
+                        val dirs = listOf(0 to R.string.l_s_lyrics_dir_h, 1 to R.string.l_s_lyrics_dir_v, 2 to R.string.l_s_lyrics_dir_d)
+                        dirs.forEach { (value, res) ->
+                            Pill(stringResource(res), model.lyricsDir == value, d) {
+                                model.editLyricsStyle(dir = value)
+                            }
+                        }
+                    }
+                } else {
+                    SliderRow(stringResource(R.string.l_s_lyrics_hue), model.lyricsH, 0f, 360f, d, lyricHueTrack()) {
+                        model.editLyricsStyle(h = it)
+                    }
+                    SliderRow(stringResource(R.string.l_s_lyrics_sat), model.lyricsS * 100f, 0f, 100f, d, lyricSatTrack(model.lyricsH, model.lyricsV)) {
+                        model.editLyricsStyle(s = it / 100f)
+                    }
+                    SliderRow(stringResource(R.string.l_s_lyrics_val), model.lyricsV * 100f, 0f, 100f, d, lyricValTrack(model.lyricsH, model.lyricsS)) {
+                        model.editLyricsStyle(v = it / 100f)
+                    }
+                }
+                SliderRow(stringResource(R.string.l_s_lyrics_size), model.lyricsScale, 0.45f, 1.6f, d) {
+                    model.editLyricsStyle(scale = it)
+                }
+                // позиция только пальцем: тянем сами строки, отдельных слайдеров нет
+                SliderRow(stringResource(R.string.l_s_lyrics_ov), model.lyricsOvEm, 0f, 6f, d) {
+                    model.editLyricsStyle(ovEm = it)
+                }
+                SliderRow(stringResource(R.string.l_s_lyrics_alpha), model.lyricsAlpha, 0.1f, 1f, d) {
+                    model.editLyricsStyle(alpha = it)
+                }
+            }
+        }
+    }
+}
+
+/** Слайдер с произвольным числовым диапазоном: подпись слева, трек и ручка справа. */
+@Composable
+private fun SliderRow(label: String, value: Float, from: Float, to: Float, d: SettingsDims, track: Brush? = null, onChange: (Float) -> Unit) {
+    val m = LocalMetrics.current
+    val s = m.spec
+    val density = androidx.compose.ui.platform.LocalDensity.current
+    val knobDp = m.dp(d.knob)
+    val knobPx = with(density) { knobDp.toPx() }
+    Row(
+        Modifier.fillMaxWidth().height(m.dp(d.ctl)),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(m.dp(s.g)),
+    ) {
+        Txt(label, d.sub, Modifier.weight(0.34f), maxLines = 1, ellipsis = false)
+        BoxWithConstraints(Modifier.weight(0.66f).fillMaxHeight()) {
+            val w = constraints.maxWidth.toFloat()
+            val span = (w - knobPx).coerceAtLeast(1f)
+            fun at(x: Float): Float = from + ((x - knobPx / 2) / span).coerceIn(0f, 1f) * (to - from)
+            Box(
+                Modifier.fillMaxSize()
+                    .pointerInput(span, from, to) { detectTapGestures { onChange(at(it.x)) } }
+                    .pointerInput(span, from, to) { detectHorizontalDragGestures { c, _ -> c.consume(); onChange(at(c.position.x)) } },
+            ) {
+                Box(
+                    Modifier.align(Alignment.CenterStart).padding(horizontal = knobDp / 2).fillMaxWidth()
+                        .height(m.dp(d.trackH * 4 / 10)).clip(RoundedCornerShape(m.dp(d.trackH / 5)))
+                        .then(if (track != null) Modifier.background(track) else Modifier.background(Pal.SEC))
+                )
+                val frac = ((value - from) / (to - from)).coerceIn(0f, 1f)
+                val x = with(density) { (span * frac).toDp() }
+                Box(
+                    Modifier.align(Alignment.CenterStart).offset(x = x).size(knobDp).clip(CircleShape).background(Pal.WHITE)
+                        .border(m.dp(max(2, d.knob / 12)), Color(0x8C000000), CircleShape)
+                )
+            }
         }
     }
 }

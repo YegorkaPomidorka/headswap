@@ -59,6 +59,26 @@ internal object LauncherModel {
     /** Заряд телефона в строке статуса ([LauncherPrefs.showBattery]). */
     var showBattery by mutableStateOf(true)
     var autoplay by mutableStateOf(true)
+    // --- Текст песни на рабочем столе (LauncherPrefs.lyrics*) ---
+    var lyricsOn by mutableStateOf(false)
+    var lyricsLocked by mutableStateOf(false)
+    var lyricsX by mutableStateOf(0.5f)
+    var lyricsY by mutableStateOf(0.62f)
+    var lyricsScale by mutableStateOf(1.0f)
+    var lyricsGapEm by mutableStateOf(1.3f)
+    var lyricsOvEm by mutableStateOf(2.0f)
+    var lyricsH by mutableStateOf(0f)
+    var lyricsS by mutableStateOf(0f)
+    var lyricsV by mutableStateOf(1f)
+    var lyricsAlpha by mutableStateOf(0.9f)
+    var lyricsRainbow by mutableStateOf(true)
+    var lyricsDir by mutableStateOf(0)
+    /** «Текст песни: включение и настройка» - раскрыт ли выдвижной блок в «Музыке». */
+    var lyricsDrawerOpen by mutableStateOf(false)
+    /** «Ящик» с настройкой текста песни раскрыт (только на экране «Музыка», в prefs не пишется). */
+    var lyricsDrawer by mutableStateOf(false)
+    /** «Настройки › Музыка» открыты: только здесь разрешено править вид, уход с экрана - сохранение. */
+    val musicPageOpen: Boolean get() = area == Area.Settings && settingsPage == SettingsPage.MUSIC
     /** «Уведомления» телефона на экране ГУ (слушатель - [NotificationsRepo]). */
     var notifications by mutableStateOf(true)
     /** «Алиса только голосом» ([LauncherPrefs.aliceVoiceOnly]). */
@@ -188,6 +208,25 @@ internal object LauncherModel {
         animations = prefs.animations
         showBattery = prefs.showBattery
         autoplay = prefs.autoplay
+        lyricsOn = prefs.lyricsOn
+        lyricsLocked = prefs.lyricsLocked
+        lyricsX = prefs.lyricsX
+        lyricsY = prefs.lyricsY
+        if (!prefs.lyricsPosMoved) {
+            // ставили 0.62 на первом выпуске: снизу оставалось лишнее поле, опускаем к нижнему краю
+            lyricsY = 0.80f
+            prefs.lyricsY = 0.80f
+            prefs.lyricsPosMoved = true
+        }
+        lyricsScale = prefs.lyricsScale
+        lyricsGapEm = prefs.lyricsGapEm
+        lyricsOvEm = prefs.lyricsOvEm
+        lyricsH = prefs.lyricsH
+        lyricsS = prefs.lyricsS
+        lyricsV = prefs.lyricsV
+        lyricsAlpha = prefs.lyricsAlpha
+        lyricsRainbow = prefs.lyricsRainbow
+        lyricsDir = prefs.lyricsDir
         notifications = prefs.notifications
         NotificationsRepo.setEnabled(notifications)
         aliceVoiceOnly = prefs.aliceVoiceOnly
@@ -272,6 +311,32 @@ internal object LauncherModel {
     fun chooseAnimations(on: Boolean) { animations = on; prefs.animations = on }
     fun chooseShowBattery(on: Boolean) { showBattery = on; prefs.showBattery = on }
     fun chooseAutoplay(on: Boolean) { autoplay = on; prefs.autoplay = on }
+
+    fun chooseLyricsOn(on: Boolean) { lyricsOn = on; prefs.lyricsOn = on }
+
+    fun chooseLyricsLocked(locked: Boolean) { lyricsLocked = locked; prefs.lyricsLocked = locked }
+
+    /** Позиция стыка; пишется и на отпускании пальца, и на «Замке». */
+    fun moveLyrics(x: Float, y: Float) {
+        lyricsX = x
+        lyricsY = y
+        prefs.lyricsX = x
+        prefs.lyricsY = y
+    }
+
+    fun editLyricsStyle(
+        scale: Float = lyricsScale, gapEm: Float = lyricsGapEm, ovEm: Float = lyricsOvEm,
+        h: Float = lyricsH, s: Float = lyricsS, v: Float = lyricsV, alpha: Float = lyricsAlpha,
+        rainbow: Boolean = lyricsRainbow, dir: Int = lyricsDir,
+    ) {
+        lyricsScale = scale.coerceIn(0.45f, 1.6f)
+        lyricsGapEm = gapEm; lyricsOvEm = ovEm.coerceIn(0f, 6f)
+        lyricsH = h; lyricsS = s; lyricsV = v; lyricsAlpha = alpha
+        prefs.lyricsScale = scale; prefs.lyricsGapEm = gapEm; prefs.lyricsOvEm = ovEm
+        prefs.lyricsH = h; prefs.lyricsS = s; prefs.lyricsV = v; prefs.lyricsAlpha = alpha
+        lyricsRainbow = rainbow; lyricsDir = dir
+        prefs.lyricsRainbow = rainbow; prefs.lyricsDir = dir
+    }
     /** Из «Для разработчиков» на телефоне: лаунчер мог ещё не стартовать, поэтому префы — своим экземпляром. */
     fun chooseHideStatusBar(ctx: Context, on: Boolean) { hideStatusBar = on; LauncherPrefs(ctx.applicationContext).hideStatusBar = on }
     fun chooseAliceVoiceOnly(on: Boolean) {

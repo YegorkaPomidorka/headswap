@@ -162,4 +162,72 @@ class LauncherPrefs(private val context: Context) {
     var missedSeenMs: Long
         get() = prefs.getLong("missed_seen", 0L)
         set(value) { prefs.edit().putLong("missed_seen", value).apply() }
+
+    // --- Текст песни на рабочем столе ---
+
+    /** «Текст песни на экране»: единственный вход, без него слой не существует. */
+    var lyricsOn: Boolean
+        get() = prefs.getBoolean("lyrics_on", false)
+        set(value) { prefs.edit().putBoolean("lyrics_on", value).apply() }
+
+    /** Замок держит только позицию: цвет, размер, интервал остаются доступны. */
+    var lyricsLocked: Boolean
+        get() = prefs.getBoolean("lyrics_locked", false)
+        set(value) { prefs.edit().putBoolean("lyrics_locked", value).apply() }
+
+    /** Стык (середина перекрытия) в долях экрана, 0-1. */
+    var lyricsX: Float
+        get() = prefs.getFloat("lyrics_x", 0.5f)
+        set(value) { prefs.edit().putFloat("lyrics_x", value).apply() }
+
+    var lyricsY: Float
+        get() = prefs.getFloat("lyrics_y", 0.80f)
+        set(value) { prefs.edit().putFloat("lyrics_y", value).apply() }
+
+    /** Размер шрифта: множитель к 6.25% высоты экрана (45 px на 1280x720). */
+    var lyricsScale: Float
+        get() = prefs.getFloat("lyrics_scale", 1.0f)
+        set(value) { prefs.edit().putFloat("lyrics_scale", value).apply() }
+
+    /** Интервал между строками в долях кегля (1.3 = 58 px при 45 px). */
+    var lyricsGapEm: Float
+        get() = prefs.getFloat("lyrics_gap_em", 1.3f)
+        set(value) { prefs.edit().putFloat("lyrics_gap_em", value).apply() }
+
+    /** Перекрытие концов в долях кегля (2.0 = 90 px, примерно два знака). */
+    var lyricsOvEm: Float
+        get() = prefs.getFloat("lyrics_ov_em", 2.0f)
+        set(value) { prefs.edit().putFloat("lyrics_ov_em", value).apply() }
+
+    /** Цвет в HSV: серый и чёрный не дают обратно оттенок, поэтому храним три числа. */
+    var lyricsH: Float
+        get() = prefs.getFloat("lyrics_h", 0f)
+        set(value) { prefs.edit().putFloat("lyrics_h", value).apply() }
+
+    var lyricsS: Float
+        get() = prefs.getFloat("lyrics_s", 0f)
+        set(value) { prefs.edit().putFloat("lyrics_s", value).apply() }
+
+    var lyricsV: Float
+        get() = prefs.getFloat("lyrics_v", 1f)
+        set(value) { prefs.edit().putFloat("lyrics_v", value).apply() }
+
+    /** Радужная заливка букв: по умолчанию включена, три слайдера цвета тогда не нужны. */
+    var lyricsRainbow: Boolean
+        get() = prefs.getBoolean("lyrics_rainbow", true)
+        set(value) { prefs.edit().putBoolean("lyrics_rainbow", value).apply() }
+
+    var lyricsAlpha: Float
+        get() = prefs.getFloat("lyrics_alpha", 0.9f)
+        set(value) { prefs.edit().putFloat("lyrics_alpha", value).apply() }
+
+    /** Один раз опускаем позицию по умолчанию ниже: у первого выпуска стык стоял слишком высоко. */
+    var lyricsPosMoved: Boolean
+        get() = prefs.getBoolean("lyrics_pos_moved", false)
+        set(value) { prefs.edit().putBoolean("lyrics_pos_moved", value).apply() }
+
+    /** Направление радуги: 0 - горизонталь, 1 - вертикаль, 2 - диагональ. */
+    var lyricsDir: Int
+        get() = prefs.getInt("lyrics_dir", 0)
+        set(value) { prefs.edit().putInt("lyrics_dir", value).apply() }
 }

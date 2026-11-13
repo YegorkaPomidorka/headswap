@@ -192,4 +192,26 @@
     <string name="l_notif_clear_all">Clear all</string>
     <string name="l_notif_dismiss">Dismiss</string>
     <string name="l_notif_open_in">Open in %1$s</string>
+    <string name="l_s_lyrics">Lyrics on screen</string>
+    <string name="l_s_lyrics_sub">Lyrics float above every app</string>
+    <string name="l_s_lyrics_lock">Lock position</string>
+    <string name="l_s_lyrics_lock_sub">Styling stays available</string>
+    <string name="l_s_lyrics_style">Appearance</string>
+    <string name="l_s_lyrics_color">Color</string>
+    <string name="l_s_lyrics_size">Size</string>
+    <string name="l_s_lyrics_x">Horizontal position</string>
+    <string name="l_s_lyrics_y">Vertical position</string>
+    <string name="l_s_lyrics_gap">Line spacing</string>
+    <string name="l_s_lyrics_ov">Overlap</string>
+    <string name="l_s_lyrics_alpha">Transparency</string>
+    <string name="l_s_lyrics_hue">Hue</string>
+    <string name="l_s_lyrics_sat">Saturation</string>
+    <string name="l_s_lyrics_val">Brightness</string>
+    <string name="l_s_lyrics_title">Lyrics: on/off &amp; tuning</string>
+    <string name="l_s_lyrics_rainbow">Rainbow</string>
+    <string name="l_s_lyrics_dir_h">Horizontal</string>
+    <string name="l_s_lyrics_dir_v">Vertical</string>
+    <string name="l_s_lyrics_dir_d">Diagonal</string>
+    <string name="l_s_lyrics_hint1">Turn on in the music app you use:</string>
+    <string name="l_s_lyrics_hint2">car Bluetooth lyrics or car lyrics</string>
 </resources>

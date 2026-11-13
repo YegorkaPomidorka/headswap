@@ -190,4 +190,26 @@
     <string name="l_notif_clear_all">Очистить всё</string>
     <string name="l_notif_dismiss">Убрать</string>
     <string name="l_notif_open_in">Открыть в %1$s</string>
+    <string name="l_s_lyrics">Текст песни на экране</string>
+    <string name="l_s_lyrics_sub">Текст песни поверх всех приложений</string>
+    <string name="l_s_lyrics_lock">Закрепить позицию</string>
+    <string name="l_s_lyrics_lock_sub">Оформление остаётся доступным</string>
+    <string name="l_s_lyrics_style">Оформление</string>
+    <string name="l_s_lyrics_color">Цвет</string>
+    <string name="l_s_lyrics_size">Размер</string>
+    <string name="l_s_lyrics_x">Положение по горизонтали</string>
+    <string name="l_s_lyrics_y">Положение по вертикали</string>
+    <string name="l_s_lyrics_gap">Интервал строк</string>
+    <string name="l_s_lyrics_ov">Перекрытие</string>
+    <string name="l_s_lyrics_alpha">Прозрачность</string>
+    <string name="l_s_lyrics_hue">Оттенок</string>
+    <string name="l_s_lyrics_sat">Насыщенность</string>
+    <string name="l_s_lyrics_val">Яркость</string>
+    <string name="l_s_lyrics_title">Текст песни: включение и настройка</string>
+    <string name="l_s_lyrics_rainbow">Радуга</string>
+    <string name="l_s_lyrics_dir_h">По горизонтали</string>
+    <string name="l_s_lyrics_dir_v">По вертикали</string>
+    <string name="l_s_lyrics_dir_d">По диагонали</string>
+    <string name="l_s_lyrics_hint1">Включите в плеере:</string>
+    <string name="l_s_lyrics_hint2">текст песни по Bluetooth или встроенный текст</string>
 </resources>

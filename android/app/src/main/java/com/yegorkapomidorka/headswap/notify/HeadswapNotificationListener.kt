@@ -54,6 +54,7 @@ class HeadswapNotificationListener : NotificationListenerService() {
 
     override fun onNotificationPosted(sbn: StatusBarNotification?, rankingMap: RankingMap?) {
         sbn ?: return
+        runCatching { com.yegorkapomidorka.headswap.launcher.LyricsReceiver.onNotification(sbn.packageName, sbn.notification?.extras) }
         if (!NotificationsRepo.enabled) return
         val importance = importanceOf(sbn.key, rankingMap)
         io.execute {

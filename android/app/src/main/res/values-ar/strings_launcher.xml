@@ -190,4 +190,26 @@
     <string name="l_s_alice_voice">Alice بالصوت فقط</string>
     <string name="l_s_alice_voice_on">بلا نافذة، شريط صغير في الأسفل؛ يعمل حتى والهاتف مقفل</string>
     <string name="l_s_alice_voice_off">Alice في لوحة بجانب الشريط الجانبي</string>
+    <string name="l_s_lyrics">كلمات الأغنية على الشاشة</string>
+    <string name="l_s_lyrics_sub">الكلمات تطفو فوق كل التطبيقات</string>
+    <string name="l_s_lyrics_lock">تثبيت الموضع</string>
+    <string name="l_s_lyrics_lock_sub">يبقى تغيير المظهر متاحًا</string>
+    <string name="l_s_lyrics_style">المظهر</string>
+    <string name="l_s_lyrics_color">اللون</string>
+    <string name="l_s_lyrics_size">الحجم</string>
+    <string name="l_s_lyrics_x">الموضع الأفقي</string>
+    <string name="l_s_lyrics_y">الموضع الرأسي</string>
+    <string name="l_s_lyrics_gap">المسافة بين السطرين</string>
+    <string name="l_s_lyrics_ov">التراكب</string>
+    <string name="l_s_lyrics_alpha">الشفافية</string>
+    <string name="l_s_lyrics_hue">درجة اللون</string>
+    <string name="l_s_lyrics_sat">التشبع</string>
+    <string name="l_s_lyrics_val">السطوع</string>
+    <string name="l_s_lyrics_title">كلمات الأغنية: التشغيل والضبط</string>
+    <string name="l_s_lyrics_rainbow">قوس قزح</string>
+    <string name="l_s_lyrics_dir_h">أفقي</string>
+    <string name="l_s_lyrics_dir_v">عمودي</string>
+    <string name="l_s_lyrics_dir_d">مائل</string>
+    <string name="l_s_lyrics_hint1">شغّل في تطبيق الموسيقى:</string>
+    <string name="l_s_lyrics_hint2">كلمات عبر البلوتوث أو كلمات السيارة</string>
 </resources>

@@ -190,4 +190,26 @@
     <string name="l_notif_clear_all">Tout effacer</string>
     <string name="l_notif_dismiss">Ignorer</string>
     <string name="l_notif_open_in">Ouvrir dans %1$s</string>
+    <string name="l_s_lyrics">Paroles à l\'écran</string>
+    <string name="l_s_lyrics_sub">Les paroles flottent au-dessus de toutes les applis</string>
+    <string name="l_s_lyrics_lock">Verrouiller la position</string>
+    <string name="l_s_lyrics_lock_sub">Le style reste modifiable</string>
+    <string name="l_s_lyrics_style">Apparence</string>
+    <string name="l_s_lyrics_color">Couleur</string>
+    <string name="l_s_lyrics_size">Taille</string>
+    <string name="l_s_lyrics_x">Position horizontale</string>
+    <string name="l_s_lyrics_y">Position verticale</string>
+    <string name="l_s_lyrics_gap">Interligne</string>
+    <string name="l_s_lyrics_ov">Chevauchement</string>
+    <string name="l_s_lyrics_alpha">Transparence</string>
+    <string name="l_s_lyrics_hue">Teinte</string>
+    <string name="l_s_lyrics_sat">Saturation</string>
+    <string name="l_s_lyrics_val">Luminosité</string>
+    <string name="l_s_lyrics_title">Paroles : activation et réglages</string>
+    <string name="l_s_lyrics_rainbow">Arc-en-ciel</string>
+    <string name="l_s_lyrics_dir_h">Horizontal</string>
+    <string name="l_s_lyrics_dir_v">Vertical</string>
+    <string name="l_s_lyrics_dir_d">Diagonal</string>
+    <string name="l_s_lyrics_hint1">Activez dans votre lecteur :</string>
+    <string name="l_s_lyrics_hint2">paroles Bluetooth ou paroles voiture</string>
 </resources>

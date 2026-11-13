@@ -19,6 +19,7 @@ import com.yegorkapomidorka.headswap.aa.FpsSetting
 import com.yegorkapomidorka.headswap.aa.IdrBitrateCeiling
 import com.yegorkapomidorka.headswap.aa.IdrThrottle
 import com.yegorkapomidorka.headswap.aa.CarlifeMediaInfo
+import com.yegorkapomidorka.headswap.launcher.LyricsReceiver
 import com.yegorkapomidorka.headswap.aa.LinkVideoStats
 import com.yegorkapomidorka.headswap.aa.NaviField6
 import com.yegorkapomidorka.headswap.aa.NaviTurnInfo
@@ -357,6 +358,8 @@ class CarLifeSession(
 
     // ---------------- CMD ----------------
 
+    private val unknownDumpAt = HashMap<Int, Long>()
+
     private fun onCmd(m: CmdMsg) {
         when (m.type) {
             Msg.HU_PROTOCOL_VERSION -> {
@@ -573,7 +576,23 @@ class CarLifeSession(
                 }
             }
             Msg.MD_EXIT -> close("ГУ прислало MD_EXIT")
-            else -> Unit // всё остальное только в логе
+            else -> {
+                // 取证用：把协议里没登记的报文类型、长度、头几个字节打出来（每类 2 秒最多一次）
+                // 目的只有一个——确认车机侧到底有没有"歌词"这类报文；确认没有就把这段删掉。
+                val now = android.os.SystemClock.elapsedRealtime()
+                if (now - (unknownDumpAt[m.type] ?: 0L) > 2_000L) {
+                    unknownDumpAt[m.type] = now
+                    val head = m.body.take(24).joinToString(" ") { b -> String.format("%02X", b) }
+                    AppLog.i("== UNKNOWN_CMD type=" + Msg.name(m.type) +
+                        " hex=" + Integer.toHexString(m.type) + " len=" + m.body.size + " head=" + head)
+                }
+                // 兜底：万一某个播放器真把歌词塞进 CarLife 报文，这里作为最低优先级来源收下
+                if (m.body.size in 6..600) {
+                    val txt = runCatching { m.body.toString(Charsets.UTF_8) }.getOrDefault("")
+                    val cjk = txt.count { it.code in 0x4E00..0x9FFF }
+                    if (cjk >= 4) runCatching { LyricsReceiver.onUnknownCommandText(txt) }
+                }
+            }
         }
     }
 
