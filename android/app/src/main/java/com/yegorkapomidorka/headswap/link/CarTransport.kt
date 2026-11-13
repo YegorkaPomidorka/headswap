@@ -5,7 +5,7 @@ package com.yegorkapomidorka.headswap.link
  * kind идёт в лог строкой «транспорт=…» и в WL-лог.
  */
 class TransportCaps(
-    /** usb-aoa, tcp-debug (один поток с внешним заголовком), tcp6 (6 сокетов Baidu без внешнего заголовка). */
+    /** usb-aoa, tcp-debug и usb-tcp (один поток с внешним заголовком), tcp6 (6 сокетов Baidu без внешнего заголовка). */
     val kind: String,
     /** Поток с внешним заголовком [chan u32][len u32] (USB AOA, debug-TCP). */
     val outerHeader: Boolean,
@@ -14,10 +14,19 @@ class TransportCaps(
     /** Обрыв приходит системным событием (USB_ACCESSORY_DETACHED), а не только EOF. */
     val nativeDetach: Boolean,
 ) {
+    /**
+     * Для ГУ это «USB-аксессуар»: звук и рабочий стол ведут себя как по кабелю (USB_AOA, debug-TCP и свисток).
+     * Физический USB телефона тут ни при чём: detach по accessoryList, usb-to-air и восстановление рабочего стола
+     * проверяют именно USB_AOA.
+     */
+    val usbLike: Boolean get() = this === USB_AOA || this === TCP_DEBUG || this === USB_TCP
+
     companion object {
         val USB_AOA = TransportCaps("usb-aoa", outerHeader = true, separateSockets = false, nativeDetach = true)
         val TCP_DEBUG = TransportCaps("tcp-debug", outerHeader = true, separateSockets = false, nativeDetach = false)
         val TCP6 = TransportCaps("tcp6", outerHeader = false, separateSockets = true, nativeDetach = false)
+        /** Свисток: стик в USB ГУ гонит поток аксессуара по одному TCP-сокету на телефон (порт 7250). */
+        val USB_TCP = TransportCaps("usb-tcp", outerHeader = true, separateSockets = false, nativeDetach = false)
     }
 }
 
