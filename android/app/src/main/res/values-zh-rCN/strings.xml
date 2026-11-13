@@ -5,4 +5,6 @@
 
     <string name="lang_title">语言</string>
     <string name="lang_system">跟随系统</string>
+
+    <string name="notif_channel_bridge">Headswap</string>
 </resources>

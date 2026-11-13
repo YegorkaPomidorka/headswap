@@ -100,4 +100,8 @@
     <plurals name="dev_deleted_old_files">
         <item quantity="other">已删除 %d 个旧文件</item>
     </plurals>
+
+    <string name="dev_action_aa_selftest">AA 自检</string>
+    <string name="dev_action_mic_test">麦克风测试</string>
+    <string name="dev_mic_vr_title">模块状态 VR</string>
 </resources>

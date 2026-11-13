@@ -109,4 +109,8 @@
     <string name="mock_ok">确定</string>
 
     <string name="home_wireless">无线：%1$s</string>
+
+    <string name="home_stage_aa">Android Auto</string>
+    <string name="mock_aa_title">Android Auto</string>
+    <string name="mock_bt_title">蓝牙</string>
 </resources>

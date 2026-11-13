@@ -295,4 +295,16 @@
     <string name="about_author_ildar">Ildar Sadykov</string>
     <string name="about_open_project">项目主页</string>
     <string name="about_license_unavailable">许可证文本不可用。请查看项目主页。</string>
+
+    <string name="set_desktop_direct_title">直通</string>
+    <string name="set_desktop_transcode_title">重新编码</string>
+    <string name="set_desktop_transcode_note">下次连接时生效。重新编码会插入一段 H.264 中间环节，与 Android Auto 类似：延迟和发热增加，但在部分车机上更稳定。</string>
+    <string name="set_video_range_title">色彩范围</string>
+    <string name="set_video_range_auto">自动</string>
+    <string name="set_video_range_limited">有限（16–235）</string>
+    <string name="set_video_range_full">全范围（0–255）</string>
+    <string name="set_video_range_note">「自动」对本田 CR-V 2026 / CR-V 2026 混动预设使用有限范围（16–235），其他车型沿用原视频流；手动选择对所有车型生效。下次连接时生效。</string>
+    <string name="bm_aa">Android Auto</string>
+    <string name="bm_desktop">Headswap 桌面</string>
+    <string name="bm_launcher_own">Headswap</string>
 </resources>

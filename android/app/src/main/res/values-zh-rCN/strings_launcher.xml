@@ -190,4 +190,6 @@
     <string name="l_notif_clear_all">全部清除</string>
     <string name="l_notif_dismiss">清除</string>
     <string name="l_notif_open_in">在%1$s中打开</string>
+
+    <string name="l_nav_waze">Waze</string>
 </resources>
