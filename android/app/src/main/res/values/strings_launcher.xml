@@ -180,6 +180,7 @@
     <string name="l_nh_arrival">arrival</string>
     <string name="l_nh_end">End route</string>
     <string name="l_nh_search">Search</string>
+    <string name="l_nh_voice">Voice assistant</string>
     <string name="l_nh_loading">Loading…</string>
     <string name="l_s_notifications">Notifications</string>
     <string name="l_s_alice_voice">Alice by voice only</string>

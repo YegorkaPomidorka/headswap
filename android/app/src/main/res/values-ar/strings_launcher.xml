@@ -161,6 +161,7 @@
     <string name="l_nh_arrival">الوصول</string>
     <string name="l_nh_end">إنهاء المسار</string>
     <string name="l_nh_search">بحث</string>
+    <string name="l_nh_voice">المساعد الصوتي</string>
     <string name="l_nh_loading">جارٍ التحميل…</string>
     <string name="l_s_notifications">الإشعارات</string>
     <string name="l_notif_show_all">الإشعارات: %1$d. عرض الكل</string>

@@ -179,6 +179,7 @@
     <string name="l_nh_arrival">arrivée</string>
     <string name="l_nh_end">Terminer l\'itinéraire</string>
     <string name="l_nh_search">Rechercher</string>
+    <string name="l_nh_voice">Assistant vocal</string>
     <string name="l_nh_loading">Chargement…</string>
     <string name="l_s_notifications">Notifications</string>
     <string name="l_s_alice_voice">Alice par la voix uniquement</string>
