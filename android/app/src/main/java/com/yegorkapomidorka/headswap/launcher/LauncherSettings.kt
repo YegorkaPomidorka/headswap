@@ -1123,7 +1123,8 @@ private fun systemInfo(): List<Pair<String, String>> {
     val version = CarLifeState.huCarlifeVersion ?: CarLifeState.huStatVersion
     val hu = name?.let { n -> version?.let { "$n · CarLife $it" } ?: n } ?: dash
     val link = if (!CarLifeState.running) dash else if (CarLifeState.wirelessSession) "Wi-Fi" else "USB"
-    val fps = DexPrefs(LauncherModel.context).desktopFps.fixed ?: 30
+    val desktopFps = DexPrefs(LauncherModel.context).desktopFps
+    val fps = desktopFps.fixed?.toString() ?: stringResource(R.string.fps_auto_title)
     val res = CarLifeState.videoMode?.let { stringResource(R.string.l_s_fps, "${it.outW}×${it.outH}", fps) }
     return listOf(
         stringResource(R.string.l_s_hu) to hu,

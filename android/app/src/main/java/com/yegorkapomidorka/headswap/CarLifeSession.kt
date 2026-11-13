@@ -8,6 +8,7 @@ import com.yegorkapomidorka.headswap.aa.CarlifeAudio
 import com.yegorkapomidorka.headswap.aa.AaTranscoder
 import com.yegorkapomidorka.headswap.aa.BitratePolicy
 import com.yegorkapomidorka.headswap.aa.BitrateProfile
+import com.yegorkapomidorka.headswap.aa.DesktopTranscodeTranscoder
 import com.yegorkapomidorka.headswap.aa.DesktopVideoQuality
 import com.yegorkapomidorka.headswap.aa.DupDownFilter
 import com.yegorkapomidorka.headswap.aa.DesktopVideoSelection
@@ -84,7 +85,7 @@ class CarLifeSession(
     private val air = transport.caps == TransportCaps.TCP6
     private val bitrateProfile = if (air) BitrateProfile.WIFI else BitrateProfile.USB
     private val legacyBitratePolicy = BitratePolicy(mode.bitrate, profile = bitrateProfile)
-    private val surfaceBitratePolicy: BitratePolicy by lazy { DesktopVideoQuality.bitratePolicy(bitrateProfile) }
+    private val surfaceBitratePolicy: BitratePolicy by lazy { DesktopVideoQuality.bitratePolicy(bitrateProfile, mode.bitrate, crv = bridge.crvDesktopPacing) }
     @Volatile private var encodingSurface = false
     // The source starts after this session is constructed. Select its independent policy
     // only when the direct Surface encoder is requested, never from an early source flag.
@@ -611,7 +612,7 @@ class CarLifeSession(
     }
 
     private fun chooseVideoFps(requested: Int): Int = if (cfg.desktopVideo != null)
-        DesktopVideoQuality.chooseFps(cfg.fpsSetting, requested, huMaxFps())
+        DesktopVideoQuality.chooseFps(cfg.fpsSetting, requested, huMaxFps(), cap30 = bridge.crvDesktopPacing)
         else Handshake.chooseFps(cfg.fpsSetting, requested, huMaxFps())
 
     @Synchronized private fun onVideoInit(m: CmdMsg) {
@@ -1160,19 +1161,37 @@ class CarLifeSession(
             // was active. Apply that same level to the newly selected Surface policy.
             bitratePolicy.setThermalCap(if (thermalThrottle.level == ThermalLevel.NORMAL) Int.MAX_VALUE
                 else thermalThrottle.capBitrate(bitratePolicy.ceilingBps))
-            val actualBps = if (mobis) mobisAaCeiling.current else bitratePolicy.current
+        }
+        val actualBps = if (mobis) mobisAaCeiling.current else bitratePolicy.current
+        if (directSurface) {
             AppLog.i("DEX video quality native=${mode.outW}x${mode.outH} singleEncode=true " +
                 "targetKbps=${actualBps / 1000} ceilingKbps=${bitratePolicy.ceilingBps / 1000} " +
                 "profile=${bitratePolicy.profile.name} adaptive=true", false)
         }
-        AaTranscoder(
-            mode.outW, mode.outH, thermalThrottle.capFps(if (mobis) AaBridgeCore.MOBIS_FPS else targetFps),
-            if (mobis) mobisAaCeiling.current else bitratePolicy.current, out, { AppLog.i(it, false) },
+        val fps = thermalThrottle.capFps(if (mobis) AaBridgeCore.MOBIS_FPS else targetFps)
+        val transcode = if (directSurface && bridge.desktopTranscode) {
+            try {
+                DesktopTranscodeTranscoder(
+                    mode.outW, mode.outH, fps, actualBps, out, { AppLog.i(it, false) },
+                    capabilityFps = if (mobis) AaBridgeCore.MOBIS_FPS else targetFps,
+                    baidu = mobis,
+                    limitedRange = bridge.videoLimitedRange,
+                    pacer30 = bridge.crvDesktopPacing,
+                ).also { it.start() }
+            } catch (e: Exception) {
+                AppLog.e("BRIDGE desktop transcode не создан, fallback на прямое кодирование", e)
+                null
+            }
+        } else null
+        transcode ?: AaTranscoder(
+            mode.outW, mode.outH, fps, actualBps, out, { AppLog.i(it, false) },
             srcWidth = if (directSurface) mode.outW else mode.aaW,
             srcHeight = if (directSurface) mode.outH else mode.aaH,
             crop = if (directSurface) com.yegorkapomidorka.headswap.aa.VideoCrop.NONE else mode.cropFor(bridge.marginsAtBottom),
             baidu = mobis, directSurface = directSurface,
             capabilityFps = if (mobis) AaBridgeCore.MOBIS_FPS else targetFps,
+            limitedRange = bridge.videoLimitedRange,
+            pacer30 = bridge.crvDesktopPacing,
         ).also { it.start() }
     } catch (e: Exception) {
         AppLog.e("BRIDGE транскодер не создан", e)

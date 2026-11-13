@@ -88,6 +88,9 @@ internal class SleepDiagProbe(private val context: Context, private val automati
                 Regex("""(?i)headswap|displaygroup|mState=|state=|mScreenState|powerstate|mDisplayOffloadSession|group"""), 80),
             Probe("window", "window displays",
                 Regex("""(?i)display: mDisplayId|mDisplayId=|sleep|keyguard|mAwake|mScreenOn|headswap"""), 60),
+            // h1007: тачскрин uinput - включён ли, к какому дисплею привязан, есть ли viewport дисплея ГУ.
+            Probe("input", "input",
+                Regex("""(?i)headswap|interactive|AssociatedDisplay|UniqueIdAssociation|Viewport|displayId="""), 60),
         )
     }
 }

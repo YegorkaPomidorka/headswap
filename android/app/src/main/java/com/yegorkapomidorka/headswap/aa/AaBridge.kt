@@ -150,6 +150,14 @@ class AaBridgeCore(
     // --- видео: перекодирование (по умолчанию в приложении) или passthrough ---
     /** Режим видео моста: true = AA -> декодер -> энкодер (кадры повторяются на статике), false = H.264 как есть. */
     @Volatile var transcodeEnabled = false
+    /** Desktop only: insert an intermediate H.264 encode/decode stage before the CarLife encoder. */
+    @Volatile var desktopTranscode = false
+
+    /** Encode the final stream as limited range (16-235). Set per session from the car preset / manual choice. */
+    @Volatile var videoLimitedRange = false
+
+    /** CR-V 2026 desktop pacing: fixed 30 fps pacer, AUTO up to 30, 6 Mbit/s Wi-Fi ceiling without growth. */
+    @Volatile var crvDesktopPacing = false
 
     /**
      * Разрешение видео, снятое один раз при создании хоста (уже с учётом passthrough): им построена AA (SDR),
@@ -2249,6 +2257,8 @@ class AaBridgeCore(
     private var spliceMisses = 0                       // картинка не пришла из декодера, подряд
     private var spliceBackoffUntil = NEVER             // пауза после [SPLICE_MAX_MISSES] пропусков: до этого момента свой IDR не пробуем
     private var spliceBackoffs = 0                     // сколько таких пауз за AA-сессию
+    private var spliceSendFails = 0                    // свой IDR не принят CarLife, подряд
+    private var spliceSendBackoffUntil = NEVER         // пауза после отказа sendVideo: до этого момента свой IDR не пробуем
     private var refLagSince = NEVER                    // с какого момента декодер отстаёт от кадров AA больше чем на 2 и не двигается
     private var refLagOutSeq = 0L                      // refOutSeq в начале этого отставания: сдвинулся - декодер жив
     private var spliceDisabled: String? = null          // вставка невозможна до конца AA-сессии (причина)
@@ -2270,7 +2280,7 @@ class AaBridgeCore(
      */
     internal val spliceWorks: Boolean
         get() = spliceOn && spliceDisabled == null && refDecoder != null && refPicSeq > 0 &&
-            clockMs() >= spliceBackoffUntil && splicer?.blocker() == null
+            clockMs() >= spliceBackoffUntil && clockMs() >= spliceSendBackoffUntil && splicer?.blocker() == null
 
     /** Кадр AA через splicer (frame_num/POC после своего IDR) и в декодер опорных картинок. */
     private fun spliceTrack(b: ByteArray): ByteArray {
@@ -2317,7 +2327,7 @@ class AaBridgeCore(
         if (splicePendingSeq != 0L || spliceDisabled != null || !carlifeStarted || active != Source.AA) return false
         val sp = splicer ?: return false
         if (refDecoder == null || sp.seq == 0L || sp.seq - refOutSeq > 2) return false     // декодер отстал или ждёт IDR
-        if (now < spliceNotBefore || now < spliceBackoffUntil) return false
+        if (now < spliceNotBefore || now < spliceBackoffUntil || now < spliceSendBackoffUntil) return false
         if (gotIdr && now - lastIdrSentMs < spliceMs) return false
         val why = sp.blocker()
         if (why != null) {
@@ -2486,15 +2496,34 @@ class AaBridgeCore(
     }
 
     private fun spliceSend(sp: IdrSplicer, job: IdrSplicer.Job, r: IdrSplice.Result, buildMs: Long, now: Long) {
+        // Очередь уже забита: свой IDR только добьёт её. Отпускаем придержанные кадры и ждём IDR от AA.
+        val stats = link.videoStats()
+        if (stats != null && ownIdrBlocked(stats)) {
+            spliceStats.deferred++
+            if (spliceStats.deferred <= 3) {
+                log("BRIDGE свой IDR отложен: очередь ${stats.queueFrames} кадр/${stats.queueBytes / 1024} КБ, " +
+                    "бэклог ${stats.backlogMs} мс", false)
+            }
+            spliceNotBefore = now + SPLICE_RETRY_MS
+            return
+        }
         // SPS/PPS через раз: Honda после сброса ждёт их в кадре (h295), Java-ГУ CarLife в сбросе берёт только голый IDR
         val cfg = aaConfig
         val recovered = !gotIdr
         val glued = cfg != null && sp.spliced % 2 == 0L
         val payload = if (glued) spsCrop(AnnexB.glue(cfg!!, r.nal)) else r.nal
         if (!link.sendVideo(payload)) {
-            log("BRIDGE свой IDR ${payload.size} Б не принят CarLife (очередь/закрыто)", true)
+            spliceSendFails++
+            spliceStats.sendFailed++
+            val delay = minOf(SPLICE_SEND_BACKOFF_MS * spliceSendFails, SPLICE_SEND_BACKOFF_MAX_MS)
+            spliceSendBackoffUntil = now + delay
+            spliceNotBefore = spliceSendBackoffUntil
+            log("BRIDGE свой IDR ${payload.size} Б не принят CarLife (очередь/закрыто), пауза $delay мс " +
+                "(отказов подряд $spliceSendFails), потом снова", true)
             return
         }
+        spliceSendFails = 0
+        spliceSendBackoffUntil = NEVER
         sp.commit(job)
         spliceStats.sent++
         spliceLastSentAt = now
@@ -2549,6 +2578,8 @@ class AaBridgeCore(
         spliceMisses = 0
         spliceBackoffUntil = NEVER
         spliceBackoffs = 0
+        spliceSendFails = 0
+        spliceSendBackoffUntil = NEVER
         refLagSince = NEVER
         spliceLastSentAt = NEVER
         spliceLastSeq = 0
@@ -2622,6 +2653,8 @@ class AaBridgeCore(
         var big = 0
         var holdTimeout = 0
         var noPicture = 0
+        var deferred = 0
+        var sendFailed = 0
         private var builds = 0
         private var buildSum = 0L
         private var buildMax = 0L
@@ -2636,12 +2669,13 @@ class AaBridgeCore(
         fun logIfDue(now: Long, qp: Int?) {
             if (since == NEVER) since = now
             if (now - since < SPLICE_STATS_MS) return
-            if (sent + stale + big + holdTimeout + noPicture > 0) {
+            if (sent + stale + big + holdTimeout + noPicture + deferred + sendFailed > 0) {
                 log("BRIDGE свой IDR за ${(now - since) / 1000} с: ушло $sent, устарел (AA прислал кадр) $stale, больше $SPLICE_MAX_BYTES Б $big, " +
-                    "держали кадры дольше $SPLICE_HOLD_MAX_MS мс $holdTimeout, без картинки $noPicture; сборка " +
+                    "держали кадры дольше $SPLICE_HOLD_MAX_MS мс $holdTimeout, без картинки $noPicture, " +
+                    "отложено из-за очереди $deferred, не принято CarLife $sendFailed; сборка " +
                     (if (builds > 0) "ср ${buildSum / builds} мс, макс $buildMax мс" else "-") + (if (qp != null) ", QP $qp" else ""), true)
             }
-            sent = 0; stale = 0; big = 0; holdTimeout = 0; noPicture = 0
+            sent = 0; stale = 0; big = 0; holdTimeout = 0; noPicture = 0; deferred = 0; sendFailed = 0
             builds = 0; buildSum = 0; buildMax = 0
             since = now
         }
@@ -3239,6 +3273,10 @@ class AaBridgeCore(
         const val SPS_CROP_KICK_MS = 2000L
         const val KEYFRAME_RETRY_MS = 4000L
 
+        /** Свой IDR не отправляем, если очередь уже забита: иначе он сам становится причиной переполнения. */
+        internal fun ownIdrBlocked(stats: LinkVideoStats): Boolean =
+            stats.backlogMs > SPLICE_BACKLOG_MAX_MS || stats.queueFrames > SPLICE_QUEUE_MAX_FRAMES
+
         /** Свой IDR: не больше этого (буфер приёма C++-ГУ CarLife 600 КиБ, docs/carlife-protocol.md §6). */
         const val SPLICE_MAX_BYTES = 560_000
         const val SPLICE_WAIT_MS = 300L          // картинку из декодера ждём не дольше
@@ -3248,6 +3286,10 @@ class AaBridgeCore(
         const val SPLICE_STATS_MS = 30_000L
         const val SPLICE_MAX_MISSES = 3          // таймаутов картинки подряд - пауза [SPLICE_BACKOFF_MS] и новая попытка
         const val SPLICE_BACKOFF_MS = 5000L      // пауза своего IDR после [SPLICE_MAX_MISSES] пропусков (spliceWorks в ней false)
+        const val SPLICE_BACKLOG_MAX_MS = 200L   // при таком бэклоге свой IDR не отправляем: очередь и так забита
+        const val SPLICE_QUEUE_MAX_FRAMES = 10   // то же по числу кадров в очереди
+        const val SPLICE_SEND_BACKOFF_MS = 10_000L   // пауза растёт с каждым отказом подряд: 10, 20, 30 с (свой IDR не выключаем)
+        const val SPLICE_SEND_BACKOFF_MAX_MS = 30_000L
         const val SPLICE_STALL_MS = 3000L        // декодер опорных картинок не двигается при идущих кадрах AA дольше - перезапуск
         const val SPLICE_STALL_IDLE_MS = 1000L   // AA молчит дольше - кадров нет, декодер вставшим не считаем
         const val SPLICE_KICK_GRACE_MS = 1500L   // h529-повтор IDR от AA откладывается на столько, если свой IDR вот-вот уйдёт

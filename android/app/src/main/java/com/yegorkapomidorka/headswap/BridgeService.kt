@@ -977,13 +977,11 @@ class BridgeService : Service() {
             h.core.spliceMs = spliceMs
         }
         h.core.carVwId = aaPrefs.carPreset == CarPreset.VW_ID_UNYX
+        h.core.videoLimitedRange = DexPrefs(this).effectiveLimitedRange(aaPrefs.carPreset)
+        h.core.crvDesktopPacing = aaPrefs.carPreset?.settings?.crvDesktopPacing == true
         h.core.phoneAssistant = null   // режим AA: кнопка голоса идёт в AA
         DesktopKeys.voiceStatus = null
-        if (wakeLock == null) {
-            wakeLock = getSystemService(PowerManager::class.java)
-                .newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "headswap:session")
-                .apply { acquire(4 * 60 * 60 * 1000L) }
-        }
+        acquireSessionWakeLocks()
         CarLifeState.running = true
         stopRequested = false
 
@@ -1084,14 +1082,13 @@ class BridgeService : Service() {
         val owner: BridgeHost = h
         // темп кадров CarLife, повтор статичных кадров и энкодер остаются как в основном видеоконвейере
         owner.core.transcodeEnabled = true
+        owner.core.desktopTranscode = dexPrefs.desktopTranscode
+        owner.core.videoLimitedRange = dexPrefs.effectiveLimitedRange(aaPrefs.carPreset)
+        owner.core.crvDesktopPacing = aaPrefs.carPreset?.settings?.crvDesktopPacing == true
         owner.core.spliceMs = 0L
         owner.core.carVwId = aaPrefs.carPreset == CarPreset.VW_ID_UNYX
         // кнопка голоса: системный помощник клавишей KEYCODE_ASSIST (как долгое нажатие питания), см. createDesktopHost
-        if (wakeLock == null) {
-            wakeLock = getSystemService(PowerManager::class.java)
-                .newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "headswap:session")
-                .apply { acquire(4 * 60 * 60 * 1000L) }
-        }
+        acquireSessionWakeLocks()
         CarLifeState.running = true
         stopRequested = false
 
@@ -1410,15 +1407,28 @@ class BridgeService : Service() {
         }
     }
 
-    private fun finish() {
-        if (desktopUsed) cancelDesktopRecovery()
-        stopCarNet(CarNetEvent.STOP, "finish")
-        CarLifeState.running = false
+    /** Partial wake lock: keep the bridge and the encoders running while the session is live. */
+    private fun acquireSessionWakeLocks() {
+        if (wakeLock == null) {
+            wakeLock = getSystemService(PowerManager::class.java)
+                .newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "headswap:session")
+                .apply { setReferenceCounted(false); acquire(4 * 60 * 60 * 1000L) }
+        }
+    }
+
+    private fun releaseSessionWakeLocks() {
         try {
             wakeLock?.let { if (it.isHeld) it.release() }
         } catch (_: Exception) {
         }
         wakeLock = null
+    }
+
+    private fun finish() {
+        if (desktopUsed) cancelDesktopRecovery()
+        stopCarNet(CarNetEvent.STOP, "finish")
+        CarLifeState.running = false
+        releaseSessionWakeLocks()
         stopForeground(STOP_FOREGROUND_REMOVE)
         stopSelf()
     }
@@ -1444,6 +1454,7 @@ class BridgeService : Service() {
         }
         session?.close("сервис уничтожен")
         host?.shutdown("сервис уничтожен")
+        releaseSessionWakeLocks()
         super.onDestroy()
     }
 

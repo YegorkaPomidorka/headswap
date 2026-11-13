@@ -163,7 +163,7 @@
     <string name="l_s_video">Video</string>
     <string name="l_s_version">Version</string>
     <string name="l_s_hu_channel">Channel %1$s</string>
-    <string name="l_s_fps">%1$s · %2$d fps</string>
+    <string name="l_s_fps">%1$s · %2$s fps</string>
     <string name="l_nav_yandex_navi">Ya.Navigator</string>
     <string name="l_nav_2gis">2GIS</string>
     <string name="l_nav_yandex_maps">Yandex Maps</string>
@@ -181,6 +181,7 @@
     <string name="l_nh_arrival">arrival</string>
     <string name="l_nh_end">End route</string>
     <string name="l_nh_search">Search</string>
+    <string name="l_nh_voice">Voice assistant</string>
     <string name="l_nh_loading">Loading…</string>
     <string name="l_s_notifications">Notifications</string>
     <string name="l_s_alice_voice">Alice by voice only</string>
