@@ -162,7 +162,8 @@ fun NavHostOverlay() {
         return
     }
     // видимая и стабильная области для навигатора: карта без наших карточек и кнопок (CarAreas)
-    val hasActions = (current as? CarUi.Nav)?.actions?.isNotEmpty() ?: (current as? CarUi.Panel)?.actions?.isNotEmpty() ?: false
+    // в ряду действий всегда есть наш микрофон помощника (ActionColumn)
+    val hasActions = current is CarUi.Nav || current is CarUi.Panel
     LaunchedEffect(current?.javaClass, current is CarUi.Nav && (current.maneuver != null || current.eta != null), hasActions, w) {
         val left = when (current) {
             is CarUi.Nav -> if (current.maneuver != null || current.eta != null) d.gap + maxOf(d.card, d.eta) + d.gap else 0
@@ -303,19 +304,28 @@ private fun EndButton(end: CarAction, look: NavLook, d: NavDims, modifier: Modif
     }
 }
 
-/** Действия справа вверху (в ряд) и кнопки карты справа внизу (столбиком). */
+/**
+ * Действия справа вверху (в ряд) и кнопки карты справа внизу (столбиком).
+ * В конце ряда - наш микрофон: помощник как с кнопки голоса ГУ (Алиса, нет её - Gemini), рядом с поиском навигатора.
+ */
 @Composable
 private fun androidx.compose.foundation.layout.BoxScope.ActionColumn(actions: List<CarAction>, mapActions: List<CarAction>, look: NavLook, d: NavDims) {
     val m = LocalMetrics.current
-    if (actions.isNotEmpty()) {
-        Row(Modifier.align(Alignment.TopEnd).padding(top = m.dp(d.gap), end = m.dp(d.gap)), horizontalArrangement = Arrangement.spacedBy(m.dp(d.gap))) {
-            actions.forEach { CircleAction(it, look, d) }
-        }
+    Row(Modifier.align(Alignment.TopEnd).padding(top = m.dp(d.gap), end = m.dp(d.gap)), horizontalArrangement = Arrangement.spacedBy(m.dp(d.gap))) {
+        actions.forEach { CircleAction(it, look, d) }
+        AssistantAction(look, d)
     }
     if (mapActions.isNotEmpty()) {
         Column(Modifier.align(Alignment.BottomEnd).padding(bottom = m.dp(d.gap), end = m.dp(d.gap)), verticalArrangement = Arrangement.spacedBy(m.dp(d.gap))) {
             mapActions.forEach { CircleAction(it, look, d) }
         }
+    }
+}
+
+@Composable
+private fun AssistantAction(look: NavLook, d: NavDims) {
+    RoundButton(d.btn, stringResource(R.string.l_nh_voice), onTap = { LauncherActions.toggleAssistant() }, background = look.btn) {
+        SvgIcon(Ico.MIC, d.btnIc, look.fg)
     }
 }
 
