@@ -1636,9 +1636,19 @@ class CarLifeSession(
         private const val MOBIS_KEEPALIVE_POLL_MS = 50L
 
         /**
-         * Поле time видеопакета: младшие 32 бита unix-миллисекунд, как у MEDIA/TTS/VR_DATA (sendAudio).
-         * Оригинал (Recorder.sendVideoData :930-962) клал unix-секунды: у всех кадров одной секунды одинаковый time.
+         * Время видеопакета в мс (раздел для разработчиков, по умолчанию выкл). Выставляет BridgeService на подключение
+         * из AaPrefs.videoTimeMs; эксперимент: проверяем, лечит ли это видео на проблемных ГУ.
          */
-        private fun videoTimeMs() = (System.currentTimeMillis() and 0xFFFFFFFFL).toInt()
+        @Volatile @JvmStatic var VIDEO_TIME_MS = false
+
+        /**
+         * Поле time видеопакета. По умолчанию unix-секунды, как в оригинале (Recorder.sendVideoData :930-962):
+         * у всех кадров одной секунды одинаковый time. С [VIDEO_TIME_MS] - младшие 32 бита unix-миллисекунд,
+         * как у MEDIA/TTS/VR_DATA (sendAudio).
+         */
+        internal fun videoTime(nowMs: Long, ms: Boolean): Int =
+            if (ms) (nowMs and 0xFFFFFFFFL).toInt() else (nowMs / 1000).toInt()
+
+        private fun videoTimeMs() = videoTime(System.currentTimeMillis(), VIDEO_TIME_MS)
     }
 }

@@ -34,6 +34,8 @@
     <string name="dev_section_video">视频（重新连接后生效）</string>
     <string name="dev_own_idr_title">直通模式下使用自有关键帧</string>
     <string name="dev_own_idr_sub">手机每 2 秒向车机发送一个自有关键帧：倒车影像和车机菜单之后画面可以恢复。如果车机能自行恢复（例如大众），请关闭此项：流量和手机负载更低</string>
+    <string name="dev_video_time_ms_title">视频包时间戳使用毫秒</string>
+    <string name="dev_video_time_ms_sub">实验：VIDEO_DATA 的 time 字段使用毫秒（与音乐相同）而非秒。如果车机视频卡顿或冻结请开启；如果变差请关闭</string>
     <string name="dev_custom_res_title">自定义分辨率</string>
     <string name="dev_custom_res_sub">代替视频设置中的模式</string>
     <string name="dev_section_desktop">车机桌面</string>
