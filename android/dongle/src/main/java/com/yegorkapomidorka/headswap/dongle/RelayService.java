@@ -34,6 +34,7 @@ public class RelayService extends Service {
     static final int PHONE_PORT = 7250;
     private static final int CHUNK = 16384;
     private static final int MAX_FRAME = 64 * 1024 * 1024;
+    private static final java.io.File DEV_ACCESSORY = new java.io.File("/dev/usb_accessory");
 
     private WifiManager.WifiLock wifiLock;
     private PowerManager.WakeLock wakeLock;
@@ -63,16 +64,64 @@ public class RelayService extends Service {
             UsbAccessory[] list = usb.getAccessoryList();
             if (list != null && list.length > 0 && usb.hasPermission(list[0])) acc = list[0];
         }
-        if (acc == null) {
-            Log.i("старт без аксессуара, жду ГУ");
-        } else if (relay != null && relay.isAlive()) {
-            Log.i("ретранслятор уже работает, " + acc);
-        } else {
+        if (relay != null && relay.isAlive()) {
+            Log.i("ретранслятор уже работает");
+        } else if (acc != null) {
             final UsbAccessory a = acc;
             relay = new Thread(() -> runRelay(usb, a), "relay");
             relay.start();
+        } else if (DEV_ACCESSORY.canRead() && DEV_ACCESSORY.canWrite()) {
+            relay = new Thread(this::runDirectLoop, "relay-dev");
+            relay.start();
+        } else {
+            Log.i("старт без аксессуара, жду ГУ (" + DEV_ACCESSORY + " недоступен)");
         }
         return START_STICKY;
+    }
+
+    /**
+     * Прямой режим: стик с загрузки в sys.usb.config=accessory,adb (18D1:2D01), ГУ рукопожатие не делает,
+     * фреймворк аксессуар не видит. Читаем /dev/usb_accessory сами (права 666 ставит install-recovery.sh).
+     * Чтение блокируется, пока хост не сконфигурирует устройство; телефон зовём только после первых байт от ГУ.
+     */
+    private void runDirectLoop() {
+        Log.i("прямой режим " + DEV_ACCESSORY);
+        while (true) {
+            java.io.RandomAccessFile dev = null;
+            FileInputStream usbIn = null;
+            FileOutputStream usbOut = null;
+            Socket sock = null;
+            try {
+                // Драйвер пускает только одно открытие (open_excl), поэтому один fd на чтение и запись
+                dev = new java.io.RandomAccessFile(DEV_ACCESSORY, "rw");
+                usbIn = new FileInputStream(dev.getFD());
+                usbOut = new FileOutputStream(dev.getFD());
+                byte[] buf = new byte[CHUNK];
+                int n = usbIn.read(buf);
+                if (n <= 0) throw new IOException("ГУ: пустое первое чтение " + n);
+                Log.i("ГУ заговорило, первые " + n + " Б");
+                sock = connectPhone();
+                if (sock == null) throw new IOException("нет телефона");
+                OutputStream net = sock.getOutputStream();
+                net.write(buf, 0, n);
+                final Socket s = sock;
+                final FileOutputStream out = usbOut;
+                new Thread(() -> pumpDown(s, out), "down").start();
+                pumpUp(usbIn, net);
+            } catch (IOException e) {
+                Log.i("прямой режим: " + e.getMessage());
+            } finally {
+                boolean hadPhone = sock != null;
+                closeQuietly(sock);
+                try { if (usbIn != null) usbIn.close(); } catch (IOException ignored) { }
+                try { if (usbOut != null) usbOut.close(); } catch (IOException ignored) { }
+                try { if (dev != null) dev.close(); } catch (IOException ignored) { }
+                // Сессия с телефоном была и оборвалась: ГУ живёт в старой сессии и заново рукопожатие не начнёт.
+                // Делаем вид, что кабель выдернули, — как при обрыве USB у обычного телефона.
+                if (hadPhone) replugUsb();
+            }
+            try { Thread.sleep(1000); } catch (InterruptedException e) { return; }
+        }
     }
 
     private void runRelay(UsbManager usb, UsbAccessory acc) {
@@ -170,6 +219,25 @@ public class RelayService extends Service {
             closeQuietly(s);
             try { usbOut.close(); } catch (IOException ignored) { }
         }
+    }
+
+    private static final java.io.File USB_ENABLE = new java.io.File("/sys/class/android_usb/android0/enable");
+
+    /** Отключить USB-гаджет на секунду: хост видит отсоединение и при возврате начинает сессию с нуля. */
+    private static void replugUsb() {
+        try {
+            writeSys(USB_ENABLE, "0");
+            Thread.sleep(1000);
+            writeSys(USB_ENABLE, "1");
+            Log.i("USB передёрнут: ГУ начнёт сессию заново");
+        } catch (IOException | InterruptedException e) {
+            Log.i("не вышло передёрнуть USB: " + e);
+        }
+    }
+
+    private static void writeSys(java.io.File f, String v) throws IOException {
+        FileOutputStream o = new FileOutputStream(f);
+        try { o.write(v.getBytes()); } finally { o.close(); }
     }
 
     private static void closeQuietly(Socket s) {
