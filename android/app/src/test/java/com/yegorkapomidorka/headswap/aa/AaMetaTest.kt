@@ -257,6 +257,7 @@ class AaMetaTest {
         assertEquals("A", i.song)
         assertEquals(215, i.durationSeconds)
         assertEquals("Spotify#1", i.source)
+        assertEquals("1", i.songId)
         assertEquals(listOf(10_000), r.link.progress)
 
         r.now += 400
@@ -278,8 +279,10 @@ class AaMetaTest {
         r.core.onMediaMetadata(AaMeta.parseMediaMetadata(metadata("A", art = png + byteArrayOf(9)))!!)
         assertEquals(2, r.link.infos.size)
         assertEquals("Spotify#1", r.link.infos[1].source)
+        assertEquals("1", r.link.infos[1].songId)
         r.core.onMediaMetadata(AaMeta.parseMediaMetadata(metadata("B", art = null))!!)
         assertEquals("Spotify#2", r.link.infos[2].source)
+        assertEquals("2", r.link.infos[2].songId)
         assertNull(r.link.infos[2].art)
     }
 
