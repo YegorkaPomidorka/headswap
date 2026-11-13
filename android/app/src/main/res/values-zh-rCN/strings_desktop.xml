@@ -75,4 +75,6 @@
     <string name="pa_err_io">与无线调试通信失败。请保存日志并重试。</string>
     <string name="pa_err_internal">准备连接时发生内部错误。请保存日志并重试。</string>
     <string name="pa_need_usb_debug">在 Android 17 上，还需要在“开发者选项”中开启“USB 调试”（并保持“无线调试”开启）：否则车机屏幕可能会随手机一起黑屏。然后再次点按“激活”。</string>
+
+    <string name="desk_notif_title">Headswap 桌面</string>
 </resources>
