@@ -97,11 +97,21 @@ public class RelayService extends Service {
             FileInputStream usbIn = null;
             FileOutputStream usbOut = null;
             Socket sock = null;
+            boolean gotHu = false;
             try {
                 // Драйвер пускает только одно открытие (open_excl), поэтому один fd на чтение и запись
                 dev = new java.io.RandomAccessFile(DEV_ACCESSORY, "rw");
                 usbIn = new FileInputStream(dev.getFD());
                 usbOut = new FileOutputStream(dev.getFD());
+                // Телефон подключаем ЗАРАНЕЕ, до первых байт ГУ. Поездка 13.11 (Vezel): подключение после
+                // приветствия ГУ съедало ~110 мс + дорогу туда-обратно, ГУ успевало 4 раза повторить
+                // HU_PROTOCOL_VERSION и сдавалось (по кабелю ответ за 5 мс), потом передёргивало питание USB.
+                sock = connectPhone();
+                if (sock == null) throw new IOException("нет телефона");
+                OutputStream net = sock.getOutputStream();
+                final Socket s = sock;
+                final FileOutputStream out = usbOut;
+                new Thread(() -> pumpDown(s, out), "down").start();
                 byte[] buf = new byte[CHUNK];
                 // Открытое до подключения хоста чтение может повиснуть на старом состоянии гаджета навсегда
                 // (close() другой нитью его на 4.1 не будит). ГУ говорит сразу после подключения и шлёт пульс,
@@ -130,20 +140,18 @@ public class RelayService extends Service {
                     watchdog.interrupt();
                 }
                 if (n <= 0) throw new IOException("ГУ: пустое первое чтение " + n);
+                gotHu = true;
                 silentReplugDone = false;
                 Log.i("ГУ заговорило, первые " + n + " Б: " + hex(buf, Math.min(n, 32)));
-                sock = connectPhone();
-                if (sock == null) throw new IOException("нет телефона");
-                OutputStream net = sock.getOutputStream();
                 net.write(buf, 0, n);
-                final Socket s = sock;
-                final FileOutputStream out = usbOut;
-                new Thread(() -> pumpDown(s, out), "down").start();
+                upBytes.addAndGet(n);
                 pumpUp(usbIn, net);
             } catch (IOException e) {
                 Log.i("прямой режим: " + e.getMessage());
             } finally {
-                boolean hadPhone = sock != null;
+                // Передёргиваем USB, только если с ГУ уже шла сессия: иначе тишина ГУ + переподключение
+                // к телефону дёргали бы USB по кругу
+                boolean hadPhone = gotHu;
                 closeQuietly(sock);
                 try { if (usbIn != null) usbIn.close(); } catch (IOException ignored) { }
                 try { if (usbOut != null) usbOut.close(); } catch (IOException ignored) { }
