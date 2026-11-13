@@ -166,7 +166,10 @@ class DevScreen(host: MainActivity) : Screen(host) {
 
         body.addView(c.sectionTitle(c.getString(R.string.dev_section_video)))
         body.addView(
-            group(listOf(row(c.getString(R.string.dev_own_idr_title), c.getString(R.string.dev_own_idr_sub), aa.ownIdr) { aa.ownIdr = it })),
+            group(listOf(
+                row(c.getString(R.string.dev_own_idr_title), c.getString(R.string.dev_own_idr_sub), aa.ownIdr) { aa.ownIdr = it },
+                row(c.getString(R.string.dev_video_time_ms_title), c.getString(R.string.dev_video_time_ms_sub), aa.videoTimeMs) { aa.videoTimeMs = it },
+            )),
         )
         body.addView(customResCard())
 

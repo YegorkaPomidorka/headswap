@@ -1009,6 +1009,7 @@ class BridgeService : Service() {
             metaMusic = aaPrefs.metaMusic, metaNavi = aaPrefs.metaNavi, naviField6 = aaPrefs.naviField6,
         )
         MetaRelay.PROGRESS_UNIT = if (aaPrefs.progressSeconds) 1 else 1000
+        applyVideoTime(aaPrefs)
 
         // AA-сессия к серверу ГУ на 127.0.0.1:5277 живёт на уровне сервиса (BridgeHost), а не этой USB-сессии
         var h = host
@@ -1134,6 +1135,7 @@ class BridgeService : Service() {
             metaMusic = false, metaNavi = aaPrefs.metaNavi, naviField6 = aaPrefs.naviField6, desktopVideo = desktopVideo,
         )
         MetaRelay.PROGRESS_UNIT = if (aaPrefs.progressSeconds) 1 else 1000
+        applyVideoTime(aaPrefs)
 
         // новое физическое подключение: бюджет восстановления заново; восстановление его не обновляет
         cancelDesktopRecovery()
@@ -1337,6 +1339,12 @@ class BridgeService : Service() {
     }
 
     /** Новый AA-хост: ядро, коннектор, сертификаты. null = мост не поднялся (причина в AaState.setupError). */
+    /** Единицы поля time видеопакета на это подключение (раздел для разработчиков) + строка в лог, чтобы по логу было видно режим. */
+    private fun applyVideoTime(aaPrefs: AaPrefs) {
+        CarLifeSession.VIDEO_TIME_MS = aaPrefs.videoTimeMs
+        AppLog.i("видео: time пакета в ${if (CarLifeSession.VIDEO_TIME_MS) "мс" else "секундах"}")
+    }
+
     private fun createHost(aaPrefs: AaPrefs, chosen: VideoGeometry, mode: VideoGeometry, densityOverride: Int, previous: BridgeHost?): BridgeHost? {
         return try {
             AaShadowNav.stop()      // ПРОБНИК: одноразовый сервер 5277 нужен самому мосту AA
