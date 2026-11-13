@@ -65,10 +65,8 @@ def switch_to_accessory(vid, pid):
 
 
 def endpoints(dev):
-    try:
-        dev.set_configuration()
-    except usb.core.USBError:
-        pass  # на Windows/WinUSB конфигурация уже выбрана
+    # set_configuration не зовём: повторный SET_CONFIGURATION сбрасывает функцию аксессуара на стике
+    # (read → ENODEV), конфигурацию уже выбрала ОС при подключении
     intf = dev.get_active_configuration()[(0, 0)]
     usb.util.claim_interface(dev, intf)
     ep_in = usb.util.find_descriptor(intf, custom_match=lambda e: usb.util.endpoint_direction(e.bEndpointAddress) == usb.util.ENDPOINT_IN)
@@ -83,7 +81,12 @@ def main():
     p.add_argument("--hu", default="127.0.0.1:7240", help="адрес carlife_hu.py (stream)")
     a = p.parse_args()
 
-    dev = find_accessory()
+    dev = None
+    for _ in range(30):  # свисток может быть посреди «передёргивания» USB
+        dev = find_accessory()
+        if dev is not None:
+            break
+        time.sleep(0.5)
     if dev is None:
         switch_to_accessory(a.vid, a.pid)
         for _ in range(50):

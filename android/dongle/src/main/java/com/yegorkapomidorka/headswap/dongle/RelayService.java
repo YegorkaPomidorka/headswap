@@ -39,6 +39,7 @@ public class RelayService extends Service {
     private WifiManager.WifiLock wifiLock;
     private PowerManager.WakeLock wakeLock;
     private volatile Thread relay;
+    private volatile boolean silentReplugDone;
 
     @Override
     public void onCreate() {
@@ -54,6 +55,10 @@ public class RelayService extends Service {
         wakeLock.setReferenceCounted(false);
         wakeLock.acquire();
         Log.i("сервис создан, wifi high-perf, wakelock");
+        // Прошлый процесс могли убить посреди передёргивания — гаджет остался выключенным
+        if ("0".equals(readSys(USB_ENABLE))) {
+            try { writeSys(USB_ENABLE, "1"); Log.i("USB был выключен, включила"); } catch (IOException ignored) { }
+        }
     }
 
     @Override
@@ -97,8 +102,34 @@ public class RelayService extends Service {
                 usbIn = new FileInputStream(dev.getFD());
                 usbOut = new FileOutputStream(dev.getFD());
                 byte[] buf = new byte[CHUNK];
-                int n = usbIn.read(buf);
+                // Открытое до подключения хоста чтение может повиснуть на старом состоянии гаджета навсегда
+                // (close() другой нитью его на 4.1 не будит). ГУ говорит сразу после подключения и шлёт пульс,
+                // так что хост подключён (CONFIGURED), а 3 с тишины — передёргиваем USB: ядро обрывает чтение,
+                // ГУ переподключается и начинает заново.
+                final boolean[] gotFirst = {false};
+                Thread watchdog = new Thread(() -> {
+                    while (true) {
+                        try { Thread.sleep(3000); } catch (InterruptedException e) { return; }
+                        synchronized (gotFirst) { if (gotFirst[0]) return; }
+                        // Один раз на эпизод тишины: если хост молчит и после этого (ПК без моста) — ждём молча,
+                        // иначе USB дёргается по кругу
+                        if (!silentReplugDone && "CONFIGURED".equals(readSys(USB_STATE))) {
+                            silentReplugDone = true;
+                            Log.i("хост подключён, но молчит 3 с — передёргиваю USB (один раз)");
+                            replugUsb();
+                        }
+                    }
+                }, "first-read");
+                watchdog.start();
+                int n;
+                try {
+                    n = usbIn.read(buf);
+                } finally {
+                    synchronized (gotFirst) { gotFirst[0] = true; }
+                    watchdog.interrupt();
+                }
                 if (n <= 0) throw new IOException("ГУ: пустое первое чтение " + n);
+                silentReplugDone = false;
                 Log.i("ГУ заговорило, первые " + n + " Б");
                 sock = connectPhone();
                 if (sock == null) throw new IOException("нет телефона");
@@ -227,11 +258,28 @@ public class RelayService extends Service {
     private static void replugUsb() {
         try {
             writeSys(USB_ENABLE, "0");
-            Thread.sleep(1000);
-            writeSys(USB_ENABLE, "1");
-            Log.i("USB передёрнут: ГУ начнёт сессию заново");
-        } catch (IOException | InterruptedException e) {
-            Log.i("не вышло передёрнуть USB: " + e);
+            // sleep без прерывания: оставить гаджет выключенным нельзя ни при каких условиях
+            android.os.SystemClock.sleep(1000);
+        } catch (IOException e) {
+            Log.i("не вышло выключить USB: " + e);
+        } finally {
+            try {
+                writeSys(USB_ENABLE, "1");
+                Log.i("USB передёрнут: ГУ начнёт сессию заново");
+            } catch (IOException e) {
+                Log.i("не вышло включить USB обратно: " + e);
+            }
+        }
+    }
+
+    private static final java.io.File USB_STATE = new java.io.File("/sys/class/android_usb/android0/state");
+
+    private static String readSys(java.io.File f) {
+        try {
+            java.io.BufferedReader r = new java.io.BufferedReader(new java.io.FileReader(f));
+            try { String s = r.readLine(); return s == null ? "" : s.trim(); } finally { r.close(); }
+        } catch (IOException e) {
+            return "";
         }
     }
 
