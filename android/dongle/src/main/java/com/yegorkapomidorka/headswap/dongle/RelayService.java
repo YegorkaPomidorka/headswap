@@ -56,10 +56,6 @@ public class RelayService extends Service {
         wakeLock.acquire();
         Log.i("сервис создан, wifi high-perf, wakelock");
         startMonitor();
-        // Прошлый процесс могли убить посреди передёргивания — гаджет остался выключенным
-        if ("0".equals(readSys(USB_ENABLE))) {
-            try { writeSys(USB_ENABLE, "1"); Log.i("USB был выключен, включила"); } catch (IOException ignored) { }
-        }
     }
 
     @Override
@@ -99,15 +95,20 @@ public class RelayService extends Service {
             Socket sock = null;
             boolean gotHu = false;
             try {
+                // Пока нет телефона, ГУ стик не видит (USB-гаджет выключен). Vezel здоровается в момент
+                // подключения и ждёт ответа ~100 мс: 13.11 он сдавался, пока стик грузился и шёл к телефону.
+                // Поэтому сначала телефон, потом USB.
+                if (!"0".equals(readSys(USB_ENABLE))) {
+                    try { writeSys(USB_ENABLE, "0"); Log.i("USB выключен до подключения телефона"); } catch (IOException ignored) { }
+                }
+                sock = connectPhone();
+                if (sock == null) throw new IOException("нет телефона");
+                writeSys(USB_ENABLE, "1");
+                Log.i("телефон на связи — USB включён, ждём ГУ");
                 // Драйвер пускает только одно открытие (open_excl), поэтому один fd на чтение и запись
                 dev = new java.io.RandomAccessFile(DEV_ACCESSORY, "rw");
                 usbIn = new FileInputStream(dev.getFD());
                 usbOut = new FileOutputStream(dev.getFD());
-                // Телефон подключаем ЗАРАНЕЕ, до первых байт ГУ. Поездка 13.11 (Vezel): подключение после
-                // приветствия ГУ съедало ~110 мс + дорогу туда-обратно, ГУ успевало 4 раза повторить
-                // HU_PROTOCOL_VERSION и сдавалось (по кабелю ответ за 5 мс), потом передёргивало питание USB.
-                sock = connectPhone();
-                if (sock == null) throw new IOException("нет телефона");
                 OutputStream net = sock.getOutputStream();
                 final Socket s = sock;
                 final FileOutputStream out = usbOut;
@@ -149,16 +150,13 @@ public class RelayService extends Service {
             } catch (IOException e) {
                 Log.i("прямой режим: " + e.getMessage());
             } finally {
-                // Передёргиваем USB, только если с ГУ уже шла сессия: иначе тишина ГУ + переподключение
-                // к телефону дёргали бы USB по кругу
-                boolean hadPhone = gotHu;
                 closeQuietly(sock);
                 try { if (usbIn != null) usbIn.close(); } catch (IOException ignored) { }
                 try { if (usbOut != null) usbOut.close(); } catch (IOException ignored) { }
                 try { if (dev != null) dev.close(); } catch (IOException ignored) { }
-                // Сессия с телефоном была и оборвалась: ГУ живёт в старой сессии и заново рукопожатие не начнёт.
-                // Делаем вид, что кабель выдернули, — как при обрыве USB у обычного телефона.
-                if (hadPhone) replugUsb();
+                // Отдельно передёргивать не нужно: в начале следующего круга USB выключается до телефона,
+                // ГУ видит «выдернутый кабель» и потом начинает сессию заново
+                if (gotHu) Log.i("сессия с ГУ кончилась, USB выключаю до нового подключения телефона");
             }
             try { Thread.sleep(1000); } catch (InterruptedException e) { return; }
         }
