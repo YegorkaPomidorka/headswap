@@ -850,14 +850,14 @@ class CarLifeSession(
     private fun sendVideoData(data: ByteArray) {
         val max = AaBridgeCore.MAZDA_20622111_MAX_VIDEO_PACKET
         if (!bridge.huMazda20622111 || data.size <= max) {
-            send(Ch.VIDEO, Wire.dataInner(Msg.VIDEO_DATA, unixSeconds(), data))
+            send(Ch.VIDEO, Wire.dataInner(Msg.VIDEO_DATA, videoTimeMs(), data))
             return
         }
         if (!splitLogged) {
             splitLogged = true
             AppLog.i("видео: Mazda 20622111, кадр ${data.size} Б режу на ${(data.size + max - 1) / max} VIDEO_DATA по ≤ $max Б")
         }
-        val ts = unixSeconds()
+        val ts = videoTimeMs()
         var off = 0
         while (off < data.size) {
             val end = minOf(off + max, data.size)
@@ -1448,7 +1448,7 @@ class CarLifeSession(
         if (now - lastVideoTx < period) return
         if (vBeats == 0L) AppLog.i("видео: PAUSE, шлю пустой ${Msg.name(type)} раз в $period мс, чтобы ГУ не рвало USB")
         lastVideoTx = now
-        send(Ch.VIDEO, Wire.dataInner(type, unixSeconds(), ByteArray(0)))
+        send(Ch.VIDEO, Wire.dataInner(type, videoTimeMs(), ByteArray(0)))
     }
 
     /**
@@ -1466,7 +1466,7 @@ class CarLifeSession(
             AppLog.i("видео: AA молчит ${now - lastVideoTx} мс, шлю пустой VIDEO_HEARTBEAT раз в $IDLE_HEARTBEAT_MS мс, чтобы ГУ не рвало USB")
         }
         lastVideoTx = now
-        send(Ch.VIDEO, Wire.dataInner(Msg.VIDEO_HEARTBEAT, unixSeconds(), ByteArray(0)))
+        send(Ch.VIDEO, Wire.dataInner(Msg.VIDEO_HEARTBEAT, videoTimeMs(), ByteArray(0)))
     }
 
     /**
@@ -1485,7 +1485,7 @@ class CarLifeSession(
                 AppLog.i("видео: Mobis CCNC, ${now - lastVideoTx} мс без VIDEO_DATA, шлю пустой VIDEO_DATA 0x20001 раз в $MOBIS_KEEPALIVE_MS мс тишины, как Baidu")
             }
             lastVideoTx = now
-            send(Ch.VIDEO, Wire.dataInner(Msg.VIDEO_DATA, unixSeconds(), ByteArray(0)))
+            send(Ch.VIDEO, Wire.dataInner(Msg.VIDEO_DATA, videoTimeMs(), ByteArray(0)))
         }
     }
 
@@ -1654,7 +1654,20 @@ class CarLifeSession(
         private const val MOBIS_KEEPALIVE_MS = 200L
         private const val MOBIS_KEEPALIVE_POLL_MS = 50L
 
-        /** Поле time видеопакета: unix-секунды (Recorder.sendVideoData :930-962). */
-        private fun unixSeconds() = (System.currentTimeMillis() / 1000).toInt()
+        /**
+         * Время видеопакета в мс (раздел для разработчиков, по умолчанию выкл). Выставляет BridgeService на подключение
+         * из AaPrefs.videoTimeMs; эксперимент: проверяем, лечит ли это видео на проблемных ГУ.
+         */
+        @Volatile @JvmStatic var VIDEO_TIME_MS = false
+
+        /**
+         * Поле time видеопакета. По умолчанию unix-секунды, как в оригинале (Recorder.sendVideoData :930-962):
+         * у всех кадров одной секунды одинаковый time. С [VIDEO_TIME_MS] - младшие 32 бита unix-миллисекунд,
+         * как у MEDIA/TTS/VR_DATA (sendAudio).
+         */
+        internal fun videoTime(nowMs: Long, ms: Boolean): Int =
+            if (ms) (nowMs and 0xFFFFFFFFL).toInt() else (nowMs / 1000).toInt()
+
+        private fun videoTimeMs() = videoTime(System.currentTimeMillis(), VIDEO_TIME_MS)
     }
 }

@@ -207,6 +207,11 @@ class AaPrefs(ctx: Context) {
         get() = sp.getBoolean("progressSeconds", false)
         set(v) = sp.edit().putBoolean("progressSeconds", v).apply()
 
+    /** Время видеопакета CarLife в мс вместо секунд (раздел для разработчиков, по умолчанию выкл). Читается на подключение. */
+    var videoTimeMs: Boolean
+        get() = sp.getBoolean("videoTimeMs", false)
+        set(v) = sp.edit().putBoolean("videoTimeMs", v).apply()
+
     /** Хоть раз установилась настоящая AA-сессия: сервер ГУ у пользователя работал (для «Сервер ГУ не отвечает», а не «Запустите сервер ГУ»). */
     var serverWorked: Boolean
         get() = sp.getBoolean("serverWorked", false)
