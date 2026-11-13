@@ -179,6 +179,7 @@
     <string name="l_nh_arrival">прибытие</string>
     <string name="l_nh_end">Завершить маршрут</string>
     <string name="l_nh_search">Поиск</string>
+    <string name="l_nh_voice">Голосовой помощник</string>
     <string name="l_nh_loading">Загрузка…</string>
     <string name="l_s_notifications">Уведомления</string>
     <string name="l_s_alice_voice">Алиса только голосом</string>

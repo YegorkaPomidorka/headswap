@@ -179,6 +179,7 @@
     <string name="l_nh_arrival">到达</string>
     <string name="l_nh_end">结束导航</string>
     <string name="l_nh_search">搜索</string>
+    <string name="l_nh_voice">语音助手</string>
     <string name="l_nh_loading">正在加载…</string>
     <string name="l_s_notifications">通知</string>
     <string name="l_s_alice_voice">Alice 仅语音</string>
