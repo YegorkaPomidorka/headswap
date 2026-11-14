@@ -6,6 +6,8 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -63,6 +65,10 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /** Раздел настроек (колонка слева). ABOUT - «О приложении», вложен в «Система»: своей кнопки нет, подсвечена «Система». */
+/** Пределы ползунков обоев: затемнение до 60 % и размытие до 40 % от максимума (30 dp). */
+private const val WALL_DIM_MAX = 60
+private const val WALL_BLUR_MAX = 12
+private const val WALL_BTN_BLUR_MAX = 30
 /** Разделы настроек; [COLORS] и [ABOUT] - вложенные страницы «Вида» и «Системы», своей кнопки слева у них нет. */
 enum class SettingsPage { LOOK, NAVIGATOR, MUSIC, HOME, SYSTEM, ABOUT, COLORS }
 
@@ -143,25 +149,31 @@ fun LauncherSettingsScreen() {
                 (page == SettingsPage.LOOK && model.settingsPage == SettingsPage.COLORS)
             val pages = SettingsPage.entries.filter { it != SettingsPage.ABOUT && it != SettingsPage.COLORS }
             // портрет: «Цвета» - блок прямо в «Виде», отдельной страницы нет
-            val shownPage = if (s.portrait && model.settingsPage == SettingsPage.COLORS) SettingsPage.LOOK else model.settingsPage
+            val shownPage = model.settingsPage
             SettingsFrame(
                 portrait = s.portrait,
                 tabs = {
-                    Row(Modifier.fillMaxWidth().height(m.dp(s.t)), horizontalArrangement = Arrangement.spacedBy(m.dp(gap))) {
-                        for (page in pages) TabButton(page, isSelected(page), Modifier.weight(1f))
+                    // вкладки разделов в портрете - тоже на стекле
+                    FrostedPanel(Modifier.fillMaxWidth().height(m.dp(s.t)), RoundedCornerShape(m.dp(s.t / 2))) {
+                        Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(m.dp(gap))) {
+                            for (page in pages) TabButton(page, isSelected(page), Modifier.weight(1f))
+                        }
                     }
                 },
                 categories = {
-                    Box(Modifier.width(m.dp(d.catW)).fillMaxHeight()) {
-                        for ((i, page) in pages.withIndex()) Placed(i) { CategoryButton(page, isSelected(page), d, Modifier) }
+                    // разделы - на одной полосе стекла: кнопки прозрачные, фон даёт [FrostedPanel]
+                    FrostedPanel(Modifier.width(m.dp(d.catW)).fillMaxHeight(), RoundedCornerShape(m.dp(s.radius))) {
+                        Box(Modifier.fillMaxSize()) {
+                            for ((i, page) in pages.withIndex()) Placed(i) { CategoryButton(page, isSelected(page), d, Modifier) }
+                        }
                     }
                 },
             ) {
                     when (shownPage) {
                         SettingsPage.LOOK -> if (s.portrait) {
                             ThemeCard(d, cell(0).fillMaxWidth())
-                            ColorsBlock(d, cell(1, 3).fillMaxWidth())
-                            RailSizeCard(d, cell(4, 2).fillMaxWidth())
+                            WallpaperLinkCard(d, cell(1, 2).fillMaxWidth())
+                            RailSizeCard(d, cell(3, 3).fillMaxWidth())
                             Row(cell(6).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(m.dp(d.gap))) {
                                 SwitchCard(stringResource(R.string.l_s_anim), model.animations, d, Modifier.weight(1f).fillMaxHeight()) {
                                     model.chooseAnimations(it)
@@ -186,18 +198,29 @@ fun LauncherSettingsScreen() {
                         }
                         SettingsPage.COLORS -> {
                             ColorsModeCard(d, cell(0).fillMaxWidth())
-                            val set = if (model.colorsEditDay) model.dayColors else model.nightColors
-                            val light = model.colorsEditDay
-                            ColorSliderCard(stringResource(R.string.l_s_colors_accent), set.accentHue, ColorSet.HUE_NEUTRAL, d, cell(1).fillMaxWidth(),
-                                hueTrack(light, accent = true)) { model.editColors(set.copy(accentHue = it)) }
-                            ColorSliderCard(stringResource(R.string.l_s_colors_bg_hue), set.bgHue, ColorSet.HUE_NEUTRAL, d, cell(2).fillMaxWidth(),
-                                hueTrack(light, accent = false)) { model.editColors(set.copy(bgHue = it)) }
-                            ColorSliderCard(stringResource(R.string.l_s_colors_bg_sat), set.bgSat, 100, d, cell(3).fillMaxWidth(),
-                                satTrack(light, set.bgHue)) { model.editColors(set.copy(bgSat = it)) }
-                            Card(cell(4).fillMaxWidth()) {
-                                Box(Modifier.fillMaxSize().padding(start = m.dp(d.padStart), end = m.dp(d.padEnd)), contentAlignment = Alignment.CenterStart) {
-                                    Txt(stringResource(R.string.l_s_colors_hint), d.sub, color = Pal.SEC, maxLines = 2, ellipsis = false)
+                            if (model.wallpaper.isEmpty()) {
+                                val set = if (model.colorsEditDay) model.dayColors else model.nightColors
+                                val light = model.colorsEditDay
+                                ColorSliderCard(stringResource(R.string.l_s_colors_accent), set.accentHue, ColorSet.HUE_NEUTRAL, d, cell(1).fillMaxWidth(),
+                                    hueTrack(light, accent = true)) { model.editColors(set.copy(accentHue = it)) }
+                                ColorSliderCard(stringResource(R.string.l_s_colors_bg_hue), set.bgHue, ColorSet.HUE_NEUTRAL, d, cell(2).fillMaxWidth(),
+                                    hueTrack(light, accent = false)) { model.editColors(set.copy(bgHue = it)) }
+                                ColorSliderCard(stringResource(R.string.l_s_colors_bg_sat), set.bgSat, 100, d, cell(3).fillMaxWidth(),
+                                    satTrack(light, set.bgHue)) { model.editColors(set.copy(bgSat = it)) }
+                                Row(cell(4).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(m.dp(d.gap))) {
+                                    ValueSliderCard(stringResource(R.string.l_s_wall_dim), model.brightness, 100, d,
+                                        Modifier.weight(1.5f).fillMaxHeight()) { model.editBrightness(it) }
+                                    WallpaperPickCard(d, Modifier.weight(1f).fillMaxHeight(), has = false)
                                 }
+                            } else {
+                                WallpaperPickCard(d, cell(1).fillMaxWidth(), has = true)
+                                ValueSliderCard(stringResource(R.string.l_s_wall_dim), model.brightness, 100, d, cell(2).fillMaxWidth()) {
+                                    model.editBrightness(it)
+                                }
+                                ValueSliderCard(stringResource(R.string.l_s_wall_btn_blur), model.wallpaperBtnBlur, WALL_BTN_BLUR_MAX, d, cell(3).fillMaxWidth()) {
+                                    model.editWallpaperBtnBlur(it)
+                                }
+                                WallpaperHintCard(d, cell(4).fillMaxWidth())
                             }
                         }
                         SettingsPage.NAVIGATOR -> {
@@ -306,12 +329,18 @@ private fun SettingsFrame(
     if (portrait) {
         Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(m.dp(s.g8))) {
             tabs()
-            Box(Modifier.weight(1f).fillMaxWidth()) { page() }
+            Box(Modifier.weight(1f).fillMaxWidth()) {
+                page()
+                LauncherModel.wallpaperPending?.let { WallpaperPreview(it) }
+            }
         }
     } else {
         Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(m.dp(s.g))) {
             categories()
-            Box(Modifier.weight(1f).fillMaxHeight()) { page() }
+            Box(Modifier.weight(1f).fillMaxHeight()) {
+                page()
+                LauncherModel.wallpaperPending?.let { WallpaperPreview(it) }
+            }
         }
     }
 }
@@ -328,7 +357,7 @@ private fun TabButton(page: SettingsPage, selected: Boolean, modifier: Modifier)
         SettingsPage.HOME -> R.string.l_sec_home
         SettingsPage.SYSTEM, SettingsPage.ABOUT -> R.string.l_sec_system
     })
-    OptionBox(selected, modifier.fillMaxHeight(), RoundedCornerShape(m.dp(s.t / 2)), description = label, unselected = Pal.SURFACE,
+    OptionBox(selected, modifier.fillMaxHeight(), RoundedCornerShape(m.dp(s.t / 2)), description = label, unselected = Color.Transparent,
         onTap = { LauncherModel.settingsPage = page; LauncherModel.aboutLicense = null }) {
         Box(Modifier.fillMaxSize().padding(horizontal = m.dp(s.g4)), contentAlignment = Alignment.Center) {
             Txt(label, (s.f2 * 0.93f).roundToInt(), color = Pal.TEXT, weight = FontWeight.SemiBold, ellipsis = false)
@@ -348,7 +377,7 @@ private fun CategoryButton(page: SettingsPage, selected: Boolean, d: SettingsDim
         SettingsPage.HOME -> R.string.l_sec_home
         SettingsPage.SYSTEM, SettingsPage.ABOUT -> R.string.l_sec_system
     })
-    OptionBox(selected, modifier, RoundedCornerShape(m.dp(s.radius)), description = label, unselected = Pal.SURFACE,
+    OptionBox(selected, modifier, RoundedCornerShape(m.dp(s.radius)), description = label, unselected = Color.Transparent,
         onTap = { LauncherModel.settingsPage = page; LauncherModel.aboutLicense = null }) {
         Row(Modifier.fillMaxSize().padding(horizontal = m.dp(d.padStart)), verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(m.dp(d.catGap))) {
@@ -388,7 +417,7 @@ private fun OptionBox(
 @Composable
 private fun Card(modifier: Modifier, content: @Composable () -> Unit) {
     val m = LocalMetrics.current
-    Box(modifier.clip(RoundedCornerShape(m.dp(m.spec.radius))).background(Pal.SURFACE)) { content() }
+    FrostedPanel(modifier, RoundedCornerShape(m.dp(m.spec.radius))) { content() }
 }
 
 /** «Тема»: название с подписью слева, три пилюли справа. 1 ряд (второй отдан «Цветам»). */
@@ -425,6 +454,142 @@ private fun Pill(label: String, selected: Boolean, d: SettingsDims, onTap: () ->
     }
 }
 
+/** Системный выбор файла для обоев; URI запоминается с правом на чтение после перезапуска. */
+@Composable
+private fun rememberWallpaperPicker(): () -> Unit {
+    val context = LocalContext.current
+    val aspect = with(LocalMetrics.current.spec) { w.toFloat() / h.toFloat() }
+    val launch = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.OpenDocument(),
+    ) { uri ->
+        if (uri != null) {
+            runCatching {
+                context.contentResolver.takePersistableUriPermission(uri, android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+            prepareWallpaper(context, uri, aspect)?.let { LauncherModel.previewWallpaper(it) }
+        }
+    }
+    return { launch.launch(arrayOf("image/*")) }
+}
+
+/** Декодирует картинку и обрезает по центру под пропорции экрана ГУ; результат - временный JPEG в files/. */
+private fun prepareWallpaper(context: android.content.Context, uri: android.net.Uri, aspect: Float): String? = runCatching {
+    val bounds = android.graphics.BitmapFactory.Options().apply { inJustDecodeBounds = true }
+    context.contentResolver.openInputStream(uri)?.use { android.graphics.BitmapFactory.decodeStream(it, null, bounds) }
+    var sample = 1
+    while (maxOf(bounds.outWidth, bounds.outHeight) / (sample * 2) >= 2560) sample *= 2
+    val opts = android.graphics.BitmapFactory.Options().apply { inSampleSize = sample }
+    val src = context.contentResolver.openInputStream(uri)?.use {
+        android.graphics.BitmapFactory.decodeStream(it, null, opts)
+    } ?: return@runCatching null
+    var cw = src.width
+    var ch = src.height
+    if (cw.toFloat() / ch > aspect) cw = (ch * aspect).toInt() else ch = (cw / aspect).toInt()
+    val crop = android.graphics.Bitmap.createBitmap(src, (src.width - cw) / 2, (src.height - ch) / 2, cw, ch)
+    // имя с отметкой времени: иначе кэш стекла принимает новую картинку за старую (тот же путь)
+    val file = java.io.File(context.filesDir, "wallpaper_pending_${System.currentTimeMillis()}.jpg")
+    file.outputStream().use { crop.compress(android.graphics.Bitmap.CompressFormat.JPEG, 92, it) }
+    file.absolutePath
+}.getOrNull()
+
+/** Предпросмотр обрезанного кадра: картинка на весь блок и две кнопки «Отмена» / «Готово». */
+@Composable
+private fun WallpaperPreview(path: String) {
+    val m = LocalMetrics.current
+    val s = m.spec
+    val model = LauncherModel
+    val bmp = remember(path) { android.graphics.BitmapFactory.decodeFile(path) }
+    Box(Modifier.fillMaxSize().clip(RoundedCornerShape(m.dp(s.radius))).background(Color(0xE6000000))) {
+        Column(Modifier.fillMaxSize().padding(m.dp(s.g))) {
+            val image = bmp
+            if (image != null) androidx.compose.foundation.Image(
+                bitmap = image.asImageBitmap(), contentDescription = null,
+                modifier = Modifier.weight(1f).fillMaxWidth(), contentScale = ContentScale.Fit,
+            )
+            Row(Modifier.fillMaxWidth().padding(top = m.dp(s.g)), horizontalArrangement = Arrangement.spacedBy(m.dp(s.g))) {
+                Pill(stringResource(R.string.l_s_wall_cancel), false, SettingsDims(s, s.t * 2)) {
+                    model.cancelWallpaperPreview()
+                }
+                Spacer(Modifier.weight(1f))
+                Pill(stringResource(R.string.l_s_wall_ok), true, SettingsDims(s, s.t * 2)) {
+                    model.confirmWallpaper()
+                }
+            }
+        }
+    }
+}
+
+/** «Обои»: слева название и подпись, справа «Выбрать»/«Заменить» и «Убрать» (когда обои уже стоят). */
+@Composable
+private fun WallpaperPickCard(d: SettingsDims, modifier: Modifier, has: Boolean) {
+    val m = LocalMetrics.current
+    val s = m.spec
+    val model = LauncherModel
+    val pick = rememberWallpaperPicker()
+    val label = stringResource(R.string.l_s_wall)
+    val sub = stringResource(if (has) R.string.l_s_wall_sub_on else R.string.l_s_wall_sub_off)
+    Card(modifier) {
+        Row(Modifier.fillMaxSize().padding(start = m.dp(d.padStart), end = m.dp(d.padEnd)), verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(m.dp(s.g))) {
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(m.dp(4))) {
+                Txt(label, s.f2, ellipsis = false)
+                Txt(sub, d.sub, color = Pal.SEC, maxLines = 2, ellipsis = false)
+            }
+            if (has) Pill(stringResource(R.string.l_s_wall_remove), false, d) { model.removeWallpaper() }
+            Pill(stringResource(if (has) R.string.l_s_wall_change else R.string.l_s_wall_pick), !has, d) { pick() }
+        }
+    }
+}
+
+/** Слайдер без цветового градиента: затемнение и размытие обоев. */
+@Composable
+private fun ValueSliderCard(label: String, value: Int, top: Int, d: SettingsDims, modifier: Modifier, onChange: (Int) -> Unit) {
+    val m = LocalMetrics.current
+    val accent = LocalAccent.current
+    Card(modifier) {
+        ColorSliderRow(label, value, top, d, Modifier.fillMaxSize().padding(start = m.dp(d.padStart), end = m.dp(d.padEnd)),
+            androidx.compose.ui.graphics.Brush.horizontalGradient(listOf(Pal.SEC.copy(alpha = 0.5f), accent)) , onChange)
+    }
+}
+
+/** Подсказка режима обоев: цвета недоступны, пока стоит картинка; здесь же выход обратно в цвета. */
+@Composable
+private fun WallpaperHintCard(d: SettingsDims, modifier: Modifier) {
+    val m = LocalMetrics.current
+    val model = LauncherModel
+    Card(modifier) {
+        Row(Modifier.fillMaxSize().padding(start = m.dp(d.padStart), end = m.dp(d.padEnd)), verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(m.dp(m.spec.g))) {
+            Txt(stringResource(R.string.l_s_wall_hint), d.sub, Modifier.weight(1f), color = Pal.SEC, maxLines = 2, ellipsis = false)
+            Pill(stringResource(R.string.l_s_wall_back), false, d) { model.removeWallpaper() }
+        }
+    }
+}
+
+/** Портрет: вместо блока со слайдерами - карточка-переход на страницу «Цвета и обои». */
+@Composable
+private fun WallpaperLinkCard(d: SettingsDims, modifier: Modifier) {
+    val m = LocalMetrics.current
+    val s = m.spec
+    val model = LauncherModel
+    val label = stringResource(R.string.l_s_colors)
+    FrostedPanel(modifier, RoundedCornerShape(m.dp(s.radius))) {
+        Pressable(Modifier.fillMaxSize(), description = label, onTap = { model.openColors() }) { pressed ->
+            if (pressed) Box(Modifier.matchParentSize().background(Pal.SURFACE_PRESSED))
+            Row(Modifier.fillMaxSize().padding(start = m.dp(d.padStart), end = m.dp(d.padEnd)), verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(m.dp(s.g))) {
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(m.dp(4))) {
+                    Txt(label, s.f2, ellipsis = false)
+                    Txt(stringResource(R.string.l_s_colors_sub), d.sub, color = Pal.SEC, maxLines = 2, ellipsis = false)
+                }
+            ColorsSwatch(LauncherColors.palette(false, model.nightColors), d)
+            ColorsSwatch(LauncherColors.palette(true, model.dayColors), d)
+            SvgIcon(Ico.CHEV_R, d.catIcon, Pal.SEC, stroke = 2.6f)
+        }
+    }
+}
+}
+
 /** «Цвета» в «Виде»: подпись, миниатюры ночного и дневного набора, шеврон; тап открывает [SettingsPage.COLORS]. */
 @Composable
 private fun ColorsLinkCard(d: SettingsDims, modifier: Modifier) {
@@ -432,20 +597,21 @@ private fun ColorsLinkCard(d: SettingsDims, modifier: Modifier) {
     val s = m.spec
     val model = LauncherModel
     val label = stringResource(R.string.l_s_colors)
-    Pressable(modifier.clip(RoundedCornerShape(m.dp(s.radius))).background(Pal.SURFACE), description = label,
-        onTap = { model.openColors() }) { pressed ->
-        if (pressed) Box(Modifier.matchParentSize().background(Pal.SURFACE_PRESSED))
-        Row(Modifier.fillMaxSize().padding(start = m.dp(d.padStart), end = m.dp(d.padEnd)), verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(m.dp(s.g))) {
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(m.dp(4))) {
-                Txt(label, s.f2, ellipsis = false)
-                Txt(stringResource(R.string.l_s_colors_sub), d.sub, color = Pal.SEC)
-            }
+    FrostedPanel(modifier, RoundedCornerShape(m.dp(s.radius))) {
+        Pressable(Modifier.fillMaxSize(), description = label, onTap = { model.openColors() }) { pressed ->
+            if (pressed) Box(Modifier.matchParentSize().background(Pal.SURFACE_PRESSED))
+            Row(Modifier.fillMaxSize().padding(start = m.dp(d.padStart), end = m.dp(d.padEnd)), verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(m.dp(s.g))) {
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(m.dp(4))) {
+                    Txt(label, s.f2, ellipsis = false)
+                    Txt(stringResource(R.string.l_s_colors_sub), d.sub, color = Pal.SEC)
+                }
             ColorsSwatch(LauncherColors.palette(false, model.nightColors), d)
             ColorsSwatch(LauncherColors.palette(true, model.dayColors), d)
             SvgIcon(Ico.CHEV_R, d.catIcon, Pal.SEC, stroke = 2.6f)
         }
     }
+}
 }
 
 /** Миниатюра набора: фон палитры и уголок акцента слева снизу, как кнопка навигации. */
@@ -825,14 +991,16 @@ private fun NavigatorTiles(d: SettingsDims, rowH: Int, modifier: Modifier) {
                 for ((pkg, res) in row) {
                     val has = pkg in installed
                     val label = stringResource(res)
-                    OptionBox(has && model.navigatorPkg == pkg, Modifier.weight(1f).fillMaxHeight().alpha(if (has) 1f else 0.4f),
-                        RoundedCornerShape(m.dp(s.radius)), label, unselected = Pal.SURFACE, enabled = has,
+                    FrostedPanel(Modifier.weight(1f).fillMaxHeight().alpha(if (has) 1f else 0.4f), RoundedCornerShape(m.dp(s.radius))) {
+                    OptionBox(has && model.navigatorPkg == pkg, Modifier.fillMaxSize(),
+                        RoundedCornerShape(m.dp(s.radius)), label, unselected = Color.Transparent, enabled = has,
                         onTap = { model.setNavigator(pkg) }) {
                         Row(Modifier.fillMaxSize().padding(horizontal = m.dp(d.tileGap)), verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(m.dp(d.tileGap))) {
                             PackageCircle(pkg, d.tileIcon, has)
                             Txt(label, s.f2, weight = FontWeight.SemiBold, ellipsis = false)
                         }
+                    }
                     }
                 }
             }
@@ -1137,11 +1305,13 @@ private fun ActionCard(label: String, modifier: Modifier, onTap: () -> Unit, con
     val m = LocalMetrics.current
     val accent = LocalAccent.current
     val flash = rememberPressAnim(500)
-    Pressable(modifier.clip(RoundedCornerShape(m.dp(m.spec.radius))).background(Pal.SURFACE), description = label,
+    FrostedPanel(modifier, RoundedCornerShape(m.dp(m.spec.radius))) {
+    Pressable(Modifier.fillMaxSize(), description = label,
         onPress = { flash.play() }, onTap = onTap) { pressed ->
         if (pressed) Box(Modifier.matchParentSize().background(Pal.SURFACE_PRESSED))
         Box(Modifier.matchParentSize().background(accent.copy(alpha = 0.32f * (1f - flash.progress))))
         content()
+    }
     }
 }
 
@@ -1164,7 +1334,8 @@ private fun AboutLinkCard(d: SettingsDims, modifier: Modifier) {
     val s = m.spec
     val label = stringResource(R.string.l_s_version)
     val value = "Headswap ${BuildConfig.VERSION_NAME} · ${stringResource(R.string.about_title)}"
-    Pressable(modifier.clip(RoundedCornerShape(m.dp(s.radius))).background(Pal.SURFACE), description = value,
+    FrostedPanel(modifier, RoundedCornerShape(m.dp(s.radius))) {
+    Pressable(Modifier.fillMaxSize(), description = value,
         onTap = { LauncherModel.settingsPage = SettingsPage.ABOUT }) { pressed ->
         if (pressed) Box(Modifier.matchParentSize().background(Pal.SURFACE_PRESSED))
         Row(Modifier.fillMaxSize().padding(start = m.dp(d.padStart), end = m.dp(d.padEnd)), verticalAlignment = Alignment.CenterVertically,
@@ -1174,6 +1345,7 @@ private fun AboutLinkCard(d: SettingsDims, modifier: Modifier) {
                 align = androidx.compose.ui.text.style.TextAlign.End)
             SvgIcon(Ico.CHEV_R, d.catIcon, Pal.SEC, Modifier.mirrorRtl(), stroke = 2.6f)
         }
+    }
     }
 }
 
@@ -1252,11 +1424,13 @@ private fun AuthorCard(name: String, handle: String, d: SettingsDims, modifier: 
 private fun LicenseCard(lic: OpenSource, d: SettingsDims, modifier: Modifier, onTap: () -> Unit) {
     val m = LocalMetrics.current
     val s = m.spec
-    Pressable(modifier.clip(RoundedCornerShape(m.dp(s.radius))).background(Pal.SURFACE), description = lic.title, onTap = onTap) { pressed ->
+    FrostedPanel(modifier, RoundedCornerShape(m.dp(s.radius))) {
+    Pressable(Modifier.fillMaxSize(), description = lic.title, onTap = onTap) { pressed ->
         if (pressed) Box(Modifier.matchParentSize().background(Pal.SURFACE_PRESSED))
         Column(Modifier.fillMaxSize().padding(start = m.dp(d.padStart), end = m.dp(d.padEnd)), verticalArrangement = Arrangement.Center) {
             Txt(lic.title, s.f2, weight = FontWeight.SemiBold)
             Txt("${lic.license} · ${lic.holder}", d.sub, color = Pal.SEC)
         }
+    }
     }
 }

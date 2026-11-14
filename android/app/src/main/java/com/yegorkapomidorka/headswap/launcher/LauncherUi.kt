@@ -2,6 +2,22 @@ package com.yegorkapomidorka.headswap.launcher
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.requiredSize
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.ui.draw.blur
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInRoot
+import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.produceState
+import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -25,6 +41,8 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
@@ -61,6 +79,7 @@ import androidx.compose.ui.unit.TextUnit
 import com.yegorkapomidorka.headswap.R
 import kotlin.math.abs
 import kotlin.math.cos
+import kotlin.math.roundToInt
 import kotlin.math.sin
 
 /** px экрана ГУ -> dp/sp в одном месте: остальной код живёт в px из [LauncherSpec]. */
@@ -171,6 +190,215 @@ object Pal {
 }
 
 /** Фон под углом 118deg и золотое свечение слева и справа по палитре темы. Статичный. */
+/** Текст внутри стеклянной плитки: при включённой «кнопочной» размывке он всегда тёмный. */
+val LocalOnGlass = androidx.compose.runtime.compositionLocalOf { false }
+
+/** Яркость обоев: сеткой 16×9 - чтобы верхняя полоса статуса считалась по своей области, а не по всей картинке. */
+object WallpaperTone {
+    /** Средняя яркость картинки 0..1. */
+    var luma by androidx.compose.runtime.mutableStateOf(0.0)
+        private set
+
+    private var grid: Array<DoubleArray> = emptyArray()
+
+    /** Яркость верхней полосы (строка статуса): доля высоты картинки. */
+    fun topLuma(strip: Float = 0.14f): Double {
+        if (grid.isEmpty()) return luma
+        val rows = maxOf(1, Math.ceil(grid.size * strip.toDouble()).toInt())
+        var sum = 0.0
+        for (r in 0 until rows) for (v in grid[r]) sum += v
+        return sum / (rows * grid[0].size)
+    }
+
+    /** Светлый ли фон под текстом. [glass] учитывает молочную плёнку стекла; [lumaIn] - своя яркость области. */
+    fun bright(glass: Boolean = true, lumaIn: Double = luma): Boolean {
+        val model = LauncherModel
+        if (model.wallpaper.isEmpty()) return false
+        if (glass && model.wallpaperBtnBlur > 0) return true
+        val milk = if (glass) 0.10 + 0.45 * (model.wallpaperBtnBlur / 30.0) else 0.0
+        // 50 - нейтраль: выше светлее, ниже темнее
+        val gain = 1.0 + (model.brightness - 50) / 50.0 * 0.55
+        val eff = lumaIn * gain.coerceIn(0.15, 1.55) * (1.0 - milk) + milk
+        return eff > 0.5
+    }
+
+    fun update(bitmap: android.graphics.Bitmap) {
+        val cols = 16
+        val rows = 9
+        val g = Array(rows) { DoubleArray(cols) }
+        var total = 0.0
+        var count = 0
+        for (r in 0 until rows) for (c in 0 until cols) {
+            val x = (bitmap.width - 1) * (c + 0.5) / cols
+            val y = (bitmap.height - 1) * (r + 0.5) / rows
+            val px = bitmap.getPixel(x.toInt(), y.toInt())
+            val v = (0.299 * android.graphics.Color.red(px) + 0.587 * android.graphics.Color.green(px) +
+                0.114 * android.graphics.Color.blue(px)) / 255.0
+            g[r][c] = v
+            total += v
+            count++
+        }
+        grid = g
+        luma = if (count > 0) total / count else 0.0
+    }
+}
+
+/** Базовая подложка для «стекла»: обои, обрезанные под экран и приведённые к его размеру. */
+private object WallpaperBase {
+    private var key: String? = null
+    private var image: androidx.compose.ui.graphics.ImageBitmap? = null
+
+    fun get(context: android.content.Context, uri: String, screenW: Int, screenH: Int): androidx.compose.ui.graphics.ImageBitmap? {
+        val k = "$uri|$screenW|$screenH"
+        if (k == key) return image
+        val src = decodeWallpaperBitmap(context, uri) ?: return null
+        val aspect = screenW.toFloat() / screenH.toFloat()
+        var cw = src.width
+        var ch = src.height
+        if (cw.toFloat() / ch > aspect) cw = (ch * aspect).toInt() else ch = (cw / aspect).toInt()
+        val crop = android.graphics.Bitmap.createBitmap(src, (src.width - cw) / 2, (src.height - ch) / 2, cw, ch)
+        val scaled = android.graphics.Bitmap.createScaledBitmap(crop, screenW, screenH, true)
+        WallpaperTone.update(scaled)
+        key = k
+        image = scaled.asImageBitmap()
+        return image
+    }
+}
+
+/** Прямоугольники «стеклянных» плиток в координатах корня: одно размытое полотно режется их формой. */
+object GlassRegions {
+    private val map = androidx.compose.runtime.mutableStateMapOf<Any, androidx.compose.ui.geometry.Rect>()
+
+    fun rects(): List<androidx.compose.ui.geometry.Rect> = map.values.toList()
+
+    fun set(key: Any, rect: androidx.compose.ui.geometry.Rect?) {
+        if (rect == null) map.remove(key) else map[key] = rect
+    }
+}
+
+/**
+ * Одно размытое полотно под всеми плитками: картинка обоев во весь экран, размытая один раз,
+ * и вырезанная по фигурам плиток. Так в стекле нет стыков между кусками - это один непрерывный слой.
+ */
+@Composable
+fun GlassLayer() {
+    val model = LauncherModel
+    val radius = model.wallpaperBtnBlur
+    if (model.wallpaper.isEmpty() || radius <= 0) return
+    val context = LocalContext.current
+    val spec = LocalMetrics.current.spec
+    val bmp = remember(model.wallpaper, spec.w, spec.h) { WallpaperBase.get(context, model.wallpaper, spec.w, spec.h) }
+    val rects = GlassRegions.rects()
+    val corner = spec.radius.toFloat()
+    val image = bmp ?: return
+    Box(
+        Modifier.fillMaxSize().drawWithContent {
+            val path = androidx.compose.ui.graphics.Path()
+            for (r in rects) path.addRoundRect(androidx.compose.ui.geometry.RoundRect(r, androidx.compose.ui.geometry.CornerRadius(corner)))
+            clipPath(path) { this@drawWithContent.drawContent() }
+        },
+    ) {
+        androidx.compose.foundation.Image(
+            bitmap = image, contentDescription = null,
+            modifier = Modifier.fillMaxSize().blur(radius.dp), contentScale = ContentScale.Crop,
+        )
+    }
+}
+
+/**
+ * «Стекло»: плитка только регистрирует свою область и рисует полупрозрачную плёнку;
+ * сама размытая картинка одна на весь экран и приходит из [GlassLayer].
+ */
+@Composable
+fun FrostedPanel(modifier: Modifier, shape: Shape, tint: Color = Pal.SURFACE, content: @Composable BoxScope.() -> Unit) {
+    val model = LauncherModel
+    val radius = model.wallpaperBtnBlur
+    if (model.wallpaper.isEmpty() || radius <= 0) {
+        Box(modifier.clip(shape).background(tint)) {
+            androidx.compose.runtime.CompositionLocalProvider(LocalOnGlass provides true) { content() }
+        }
+        return
+    }
+    val p = (radius / 30f).coerceIn(0f, 1f)
+    val key = remember { Any() }
+    Box(
+        modifier.clip(shape).background(tint.copy(alpha = 0.05f + 0.55f * p))
+            .onGloballyPositioned {
+                val b = it.boundsInRoot()
+                GlassRegions.set(key, androidx.compose.ui.geometry.Rect(b.left, b.top, b.right, b.bottom))
+            },
+    ) {
+        androidx.compose.runtime.CompositionLocalProvider(LocalOnGlass provides true) { content() }
+    }
+    DisposableEffect(key) { onDispose { GlassRegions.set(key, null) } }
+}
+
+/** Картинка обоев: декодируется в фоне под размер окна, при ошибке остаётся градиент темы. */
+@Composable
+private fun WallpaperImage(pal: LauncherPalette) {
+    val model = LauncherModel
+    val context = LocalContext.current
+    val uri = model.wallpaper
+    val blur = model.wallpaperBlur
+    val dim = model.wallpaperDim
+    val bmp by produceState<androidx.compose.ui.graphics.ImageBitmap?>(null, uri) {
+        value = withContext(kotlinx.coroutines.Dispatchers.IO) { decodeWallpaper(context, uri) }
+    }
+    val image = bmp
+    if (image == null) {
+        Box(Modifier.fillMaxSize().launcherBackground(pal))
+        return
+    }
+    Box(Modifier.fillMaxSize().background(Color.Black)) {
+        androidx.compose.foundation.Image(
+            bitmap = image, contentDescription = null,
+            modifier = Modifier.fillMaxSize().then(if (blur > 0) Modifier.blur(blur.dp) else Modifier),
+            contentScale = ContentScale.Crop, alignment = Alignment.Center,
+        )
+        if (dim > 0) Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = dim / 100f)))
+    }
+}
+
+/** Обои на весь экран под всеми слоями; без обоев - прежний градиент темы. */
+@Composable
+fun DesktopBackdrop(pal: LauncherPalette) {
+    if (LauncherModel.wallpaper.isEmpty()) Box(Modifier.fillMaxSize().launcherBackground(pal))
+    else WallpaperImage(pal)
+}
+
+/** content:// -> Bitmap с даунсэмплингом под ширину окна: 4K-фото не тянет 30 МБ в память лаунчера. */
+private fun decodeWallpaper(context: android.content.Context, uri: String): androidx.compose.ui.graphics.ImageBitmap? =
+    decodeWallpaperBitmap(context, uri)?.asImageBitmap()
+
+/** content:// или путь файла -> Bitmap с даунсэмплингом под ширину окна. */
+private fun decodeWallpaperBitmap(context: android.content.Context, uri: String): android.graphics.Bitmap? = runCatching {
+    if (!uri.contains("://")) return@runCatching android.graphics.BitmapFactory.decodeFile(uri)
+    val resolver = context.contentResolver
+    val bounds = android.graphics.BitmapFactory.Options().apply { inJustDecodeBounds = true }
+    resolver.openInputStream(android.net.Uri.parse(uri))?.use { android.graphics.BitmapFactory.decodeStream(it, null, bounds) }
+    var sample = 1
+    val target = 1920
+    while (maxOf(bounds.outWidth, bounds.outHeight) / (sample * 2) >= target) sample *= 2
+    val opts = android.graphics.BitmapFactory.Options().apply { inSampleSize = sample }
+    resolver.openInputStream(android.net.Uri.parse(uri))?.use { android.graphics.BitmapFactory.decodeStream(it, null, opts) }
+}.getOrNull()
+
+/** Цвет значков строки статуса: решает яркость верхней полосы обоев с учётом общей яркости, плёнка кнопок не учитывается. */
+@Composable
+fun statusColor(base: Color): Color = adaptiveColor(base, glass = false, lumaIn = WallpaperTone.topLuma())
+
+/** Цвет текста и значков под обоями: на светлой основе - тёмный, на тёмной - светлый; прочие цвета не трогаем. */
+@Composable
+fun adaptiveColor(base: Color, glass: Boolean = true, lumaIn: Double = WallpaperTone.luma): Color {
+    if (LauncherModel.wallpaper.isEmpty()) return base
+    val bright = WallpaperTone.bright(glass, lumaIn)
+    return when {
+        base == Pal.TEXT -> if (bright) Color(0xFF11151A) else Color(0xFFFFFFFF)
+        base == Pal.SEC || base == Pal.SEC2 -> if (bright) Color(0xFF11151A) else Color(0xFFFFFFFF)
+        else -> base
+    }
+}
+
 fun Modifier.launcherBackground(pal: LauncherPalette): Modifier = drawBehind {
     val w = size.width
     val h = size.height
@@ -290,7 +518,8 @@ object VIco {
 }
 
 @Composable
-fun VectorIcon(paths: List<VPath>, viewport: Float, sizePx: Int, color: Color, modifier: Modifier = Modifier) {
+fun VectorIcon(paths: List<VPath>, viewport: Float, sizePx: Int, color0: Color, modifier: Modifier = Modifier) {
+    val color = adaptiveColor(color0)
     val m = LocalMetrics.current
     val parsed = remember(paths) { paths.map { PathParser().parsePathString(it.d).toPath() } }
     Canvas(modifier.size(m.dp(sizePx))) {
@@ -308,7 +537,8 @@ fun VectorIcon(paths: List<VPath>, viewport: Float, sizePx: Int, color: Color, m
 }
 
 @Composable
-fun SvgIcon(paths: List<String>, sizePx: Int, color: Color, modifier: Modifier = Modifier, stroke: Float = 2.2f, fill: Boolean = false) {
+fun SvgIcon(paths: List<String>, sizePx: Int, color0: Color, modifier: Modifier = Modifier, stroke: Float = 2.2f, fill: Boolean = false) {
+    val color = adaptiveColor(color0)
     val m = LocalMetrics.current
     val parsed = remember(paths) { paths.map { PathParser().parsePathString(it).toPath() } }
     Canvas(modifier.size(m.dp(sizePx))) {
@@ -430,6 +660,15 @@ fun Txt(
     ellipsis: Boolean = true,
 ) {
     val m = LocalMetrics.current
+    // На обоях цвет текста адаптивный: на светлой картинке - тёмный, на тёмной - светлый
+    val onWallpaper = LauncherModel.wallpaper.isNotEmpty()
+    val bright = WallpaperTone.bright(LocalOnGlass.current)
+    val adaptive = when {
+        !onWallpaper -> color
+        color == Pal.TEXT -> if (bright) Color(0xFF11151A) else Color(0xFFFFFFFF)
+        color == Pal.SEC || color == Pal.SEC2 -> if (bright) Color(0xFF3D434A) else Color(0xFFCBD0D6)
+        else -> color
+    }
     // Арабский (RTL): Start/End - по раскладке, а не по абзацу (латиница в RTL-интерфейсе тоже прижата вправо);
     // текст без RTL-символов ("1 / 3", "2 : 1") читается слева направо, иначе пробелы вокруг "/" переворачивают его.
     val rtl = LocalLayoutDirection.current == LayoutDirection.Rtl
@@ -443,10 +682,12 @@ fun Txt(
     BasicText(
         text, modifier,
         style = TextStyle(
-            color = color, fontSize = m.sp(sizePx), fontWeight = weight,
+            color = adaptive, fontSize = m.sp(sizePx), fontWeight = weight,
             fontFamily = LauncherFonts.family(LocalContext.current, mono, weight),
             lineHeight = m.sp((sizePx * 1.15f).toInt()), textAlign = physicalAlign,
             textDirection = if (rtl && !hasRtl) TextDirection.ContentOrLtr else TextDirection.Unspecified,
+            // на обоях текст теряет контраст: мягкая тень «подписывает» его на любом фоне (светлая тема - светлая тень)
+
         ),
         maxLines = maxLines, softWrap = maxLines > 1, overflow = if (ellipsis) TextOverflow.Ellipsis else TextOverflow.Clip,
     )

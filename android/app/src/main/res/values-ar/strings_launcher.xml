@@ -178,7 +178,7 @@
     <string name="l_gemini_close">إغلاق Gemini</string>
     <string name="l_favorites">المفضّلة</string>
     <string name="l_favorites_empty">لا توجد جهات اتصال مفضّلة. ضع عليها نجمة في دفتر الهاتف</string>
-    <string name="l_s_colors">الألوان</string>
+    <string name="l_s_colors">الألوان والخلفية</string>
     <string name="l_s_colors_sub">لون التمييز والخلفية، لليل والنهار كلٌّ على حدة</string>
     <string name="l_s_colors_night">الليل</string>
     <string name="l_s_colors_day">النهار</string>
@@ -190,4 +190,17 @@
     <string name="l_s_alice_voice">Alice بالصوت فقط</string>
     <string name="l_s_alice_voice_on">بلا نافذة، شريط صغير في الأسفل؛ يعمل حتى والهاتف مقفل</string>
     <string name="l_s_alice_voice_off">Alice في لوحة بجانب الشريط الجانبي</string>
+    <string name="l_s_wall">خلفية سطح المكتب</string>
+    <string name="l_s_wall_sub_on">الخلفية مفعّلة، الألوان معطّلة</string>
+    <string name="l_s_wall_sub_off">صورة ملء الشاشة بدل التدرج</string>
+    <string name="l_s_wall_pick">اختيار</string>
+    <string name="l_s_wall_change">تغيير</string>
+    <string name="l_s_wall_remove">إزالة</string>
+    <string name="l_s_wall_dim">السطوع</string>
+    <string name="l_s_wall_blur">ضبابية الخلفية</string>
+    <string name="l_s_wall_hint">الألوان معطّلة أثناء وجود خلفية. أزل الخلفية لتعود الألوان.</string>
+    <string name="l_s_wall_back">استخدام الألوان</string>
+    <string name="l_s_wall_ok">تم</string>
+    <string name="l_s_wall_cancel">إلغاء</string>
+    <string name="l_s_wall_btn_blur">ضبابية الأزرار</string>
 </resources>

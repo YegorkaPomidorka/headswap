@@ -119,8 +119,8 @@
     <string name="l_s_theme_light">Light</string>
     <string name="l_s_theme_auto">Auto</string>
     <string name="l_s_theme_sub">Auto follows the headlights</string>
-    <string name="l_s_colors">Colors</string>
-    <string name="l_s_colors_sub">Accent and background, night and day apart</string>
+    <string name="l_s_colors">Colours and wallpaper</string>
+    <string name="l_s_colors_sub">Accent and background, or your own picture</string>
     <string name="l_s_colors_night">Night</string>
     <string name="l_s_colors_day">Day</string>
     <string name="l_s_colors_reset">Reset</string>
@@ -191,4 +191,17 @@
     <string name="l_notif_clear_all">Clear all</string>
     <string name="l_notif_dismiss">Dismiss</string>
     <string name="l_notif_open_in">Open in %1$s</string>
+    <string name="l_s_wall">Desktop wallpaper</string>
+    <string name="l_s_wall_sub_on">Wallpaper is on; colours are off</string>
+    <string name="l_s_wall_sub_off">Full-screen picture instead of the gradient</string>
+    <string name="l_s_wall_pick">Choose</string>
+    <string name="l_s_wall_change">Replace</string>
+    <string name="l_s_wall_remove">Remove</string>
+    <string name="l_s_wall_dim">Brightness</string>
+    <string name="l_s_wall_blur">Wallpaper blur</string>
+    <string name="l_s_wall_hint">Colours are off while a wallpaper is set. Removing it brings them back.</string>
+    <string name="l_s_wall_back">Use colours</string>
+    <string name="l_s_wall_ok">Done</string>
+    <string name="l_s_wall_cancel">Cancel</string>
+    <string name="l_s_wall_btn_blur">Button blur</string>
 </resources>
