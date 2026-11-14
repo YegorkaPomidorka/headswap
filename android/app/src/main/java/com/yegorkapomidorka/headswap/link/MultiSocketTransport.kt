@@ -423,7 +423,11 @@ class MultiSocketTransport internal constructor(
     private fun writeLoop(chan: Int, s: Socket, onWritten: (Int, ByteArray) -> Unit) {
         runCatching {
             Process.setThreadPriority(
-                if (chan == Ch.VIDEO) Process.THREAD_PRIORITY_DISPLAY else Process.THREAD_PRIORITY_DEFAULT
+                when (chan) {
+                    Ch.VIDEO, Ch.CMD, Ch.TOUCH -> Process.THREAD_PRIORITY_DISPLAY
+                    Ch.MEDIA, Ch.TTS, Ch.VR -> Process.THREAD_PRIORITY_AUDIO
+                    else -> Process.THREAD_PRIORITY_DEFAULT
+                }
             )
         }
         val q = queues.getValue(chan)

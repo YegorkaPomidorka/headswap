@@ -142,7 +142,7 @@ class AapSession(
     private val firstVideo = AtomicLong(0)
 
     fun start() {
-        val t = Thread({ run() }, "aa-session")
+        val t = Thread({ runCatching { android.os.Process.setThreadPriority(android.os.Process.THREAD_PRIORITY_DISPLAY) }; run() }, "aa-session")
         thread = t
         t.start()
     }
@@ -441,7 +441,7 @@ class AapSession(
 
     private fun startWriter() {
         writerActive = true
-        val t = Thread({ writerLoop() }, "aa-writer")
+        val t = Thread({ runCatching { android.os.Process.setThreadPriority(android.os.Process.THREAD_PRIORITY_DISPLAY) }; writerLoop() }, "aa-writer")
         t.isDaemon = true
         writer = t
         t.start()

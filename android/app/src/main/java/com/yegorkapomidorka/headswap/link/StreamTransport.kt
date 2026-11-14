@@ -78,8 +78,8 @@ class StreamTransport(
         onClosed: (reason: String) -> Unit,
     ) {
         lastRxMs = clock()
-        writer = Thread({ writeLoop(onWritten, onClosed) }, "cl-writer").also { it.start() }
-        reader = Thread({ readLoop(sink, onClosed) }, "cl-reader").also { it.start() }
+        writer = Thread({ runCatching { android.os.Process.setThreadPriority(android.os.Process.THREAD_PRIORITY_DISPLAY) }; writeLoop(onWritten, onClosed) }, "cl-writer").also { it.start() }
+        reader = Thread({ runCatching { android.os.Process.setThreadPriority(android.os.Process.THREAD_PRIORITY_DISPLAY) }; readLoop(sink, onClosed) }, "cl-reader").also { it.start() }
     }
 
     override fun send(chan: Int, inner: ByteArray) {

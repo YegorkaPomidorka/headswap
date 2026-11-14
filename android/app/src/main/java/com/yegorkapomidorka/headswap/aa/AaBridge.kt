@@ -394,7 +394,7 @@ class AaBridgeCore(
 
     // Серийность аудио, по MD Baidu: NAVI перед TTS, MEDIA отпускается PAUSE, TTS_STOP с задержкой.
     private val audioTimer: ScheduledExecutorService by lazy {
-        Executors.newSingleThreadScheduledExecutor { r -> Thread(r, "aa-audio-timer").also { it.isDaemon = true } }
+        Executors.newSingleThreadScheduledExecutor { r -> Thread({ runCatching { android.os.Process.setThreadPriority(android.os.Process.THREAD_PRIORITY_AUDIO) }; r.run() }, "aa-audio-timer").also { it.isDaemon = true } }
     }
     private val audioSched: (Long, Runnable) -> MicTimerHandle = audioSchedule ?: { delayMs, task ->
         val f = audioTimer.schedule(task, delayMs, TimeUnit.MILLISECONDS)
