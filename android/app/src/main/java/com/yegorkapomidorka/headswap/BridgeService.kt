@@ -557,6 +557,7 @@ class BridgeService : Service() {
         carBtNear = false
         p2pThisWait = false
         p2pFailedThisWait = false
+        btProbe.newWait()
         carSkipLogged = false
         btAcceptsThisWait = 0
         btHintShown = false

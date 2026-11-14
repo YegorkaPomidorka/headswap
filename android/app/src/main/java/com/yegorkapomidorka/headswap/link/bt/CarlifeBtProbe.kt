@@ -55,10 +55,8 @@ class CarlifeBtProbe(
     private val p2p = P2pJoin(ctx, onBusy = { onP2pBusy() }, onWifi = { on -> onWifi(on) }, onJoined = { ip, owner -> onP2pJoined(ip, owner) }, onLost = { onP2pLost() })
     /** UDP-маяк и привет ГУ в её группе, пока нет TCP (главная нить). */
     private var hello: P2pHello? = null
-    /** Первый вход в группу за этот запуск и сколько раз отдали ГУ адрес: для [P2pPolicy.noTcp]. */
-    @Volatile private var firstJoinAt = 0L
-    @Volatile private var ipSends = 0
-    @Volatile private var noTcpFired = false
+    /** «Вошли, адрес отдан, а TCP нет» за текущее ожидание; сбрасывает [newWait], не [start]. */
+    private val noTcp = NoTcpTracker()
     private val noTcpTick = Runnable { checkNoTcp() }
     /** Адрес телефона в группе ГУ (после входа) и запрос IP от ГУ: MD_WIFI_IP уходит, когда есть оба. */
     @Volatile private var p2pIp: String? = null
@@ -89,9 +87,6 @@ class CarlifeBtProbe(
         lastTarget = null
         rejoinGen++
         rejoining = false
-        firstJoinAt = 0L
-        ipSends = 0
-        noTcpFired = false
         accepts = 0     // за этот запуск: в строке `stop` accepts= считаются подключения ГУ с последнего start
         val adapter = ctx.getSystemService(BluetoothManager::class.java)?.adapter
         when {
@@ -270,11 +265,8 @@ class CarlifeBtProbe(
     private fun onP2pJoined(ip: java.net.Inet4Address, owner: java.net.Inet4Address?) {
         p2pIp = ip.hostAddress
         startHello(owner)
-        if (firstJoinAt == 0L) {
-            firstJoinAt = SystemClock.elapsedRealtime()
-            main.removeCallbacks(noTcpTick)
-            main.postDelayed(noTcpTick, P2pPolicy.NO_TCP_MS)
-        }
+        noTcp.joined(SystemClock.elapsedRealtime())
+        armNoTcp()
         CarLifeState.btProbe = "телефон в группе ГУ (${ip.hostAddress})" + if (ipRequested) "" else ", ГУ ещё не просила IP"
         if (rejoining) WLog.ev(WLog.P2P, "rejoin-joined", "ipRequested" to ipRequested)
         rejoining = false
@@ -351,8 +343,8 @@ class CarlifeBtProbe(
         try {
             send(s, BtMsg.MD_WIFI_IP, BtMsg.wifiIp(ip))
             ipRequested = false
-            ipSends++
-            main.post { checkNoTcp() }
+            noTcp.ipSent(SystemClock.elapsedRealtime())
+            main.post { armNoTcp() }      // решаем не сразу: ГУ нужно время открыть TCP
             CarLifeState.btProbe = "отдал ГУ IP $ip, жду TCP от ГУ"
             AppLog.i("BT carlife: отдал ГУ адрес телефона $ip")
         } catch (e: IOException) {
@@ -361,9 +353,25 @@ class CarlifeBtProbe(
     }
 
     /** 6/6 поднялись: привет больше не нужен (главная нить). */
-    fun onTcpUp() = main.post {
+    fun onTcpUp() {
+        noTcp.tcpUp()
+        main.post {
+            main.removeCallbacks(noTcpTick)
+            stopHello("6/6")
+        }
+    }
+
+    /** Новое ожидание машины (BridgeService.beginWait): счётчики «нет TCP» с нуля. */
+    fun newWait() {
+        noTcp.newWait()
+        main.post { main.removeCallbacks(noTcpTick) }
+    }
+
+    /** Главная нить: взвести проверку «нет TCP» на срок из [NoTcpTracker.nextCheckMs]. */
+    private fun armNoTcp() {
         main.removeCallbacks(noTcpTick)
-        stopHello("6/6")
+        val d = noTcp.nextCheckMs(SystemClock.elapsedRealtime()) ?: return
+        main.postDelayed(noTcpTick, d)
     }
 
     @SuppressLint("MissingPermission")
@@ -386,18 +394,17 @@ class CarlifeBtProbe(
 
     /** Главная нить: вошли, адрес отдан, а TCP нет - бросаем Wi-Fi Direct на это ожидание. */
     private fun checkNoTcp() {
-        if (noTcpFired || !running) return
-        val since = if (firstJoinAt == 0L) null else SystemClock.elapsedRealtime() - firstJoinAt
-        if (!P2pPolicy.noTcp(since, ipSends, tcpUp())) {
-            if (since != null && !tcpUp()) {
-                main.removeCallbacks(noTcpTick)
-                main.postDelayed(noTcpTick, (P2pPolicy.NO_TCP_MS - since).coerceAtLeast(NO_TCP_RECHECK_MS))
-            }
+        if (!running) return
+        val now = SystemClock.elapsedRealtime()
+        if (tcpUp()) {
+            noTcp.tcpUp()
             return
         }
-        noTcpFired = true
-        WLog.ev(WLog.P2P, "fallback", "why" to "no-tcp", "sinceJoinMs" to since, "ipSends" to ipSends, "helloReplies" to (hello?.replies ?: 0))
-        AppLog.i("Wi-Fi Direct: вошли в группу ГУ и отдали адрес $ipSends раз, а ГУ не подключилась - жду её по Wi-Fi машины или хотспоту")
+        if (!noTcp.shouldFallback(now, tcpUpNow = false)) return armNoTcp()
+        noTcp.markFired()
+        val sends = noTcp.ipSends
+        WLog.ev(WLog.P2P, "fallback", "why" to "no-tcp", "sinceJoinMs" to noTcp.sinceJoinMs(now), "ipSends" to sends, "helloReplies" to (hello?.replies ?: 0))
+        AppLog.i("Wi-Fi Direct: вошли в группу ГУ и отдали адрес $sends раз, а ГУ не подключилась - жду её по Wi-Fi машины или хотспоту")
         CarLifeState.btProbe = "Wi-Fi Direct не дал связи, жду машину по Wi-Fi"
         stopHello("нет TCP")
         rejoinGen++
@@ -408,7 +415,6 @@ class CarlifeBtProbe(
     }
 
     companion object {
-        private const val NO_TCP_RECHECK_MS = 5_000L
         const val SERVICE_NAME = "carlife"
         val UUIDS = listOf(
             "spp" to UUID.fromString("00001101-0000-1000-8000-00805F9B34FB"),

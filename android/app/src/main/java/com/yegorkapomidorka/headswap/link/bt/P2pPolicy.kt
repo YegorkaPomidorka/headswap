@@ -38,18 +38,82 @@ object P2pPolicy {
      */
     fun rejoinDropBt(attempt: Int): Boolean = attempt >= REJOIN_DROP_BT_AFTER
 
-    /**
-     * Вошли в группу ГУ, отдали ей адрес, а TCP так и нет (#111, MG: ГУ раз за разом повторяет Bluetooth-обмен, пока
-     * группа не распадётся): с первого входа прошло [NO_TCP_MS] и MD_WIFI_IP ушёл хотя бы [NO_TCP_IP_SENDS] раз. Тогда
-     * Wi-Fi Direct в этом ожидании бросаем, и машину ждём через её Wi-Fi или хотспот телефона. UDP-привет за это время
-     * успевает отработать: ГУ, которой он нужен, подключается через секунды.
-     */
-    fun noTcp(sinceFirstJoinMs: Long?, ipSends: Int, tcpUp: Boolean): Boolean =
-        !tcpUp && sinceFirstJoinMs != null && sinceFirstJoinMs >= NO_TCP_MS && ipSends >= NO_TCP_IP_SENDS
-
-    const val NO_TCP_MS = 25_000L
-    const val NO_TCP_IP_SENDS = 2
-
     const val REJOIN_ATTEMPTS = 60
     const val REJOIN_DROP_BT_AFTER = 4
+}
+
+/**
+ * Вошли в группу ГУ, отдали ей адрес, а TCP так и нет (#111, MG: ГУ раз за разом повторяет Bluetooth-обмен, пока группа
+ * не распадётся). Тогда Wi-Fi Direct в этом ожидании бросаем и ждём машину через её Wi-Fi или хотспот телефона.
+ * Условие: с первого входа прошло [noTcpMs], MD_WIFI_IP ушёл хотя бы [minIpSends] раз, с последнего прошло [settleMs]
+ * (медленной ГУ даём время открыть TCP), и в этом ожидании TCP ни разу не поднимался. Живёт одно ожидание: [newWait]
+ * зовёт BridgeService на новом ожидании; перезапуск пробника посреди ожидания счётчики не трогает. После 6/6 ([tcpUp])
+ * до нового ожидания молчит: Wi-Fi Direct у этой машины работает, а rejoin после разрыва сессии рвать нельзя (h211).
+ * Без android.*, вызовы с любых нитей.
+ */
+class NoTcpTracker(
+    private val noTcpMs: Long = 25_000L,
+    private val minIpSends: Int = 2,
+    private val settleMs: Long = 6_000L,
+) {
+    private var firstJoinAt: Long? = null
+    private var lastIpAt: Long? = null
+    private var tcpProven = false
+    var ipSends = 0
+        @Synchronized get
+        private set
+    var fired = false
+        @Synchronized get
+        private set
+
+    @Synchronized fun newWait() {
+        firstJoinAt = null
+        lastIpAt = null
+        ipSends = 0
+        tcpProven = false
+        fired = false
+    }
+
+    /** Вошли в группу; true - первый вход в этом ожидании. */
+    @Synchronized fun joined(now: Long): Boolean {
+        if (firstJoinAt != null) return false
+        firstJoinAt = now
+        return true
+    }
+
+    @Synchronized fun ipSent(now: Long) {
+        ipSends++
+        lastIpAt = now
+    }
+
+    @Synchronized fun tcpUp() {
+        tcpProven = true
+    }
+
+    @Synchronized fun sinceJoinMs(now: Long): Long? = firstJoinAt?.let { now - it }
+
+    @Synchronized fun shouldFallback(now: Long, tcpUpNow: Boolean): Boolean {
+        val first = firstJoinAt ?: return false
+        val last = lastIpAt ?: return false
+        return !fired && !tcpProven && !tcpUpNow && now - first >= noTcpMs && ipSends >= minIpSends && now - last >= settleMs
+    }
+
+    @Synchronized fun markFired() {
+        fired = true
+    }
+
+    /** Когда проверить снова (мс от [now]); null - ждать нечего (не входили, уже сработало или TCP был). */
+    @Synchronized fun nextCheckMs(now: Long): Long? {
+        val first = firstJoinAt ?: return null
+        if (fired || tcpProven) return null
+        val byJoin = first + noTcpMs - now
+        if (ipSends < minIpSends) return maxOf(byJoin, IDLE_RECHECK_MS)      // ждём IP_REQUEST от ГУ; ipSent перевзведёт
+        val byIp = lastIpAt?.let { it + settleMs - now } ?: 0L
+        return maxOf(byJoin, byIp, MIN_RECHECK_MS)
+    }
+
+    private companion object {
+        const val MIN_RECHECK_MS = 1_000L
+        const val IDLE_RECHECK_MS = 5_000L
+    }
 }
