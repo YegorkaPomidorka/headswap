@@ -180,6 +180,8 @@ class CarLifeSession(
     private var vFrames = 0L
     private var vBytes = 0L
     private var vKeys = 0L
+    @Volatile private var vMaxWin = 0        // макс. кадр за окно статистики, Б (h1111)
+    @Volatile private var vMaxKeyWin = 0     // макс. ключевой кадр за окно статистики, Б
     private var vBeats = 0L
     private var vDropped = 0L
     private var audioTx = 0L
@@ -772,6 +774,7 @@ class CarLifeSession(
             val stubBps = when {
                 bridge.huPioneerRm56 -> minOf(mode.bitrate, AaBridgeCore.PIONEER_RM56_CEILING_BPS)
                 bridge.huMazda20622111 -> minOf(mode.bitrate, AaBridgeCore.MAZDA_20622111_CEILING_BPS)
+                bridge.huBonAuto20362105 -> minOf(mode.bitrate, AaBridgeCore.BONAUTO_20362105_CEILING_BPS)
                 else -> mode.bitrate
             }
             // h529: в passthrough с SPS-кропом заглушка в кадре AA с теми же полями, ГУ не видит смены размера на AA.
@@ -959,10 +962,20 @@ class CarLifeSession(
         if (bitratePolicy.current != old) bridge.setEncoderBitrate(bitratePolicy.current)
     }
 
+    /** Bon-Auto 20362105 (h1111): потолок 1 Мбит/с, чтобы кадры (особенно IDR) были поменьше. */
+    private fun applyBonAuto20362105Ceiling() {
+        if (!bridge.huBonAuto20362105) return
+        val old = bitratePolicy.current
+        if (!bitratePolicy.lowerCeiling(AaBridgeCore.BONAUTO_20362105_CEILING_BPS)) return
+        AppLog.i("Bon-Auto 20362105: потолок битрейта ${bitratePolicy.ceilingBps / 1000} кбит/с")
+        if (bitratePolicy.current != old) bridge.setEncoderBitrate(bitratePolicy.current)
+    }
+
     private fun applyHuCeilings() {
         applyVwCeiling()
         applyPioneerCeiling()
         applyMazda20622111Ceiling()
+        applyBonAuto20362105Ceiling()
     }
 
     /** Потолок fps под ГУ (Pioneer RM56E8B: 15), null = без ограничения. */
@@ -1335,6 +1348,8 @@ class CarLifeSession(
             if (vFrames == 1L) WLog.ev(WLog.HS, "first-video", "bytes" to m.data.size)
             val key = AnnexB.nalTypes(m.data).contains(5)
             if (key) vKeys++
+            if (m.data.size > vMaxWin) vMaxWin = m.data.size
+            if (key && m.data.size > vMaxKeyWin) vMaxKeyWin = m.data.size
             val nals = AnnexB.nalTypes(m.data)
             if (vFrames <= 5 || key) {
                 AppLog.msg("TX", chan, inner.size, m.type, m.declaredLen, "nal=$nals", inner, ui = vFrames <= 5)
@@ -1479,7 +1494,9 @@ class CarLifeSession(
             CarLifeState.status = "ГУ молчит, байт от него нет"
         }
         if (now - lastStatsAt >= 5000 && (vFrames > 0 || vBeats > 0)) {
-            AppLog.i("видео: отправлено кадров=$vFrames (ключевых=$vKeys) байт=$vBytes heartbeat=$vBeats сброшено=$vDropped очередь=${transport.queueSize(Ch.VIDEO)} (+${vFrames - lastStatsFrames} за ${(now - lastStatsAt) / 1000}с)")
+            AppLog.i("видео: отправлено кадров=$vFrames (ключевых=$vKeys) байт=$vBytes heartbeat=$vBeats сброшено=$vDropped очередь=${transport.queueSize(Ch.VIDEO)} (+${vFrames - lastStatsFrames} за ${(now - lastStatsAt) / 1000}с) макс кадр=$vMaxWin Б, макс ключевой=$vMaxKeyWin Б")
+            vMaxWin = 0
+            vMaxKeyWin = 0
             lastStatsAt = now
             lastStatsFrames = vFrames
             CarLifeState.video = "$chosen; кадров=$vFrames hb=$vBeats"
