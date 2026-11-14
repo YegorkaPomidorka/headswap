@@ -18,6 +18,8 @@ import android.os.SystemClock
 import com.yegorkapomidorka.headswap.AppLog
 import com.yegorkapomidorka.headswap.CarLifeState
 import com.yegorkapomidorka.headswap.link.diag.WLog
+import com.yegorkapomidorka.headswap.link.wifi.BeaconCodec
+import com.yegorkapomidorka.headswap.link.wifi.P2pHello
 import java.io.IOException
 import java.util.UUID
 
@@ -38,13 +40,24 @@ class CarlifeBtProbe(
     private val onP2pBusy: () -> Unit = {},
     /** Wi-Fi на телефоне выключен (false, Wi-Fi Direct не войдёт) или включён (true) на входе в группу ГУ (главная нить). */
     private val onWifi: (on: Boolean) -> Unit = {},
+    /** Можно ли входить в группу ГУ (false - Wi-Fi Direct в этом ожидании уже не дал TCP, ждём машину иначе). */
+    private val p2pAllowed: () -> Boolean = { true },
+    /** 6/6 уже поднялись: проверка «вошли, а TCP нет» молчит. */
+    private val tcpUp: () -> Boolean = { false },
+    /** Вошли в группу, отдали адрес, а TCP нет ([P2pPolicy.noTcp]); Wi-Fi Direct уже снят (главная нить). */
+    private val onP2pNoTcp: () -> Unit = {},
 ) {
     @Volatile private var running = false
     private val servers = ArrayList<BluetoothServerSocket>()
     private val lock = Any()
     @Volatile private var accepts = 0
     @Volatile private var active: BluetoothSocket? = null
-    private val p2p = P2pJoin(ctx, onBusy = { onP2pBusy() }, onWifi = { on -> onWifi(on) }, onJoined = { ip -> onP2pJoined(ip) }, onLost = { onP2pLost() })
+    private val p2p = P2pJoin(ctx, onBusy = { onP2pBusy() }, onWifi = { on -> onWifi(on) }, onJoined = { ip, owner -> onP2pJoined(ip, owner) }, onLost = { onP2pLost() })
+    /** UDP-маяк и привет ГУ в её группе, пока нет TCP (главная нить). */
+    private var hello: P2pHello? = null
+    /** «Вошли, адрес отдан, а TCP нет» за текущее ожидание; сбрасывает [newWait], не [start]. */
+    private val noTcp = NoTcpTracker()
+    private val noTcpTick = Runnable { checkNoTcp() }
     /** Адрес телефона в группе ГУ (после входа) и запрос IP от ГУ: MD_WIFI_IP уходит, когда есть оба. */
     @Volatile private var p2pIp: String? = null
     @Volatile private var ipRequested = false
@@ -140,6 +153,7 @@ class CarlifeBtProbe(
         rejoinGen++
         rejoining = false
         active?.let { try { it.close() } catch (_: IOException) {} }
+        main.post { stopHello(why); main.removeCallbacks(noTcpTick) }
         p2p.stop(why)
         WLog.ev(WLog.BT, "stop", "why" to why, "accepts" to accepts)
     }
@@ -215,7 +229,11 @@ class CarlifeBtProbe(
                             else {
                                 lastTarget = t
                                 onTargetInfo(dev?.address)
-                                p2p.start(t)
+                                if (p2pAllowed()) p2p.start(t)
+                                else {
+                                    WLog.ev(WLog.P2P, "skip", "why" to "Wi-Fi Direct не дал TCP, жду машину по Wi-Fi")
+                                    CarLifeState.btProbe = "Wi-Fi Direct не дал связи, жду машину по Wi-Fi"
+                                }
                             }
                         }
                         BtMsg.HU_IP_REQUEST -> {
@@ -244,8 +262,11 @@ class CarlifeBtProbe(
         WLog.ev(WLog.BT, "tx", "type" to BtMsg.name(type), "len" to (body?.size ?: 0))
     }
 
-    private fun onP2pJoined(ip: java.net.Inet4Address) {
+    private fun onP2pJoined(ip: java.net.Inet4Address, owner: java.net.Inet4Address?) {
         p2pIp = ip.hostAddress
+        startHello(owner)
+        noTcp.joined(SystemClock.elapsedRealtime())
+        armNoTcp()
         CarLifeState.btProbe = "телефон в группе ГУ (${ip.hostAddress})" + if (ipRequested) "" else ", ГУ ещё не просила IP"
         if (rejoining) WLog.ev(WLog.P2P, "rejoin-joined", "ipRequested" to ipRequested)
         rejoining = false
@@ -261,6 +282,7 @@ class CarlifeBtProbe(
      */
     private fun onP2pLost() {
         p2pIp = null
+        stopHello("группа распалась")
         val s = active
         if (!running || s == null) return
         rejoining = true
@@ -321,11 +343,75 @@ class CarlifeBtProbe(
         try {
             send(s, BtMsg.MD_WIFI_IP, BtMsg.wifiIp(ip))
             ipRequested = false
+            noTcp.ipSent(SystemClock.elapsedRealtime())
+            main.post { armNoTcp() }      // решаем не сразу: ГУ нужно время открыть TCP
             CarLifeState.btProbe = "отдал ГУ IP $ip, жду TCP от ГУ"
             AppLog.i("BT carlife: отдал ГУ адрес телефона $ip")
         } catch (e: IOException) {
             WLog.ev(WLog.BT, "tx-fail", "type" to "WIFI_IP", "err" to e.message)
         }
+    }
+
+    /** 6/6 поднялись: привет больше не нужен (главная нить). */
+    fun onTcpUp() {
+        noTcp.tcpUp()
+        main.post {
+            main.removeCallbacks(noTcpTick)
+            stopHello("6/6")
+        }
+    }
+
+    /** Новое ожидание машины (BridgeService.beginWait): счётчики «нет TCP» с нуля. */
+    fun newWait() {
+        noTcp.newWait()
+        main.post { main.removeCallbacks(noTcpTick) }
+    }
+
+    /** Главная нить: взвести проверку «нет TCP» на срок из [NoTcpTracker.nextCheckMs]. */
+    private fun armNoTcp() {
+        main.removeCallbacks(noTcpTick)
+        val d = noTcp.nextCheckMs(SystemClock.elapsedRealtime()) ?: return
+        main.postDelayed(noTcpTick, d)
+    }
+
+    @SuppressLint("MissingPermission")
+    private fun startHello(owner: java.net.Inet4Address?) {
+        if (tcpUp()) return
+        val lan = p2p.joinedIface ?: return
+        stopHello("новый вход")
+        val btName = try {
+            ctx.getSystemService(BluetoothManager::class.java)?.adapter?.name
+        } catch (_: SecurityException) {
+            null
+        }
+        hello = P2pHello(lan, owner, hello = { BeaconCodec.hello(btName, p2p.myName) }).also { it.start() }
+    }
+
+    private fun stopHello(why: String) {
+        hello?.stop(why)
+        hello = null
+    }
+
+    /** Главная нить: вошли, адрес отдан, а TCP нет - бросаем Wi-Fi Direct на это ожидание. */
+    private fun checkNoTcp() {
+        if (!running) return
+        val now = SystemClock.elapsedRealtime()
+        if (tcpUp()) {
+            noTcp.tcpUp()
+            return
+        }
+        if (!noTcp.shouldFallback(now, tcpUpNow = false)) return armNoTcp()
+        noTcp.markFired()
+        val sends = noTcp.ipSends
+        WLog.ev(WLog.P2P, "fallback", "why" to "no-tcp", "sinceJoinMs" to noTcp.sinceJoinMs(now), "ipSends" to sends, "helloReplies" to (hello?.replies ?: 0))
+        AppLog.i("Wi-Fi Direct: вошли в группу ГУ и отдали адрес $sends раз, а ГУ не подключилась - жду её по Wi-Fi машины или хотспоту")
+        CarLifeState.btProbe = "Wi-Fi Direct не дал связи, жду машину по Wi-Fi"
+        stopHello("нет TCP")
+        rejoinGen++
+        rejoining = false
+        p2pIp = null
+        p2p.stop("нет TCP")
+        onP2pNoTcp()
     }
 
     companion object {
