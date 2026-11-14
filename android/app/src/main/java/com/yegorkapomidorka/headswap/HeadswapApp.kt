@@ -2,11 +2,14 @@ package com.yegorkapomidorka.headswap
 
 import android.app.Application
 import com.yegorkapomidorka.headswap.dex.ActivationToken
+import com.yegorkapomidorka.headswap.dex.VdmDesktop
 
 /** Старт процесса: токен активации с ПК должен существовать до первой команды ManualAccessLauncher, экрана для него больше нет. */
 class HeadswapApp : Application() {
     override fun onCreate() {
         super.onCreate()
+        // onCreate зовётся в каждом процессе приложения (main, :delegated), флаг VDM-хоста нужен в каждом
+        VdmDesktop.loadOptIn(this)
         // current() создаёт токен через синхронный commit(): не на главном потоке
         Thread({
             try {

@@ -126,7 +126,7 @@ internal object PhoneAdb {
                 if (adb.shell(PhoneActivationPolicy.PREFLIGHT).exitCode != 0)
                     throw AdbAccessException(AdbStage.SHELL, AdbReason.UNSUPPORTED_SHELL)
                 nonce = PhoneActivationPolicy.newNonce()
-                val options = ActivationToken(context).options(audio)
+                val options = ActivationToken(context).options(audio, VdmDesktop.activationFlag(context))
                 val command = PhoneActivationPolicy.dispatchCommand(apk, options, nonce)
                 state.connectPort = port
                 state.begin(nonce) // on disk before the app is restarted

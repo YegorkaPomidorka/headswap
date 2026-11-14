@@ -29,13 +29,22 @@ class VdmHostPolicyTest {
         assertThrows(IllegalArgumentException::class.java) { VdmHostPolicy.Args.parse(arrayOf("--pid", "4", "--x")) }
     }
 
-    @Test fun hostOnAndroid17EverywhereAndSamsungOn16() {
-        assertTrue(VdmHostPolicy.supported(37, "Google"))
-        assertTrue(VdmHostPolicy.supported(36, "samsung"))
-        assertTrue(VdmHostPolicy.supported(36, "Samsung"))
-        assertEquals(false, VdmHostPolicy.supported(36, "Xiaomi"))
-        assertEquals(false, VdmHostPolicy.supported(36, null))
-        assertEquals(false, VdmHostPolicy.supported(35, "samsung"))
+    @Test fun hostOnAndroid17EverywhereAndSamsungOn16OnlyByToggle() {
+        assertTrue(VdmHostPolicy.supported(37, "Google", false))
+        assertTrue(VdmHostPolicy.supported(37, "Google", true))
+        assertTrue(VdmHostPolicy.supported(36, "samsung", true))
+        assertTrue(VdmHostPolicy.supported(36, "Samsung", true))
+        assertEquals(false, VdmHostPolicy.supported(36, "samsung", false))
+        assertEquals(false, VdmHostPolicy.supported(36, "Xiaomi", true))
+        assertEquals(false, VdmHostPolicy.supported(36, null, true))
+        assertEquals(false, VdmHostPolicy.supported(35, "samsung", true))
+    }
+
+    @Test fun toggleIsOfferedOnlyOnSamsungAndroid16() {
+        assertTrue(VdmHostPolicy.optInAvailable(36, "samsung"))
+        assertEquals(false, VdmHostPolicy.optInAvailable(36, "Xiaomi"))
+        assertEquals(false, VdmHostPolicy.optInAvailable(37, "samsung"))
+        assertEquals(false, VdmHostPolicy.optInAvailable(35, "samsung"))
     }
 
     @Test fun hostFlagsSwapOwnGroupForDeviceGroup() {

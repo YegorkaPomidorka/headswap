@@ -35,16 +35,22 @@ public final class ManualAccessPolicy {
 
     public static final class Options {
         public final boolean audio, help;
+        /** Запустить shell-хост VirtualDevice на Android 16 (h1091): тумблер в приложении, shell-процесс префы не читает. */
+        public final boolean vdm;
         public final String packageName, token;
         public Options(boolean audio, boolean help, String packageName, String token) {
-            this.audio = audio; this.help = help; this.packageName = packageName; this.token = token;
+            this(audio, help, packageName, token, false);
+        }
+        public Options(boolean audio, boolean help, String packageName, String token, boolean vdm) {
+            this.audio = audio; this.help = help; this.packageName = packageName; this.token = token; this.vdm = vdm;
         }
         public static Options parse(String[] args) {
-            boolean audio = false, help = false;
+            boolean audio = false, help = false, vdm = false;
             String packageName = null, token = null;
             for (int n = 0; n < args.length; n++) {
                 switch (args[n]) {
                     case "--audio": if (audio) throw new IllegalArgumentException("Повторный --audio"); audio = true; break;
+                    case "--vdm": if (vdm) throw new IllegalArgumentException("Повторный --vdm"); vdm = true; break;
                     case "--help": if (help) throw new IllegalArgumentException("Повторный --help"); help = true; break;
                     case "--package":
                         if (packageName != null) throw new IllegalArgumentException("Повторный --package");
@@ -56,14 +62,14 @@ public final class ManualAccessPolicy {
                 }
             }
             if (help) {
-                if (audio || packageName != null || token != null) throw new IllegalArgumentException("--help используется отдельно");
+                if (audio || vdm || packageName != null || token != null) throw new IllegalArgumentException("--help используется отдельно");
                 return new Options(false, true, null, null);
             }
             if (packageName == null) throw new IllegalArgumentException("Не указан --package");
             if (token == null) throw new IllegalArgumentException("Не указан --token");
             requirePackage(packageName);
             requireToken(token);
-            return new Options(audio, false, packageName, token);
+            return new Options(audio, false, packageName, token, vdm);
         }
         private static String value(String[] args, int index, String name) {
             if (index >= args.length) throw new IllegalArgumentException("У " + name + " нет значения");
@@ -135,7 +141,7 @@ public final class ManualAccessPolicy {
         requirePackage(options.packageName);
         requireToken(options.token);
         return "CLASSPATH=" + apkPath + " app_process / " + ENTRY + " --package " + options.packageName
-            + " --token " + options.token + (options.audio ? " --audio" : "");
+            + " --token " + options.token + (options.audio ? " --audio" : "") + (options.vdm ? " --vdm" : "");
     }
 
     public static String adbCommand(String apkPath, Options options) {

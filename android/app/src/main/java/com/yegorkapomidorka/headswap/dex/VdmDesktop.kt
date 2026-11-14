@@ -16,7 +16,7 @@ import com.yegorkapomidorka.headswap.AppLog
  * отдельный shell-процесс [VdmHostMain], а сюда он отдаёт свой binder через [VdmHostProvider].
  */
 internal object VdmDesktop {
-    /** Android 17 (separate_timeouts) везде; на 16 только Samsung (h1091), остальным старый путь с OWN_DISPLAY_GROUP. */
+    /** Android 17 (separate_timeouts) везде; на 16 только Samsung по ручному тумблеру (h1091), остальным старый путь с OWN_DISPLAY_GROUP. */
     const val MIN_SDK = VdmHostPolicy.MIN_SDK
     const val METHOD = "vdm_host"
     const val METHOD_REPORT = "vdm_report"
@@ -31,7 +31,20 @@ internal object VdmDesktop {
     const val FLAG_ALWAYS_UNLOCKED = 1 shl 12
     const val FLAG_DEVICE_DISPLAY_GROUP = 1 shl 15
 
-    val supported: Boolean get() = VdmHostPolicy.supported(Build.VERSION.SDK_INT, Build.MANUFACTURER)
+    /**
+     * Ручной тумблер «Хост VirtualDevice на Android 16». Из префов выставляется в Application.onCreate каждого процесса
+     * приложения (main, :delegated) и при переключении; другой процесс увидит смену после перезапуска (активация его перезапускает).
+     */
+    @Volatile var hostOnAndroid16 = false
+
+    val supported: Boolean get() = VdmHostPolicy.supported(Build.VERSION.SDK_INT, Build.MANUFACTURER, hostOnAndroid16)
+
+    /** Читает тумблер из префов; на устройствах без возможности включить не трогает диск. */
+    fun loadOptIn(context: android.content.Context) { hostOnAndroid16 = activationFlag(context) }
+
+    /** Флаг `--vdm` для активации: shell-процесс префы не читает. */
+    fun activationFlag(context: android.content.Context): Boolean =
+        VdmHostPolicy.optInAvailable(Build.VERSION.SDK_INT, Build.MANUFACTURER) && DexPrefs(context).vdmHostOnAndroid16
 
     /**
      * Отладка по USB выключена: без неё Samsung при подключении ГУ кабелем останавливает adbd, а с ним shell-хост
