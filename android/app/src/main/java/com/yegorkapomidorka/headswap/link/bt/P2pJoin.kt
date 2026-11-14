@@ -71,8 +71,17 @@ class P2pJoin(
     private var joinedIp: Inet4Address? = null
     @Volatile private var iface: LanIface? = null
 
-    /** Адрес из P2P-подсети, куда мы вошли (для фильтра входящих TCP). */
-    fun owns(a: InetAddress): Boolean = iface?.contains(a) == true
+    /**
+     * Адрес из P2P-подсети, куда мы вошли (для фильтра входящих TCP). Если мы сами не входили, но p2p*-интерфейс
+     * поднят, группа осталась от прошлого процесса: h420, MIUI убил процесс посреди сессии, система перезапустила
+     * сервис, а ГУ стучалась в живую группу и получала отказ, пока юзер не передёргивал Bluetooth.
+     */
+    fun owns(a: InetAddress): Boolean {
+        iface?.let { return it.contains(a) }
+        val stale = p2pIface()?.takeIf { it.contains(a) } ?: return false
+        WLog.ev(WLog.P2P, "stale-group", "iface" to stale.toString(), "note" to "группа от прошлого процесса, пускаю ГУ")
+        return true
+    }
 
     fun hasPermission(): Boolean {
         val p = if (Build.VERSION.SDK_INT >= 33) Manifest.permission.NEARBY_WIFI_DEVICES else Manifest.permission.ACCESS_FINE_LOCATION
