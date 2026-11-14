@@ -99,7 +99,11 @@ fun LauncherRoot(connected: Boolean) {
         val pal = model.palette
         CompositionLocalProvider(LocalMetrics provides metrics, LocalAccent provides pal.accent, LocalPalette provides pal,
             LocalLocaleDirection provides localeDir) {
-            Box(Modifier.fillMaxSize().launcherBackground(pal)) {
+            Box(Modifier.fillMaxSize()) {
+                DesktopBackdrop(pal)
+                GlassLayer()
+                // общая яркость: плёнка только над фоном и стеклом, текст и карточки остаются чёткими
+                BrightnessVeil()
                 if (!connected) {
                     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         Txt(stringResource(R.string.l_connecting), spec.f1, color = Pal.SEC)
@@ -163,6 +167,7 @@ fun LauncherRoot(connected: Boolean) {
                         }
                         RemoveConfirm()
                     }
+
                 }
             }
         }
@@ -192,10 +197,11 @@ private fun Rail() {
     val model = LauncherModel
     val status = model.status
     Column(Modifier.width(m.dp(s.rail)).fillMaxHeight(), verticalArrangement = Arrangement.spacedBy(m.dp(s.g))) {
+        FrostedPanel(
+            Modifier.weight(1f).fillMaxWidth(), RoundedCornerShape(bottomEnd = m.dp(s.radius)),
+        ) {
         Column(
-            Modifier.weight(1f).fillMaxWidth()
-                .clip(RoundedCornerShape(bottomEnd = m.dp(s.radius))).background(Pal.SURFACE)
-                .padding(top = m.dp(s.g), bottom = m.dp(s.g8)),
+            Modifier.fillMaxSize().padding(top = m.dp(s.g), bottom = m.dp(s.g8)),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.SpaceBetween,
         ) {
@@ -222,6 +228,7 @@ private fun Rail() {
             RailGearButton()
             // «Вид карточки» в рейке; в ленте с обычной рейкой - стеклянная кнопка в углу большой плашки (HomeTileButtons)
             if (s.cardViewInRail) CardViewButton(s.rb, s.ric, Color.Transparent, Pal.SEC2)
+        }
         }
         NavBlock(Modifier.width(m.dp(s.rail)).height(m.dp(s.navH)), RoundedCornerShape(topEnd = m.dp(s.radius)))
     }
@@ -303,13 +310,15 @@ private fun BottomRail() {
     val top = RoundedCornerShape(topStart = r, topEnd = r)
     Row(Modifier.fillMaxWidth().height(m.dp(s.bottomRailH)).padding(horizontal = m.dp(s.g)),
         horizontalArrangement = Arrangement.spacedBy(m.dp(s.g))) {
-        Row(Modifier.weight(1f).fillMaxHeight().clip(top).background(Pal.SURFACE),
-            verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceAround) {
-            RailBackButton()
-            RailLogoButton()
-            RailGearButton()
-            CardViewButton(s.rb, s.ric, Color.Transparent, Pal.SEC2)
-            VolumeGroup()
+        FrostedPanel(Modifier.weight(1f).fillMaxHeight(), top) {
+            Row(Modifier.fillMaxSize(),
+                verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceAround) {
+                RailBackButton()
+                RailLogoButton()
+                RailGearButton()
+                CardViewButton(s.rb, s.ric, Color.Transparent, Pal.SEC2)
+                VolumeGroup()
+            }
         }
         NavBlock(Modifier.width(m.dp(s.rail)).fillMaxHeight(), top)
     }
@@ -347,6 +356,16 @@ fun CardViewButton(sizePx: Int, iconPx: Int, background: Color, color: Color, mo
  * (все три экрана со строкой - start g, top g8, end m). Нижний край полосы уходит в модель: к нему крепится язычок
  * уведомлений ([NotificationsOverlay]); золотая полоска живёт там же, по центру области.
  */
+/** Общая яркость 0..100 от нейтрали 50: ниже - затемнение, выше - подсветка; только фон и стекло, текст не трогаем. */
+@Composable
+private fun BrightnessVeil() {
+    val b = LauncherModel.brightness
+    when {
+        b < 50 -> Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = (50 - b) / 50f * 0.72f)))
+        b > 50 -> Box(Modifier.fillMaxSize().background(Color.White.copy(alpha = (b - 50) / 50f * 0.35f)))
+    }
+}
+
 @Composable
 fun StatusBar(title: String? = null, showNet: Boolean = true) {
     val m = LocalMetrics.current
@@ -379,7 +398,9 @@ fun StatusBar(title: String? = null, showNet: Boolean = true) {
                 val rtl = layoutDirection == LayoutDirection.Rtl
                 val left = if (rtl) s.padEnd else s.g
                 val right = if (rtl) s.g else s.padEnd
-                drawRect(bar, Offset(-left.toFloat(), -s.g8.toFloat()), Size(size.width + left + right, s.statusBandH.toFloat()))
+                // с обоями полоса полупрозрачная: картинка просвечивает, значки и время остаются читаемыми
+                val fill = if (LauncherModel.wallpaper.isEmpty()) bar else Color.Transparent
+                drawRect(fill, Offset(-left.toFloat(), -s.g8.toFloat()), Size(size.width + left + right, s.statusBandH.toFloat()))
             }
             // строка по центру полосы: родитель опускает её на g8, полоса ниже строки на 3/4 g8
             .offset(y = -m.dp(s.g8 / 4)),
@@ -388,7 +409,9 @@ fun StatusBar(title: String? = null, showNet: Boolean = true) {
     ) {
         // в узкой рейке часов нет: время слева, прижато к краю (перед заголовком, если он есть)
         if (s.clockInStatus) {
-            Txt(st.time, s.statusFs, Modifier.busy { timeX = it }, color = Pal.TEXT, weight = FontWeight.SemiBold, mono = true)
+            val timeOnGlass = !s.portrait && LauncherModel.wallpaper.isNotEmpty() && LauncherModel.wallpaperBtnBlur > 0
+            Txt(st.time, s.statusFs, Modifier.busy { timeX = it }, color = adaptiveColor(Pal.TEXT, glass = timeOnGlass),
+                weight = FontWeight.SemiBold, mono = true)
             if (title == null) Spacer(Modifier.weight(1f))
         }
         // заголовок экрана у начала (слева; в RTL справа), статус у конца; сам ряд значков всегда слева направо (создан внутри Ltr)
@@ -406,30 +429,31 @@ private fun StatusIcons(st: StatusInfo, showNet: Boolean, showBattery: Boolean) 
     val m = LocalMetrics.current
     val s = m.spec
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(m.dp(s.g))) {
-        Txt(st.date, s.statusFs, color = Pal.SEC2)
-        SvgIcon(Ico.BT, s.statusFs, if (st.bluetooth) Pal.SEC2 else Pal.SEC2.copy(alpha = 0.3f))
-        SvgIcon(Ico.WIFI, s.statusFs, if (st.wifi) Pal.SEC2 else Pal.SEC2.copy(alpha = 0.3f))
+        Txt(st.date, s.statusFs, color = statusColor(Pal.SEC2))
+        SvgIcon(Ico.BT, s.statusFs, statusColor(if (st.bluetooth) Pal.SEC2 else Pal.SEC2.copy(alpha = 0.3f)))
+        SvgIcon(Ico.WIFI, s.statusFs, statusColor(if (st.wifi) Pal.SEC2 else Pal.SEC2.copy(alpha = 0.3f)))
         // сеть с уровнем сигнала - здесь, рядом с Wi-Fi, а не в рейке
         if (showNet && st.signal >= 0) Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(m.dp(s.g4))) {
-            VectorIcon(VIco.signal(st.signal), 24f, s.statusFs, Pal.SEC2)
-            Txt(st.net, s.statusFs, color = Pal.SEC2)
+            VectorIcon(VIco.signal(st.signal), 24f, s.statusFs, statusColor(Pal.SEC2))
+            Txt(st.net, s.statusFs, color = statusColor(Pal.SEC2))
         }
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(m.dp(s.g4))) {
-            SvgIcon(Ico.VOLUME, s.statusFs, Pal.SEC2)
-            Txt(st.volume.toString(), s.statusFs, color = Pal.SEC2)
+            SvgIcon(Ico.VOLUME, s.statusFs, statusColor(Pal.SEC2))
+            Txt(st.volume.toString(), s.statusFs, color = statusColor(Pal.SEC2))
         }
         // заряд телефона в конце ряда: цифра внутри батарейки, молния справа - на зарядке.
         // Нет данных или выключено в «Вид» - ничего не рисуем
         if (showBattery && st.battery >= 0) Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(m.dp(s.g4))) {
-            BatteryBadge(st.battery, s.statusFs, Pal.SEC2)
-            if (st.charging) VectorIcon(VIco.BOLT, 24f, s.statusFs, Pal.SEC2)
+            BatteryBadge(st.battery, s.statusFs, statusColor(Pal.SEC2))
+            if (st.charging) VectorIcon(VIco.BOLT, 24f, s.statusFs, statusColor(Pal.SEC2))
         }
     }
 }
 
 /** Батарейка с цифрой заряда внутри (без «%»): контур со скруглением и «носик» справа. Высота - [fs], ширина - 2·fs. */
 @Composable
-private fun BatteryBadge(percent: Int, fs: Int, color: Color) {
+private fun BatteryBadge(percent: Int, fs: Int, color0: Color) {
+    val color = adaptiveColor(color0)
     val m = LocalMetrics.current
     val nub = maxOf(2, fs / 9)
     Box(

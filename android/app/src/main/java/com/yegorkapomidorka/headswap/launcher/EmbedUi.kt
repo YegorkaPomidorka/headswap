@@ -365,9 +365,11 @@ private fun ClockFace(small: Boolean) {
         val byW = (constraints.maxWidth * 0.85f / (chars * 0.62f)).toInt()
         val byH = (constraints.maxHeight * 0.45f).toInt()
         val timeFs = if (!s.strip) base else minOf(base, byW, byH).coerceAtLeast(s.f1)
+        // на обоях часы и дата - чистым белым: тёмная подложка плитки иначе даёт серый нечитаемый текст
+        val onWall = LauncherModel.wallpaper.isNotEmpty()
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Txt(st.time, timeFs, weight = FontWeight.Bold, mono = true)
-            Txt(st.date, if (small) s.f2 else s.f1, color = Pal.SEC2)
+            Txt(st.time, timeFs, color = if (onWall) Color.White else Pal.TEXT, weight = FontWeight.Bold, mono = true)
+            Txt(st.date, if (small) s.f2 else s.f1, color = if (onWall) Color.White else Pal.SEC2)
         }
     }
 }

@@ -86,7 +86,7 @@ object PhoneLogic {
         return when (then.toLocalDate()) {
             now -> then.format(DateTimeFormatter.ofPattern("HH:mm", Locale.ROOT))
             now.minusDays(1) -> yesterday
-            else -> then.format(DateTimeFormatter.ofPattern("dd.MM", Locale.ROOT))
+            else -> then.format(DateTimeFormatter.ofPattern("MM.dd", Locale.ROOT))
         }
     }
 

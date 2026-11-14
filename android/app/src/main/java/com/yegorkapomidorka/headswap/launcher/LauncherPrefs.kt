@@ -52,6 +52,31 @@ class LauncherPrefs(private val context: Context) {
         get() = ColorSet.decode(prefs.getString("colors_day", null), ColorSet.DAY)
         set(value) { prefs.edit().putString("colors_day", value.encode()).apply() }
 
+    /** Фон-обои «Вид › Цвета»: content:// URI выбранной картинки; пусто - обычный градиент темы. */
+    var wallpaper: String
+        get() = prefs.getString("wallpaper", "") ?: ""
+        set(value) { prefs.edit().putString("wallpaper", value).apply() }
+
+    /** Общая яркость стола, 0..100 % (100 - без затемнения); работает и в режиме цветов, и с обоями. */
+    var brightness: Int
+        get() = prefs.getInt("brightness", 50)
+        set(value) { prefs.edit().putInt("brightness", value).apply() }
+
+    /** Затемнение обоев, 0..100 % (устарело, оставлено для совместимости). */
+    var wallpaperDim: Int
+        get() = prefs.getInt("wallpaper_dim", 30)
+        set(value) { prefs.edit().putInt("wallpaper_dim", value).apply() }
+
+    /** «Размытие кнопок»: насколько сильнее размыты обои под плитками рейки и карточками настроек, 0..30 dp. */
+    var wallpaperBtnBlur: Int
+        get() = prefs.getInt("wallpaper_btn_blur", 8)
+        set(value) { prefs.edit().putInt("wallpaper_btn_blur", value).apply() }
+
+    /** Размытие обоев, 0..30 dp (0 - без размытия). */
+    var wallpaperBlur: Int
+        get() = prefs.getInt("wallpaper_blur", 0)
+        set(value) { prefs.edit().putInt("wallpaper_blur", value).apply() }
+
     var railSize: RailSize
         get() = RailSize.restore(prefs.getString("rail_size", null))
         set(value) { prefs.edit().putString("rail_size", value.name).apply() }

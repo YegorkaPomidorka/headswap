@@ -119,8 +119,8 @@
     <string name="l_s_theme_light">浅色</string>
     <string name="l_s_theme_auto">自动</string>
     <string name="l_s_theme_sub">自动模式跟随车灯</string>
-    <string name="l_s_colors">颜色</string>
-    <string name="l_s_colors_sub">强调色和背景，夜间与白天分别设置</string>
+    <string name="l_s_colors">桌面颜色与壁纸</string>
+    <string name="l_s_colors_sub">强调色与背景，或者你自己的图片</string>
     <string name="l_s_colors_night">夜间</string>
     <string name="l_s_colors_day">白天</string>
     <string name="l_s_colors_reset">重置</string>
@@ -190,4 +190,17 @@
     <string name="l_notif_clear_all">全部清除</string>
     <string name="l_notif_dismiss">清除</string>
     <string name="l_notif_open_in">在%1$s中打开</string>
+    <string name="l_s_wall">桌面壁纸</string>
+    <string name="l_s_wall_sub_on">已启用壁纸，颜色不可用</string>
+    <string name="l_s_wall_sub_off">用整张图片代替渐变色背景</string>
+    <string name="l_s_wall_pick">选择图片</string>
+    <string name="l_s_wall_change">更换</string>
+    <string name="l_s_wall_remove">移除</string>
+    <string name="l_s_wall_dim">亮度</string>
+    <string name="l_s_wall_blur">壁纸模糊</string>
+    <string name="l_s_wall_hint">设置壁纸时颜色选项不可用；移除壁纸即可恢复颜色。</string>
+    <string name="l_s_wall_back">改用颜色</string>
+    <string name="l_s_wall_ok">确定</string>
+    <string name="l_s_wall_cancel">取消</string>
+    <string name="l_s_wall_btn_blur">按钮模糊度</string>
 </resources>
