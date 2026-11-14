@@ -15,7 +15,7 @@ object DesktopVideoGeometry : VideoGeometry {
     override val marginW = 0
     override val marginH = 0
     override val density = 160
-    override val bitrate = DesktopVideoQuality.BITRATE_CEILING_BPS
+    override val bitrate = DesktopVideoQuality.DEFAULT_BITRATE_BPS
     override val label = "DeX ${WIDTH}x$HEIGHT"
 
     override fun describe(densityOverride: Int): String =

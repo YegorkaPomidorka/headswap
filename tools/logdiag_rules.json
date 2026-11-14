@@ -32,7 +32,9 @@
     "iface_down": "WL net iface-down",
     "stream_desync": "РАССИНХРОН потока",
     "pause": "VIDEO_ENCODER_PAUSE",
-    "eio": "EIO \\(I/O error\\)|ENODEV"
+    "eio": "EIO \\(I/O error\\)|ENODEV",
+    "own_idr_rejected": "BRIDGE свой IDR .*не принят CarLife",
+    "bitrate_swing": "битрейт энкодера (8000 -> 5600|941 -> 800)"
   },
   "rules": [
     {
@@ -772,6 +774,44 @@
       "steps": [
         {"text": "Опишите проблему словами и приложите фото экрана магнитолы", "text_en": "Describe the problem in words and attach a photo of the head unit screen", "action": "share_log"}
       ]
+    },
+    {
+      "id": "own_idr_rejected",
+      "title": "Свой IDR не принимается CarLife",
+      "title_en": "The custom IDR is rejected by CarLife",
+      "phase": "drops",
+      "category": "our_bug",
+      "score": 85,
+      "all": [["m.own_idr_rejected", ">=", 1]],
+      "advice": "Очередь CarLife не принимает свой IDR: отключите «Свой ключевой кадр» в «Для разработчиков» или включите перекодирование. Если это «Свой лаунчер», проверьте потолок битрейта.",
+      "advice_en": "The CarLife queue rejects the custom IDR: turn off the custom keyframe in Developer settings or enable transcoding. In Own launcher mode check the bitrate ceiling.",
+      "what": "Мост отправляет свой IDR, но CarLife его не принимает; кадры AA отбрасываются до следующего IDR.",
+      "what_en": "The bridge sends a custom IDR but CarLife rejects it; AA frames are dropped until the next IDR.",
+      "steps": [
+        {"text": "Включите перекодирование в настройках видео", "text_en": "Enable transcoding in Video settings"},
+        {"text": "Или выключите «Свой ключевой кадр» в разделе «Для разработчиков»", "text_en": "Or turn off the custom keyframe in Developer settings"}
+      ],
+      "ask": "Это режим AA или «Свой лаунчер»?",
+      "ask_en": "Is this AA or Own launcher mode?"
+    },
+    {
+      "id": "bitrate_oscillation",
+      "title": "Битрейт скачет на Wi-Fi",
+      "title_en": "Bitrate oscillates on Wi-Fi",
+      "phase": "drops",
+      "category": "hu_limit",
+      "score": 75,
+      "all": [["m.bitrate_swing", ">=", 1]],
+      "advice": "Похоже на нестабильный Wi-Fi: битрейт уходит на 8 Мбит/с и резко падает. В «Своём лаунчере» поставьте 30 fps и потолок 6 Мбит/с; для AA включите перекодирование.",
+      "advice_en": "Looks like unstable Wi-Fi: the bitrate climbs to 8 Mbit/s and collapses. In Own launcher mode use 30 fps and a 6 Mbit/s ceiling; for AA enable transcoding.",
+      "what": "Битрейт энкодера резко менялся между высоким и низким уровнем.",
+      "what_en": "The encoder bitrate changed sharply between high and low levels.",
+      "steps": [
+        {"text": "Проверьте Wi-Fi или подключитесь кабелем", "text_en": "Check Wi-Fi or connect by cable"},
+        {"text": "В «Своём лаунчере» оставьте 30 fps", "text_en": "In Own launcher mode keep 30 fps"}
+      ],
+      "ask": "Это по кабелю или по воздуху?",
+      "ask_en": "Is this over cable or wireless?"
     }
   ]
 }

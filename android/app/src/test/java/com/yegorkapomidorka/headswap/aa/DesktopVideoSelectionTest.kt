@@ -48,6 +48,7 @@ class DesktopVideoSelectionTest {
             VideoMode.R1024 to (1024 to 600), VideoMode.WIDE_HD to (1920 to 720), VideoMode.WIDE_836 to (1920 to 836))) {
             val mode = DesktopVideoSelection.forAaVideo(video, 0).resolve(1024, 768) // запрос магнитолы игнорируется
             assertEquals(video.name, size, mode.outW to mode.outH)
+            assertEquals(video.bitrate, mode.bitrate)
         }
         val custom = DesktopVideoSelection.forAaVideo(CustomVideoMode(1600, 700), 0).resolve()
         assertEquals(1600 to 700, custom.outW to custom.outH)

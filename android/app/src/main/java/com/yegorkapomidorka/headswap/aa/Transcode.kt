@@ -27,6 +27,9 @@ interface TranscodeOutput {
     /** Кадр энкодера (Annex-B). */
     fun onEncoderFrame(data: ByteArray, key: Boolean)
 
+    /** Кадр энкодера с исходным PTS; по умолчанию PTS не нужен. */
+    fun onEncoderFrame(data: ByteArray, key: Boolean, ptsUs: Long) = onEncoderFrame(data, key)
+
     fun onTranscodeError(msg: String)
 
     /** Декодеру нужен новый IDR от AA (кадр потерян). */

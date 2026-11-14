@@ -55,9 +55,35 @@ object CarAreas {
         return Box(x, y, x + minOf(cw, w), y + minOf(ch, h))
     }
 
+    /**
+     * Касание окна навигатора [viewW]x[viewH] в координаты поверхности [w]x[h]: на весь экран окно растягивает
+     * поверхность, в карточке на главном показывает вырезку [crop] 1:1 (h1045: плашка стала живой, как у YouTube).
+     */
+    fun touch(x: Float, y: Float, viewW: Int, viewH: Int, w: Int, h: Int, crop: Box?): Pair<Float, Float> =
+        if (crop == null || crop.width <= 0 || crop.height <= 0) x * w / viewW to y * h / viewH
+        else crop.left + x * crop.width / viewW to crop.top + y * crop.height / viewH
+
     /** Пока рендер не сообщил свою геометрию: как в пробнике (карточки слева 36 %, кнопки справа 10 %, stable ниже на 15 %). */
     fun default(w: Int, h: Int): Pair<Box, Box> =
         of(w, h, (w * 0.36f).roundToInt(), (w * 0.10f).roundToInt(), 0)
+}
+
+/**
+ * Карточки манёвра и прибытия в плашке навигатора на главном (h1045: в режимах 2 и 4 окон их не было вовсе).
+ * Множитель к полноэкранным размерам: карточки занимают не больше [SHARE] ширины плашки слева. Если так текст
+ * мельчает ниже [MIN_SCALE] (узкая плашка 2:1), карточки встают на всю ширину плашки сверху и снизу.
+ */
+object CarTileFit {
+    const val SHARE = 0.55f
+    const val MIN_SCALE = 0.6f
+
+    /** [tileW] - ширина плашки, [cardW] - самая широкая карточка, [gap] - отступ, оба при множителе 1. (множитель, узкая) */
+    fun scale(tileW: Int, cardW: Int, gap: Int): Pair<Float, Boolean> {
+        if (tileW <= 0 || cardW <= 0) return 1f to false
+        val side = minOf(1f, tileW * SHARE / cardW)
+        if (side >= MIN_SCALE) return side to false
+        return minOf(1f, tileW.toFloat() / (cardW + 2 * gap)) to true
+    }
 }
 
 /** Числа Configuration для приложения: размер в dp, плотность. */

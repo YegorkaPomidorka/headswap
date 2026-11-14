@@ -1,5 +1,6 @@
 package com.yegorkapomidorka.headswap.link
 
+import android.os.Process
 import android.os.SystemClock
 import com.yegorkapomidorka.headswap.AppLog
 import com.yegorkapomidorka.headswap.Ch
@@ -420,6 +421,11 @@ class MultiSocketTransport internal constructor(
     }
 
     private fun writeLoop(chan: Int, s: Socket, onWritten: (Int, ByteArray) -> Unit) {
+        runCatching {
+            Process.setThreadPriority(
+                if (chan == Ch.VIDEO) Process.THREAD_PRIORITY_DISPLAY else Process.THREAD_PRIORITY_DEFAULT
+            )
+        }
         val q = queues.getValue(chan)
         val video = chan == Ch.VIDEO
         try {

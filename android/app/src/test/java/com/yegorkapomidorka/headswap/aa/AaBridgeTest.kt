@@ -123,6 +123,13 @@ class AaBridgeCoreTest {
     private fun types(b: ByteArray) = AnnexB.nalTypes(b)
 
     @Test
+    fun ownIdrIsBlockedByQueueBacklogOrFrameCount() {
+        assertFalse(AaBridgeCore.ownIdrBlocked(LinkVideoStats(0.0, 200, 10, 0)))
+        assertTrue(AaBridgeCore.ownIdrBlocked(LinkVideoStats(0.0, 201, 0, 0)))
+        assertTrue(AaBridgeCore.ownIdrBlocked(LinkVideoStats(0.0, 0, 11, 0)))
+    }
+
+    @Test
     fun hyundaiCn7ForcesTranscode() {
         // h638: на CN7 прямой проброс моргает и гаснет
         core.transcodeEnabled = false

@@ -240,7 +240,7 @@ object LogShare {
             appendLine("  тишина перед подсказкой: ${aa.ttsPreroll.name}")
             appendLine("  прореживание тача: ${aa.touchDecimation.name}")
             appendLine("  двойное касание: ${aa.dupDownFilter.name}")
-            appendLine("  мой автомобиль: ${aa.carPreset?.let { "${it.name}${if (aa.carSettings == it.settings) "" else ", настройки изменены вручную"}" } ?: "не выбрана"}")
+            appendLine("  мой автомобиль: ${aa.carPreset?.let { p -> "${p.name}${if (aa.carSettings.copy(desktopFps = p.settings.desktopFps) == p.settings) "" else ", настройки изменены вручную"}" } ?: "не выбрана"}")
             appendLine("  сертификат: ${aa.certSet}")
             appendLine("  микрофон: ${aa.micMode.label}, MODULE_STATUS VR: ${aa.micVrStatus}")
             appendLine("  проверка обновлений: ${upd.enabled}, на GitHub: ${upd.release()?.version ?: "не проверялось"}")

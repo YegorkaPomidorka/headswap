@@ -20,3 +20,5 @@ dependencyResolutionManagement {
 
 rootProject.name = "headswap"
 include(":app")
+// Свисток: Android-стик в USB ГУ, гонит AOA-поток по Wi-Fi на телефон с Headswap
+include(":dongle")

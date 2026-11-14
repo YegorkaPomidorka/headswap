@@ -133,7 +133,9 @@ object AaMeta {
     const val NAV_STATE = 0x8006
     const val NAV_POSITION = 0x8007
 
+    const val STATE_STOPPED = 1
     const val STATE_PLAYING = 2
+    const val STATE_PAUSED = 3
 
     const val NAV_UNAVAILABLE = 0
     const val NAV_ACTIVE = 1
@@ -527,13 +529,14 @@ class MetaRelay(
     }
 
     // --- музыка ---
-    fun onMediaStatus(s: AaMediaStatus) {
+    /** [notifyPlayer]=false - плеер рабочего стола (h1054): только трек на ГУ, без реакций ядра на плеер AA (MUSIC, пауза ГУ). */
+    fun onMediaStatus(s: AaMediaStatus, notifyPlayer: Boolean = true) {
         s.source?.takeIf { it.isNotBlank() }?.let { mediaSource = it }
         s.playbackSeconds?.let { posMs = it * PROGRESS_UNIT }
         if (s.state != null && s.playing != playing) {
             playing = s.playing
             log("META музыка: ${AaMeta.stateName(s.state)}", true)
-            musicState(playing)
+            if (notifyPlayer) musicState(playing)
             if (playing && infoPending) {
                 replayMusic("AA заиграл")
                 return
