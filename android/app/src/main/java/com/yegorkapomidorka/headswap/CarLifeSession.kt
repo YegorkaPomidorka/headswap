@@ -831,15 +831,18 @@ class CarLifeSession(
      * по [AaBridgeCore.MAZDA_20622111_MAX_VIDEO_PACKET] байт, каждый отдельным VIDEO_DATA подряд (расчёт на то, что ГУ
      * склеивает поток перед декодером). Остальные ГУ получают кадр одним пакетом, как раньше.
      */
+    /** ГУ, которые режут/вешают USB на пакетах больше ~16 КиБ: Mazda 20622111 (h359), Bon-Auto 20362105 (h1111: IDR > ~18 КБ = каша, потом ГУ перестаёт читать). */
+    private val huSmallPackets get() = bridge.huMazda20622111 || bridge.huBonAuto20362105
+
     private fun sendVideoData(data: ByteArray) {
         val max = AaBridgeCore.MAZDA_20622111_MAX_VIDEO_PACKET
-        if (!bridge.huMazda20622111 || data.size <= max) {
+        if (!huSmallPackets || data.size <= max) {
             send(Ch.VIDEO, Wire.dataInner(Msg.VIDEO_DATA, videoTimeMs(), data))
             return
         }
         if (!splitLogged) {
             splitLogged = true
-            AppLog.i("видео: Mazda 20622111, кадр ${data.size} Б режу на ${(data.size + max - 1) / max} VIDEO_DATA по ≤ $max Б")
+            AppLog.i("видео: ${if (bridge.huBonAuto20362105) "Bon-Auto 20362105" else "Mazda 20622111"}, кадр ${data.size} Б режу на ${(data.size + max - 1) / max} VIDEO_DATA по ≤ $max Б")
         }
         val ts = videoTimeMs()
         var off = 0
@@ -1111,7 +1114,7 @@ class CarLifeSession(
                 else -> {
                     val t = SystemClock.elapsedRealtime()
                     // Mazda 20622111 (h359): пакет > ~16 КиБ вешает USB, обложка 24 КБ убила сессию через 3 с после картинки
-                    val limit = if (bridge.huMazda20622111) AaBridgeCore.MAZDA_20622111_ART_BYTES else MetaImages.MAX_BYTES
+                    val limit = if (huSmallPackets) AaBridgeCore.MAZDA_20622111_ART_BYTES else MetaImages.MAX_BYTES
                     val j = MetaImages.albumJpeg(art, limit) ?: ByteArray(0)
                     AppLog.i("метаданные: обложка ${PbText.blob(art)} -> ${PbText.blob(j)} за ${SystemClock.elapsedRealtime() - t} мс", ui = false)
                     lastArtSrc = art
@@ -1305,7 +1308,7 @@ class CarLifeSession(
 
     private fun send(chan: Int, inner: ByteArray) {
         if (closed.get()) return
-        if (bridge.huMazda20622111 && inner.size > AaBridgeCore.MAZDA_20622111_MAX_VIDEO_PACKET + 12) {
+        if (huSmallPackets && inner.size > AaBridgeCore.MAZDA_20622111_MAX_VIDEO_PACKET + 12) {
             // страховка h359: VIDEO_DATA уже нарезан, всё прочее больше лимита ГУ не шлём - иначе ГУ перестаёт читать USB
             AppLog.i("Mazda 20622111: пакет ch$chan ${inner.size} Б больше лимита ГУ, не отправляю")
             return
