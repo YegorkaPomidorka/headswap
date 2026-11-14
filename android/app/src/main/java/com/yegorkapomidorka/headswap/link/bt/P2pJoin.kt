@@ -43,7 +43,8 @@ class P2pJoin(
     private val ctx: Context,
     private val onBusy: () -> Unit = {},
     private val onWifi: (on: Boolean) -> Unit = {},
-    private val onJoined: (local: Inet4Address) -> Unit,
+    /** Вошли: [local] - адрес телефона в группе, [owner] - адрес ГУ (владельца группы), если система его дала. */
+    private val onJoined: (local: Inet4Address, owner: Inet4Address?) -> Unit,
     private val onLost: () -> Unit = {},
 ) {
     private val main = Handler(Looper.getMainLooper())
@@ -69,7 +70,16 @@ class P2pJoin(
     /** Группа собрана, ждём IPv4 по DHCP: приглашение уже не висит. */
     private var formed = false
     private var joinedIp: Inet4Address? = null
+    /** Адрес ГУ в группе (groupOwnerAddress), для UDP-привета. */
+    private var ownerIp: Inet4Address? = null
     @Volatile private var iface: LanIface? = null
+
+    /** Имя нашего Wi-Fi Direct-устройства (THIS_DEVICE_CHANGED): уходит ГУ в UDP-привете, как у FT. */
+    @Volatile var myName: String? = null
+        private set
+
+    /** Интерфейс группы, куда мы вошли (null - не в группе). */
+    val joinedIface: LanIface? get() = iface
 
     /** Адрес из P2P-подсети, куда мы вошли (для фильтра входящих TCP). */
     fun owns(a: InetAddress): Boolean = iface?.contains(a) == true
@@ -297,6 +307,7 @@ class P2pJoin(
                 return@requestConnectionInfo
             }
             formed = true
+            ownerIp = info.groupOwnerAddress as? Inet4Address
             if (info.isGroupOwner) {
                 WLog.ev(WLog.P2P, "formed", "owner" to "phone", "note" to "ждали ГУ владельцем")
             }
@@ -318,7 +329,7 @@ class P2pJoin(
         main.removeCallbacks(timeout)
         WLog.ev(WLog.P2P, "joined", "iface" to lan.toString())
         AppLog.i("Wi-Fi Direct: вошли в группу ГУ, адрес телефона ${lan.ip.hostAddress}")
-        onJoined(lan.ip)
+        onJoined(lan.ip, ownerIp)
     }
 
     /** Точка доступа телефона поднята (h420: у Xiaomi она на wlan1, имена swlan и ap не ловят). */
@@ -345,6 +356,7 @@ class P2pJoin(
                     WifiP2pManager.WIFI_P2P_STATE_CHANGED_ACTION -> onP2pState(
                         i.getIntExtra(WifiP2pManager.EXTRA_WIFI_STATE, -1) == WifiP2pManager.WIFI_P2P_STATE_ENABLED
                     )
+                    WifiP2pManager.WIFI_P2P_THIS_DEVICE_CHANGED_ACTION -> thisDevice(i)?.deviceName?.takeIf { it.isNotBlank() }?.let { myName = it }
                 }
             }
         }
@@ -352,10 +364,16 @@ class P2pJoin(
             addAction(WifiP2pManager.WIFI_P2P_PEERS_CHANGED_ACTION)
             addAction(WifiP2pManager.WIFI_P2P_CONNECTION_CHANGED_ACTION)
             addAction(WifiP2pManager.WIFI_P2P_STATE_CHANGED_ACTION)
+            addAction(WifiP2pManager.WIFI_P2P_THIS_DEVICE_CHANGED_ACTION)
         }
         ctx.registerReceiver(r, f, Context.RECEIVER_NOT_EXPORTED)
         receiver = r
     }
+
+    @Suppress("DEPRECATION")
+    private fun thisDevice(i: Intent): WifiP2pDevice? =
+        if (Build.VERSION.SDK_INT >= 33) i.getParcelableExtra(WifiP2pManager.EXTRA_WIFI_P2P_DEVICE, WifiP2pDevice::class.java)
+        else i.getParcelableExtra(WifiP2pManager.EXTRA_WIFI_P2P_DEVICE)
 
     private fun lostMain() {
         AppLog.i("Wi-Fi Direct: группа ГУ распалась, жду от ГУ новый TARGET_INFO")
@@ -387,6 +405,7 @@ class P2pJoin(
         discoverFails = 0
         formed = false
         joinedIp = null
+        ownerIp = null
         iface = null
     }
 

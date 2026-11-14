@@ -81,6 +81,38 @@ enum class CarConnMode {
     HOTSPOT,
 }
 
+/**
+ * Чистая логика режима машины, без android.*: проверяется JVM-тестами. Режим пишется по тому, чем реально поднялись 6/6,
+ * а не по одному TARGET_INFO: ГУ #111 (MG) шлёт TARGET_INFO и пускает в группу, но TCP по ней не открывает, а работает
+ * только через свою сеть или хотспот. Раньше первый же TARGET_INFO навсегда делал её Wi-Fi Direct-машиной.
+ */
+object CarModePolicy {
+    /**
+     * Считать ли машину Wi-Fi Direct-машиной в этом ожидании (тогда сеть машины не запрашиваем и подсказку про Wi-Fi не
+     * показываем). Wi-Fi Direct в этом ожидании не дал TCP ([p2pFailed]) - нет. Иначе по запомненному режиму; пока он
+     * неизвестен - по TARGET_INFO в этом ожидании.
+     */
+    fun wifiDirect(mode: CarConnMode, targetInfoThisWait: Boolean, p2pFailed: Boolean): Boolean = when {
+        p2pFailed -> false
+        mode == CarConnMode.BT_CARLIFE -> true
+        mode == CarConnMode.HOTSPOT -> false
+        else -> targetInfoThisWait
+    }
+
+    /** TARGET_INFO от выбранной машины: Wi-Fi Direct помечаем только машину без режима; проверенную хотспотом не трогаем. */
+    fun onTargetInfo(mode: CarConnMode): CarConnMode? = if (mode == CarConnMode.UNKNOWN) CarConnMode.BT_CARLIFE else null
+
+    /**
+     * Поднялись 6/6: [viaP2p] - пир из группы ГУ, [viaBeacon] - из подсети маяка (хотспот или сеть машины). Пишем то,
+     * что сработало. null - не менять.
+     */
+    fun onSixReady(viaP2p: Boolean, viaBeacon: Boolean): CarConnMode? = when {
+        viaP2p -> CarConnMode.BT_CARLIFE
+        viaBeacon -> CarConnMode.HOTSPOT
+        else -> null
+    }
+}
+
 /** События, при которых решается судьба запроса сети машины. */
 enum class CarNetEvent { AUTO_OFF, STOP, USB_WINS, DESTROY, SESSION_START, SESSION_END }
 

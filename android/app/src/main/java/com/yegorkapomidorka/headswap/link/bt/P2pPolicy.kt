@@ -38,6 +38,18 @@ object P2pPolicy {
      */
     fun rejoinDropBt(attempt: Int): Boolean = attempt >= REJOIN_DROP_BT_AFTER
 
+    /**
+     * Вошли в группу ГУ, отдали ей адрес, а TCP так и нет (#111, MG: ГУ раз за разом повторяет Bluetooth-обмен, пока
+     * группа не распадётся): с первого входа прошло [NO_TCP_MS] и MD_WIFI_IP ушёл хотя бы [NO_TCP_IP_SENDS] раз. Тогда
+     * Wi-Fi Direct в этом ожидании бросаем, и машину ждём через её Wi-Fi или хотспот телефона. UDP-привет за это время
+     * успевает отработать: ГУ, которой он нужен, подключается через секунды.
+     */
+    fun noTcp(sinceFirstJoinMs: Long?, ipSends: Int, tcpUp: Boolean): Boolean =
+        !tcpUp && sinceFirstJoinMs != null && sinceFirstJoinMs >= NO_TCP_MS && ipSends >= NO_TCP_IP_SENDS
+
+    const val NO_TCP_MS = 25_000L
+    const val NO_TCP_IP_SENDS = 2
+
     const val REJOIN_ATTEMPTS = 60
     const val REJOIN_DROP_BT_AFTER = 4
 }

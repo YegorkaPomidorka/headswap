@@ -72,6 +72,7 @@ import com.yegorkapomidorka.headswap.link.car.CAR_NET_DELAY_MS
 import com.yegorkapomidorka.headswap.link.car.CAR_NET_TIMEOUT_MS
 import com.yegorkapomidorka.headswap.link.car.CarConnMode
 import com.yegorkapomidorka.headswap.link.car.CarMac
+import com.yegorkapomidorka.headswap.link.car.CarModePolicy
 import com.yegorkapomidorka.headswap.link.car.CarNetEvent
 import com.yegorkapomidorka.headswap.link.car.CarNetPolicy
 import com.yegorkapomidorka.headswap.link.car.CarNetState
@@ -164,8 +165,10 @@ class BridgeService : Service() {
     /** В этом ожидании ГУ прислала TARGET_INFO по Bluetooth: Wi-Fi Direct, сеть машины не нужна. Только главная нить. */
     private var p2pThisWait = false
     /** Wi-Fi Direct-машина (TARGET_INFO в этом ожидании или в профиле): сеть машины не запрашиваем, wifi-подсказку не показываем. */
+    /** Wi-Fi Direct в этом ожидании вошёл в группу ГУ, но TCP не дал ([P2pPolicy.noTcp]): ждём машину через её Wi-Fi или хотспот. */
+    private var p2pFailedThisWait = false
     private val wifiDirectCar: Boolean
-        get() = p2pThisWait || CarProfile(this).connMode == CarConnMode.BT_CARLIFE
+        get() = CarModePolicy.wifiDirect(CarProfile(this).connMode, p2pThisWait, p2pFailedThisWait)
     /** `car-skip` уже записан в этом ожидании. Только главная нить. */
     private var carSkipLogged = false
     /** Подключений ГУ к RFCOMM `carlife` в этом ожидании и показана ли подсказка «переподключи Bluetooth». Только главная нить. */
@@ -184,6 +187,9 @@ class BridgeService : Service() {
             onTargetInfo = { mac -> main.post { onBtTargetInfo(mac) } },
             onP2pBusy = { main.post { onP2pBusy() } },
             onWifi = { on -> main.post { onP2pWifi(on) } },
+            p2pAllowed = { !p2pFailedThisWait },
+            tcpUp = { sixReady || session != null },
+            onP2pNoTcp = { onP2pNoTcp() },
         )
     }
     private val scheduler: ScheduledExecutorService = Executors.newSingleThreadScheduledExecutor { r -> Thread(r, "bridge-grace").also { it.isDaemon = true } }
@@ -550,6 +556,7 @@ class BridgeService : Service() {
         waitSince = SystemClock.elapsedRealtime()
         carBtNear = false
         p2pThisWait = false
+        p2pFailedThisWait = false
         carSkipLogged = false
         btAcceptsThisWait = 0
         btHintShown = false
@@ -627,18 +634,38 @@ class BridgeService : Service() {
     private fun onBtTargetInfo(mac: String?) {
         if (!wifiBMode || stopRequested) return
         val profile = CarProfile(this)
-        // машина выбрана и это она: запоминаем навсегда; не выбрана или чужая - только на это ожидание
-        if (CarMac.same(profile.btMac, mac)) profile.connMode = CarConnMode.BT_CARLIFE
+        // машина выбрана и это она: без режима помечаем Wi-Fi Direct; не выбрана или чужая - только на это ожидание.
+        // Проверенную хотспотом машину не трогаем (#111): режим пишут 6/6, а не TARGET_INFO
+        if (CarMac.same(profile.btMac, mac)) CarModePolicy.onTargetInfo(profile.connMode)?.let { profile.connMode = it }
         p2pThisWait = true
+        if (!wifiDirectCar) return      // Wi-Fi Direct этой машине не помог: сеть машины и подсказки остаются
         main.removeCallbacks(carNetTick)
         if (carNetBusy) carNetImpl?.release("p2p")      // колбэки снимаются без вызовов: onUnavailable/onLost не придут
         if (CarWifi(this).isSet) logCarSkip()
         cancelHint()
     }
 
+    /**
+     * Вошли в группу ГУ, отдали адрес, а TCP нет (#111): Wi-Fi Direct в этом ожидании брошен (CarlifeBtProbe уже снял
+     * группу). Ждём машину через её Wi-Fi (если задан - просим сразу) или хотспот телефона; человеку подсказка.
+     */
+    private fun onP2pNoTcp() {
+        if (!wifiBMode || stopRequested || session != null || sixReady) return
+        p2pFailedThisWait = true
+        WLog.ev(WLog.LINK, "p2p-fallback", "why" to "no-tcp", "carWifi" to if (CarWifi(this).isSet) "set" else "unset")
+        AppLog.i("сервис: Wi-Fi Direct не дал связи с машиной, жду её через Wi-Fi машины или хотспот")
+        CarLifeState.wireless = getString(R.string.wl_state_p2p_no_tcp)
+        carBtNear = true      // машина рядом и на связи по Bluetooth: сеть машины просим без задержки
+        scheduleCarNet()
+        if (autoMode) {
+            main.removeCallbacks(hintTick)
+            showWifiHint()
+        }
+    }
+
     /** discoverPeers вернул BUSY: на Samsung это включённая точка доступа, просим её выключить. */
     private fun onP2pBusy() {
-        if (!wifiBMode || stopRequested || !linkWaiting) return
+        if (!wifiBMode || stopRequested || !linkWaiting || !wifiDirectCar) return
         CarLifeState.wireless = getString(R.string.wl_state_p2p_busy)
     }
 
@@ -908,13 +935,18 @@ class BridgeService : Service() {
         val waitStart = SystemClock.elapsedRealtime()
         Thread({
             var hotspotPeer = false      // 6/6 собрала не P2P-группа ГУ, а подсеть маяка
+            var p2pPeer = false          // 6/6 собрала P2P-группа ГУ
             val result: Any = try {
                 val peerOk: (java.net.InetAddress) -> Boolean =
                     if (beacon == null) { _ -> true } else { a -> beacon.current.any { it.contains(a) } || btProbe.ownsPeer(a) }
                 val l = Tcp6Listener(java.net.InetAddress.getByName(bind), peerOk = peerOk).open()
                 pendingTcp6 = l
                 beacon?.start()
-                l.await(waitMs, "$kind $bind").also { hotspotPeer = beacon != null && l.peerAddress?.let { !btProbe.ownsPeer(it) } == true }
+                l.await(waitMs, "$kind $bind").also {
+                    val peer = l.peerAddress
+                    p2pPeer = beacon != null && peer != null && btProbe.ownsPeer(peer)
+                    hotspotPeer = beacon != null && peer != null && !p2pPeer
+                }
             } catch (e: Exception) {
                 e
             } finally {
@@ -929,8 +961,13 @@ class BridgeService : Service() {
                     result is CarTransport && session != null -> result.close()
                     result is CarTransport -> {
                         sixReady = true
-                        // подключение без Wi-Fi Direct: этой машине P2P не нужен (если в этом ожидании TARGET_INFO был, режим не трогаем)
-                        if (hotspotPeer && !p2pThisWait) CarProfile(this).connMode = CarConnMode.HOTSPOT
+                        btProbe.onTcpUp()
+                        // режим машины - по тому, чем поднялись 6/6 (#111: TARGET_INFO был, а связь дал хотспот или сеть ГУ)
+                        CarModePolicy.onSixReady(viaP2p = p2pPeer, viaBeacon = hotspotPeer)?.let { m ->
+                            val profile = CarProfile(this)
+                            if (profile.connMode != m) WLog.ev(WLog.LINK, "car-mode", "from" to profile.connMode.name, "to" to m.name)
+                            profile.connMode = m
+                        }
                         // 6/6 пришли из сети машины (маяк ходил только в ней): дальше просим её сразу, без CAR_NET_DELAY_MS
                         if (hotspotPeer && carNetImpl?.current != null) CarWifi(this).let { w ->
                             if (w.isSet && !w.proven) {

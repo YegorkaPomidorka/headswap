@@ -57,4 +57,14 @@ class P2pPolicyTest {
         val dropAtMs = (0 until P2pPolicy.REJOIN_DROP_BT_AFTER + 1).sumOf { P2pPolicy.rejoinDelayMs(it)!! }
         assertTrue("сброс BT раньше конца первой попытки входа: $dropAtMs мс", dropAtMs > 32_000L)
     }
+
+    /** #111 (MG): 10 входов в группу, адрес отдан, а TCP нет - через 25 с и двух MD_WIFI_IP бросаем Wi-Fi Direct. */
+    @Test
+    fun noTcpFallback() {
+        assertEquals(false, P2pPolicy.noTcp(sinceFirstJoinMs = null, ipSends = 5, tcpUp = false))
+        assertEquals(false, P2pPolicy.noTcp(sinceFirstJoinMs = 24_999, ipSends = 5, tcpUp = false))
+        assertEquals(false, P2pPolicy.noTcp(sinceFirstJoinMs = 60_000, ipSends = 1, tcpUp = false))
+        assertEquals(false, P2pPolicy.noTcp(sinceFirstJoinMs = 60_000, ipSends = 5, tcpUp = true))
+        assertEquals(true, P2pPolicy.noTcp(sinceFirstJoinMs = 25_000, ipSends = 2, tcpUp = false))
+    }
 }

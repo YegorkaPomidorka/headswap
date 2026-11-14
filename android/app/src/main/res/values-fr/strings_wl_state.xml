@@ -4,6 +4,7 @@
     <string name="wl_state_waiting">en attente de la voiture par Wi-Fi (%1$s)</string>
     <string name="wl_state_no_hotspot">pas de point d\'accès : activez le point d\'accès Wi-Fi du téléphone</string>
     <string name="wl_state_p2p_busy">Wi-Fi Direct est occupé : désactivez le point d\'accès du téléphone</string>
+    <string name="wl_state_p2p_no_tcp">Wi-Fi Direct n\'a pas connecté la voiture : connectez le téléphone au Wi-Fi de la voiture ou activez le point d\'accès</string>
     <string name="wl_state_connected">voiture connectée par Wi-Fi</string>
     <string name="wl_state_lost">connexion perdue, en attente de la voiture</string>
     <string name="wl_state_auto">la voiture est à proximité par Bluetooth, en attente par Wi-Fi (%1$s)</string>
