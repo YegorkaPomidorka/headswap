@@ -163,7 +163,7 @@
     <string name="l_s_video">Видео</string>
     <string name="l_s_version">Версия</string>
     <string name="l_s_hu_channel">Канал %1$s</string>
-    <string name="l_s_fps">%1$s · %2$d к/с</string>
+    <string name="l_s_fps">%1$s · %2$s к/с</string>
     <string name="l_nav_yandex_navi">Я.Навигатор</string>
     <string name="l_nav_2gis">2ГИС</string>
     <string name="l_nav_yandex_maps">Яндекс Карты</string>
@@ -179,6 +179,7 @@
     <string name="l_nh_arrival">прибытие</string>
     <string name="l_nh_end">Завершить маршрут</string>
     <string name="l_nh_search">Поиск</string>
+    <string name="l_nh_voice">Голосовой помощник</string>
     <string name="l_nh_loading">Загрузка…</string>
     <string name="l_s_notifications">Уведомления</string>
     <string name="l_s_alice_voice">Алиса только голосом</string>

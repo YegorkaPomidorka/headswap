@@ -66,15 +66,21 @@ enum class DesktopResolution(val title: String, val width: Int, val height: Int)
 }
 
 /** Raw Surface, encoded pixels and touch space have identical dimensions. */
-data class NativeDesktopGeometry(override val outW: Int, override val outH: Int) : VideoGeometry {
-    init { DesktopGeometryPolicy.requireNativeDimensions(outW, outH) }
+data class NativeDesktopGeometry(
+    override val outW: Int,
+    override val outH: Int,
+    override val bitrate: Int = DesktopVideoQuality.DEFAULT_BITRATE_BPS,
+) : VideoGeometry {
+    init {
+        DesktopGeometryPolicy.requireNativeDimensions(outW, outH)
+        require(bitrate in 1..DesktopVideoQuality.BITRATE_CEILING_BPS) { "Некорректный битрейт рабочего стола $bitrate" }
+    }
     override val aaW = outW
     override val aaH = outH
     override val aaResolution = "${outW}x$outH"
     override val marginW = 0
     override val marginH = 0
     override val density = DesktopGeometryPolicy.density(outW, outH)
-    override val bitrate = DesktopVideoQuality.BITRATE_CEILING_BPS
     override val label = "Desktop ${outW}x$outH"
     override fun describe(densityOverride: Int): String =
         "Desktop: Surface ${outW}x$outH -> CarLife ${outW}x$outH, dpi ${densityFor(densityOverride)}, без кропа и масштаба"
@@ -82,17 +88,19 @@ data class NativeDesktopGeometry(override val outW: Int, override val outH: Int)
 
 /** Immutable preference snapshot; first INIT (or START fallback) locks one transport session. */
 class DesktopVideoSelection(val resolution: DesktopResolution, val densityOverride: Int,
-    val customWidth: Int = 1600, val customHeight: Int = 900) {
+    val customWidth: Int = 1600, val customHeight: Int = 900,
+    val bitrate: Int = DesktopVideoQuality.DEFAULT_BITRATE_BPS) {
     init {
         if (densityOverride != 0) DesktopGeometryPolicy.requireDensity(densityOverride)
         if (resolution == DesktopResolution.CUSTOM) DesktopGeometryPolicy.requireNativeDimensions(customWidth, customHeight)
+        require(bitrate in 1..DesktopVideoQuality.BITRATE_CEILING_BPS) { "Некорректный битрейт рабочего стола $bitrate" }
     }
     private var selected: NativeDesktopGeometry? = null
-    fun initialGeometry() = if (resolution == DesktopResolution.CUSTOM) NativeDesktopGeometry(customWidth, customHeight)
-        else NativeDesktopGeometry(resolution.width, resolution.height)
+    fun initialGeometry() = if (resolution == DesktopResolution.CUSTOM) NativeDesktopGeometry(customWidth, customHeight, bitrate)
+        else NativeDesktopGeometry(resolution.width, resolution.height, bitrate)
     @Synchronized fun resolve(width: Int = 0, height: Int = 0): NativeDesktopGeometry = selected ?: run {
         val result = if (resolution == DesktopResolution.AUTO && DesktopGeometryPolicy.acceptsNative(width, height))
-            NativeDesktopGeometry(width, height) else initialGeometry()
+            NativeDesktopGeometry(width, height, bitrate) else initialGeometry()
         selected = result
         result
     }
@@ -106,7 +114,7 @@ class DesktopVideoSelection(val resolution: DesktopResolution, val densityOverri
          */
         fun forAaVideo(video: VideoGeometry, densityOverride: Int): DesktopVideoSelection =
             if (DesktopGeometryPolicy.acceptsNative(video.outW, video.outH))
-                DesktopVideoSelection(DesktopResolution.CUSTOM, densityOverride, video.outW, video.outH)
+                DesktopVideoSelection(DesktopResolution.CUSTOM, densityOverride, video.outW, video.outH, video.bitrate)
             else DesktopVideoSelection(DesktopResolution.AUTO, densityOverride)
     }
 }

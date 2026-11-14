@@ -58,6 +58,7 @@ import com.yegorkapomidorka.headswap.dex.DexState
 import com.yegorkapomidorka.headswap.dex.PhoneAssistant
 import com.yegorkapomidorka.headswap.dex.UsbDetachPolicy
 import com.yegorkapomidorka.headswap.link.CarTransport
+import com.yegorkapomidorka.headswap.link.DongleListener
 import com.yegorkapomidorka.headswap.link.LinkSetupException
 import com.yegorkapomidorka.headswap.link.StreamTransport
 import com.yegorkapomidorka.headswap.link.Tcp6Listener
@@ -120,6 +121,8 @@ class BridgeService : Service() {
     @Volatile private var pendingTcp6: Tcp6Listener? = null
     /** Идёт подъём tcp6/беспровода (от старта до 6/6 или отказа); сервис в это время не гасим. Только главная нить. */
     private var linkWaiting = false
+    /** Режим «свисток»: слушаем :7250, пока не Стоп; живёт и между сессиями, сервис в это время не гасим. Только главная нить. */
+    private var dongle: DongleListener? = null
     /** Беспровод (бета, ветка B) включён пользователем: после обрыва снова ждём машину. Пишет главная нить, читает и коннектор. */
     @Volatile private var wifiBMode = false
     /**
@@ -246,20 +249,20 @@ class BridgeService : Service() {
             val accepted = !stopRequested && s != null
             AppLog.i("DESKTOP «Домой» долгое: меню ГУ, accepted=$accepted", true)
             if (accepted) s!!.goToDesktop()
-            if (session == null && host == null && !linkWaiting) stopSelfResult(startId)
+            if (session == null && host == null && !linkWaiting && dongle == null) stopSelfResult(startId)
             return stickiness()
         }
         if (intent?.action == ACTION_DESKTOP_HOME) {
             // команда относится только к живой desktop-сессии: опоздавший клик не должен поднимать сервис и новый рабочий стол
             val accepted = !stopRequested && session != null && host?.showDesktop() == true
             AppLog.i("DESKTOP home request accepted=$accepted", false)
-            if (session == null && host == null && !linkWaiting) stopSelfResult(startId)
+            if (session == null && host == null && !linkWaiting && dongle == null) stopSelfResult(startId)
             return stickiness()
         }
         if (intent?.action == ACTION_LAUNCHER_DEBUG) {
             // стенд лаунчера: экран, раздел, тема и карта без тапов и без окна MainActivity поверх рабочего стола
             com.yegorkapomidorka.headswap.launcher.LauncherDebug.apply(this, intent)
-            if (session == null && host == null && !linkWaiting) stopSelfResult(startId)
+            if (session == null && host == null && !linkWaiting && dongle == null) stopSelfResult(startId)
             return stickiness()
         }
         DexState.desktopSession = foregroundMode() == BridgeMode.DESKTOP
@@ -322,6 +325,7 @@ class BridgeService : Service() {
             CarLifeState.wireless = null
             btProbe.stop("стоп")
             pendingTcp6?.abort()
+            stopDongle("стоп")
             val s = session
             if (s != null) {
                 s.close("остановлено пользователем")        // onSessionClosed увидит stopRequested: AA закрывается сразу
@@ -393,6 +397,11 @@ class BridgeService : Service() {
             btProbe.start()      // после WLog.begin в startWifiB: t= в строках WL bt от начала попытки
             return
         }
+        // свисток: стик в USB ГУ подключается к телефону по Wi-Fi и несёт поток аксессуара одним TCP-сокетом
+        if (intent?.action == ACTION_DONGLE) {
+            startDongle()
+            return
+        }
 
         val usb = getSystemService(UsbManager::class.java)
         val acc = usb.accessoryList?.firstOrNull()
@@ -435,6 +444,73 @@ class BridgeService : Service() {
             pendingTcp6?.abort()
         }
         startSession(StreamTransport.fromPfd(pfd, TransportCaps.USB_AOA, MainActivity.describe(acc)))
+    }
+
+    /**
+     * Свисток: слушаем :7250 на всех интерфейсах (точку доступа раздаёт телефон, стик подключается к её шлюзу).
+     * Слушатель живёт до Стопа и переживает сессии: после обрыва стик подключается заново.
+     */
+    private fun startDongle() {
+        if (dongle != null) {
+            AppLog.i("сервис: свисток: уже жду, повторный старт игнорирую")
+            return
+        }
+        stopRequested = false
+        val l = try {
+            lateinit var self: DongleListener
+            self = DongleListener { sock -> main.post { onDongleSocket(self, sock) } }
+            self.open()
+        } catch (e: Exception) {
+            AppLog.e("свисток: порт ${DongleListener.PORT} не открылся", e)
+            CarLifeState.status = getString(R.string.dongle_state_bind_failed, DongleListener.PORT)
+            CarLifeState.wireless = CarLifeState.status
+            failStart()
+            return
+        }
+        dongle = l
+        CarLifeState.dongle = true
+        CarLifeState.wireless = getString(R.string.dongle_state_waiting, DongleListener.PORT)
+        CarLifeState.status = CarLifeState.wireless!!
+        WLog.begin(TransportCaps.USB_TCP.kind, "port" to DongleListener.PORT, "ACCESS_LOCAL_NETWORK" to NetProbe.localNetworkGranted(this))
+        AppLog.i("сервис: свисток, слушаю :${DongleListener.PORT}")
+    }
+
+    /** Режим свистка выключен (Стоп, сервис гасится). Принятый сокет остаётся сессии. Только главная нить. */
+    private fun stopDongle(why: String) {
+        val l = dongle ?: return
+        dongle = null
+        l.close()
+        CarLifeState.dongle = false
+        if (session == null) CarLifeState.wireless = null
+        WLog.ev(WLog.TCP, "dongle-stop", "why" to why)
+    }
+
+    /** Стик подключился (нить main). Занято или режим уже выключен: сокет закрываем. */
+    private fun onDongleSocket(from: DongleListener, sock: java.net.Socket, attempt: Int = 0) {
+        val peer = sock.inetAddress?.hostAddress ?: "?"
+        // Слушатель только что закрыл старый сокет свистка: даём старой сессии до 3 с закрыться
+        if (session != null && dongle === from && !stopRequested && attempt < DONGLE_REPLACE_TRIES) {
+            main.postDelayed({ onDongleSocket(from, sock, attempt + 1) }, DONGLE_REPLACE_STEP_MS)
+            return
+        }
+        if (dongle !== from || stopRequested || session != null) {
+            AppLog.i("сервис: свисток $peer отклонён (сессия ${if (session != null) "идёт" else "не нужна"}, режим ${if (dongle === from) "включён" else "выключен"})")
+            WLog.ev(WLog.TCP, "dongle-reject", "peer" to peer, "why" to if (session != null) "session" else "off")
+            try {
+                sock.close()
+            } catch (_: Exception) {
+            }
+            return
+        }
+        val transport = try {
+            StreamTransport(sock.getInputStream(), sock.getOutputStream(), TransportCaps.USB_TCP, "Свисток $peer", closeFd = { sock.close() })
+        } catch (e: java.io.IOException) {      // стик успел отвалиться между accept и этим местом
+            AppLog.i("сервис: свисток $peer отвалился до старта сессии: ${e.message}")
+            sock.close()
+            return
+        }
+        CarLifeState.wireless = getString(R.string.dongle_state_connected, peer)
+        startSession(transport)
     }
 
     /** debug tcp6: слушать 6 портов на loopback, ждать ГУ (pc-headunit --transport tcp6), затем обычная сессия. */
@@ -637,7 +713,7 @@ class BridgeService : Service() {
 
     /** ACL_DISCONNECTED выбранной машины: гасим не сразу (всплески ACL у ГУ), а через [AUTO_OFF_DEBOUNCE_MS]. */
     private fun onCarAutoOff() {
-        if (session == null && host == null && !linkWaiting && !wifiBMode) {
+        if (session == null && host == null && !linkWaiting && !wifiBMode && dongle == null) {
             // сервис поднят с нуля только ради отбоя (процесс убит, ресивер дошёл до пустого сервиса): гасить нечего
             autoMode = false
             finish()
@@ -685,12 +761,12 @@ class BridgeService : Service() {
     private fun usbToAir() {
         usbToAirPending = false
         if (session != null || wifiBMode || !autoMode || stopRequested) {
-            if (session == null && host == null && !linkWaiting && !wifiBMode) finish()
+            if (session == null && host == null && !linkWaiting && !wifiBMode && dongle == null) finish()
             return
         }
         if (getSystemService(UsbManager::class.java).accessoryList?.isNotEmpty() == true) {
             WLog.ev(WLog.LINK, "usb-to-air", "skip" to "кабель на месте")
-            if (session == null && host == null) finish()
+            if (session == null && host == null && dongle == null) finish()
             return
         }
         WLog.ev(WLog.LINK, "usb-to-air")
@@ -933,6 +1009,7 @@ class BridgeService : Service() {
             metaMusic = aaPrefs.metaMusic, metaNavi = aaPrefs.metaNavi, naviField6 = aaPrefs.naviField6,
         )
         MetaRelay.PROGRESS_UNIT = if (aaPrefs.progressSeconds) 1 else 1000
+        applyVideoTime(aaPrefs)
 
         // AA-сессия к серверу ГУ на 127.0.0.1:5277 живёт на уровне сервиса (BridgeHost), а не этой USB-сессии
         var h = host
@@ -977,13 +1054,11 @@ class BridgeService : Service() {
             h.core.spliceMs = spliceMs
         }
         h.core.carVwId = aaPrefs.carPreset == CarPreset.VW_ID_UNYX
+        h.core.videoLimitedRange = DexPrefs(this).effectiveLimitedRange(aaPrefs.carPreset)
+        h.core.crvDesktopPacing = aaPrefs.carPreset?.settings?.crvDesktopPacing == true
         h.core.phoneAssistant = null   // режим AA: кнопка голоса идёт в AA
         DesktopKeys.voiceStatus = null
-        if (wakeLock == null) {
-            wakeLock = getSystemService(PowerManager::class.java)
-                .newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "headswap:session")
-                .apply { acquire(4 * 60 * 60 * 1000L) }
-        }
+        acquireSessionWakeLocks()
         CarLifeState.running = true
         stopRequested = false
 
@@ -1045,7 +1120,7 @@ class BridgeService : Service() {
         getSystemService(NotificationManager::class.java).cancel(DESKTOP_NOT_ACTIVATED_NOTIF_ID)
         desktopUsed = true
         val isUsb = transport.caps.kind == TransportCaps.USB_AOA.kind
-        lastSessionWasUsb = isUsb
+        lastSessionWasUsb = isUsb      // физический USB телефона: свисток и debug-TCP сюда не входят
         physicalUsbDetached = false
         DexState.error = null
 
@@ -1061,6 +1136,7 @@ class BridgeService : Service() {
             metaMusic = aaPrefs.metaMusic, metaNavi = aaPrefs.metaNavi, naviField6 = aaPrefs.naviField6, desktopVideo = desktopVideo,
         )
         MetaRelay.PROGRESS_UNIT = if (aaPrefs.progressSeconds) 1 else 1000
+        applyVideoTime(aaPrefs)
 
         // новое физическое подключение: бюджет восстановления заново; восстановление его не обновляет
         cancelDesktopRecovery()
@@ -1085,14 +1161,13 @@ class BridgeService : Service() {
         val owner: BridgeHost = h
         // темп кадров CarLife, повтор статичных кадров и энкодер остаются как в основном видеоконвейере
         owner.core.transcodeEnabled = true
+        owner.core.desktopTranscode = dexPrefs.desktopTranscode
+        owner.core.videoLimitedRange = dexPrefs.effectiveLimitedRange(aaPrefs.carPreset)
+        owner.core.crvDesktopPacing = aaPrefs.carPreset?.settings?.crvDesktopPacing == true
         owner.core.spliceMs = 0L
         owner.core.carVwId = aaPrefs.carPreset == CarPreset.VW_ID_UNYX
         // кнопка голоса: системный помощник клавишей KEYCODE_ASSIST (как долгое нажатие питания), см. createDesktopHost
-        if (wakeLock == null) {
-            wakeLock = getSystemService(PowerManager::class.java)
-                .newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "headswap:session")
-                .apply { acquire(4 * 60 * 60 * 1000L) }
-        }
+        acquireSessionWakeLocks()
         CarLifeState.running = true
         stopRequested = false
 
@@ -1100,8 +1175,8 @@ class BridgeService : Service() {
         val s = CarLifeSession(transport, cfg, owner.core, PhoneThermal(this), CallStateSource.NONE, onHuSize = { w, hh -> aaPrefs.saveHuSize(w, hh) }) { reason -> main.post { onSessionClosed(sref[0]!!, reason) } }
         sref[0] = s
         session = s
-        // tcp-debug есть только в debug/smoke (эмулятор ГУ): для звука считаем его USB, чтобы проверять захват на стенде
-        val audioUsb = isUsb || transport.caps === TransportCaps.TCP_DEBUG
+        // tcp-debug (эмулятор ГУ) и свисток (usb-tcp) для ГУ тот же USB-аксессуар: звук и захват рабочего стола как по кабелю
+        val audioUsb = transport.caps.usbLike
         DesktopMusicPlayback.attach(applicationContext, this, s, audioUsb,
             ready = { session === s && DexState.running && s.hasFreshDesktopVideo() },
             audioReady = { !DexPrefs(this).usbPlaybackAudio || !owner.core.audioViaUsb || DesktopAudioState.running })
@@ -1224,7 +1299,7 @@ class BridgeService : Service() {
             DexState.status = getString(R.string.desk_recovering, recovery.attempt.number)
             main.postDelayed({ recoverDesktop(recovery) }, recovery.attempt.delayMs)
         }
-        if (session == null && host == null && !linkWaiting && !wifiBMode && !usbToAirPending) finish()
+        if (session == null && host == null && !linkWaiting && !wifiBMode && !usbToAirPending && dongle == null) finish()
     }
 
     private fun recoverDesktop(recovery: Recovery) {
@@ -1265,6 +1340,12 @@ class BridgeService : Service() {
     }
 
     /** Новый AA-хост: ядро, коннектор, сертификаты. null = мост не поднялся (причина в AaState.setupError). */
+    /** Единицы поля time видеопакета на это подключение (раздел для разработчиков) + строка в лог, чтобы по логу было видно режим. */
+    private fun applyVideoTime(aaPrefs: AaPrefs) {
+        CarLifeSession.VIDEO_TIME_MS = aaPrefs.videoTimeMs
+        AppLog.i("видео: time пакета в ${if (CarLifeSession.VIDEO_TIME_MS) "мс" else "секундах"}")
+    }
+
     private fun createHost(aaPrefs: AaPrefs, chosen: VideoGeometry, mode: VideoGeometry, densityOverride: Int, previous: BridgeHost?): BridgeHost? {
         return try {
             AaShadowNav.stop()      // ПРОБНИК: одноразовый сервер 5277 нужен самому мосту AA
@@ -1315,7 +1396,7 @@ class BridgeService : Service() {
                 main.post {
                     if (host === ref[0]) host = null
                     AppLog.i("BRIDGE: AA закрыта полностью")
-                    if (session == null && host == null && !linkWaiting && !wifiBMode && !usbToAirPending) finish()
+                    if (session == null && host == null && !linkWaiting && !wifiBMode && !usbToAirPending && dongle == null) finish()
                 }
             })
             ref[0] = h
@@ -1359,7 +1440,7 @@ class BridgeService : Service() {
 
     /** Старт не удался: если жив AA-хост (идёт grace), сервис не гасим, иначе finish. */
     private fun failStart() {
-        if (linkWaiting) return      // идёт ожидание машины по воздуху: сервис нужен
+        if (linkWaiting || dongle != null) return      // идёт ожидание машины по воздуху или свистка: сервис нужен
         val h = host
         if (h != null && !h.isDead) return
         if (h == null) finish()
@@ -1372,6 +1453,12 @@ class BridgeService : Service() {
         session = null
         markCarSeen()
         CarLifeState.wirelessSession = false
+        if (dongle != null && !stopRequested) {
+            // свисток: ServerSocket живёт дальше, стик подключится заново; сервис не гасим
+            CarLifeState.wireless = getString(R.string.dongle_state_waiting, DongleListener.PORT)
+            CarLifeState.status = CarLifeState.wireless!!
+            WLog.ev(WLog.TCP, "dongle-rearm", "after" to reason)
+        }
         if (wifiBMode && autoStarted && !autoMode && !stopRequested) {
             // машина ушла по Bluetooth, пока шла беспроводная сессия (ГУ держала Wi-Fi): ожидание заново не начинаем
             wifiBMode = false
@@ -1390,7 +1477,7 @@ class BridgeService : Service() {
         }
         val h = host
         if (h == null) {
-            if ((!wifiBMode && !usbToAirPending) || stopRequested) finish()
+            if ((!wifiBMode && !usbToAirPending && dongle == null) || stopRequested) finish()
         } else {
             // обрыв USB: CarLife закрыт, AA держим graceMs (или закрываем сразу, если Стоп)
             h.onUsbSessionClosed(immediate = stopRequested)
@@ -1411,15 +1498,29 @@ class BridgeService : Service() {
         }
     }
 
-    private fun finish() {
-        if (desktopUsed) cancelDesktopRecovery()
-        stopCarNet(CarNetEvent.STOP, "finish")
-        CarLifeState.running = false
+    /** Partial wake lock: keep the bridge and the encoders running while the session is live. */
+    private fun acquireSessionWakeLocks() {
+        if (wakeLock == null) {
+            wakeLock = getSystemService(PowerManager::class.java)
+                .newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "headswap:session")
+                .apply { setReferenceCounted(false); acquire(4 * 60 * 60 * 1000L) }
+        }
+    }
+
+    private fun releaseSessionWakeLocks() {
         try {
             wakeLock?.let { if (it.isHeld) it.release() }
         } catch (_: Exception) {
         }
         wakeLock = null
+    }
+
+    private fun finish() {
+        stopDongle("finish")
+        if (desktopUsed) cancelDesktopRecovery()
+        stopCarNet(CarNetEvent.STOP, "finish")
+        CarLifeState.running = false
+        releaseSessionWakeLocks()
         stopForeground(STOP_FOREGROUND_REMOVE)
         stopSelf()
     }
@@ -1436,6 +1537,7 @@ class BridgeService : Service() {
         cancelHint()
         stopCarNet(CarNetEvent.DESTROY, "destroy")
         pendingTcp6?.abort()
+        stopDongle("сервис уничтожен")
         btProbe.stop("сервис уничтожен")
         audioDiag.stop()
         if (desktopUsed) {
@@ -1445,6 +1547,7 @@ class BridgeService : Service() {
         }
         session?.close("сервис уничтожен")
         host?.shutdown("сервис уничтожен")
+        releaseSessionWakeLocks()
         super.onDestroy()
     }
 
@@ -1460,6 +1563,11 @@ class BridgeService : Service() {
         const val ACTION_LAUNCHER_DEBUG = "com.yegorkapomidorka.headswap.LAUNCHER_DEBUG"
         /** Беспровод (бета): ждать машину по Wi-Fi, ветка B (хотспот телефона + маяк). */
         const val ACTION_WIFI_B = "com.yegorkapomidorka.headswap.WIFI_B"
+        /** Свисток: слушать :7250, стик в USB ГУ подключается по Wi-Fi и несёт поток аксессуара. Выключается общим [ACTION_STOP]. */
+        const val ACTION_DONGLE = "com.yegorkapomidorka.headswap.DONGLE"
+        /** Новый сокет свистка ждёт закрытия старой сессии: 15 × 200 мс. */
+        private const val DONGLE_REPLACE_TRIES = 15
+        private const val DONGLE_REPLACE_STEP_MS = 200L
         /** Выбранная машина подключилась по Bluetooth (ACL_CONNECTED): ждать по Wi-Fi, пока она рядом. */
         const val ACTION_WIFI_B_AUTO = "com.yegorkapomidorka.headswap.WIFI_B_AUTO"
         /** Машина отключилась по Bluetooth (ACL_DISCONNECTED): через debounce снять ожидание. */

@@ -5,6 +5,7 @@ import android.media.MediaCodecInfo
 import android.media.MediaFormat
 import android.os.Build
 import android.os.Bundle
+import android.os.Process
 import android.os.SystemClock
 import android.view.Surface
 import com.yegorkapomidorka.headswap.AnnexB
@@ -46,10 +47,24 @@ class AaTranscoder(
     private val directSurface: Boolean = false,
     /** Validate the requested ceiling even when thermal protection starts the encoder at a lower rate. */
     private val capabilityFps: Int = fps,
+    /** Diagnostic dump tag; null = desktop/aa by input type. */
+    private val dumpTag: String? = null,
+    /**
+     * Ask the encoder for limited-range (16-235) output in its natural BT.601 matrix. The CR-V 2026
+     * head unit has two composition paths that disagree on full-range streams, which pulses the
+     * backlight ~1.7 Hz; limited range renders the same on both.
+     */
+    private val limitedRange: Boolean = false,
+    /**
+     * CR-V 2026 only: fixed 30-fps pacer on the VirtualDisplay input surface instead of the
+     * generic high-fps gate. Other cars keep the previous desktop pacing.
+     */
+    private val pacer30: Boolean = false,
 ) : VideoTranscoder {
     private var encoder: MediaCodec? = null
     private var surface: Surface? = null
     private var relay: GlRelay? = null
+    private var dump: VideoDump? = null
     private var lastRedraws = 0L
     private var lastGated = 0L
     @Volatile private var target = fps
@@ -118,8 +133,12 @@ class AaTranscoder(
                 encoderNote = when (level) {
                     BAIDU_WITH_LEVEL -> "baidu: baseline+level256+VBR+repeat100ms"
                     BAIDU_NO_LEVEL -> "baidu: baseline+VBR+repeat100ms, без level"
-                    0 -> "baseline+CBR+noB+repeat100ms+realtime"
-                    1 -> "baseline+CBR+noB+repeat100ms"
+                    0 -> if (tuning.contains("cbr")) {
+                        "baseline+CBR+noB+repeat100ms+realtime"
+                    } else {
+                        "baseline+VBR+noB+repeat100ms+realtime"
+                    }
+                    1 -> if (tuning.contains("cbr")) "baseline+CBR+noB+repeat100ms" else "baseline+VBR+noB+repeat100ms"
                     else -> "минимальный формат+repeat100ms"
                 }
                 configured = true
@@ -163,7 +182,10 @@ class AaTranscoder(
         if (directSurface || !tuning.contains("nogl")) {
             // декодер -> GL-реле -> Surface энкодера: реле перерисовывает последний кадр на статике (>= 10 fps)
             try {
-                relay = GlRelay(surface!!, width, height, REDRAW_IDLE_MS, log, srcWidth, srcHeight, crop, target, limitHighFps = directSurface).also { it.start() }
+                relay = GlRelay(surface!!, width, height, REDRAW_IDLE_MS, log, srcWidth, srcHeight, crop, target, limitHighFps = directSurface, fixedPacer = directSurface && pacer30).also { it.start() }
+                // VirtualDisplay/Compose рендерит в эту поверхность: для CR-V просим композитор отдавать кадры
+                // в темпе target fps, как ровный поток декодера AA, а не 60 Гц с дроблением гейтом.
+                if (pacer30) relay?.let { applyInputFrameRate(it, target) }
             } catch (e: Exception) {
                 if (directSurface) {
                     // Direct input depends on GL for pacing and idle redraw. Never silently
@@ -177,12 +199,23 @@ class AaTranscoder(
         }
         if (relay == null && !crop.isNone) log("транскодер: !!!!!! без GL-реле кроп невозможен, кадр AA будет сжат целиком")
         running = true
-        encThread = Thread({ encodeLoop(c) }, "aa-trans-enc").also { it.start() }
+        // Диагностика CR-V 2026: пишем ровно выход энкодера (Annex-B) и PTS, если включён маркер.
+        dump?.close()
+        dump = VideoDump.open(dumpTag ?: if (directSurface) "desktop" else "aa").also {
+            it?.event("start ${width}x$height fps=$fps bitrate=$bitrate encoder=$encoderName direct=$directSurface")
+        }
+        encThread = Thread({ runCatching { Process.setThreadPriority(Process.THREAD_PRIORITY_DISPLAY) }; encodeLoop(c) }, "aa-trans-enc").also { it.start() }
         if (threaded) {
             queue.clear()
-            feedThread = Thread({ feedLoop() }, "aa-trans-feed").also { it.start() }
+            feedThread = Thread({ runCatching { Process.setThreadPriority(Process.THREAD_PRIORITY_DISPLAY) }; feedLoop() }, "aa-trans-feed").also { it.start() }
         }
-        log("транскодер: энкодер $encoderName ${width}x$height (вход ${if (directSurface) "Surface DeX, одно кодирование" else "AA"} ${srcWidth}x$srcHeight${if (crop.isNone) "" else ", кроп $crop"}) ${fps}fps ${bitrate / 1000}kbps ($encoderNote)")
+        val modeNote = when (bitrateMode) {
+            MediaCodecInfo.EncoderCapabilities.BITRATE_MODE_CBR -> "CBR"
+            MediaCodecInfo.EncoderCapabilities.BITRATE_MODE_VBR -> "VBR"
+            MediaCodecInfo.EncoderCapabilities.BITRATE_MODE_CQ -> "CQ"
+            else -> "mode=$bitrateMode"
+        }
+        log("транскодер: энкодер $encoderName ${width}x$height (вход ${if (directSurface) "Surface DeX, одно кодирование" else "AA"} ${srcWidth}x$srcHeight${if (crop.isNone) "" else ", кроп $crop"}) ${fps}fps ${bitrate / 1000}kbps ($encoderNote, $modeNote)")
     }
 
     override val surfaceInput: SurfaceVideoInput?
@@ -200,9 +233,29 @@ class AaTranscoder(
             checkNotNull(encoder) { "Энкодер рабочего стола ещё не создан" }.codecInfo, width, height, fps, curBitrate)
         val old = target
         target = fps
+        dump?.event("targetFps $old -> $fps")
         val r = relay
-        if (r != null) r.setTargetFps(fps) else log("транскодер: без GL-реле частоту не ограничить, целевой fps $fps только в статистике")
+        if (r != null) {
+            r.setTargetFps(fps)
+            if (pacer30) applyInputFrameRate(r, fps)
+        } else {
+            log("транскодер: без GL-реле частоту не ограничить, целевой fps $fps только в статистике")
+        }
         log("транскодер: целевой fps $old -> $fps")
+    }
+
+    /**
+     * Только desktop: сообщаем композитору темп источника для поверхности, в которую рендерит VirtualDisplay.
+     * Без этого поверхность живёт на 60 Гц, а гейт режет её до 30 fps с неровными интервалами.
+     * Ошибка не критична: вендорный композитор может не поддержать подсказку.
+     */
+    private fun applyInputFrameRate(r: GlRelay, fps: Int) {
+        if (!directSurface || fps <= 0 || Build.VERSION.SDK_INT < 30) return
+        runCatching {
+            r.inputSurface.setFrameRate(fps.toFloat(), Surface.FRAME_RATE_COMPATIBILITY_FIXED_SOURCE)
+        }.onFailure {
+            log("транскодер: setFrameRate($fps) на входе DeX не принят: ${it.javaClass.simpleName}: ${it.message}")
+        }
     }
 
     override val currentBitrate: Int get() = curBitrate
@@ -218,6 +271,7 @@ class AaTranscoder(
         }
         try {
             c.setParameters(Bundle().apply { putInt(MediaCodec.PARAMETER_KEY_VIDEO_BITRATE, bps) })
+            dump?.event("bitrate $curBitrate -> $bps")
             curBitrate = bps
         } catch (e: Exception) {
             bitrateFailed = true
@@ -228,6 +282,16 @@ class AaTranscoder(
     private fun format(level: Int): MediaFormat {
         val f = MediaFormat.createVideoFormat(MIME, width, height)
         f.setInteger(MediaFormat.KEY_COLOR_FORMAT, MediaCodecInfo.CodecCapabilities.COLOR_FormatSurface)
+        if (limitedRange) {
+            runCatching {
+                // Only the range is forced. The encoder's natural matrix here is BT.601/170M, and
+                // the head unit's composition paths agree on it; forcing BT.709 made saturated
+                // colors (call button, map icons) flicker between the two paths.
+                f.setInteger(MediaFormat.KEY_COLOR_RANGE, MediaFormat.COLOR_RANGE_LIMITED)
+            }.onFailure {
+                log("транскодер: ключ цветового диапазона не принят: ${it.javaClass.simpleName}: ${it.message}")
+            }
+        }
         f.setInteger(MediaFormat.KEY_BIT_RATE, bitrate)
         f.setInteger(MediaFormat.KEY_FRAME_RATE, fps)
         f.setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, 1)
@@ -249,7 +313,11 @@ class AaTranscoder(
             // и ГУ рисовало полосы; VBR на том же потоке держит пики до ~40 КБ при той же картинке (transcode_test, 12.10.2026)
             f.setInteger(
                 MediaFormat.KEY_BITRATE_MODE,
-                if (tuning.contains("cbr")) MediaCodecInfo.EncoderCapabilities.BITRATE_MODE_CBR else MediaCodecInfo.EncoderCapabilities.BITRATE_MODE_VBR
+                if (tuning.contains("cbr")) {
+                    MediaCodecInfo.EncoderCapabilities.BITRATE_MODE_CBR
+                } else {
+                    MediaCodecInfo.EncoderCapabilities.BITRATE_MODE_VBR
+                }
             )
             f.setInteger(MediaFormat.KEY_MAX_B_FRAMES, 0)
         }
@@ -432,7 +500,7 @@ class AaTranscoder(
                 throw e
             }
             val d = Dec(c)
-            d.thread = Thread({ decodeLoop(d) }, "aa-trans-dec").also { it.start() }
+            d.thread = Thread({ runCatching { Process.setThreadPriority(Process.THREAD_PRIORITY_DISPLAY) }; decodeLoop(d) }, "aa-trans-dec").also { it.start() }
             decoder = d
             decoderCfg = s + p
             cfgStale = false
@@ -523,6 +591,7 @@ class AaTranscoder(
                         buf.get(arr)
                         val data = AnnexB.normalize(arr)
                         if (info.flags and MediaCodec.BUFFER_FLAG_CODEC_CONFIG != 0) {
+                            dump?.config(data)
                             out.onEncoderConfig(data)
                         } else {
                             val lat = System.nanoTime() - info.presentationTimeUs * 1000
@@ -532,7 +601,9 @@ class AaTranscoder(
                             }
                             winOut.incrementAndGet()
                             totalOut.incrementAndGet()
-                            out.onEncoderFrame(data, info.flags and MediaCodec.BUFFER_FLAG_KEY_FRAME != 0)
+                            val key = info.flags and MediaCodec.BUFFER_FLAG_KEY_FRAME != 0
+                            dump?.frame(data, info.presentationTimeUs, key)
+                            out.onEncoderFrame(data, key, info.presentationTimeUs)
                         }
                     }
                     c.releaseOutputBuffer(idx, false)
@@ -548,6 +619,7 @@ class AaTranscoder(
     }
 
     override fun requestSyncFrame() {
+        dump?.event("requestSyncFrame")
         try {
             encoder?.setParameters(Bundle().apply { putInt(MediaCodec.PARAMETER_KEY_REQUEST_SYNC_FRAME, 0) })
         } catch (e: Exception) {
@@ -610,6 +682,11 @@ class AaTranscoder(
             encThread?.join(1000)
         } catch (_: InterruptedException) {
         }
+        try {
+            dump?.close()
+        } catch (_: Exception) {
+        }
+        dump = null
         try {
             encoder?.stop()
         } catch (_: Exception) {

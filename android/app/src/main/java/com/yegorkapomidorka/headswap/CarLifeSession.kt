@@ -8,6 +8,7 @@ import com.yegorkapomidorka.headswap.aa.CarlifeAudio
 import com.yegorkapomidorka.headswap.aa.AaTranscoder
 import com.yegorkapomidorka.headswap.aa.BitratePolicy
 import com.yegorkapomidorka.headswap.aa.BitrateProfile
+import com.yegorkapomidorka.headswap.aa.DesktopTranscodeTranscoder
 import com.yegorkapomidorka.headswap.aa.DesktopVideoQuality
 import com.yegorkapomidorka.headswap.aa.DupDownFilter
 import com.yegorkapomidorka.headswap.aa.DesktopVideoSelection
@@ -84,7 +85,7 @@ class CarLifeSession(
     private val air = transport.caps == TransportCaps.TCP6
     private val bitrateProfile = if (air) BitrateProfile.WIFI else BitrateProfile.USB
     private val legacyBitratePolicy = BitratePolicy(mode.bitrate, profile = bitrateProfile)
-    private val surfaceBitratePolicy: BitratePolicy by lazy { DesktopVideoQuality.bitratePolicy(bitrateProfile) }
+    private val surfaceBitratePolicy: BitratePolicy by lazy { DesktopVideoQuality.bitratePolicy(bitrateProfile, mode.bitrate, crv = bridge.crvDesktopPacing) }
     @Volatile private var encodingSurface = false
     // The source starts after this session is constructed. Select its independent policy
     // only when the direct Surface encoder is requested, never from an early source flag.
@@ -611,7 +612,7 @@ class CarLifeSession(
     }
 
     private fun chooseVideoFps(requested: Int): Int = if (cfg.desktopVideo != null)
-        DesktopVideoQuality.chooseFps(cfg.fpsSetting, requested, huMaxFps())
+        DesktopVideoQuality.chooseFps(cfg.fpsSetting, requested, huMaxFps(), cap30 = bridge.crvDesktopPacing)
         else Handshake.chooseFps(cfg.fpsSetting, requested, huMaxFps())
 
     @Synchronized private fun onVideoInit(m: CmdMsg) {
@@ -830,14 +831,14 @@ class CarLifeSession(
     private fun sendVideoData(data: ByteArray) {
         val max = AaBridgeCore.MAZDA_20622111_MAX_VIDEO_PACKET
         if (!bridge.huMazda20622111 || data.size <= max) {
-            send(Ch.VIDEO, Wire.dataInner(Msg.VIDEO_DATA, unixSeconds(), data))
+            send(Ch.VIDEO, Wire.dataInner(Msg.VIDEO_DATA, videoTimeMs(), data))
             return
         }
         if (!splitLogged) {
             splitLogged = true
             AppLog.i("видео: Mazda 20622111, кадр ${data.size} Б режу на ${(data.size + max - 1) / max} VIDEO_DATA по ≤ $max Б")
         }
-        val ts = unixSeconds()
+        val ts = videoTimeMs()
         var off = 0
         while (off < data.size) {
             val end = minOf(off + max, data.size)
@@ -1160,19 +1161,37 @@ class CarLifeSession(
             // was active. Apply that same level to the newly selected Surface policy.
             bitratePolicy.setThermalCap(if (thermalThrottle.level == ThermalLevel.NORMAL) Int.MAX_VALUE
                 else thermalThrottle.capBitrate(bitratePolicy.ceilingBps))
-            val actualBps = if (mobis) mobisAaCeiling.current else bitratePolicy.current
+        }
+        val actualBps = if (mobis) mobisAaCeiling.current else bitratePolicy.current
+        if (directSurface) {
             AppLog.i("DEX video quality native=${mode.outW}x${mode.outH} singleEncode=true " +
                 "targetKbps=${actualBps / 1000} ceilingKbps=${bitratePolicy.ceilingBps / 1000} " +
                 "profile=${bitratePolicy.profile.name} adaptive=true", false)
         }
-        AaTranscoder(
-            mode.outW, mode.outH, thermalThrottle.capFps(if (mobis) AaBridgeCore.MOBIS_FPS else targetFps),
-            if (mobis) mobisAaCeiling.current else bitratePolicy.current, out, { AppLog.i(it, false) },
+        val fps = thermalThrottle.capFps(if (mobis) AaBridgeCore.MOBIS_FPS else targetFps)
+        val transcode = if (directSurface && bridge.desktopTranscode) {
+            try {
+                DesktopTranscodeTranscoder(
+                    mode.outW, mode.outH, fps, actualBps, out, { AppLog.i(it, false) },
+                    capabilityFps = if (mobis) AaBridgeCore.MOBIS_FPS else targetFps,
+                    baidu = mobis,
+                    limitedRange = bridge.videoLimitedRange,
+                    pacer30 = bridge.crvDesktopPacing,
+                ).also { it.start() }
+            } catch (e: Exception) {
+                AppLog.e("BRIDGE desktop transcode не создан, fallback на прямое кодирование", e)
+                null
+            }
+        } else null
+        transcode ?: AaTranscoder(
+            mode.outW, mode.outH, fps, actualBps, out, { AppLog.i(it, false) },
             srcWidth = if (directSurface) mode.outW else mode.aaW,
             srcHeight = if (directSurface) mode.outH else mode.aaH,
             crop = if (directSurface) com.yegorkapomidorka.headswap.aa.VideoCrop.NONE else mode.cropFor(bridge.marginsAtBottom),
             baidu = mobis, directSurface = directSurface,
             capabilityFps = if (mobis) AaBridgeCore.MOBIS_FPS else targetFps,
+            limitedRange = bridge.videoLimitedRange,
+            pacer30 = bridge.crvDesktopPacing,
         ).also { it.start() }
     } catch (e: Exception) {
         AppLog.e("BRIDGE транскодер не создан", e)
@@ -1410,7 +1429,7 @@ class CarLifeSession(
         if (now - lastVideoTx < period) return
         if (vBeats == 0L) AppLog.i("видео: PAUSE, шлю пустой ${Msg.name(type)} раз в $period мс, чтобы ГУ не рвало USB")
         lastVideoTx = now
-        send(Ch.VIDEO, Wire.dataInner(type, unixSeconds(), ByteArray(0)))
+        send(Ch.VIDEO, Wire.dataInner(type, videoTimeMs(), ByteArray(0)))
     }
 
     /**
@@ -1428,7 +1447,7 @@ class CarLifeSession(
             AppLog.i("видео: AA молчит ${now - lastVideoTx} мс, шлю пустой VIDEO_HEARTBEAT раз в $IDLE_HEARTBEAT_MS мс, чтобы ГУ не рвало USB")
         }
         lastVideoTx = now
-        send(Ch.VIDEO, Wire.dataInner(Msg.VIDEO_HEARTBEAT, unixSeconds(), ByteArray(0)))
+        send(Ch.VIDEO, Wire.dataInner(Msg.VIDEO_HEARTBEAT, videoTimeMs(), ByteArray(0)))
     }
 
     /**
@@ -1447,7 +1466,7 @@ class CarLifeSession(
                 AppLog.i("видео: Mobis CCNC, ${now - lastVideoTx} мс без VIDEO_DATA, шлю пустой VIDEO_DATA 0x20001 раз в $MOBIS_KEEPALIVE_MS мс тишины, как Baidu")
             }
             lastVideoTx = now
-            send(Ch.VIDEO, Wire.dataInner(Msg.VIDEO_DATA, unixSeconds(), ByteArray(0)))
+            send(Ch.VIDEO, Wire.dataInner(Msg.VIDEO_DATA, videoTimeMs(), ByteArray(0)))
         }
     }
 
@@ -1616,7 +1635,20 @@ class CarLifeSession(
         private const val MOBIS_KEEPALIVE_MS = 200L
         private const val MOBIS_KEEPALIVE_POLL_MS = 50L
 
-        /** Поле time видеопакета: unix-секунды (Recorder.sendVideoData :930-962). */
-        private fun unixSeconds() = (System.currentTimeMillis() / 1000).toInt()
+        /**
+         * Время видеопакета в мс (раздел для разработчиков, по умолчанию выкл). Выставляет BridgeService на подключение
+         * из AaPrefs.videoTimeMs; эксперимент: проверяем, лечит ли это видео на проблемных ГУ.
+         */
+        @Volatile @JvmStatic var VIDEO_TIME_MS = false
+
+        /**
+         * Поле time видеопакета. По умолчанию unix-секунды, как в оригинале (Recorder.sendVideoData :930-962):
+         * у всех кадров одной секунды одинаковый time. С [VIDEO_TIME_MS] - младшие 32 бита unix-миллисекунд,
+         * как у MEDIA/TTS/VR_DATA (sendAudio).
+         */
+        internal fun videoTime(nowMs: Long, ms: Boolean): Int =
+            if (ms) (nowMs and 0xFFFFFFFFL).toInt() else (nowMs / 1000).toInt()
+
+        private fun videoTimeMs() = videoTime(System.currentTimeMillis(), VIDEO_TIME_MS)
     }
 }
