@@ -74,6 +74,16 @@ internal object LauncherModel {
     /** Свои цвета «Вид › Цвета» ([ColorSet]): ночные - для тёмной палитры, дневные - для светлой. */
     var nightColors by mutableStateOf(ColorSet.NIGHT)
     var dayColors by mutableStateOf(ColorSet.DAY)
+    /** Обои вместо градиента: URI картинки; пусто - режим цветов. Взаимоисключающе с цветами. */
+    var wallpaper by mutableStateOf("")
+    var wallpaperDim by mutableStateOf(30)
+    /** Общая яркость стола 0..100. */
+    var brightness by mutableStateOf(50)
+    var wallpaperBlur by mutableStateOf(0)
+    /** «Размытие кнопок»: подложка плиток рейки и карточек настроек. */
+    var wallpaperBtnBlur by mutableStateOf(8)
+    /** Обрезанная под экран картинка ждёт подтверждения: путь к временному файлу, показывается предпросмотр. */
+    var wallpaperPending by mutableStateOf<String?>(null)
     /** На экране «Цвета» настраиваются дневные (иначе ночные); пока он открыт, весь стол показывает этот набор. */
     var colorsEditDay by mutableStateOf(false)
     /** Страница «Цвета» открыта; в портрете «Цвета» - блок «Вида», он правит набор, пока открыт сам «Вид» (h921). */
@@ -183,6 +193,11 @@ internal object LauncherModel {
         theme = prefs.theme
         nightColors = prefs.nightColors
         dayColors = prefs.dayColors
+        wallpaper = prefs.wallpaper
+        wallpaperDim = prefs.wallpaperDim
+        brightness = prefs.brightness
+        wallpaperBlur = prefs.wallpaperBlur
+        wallpaperBtnBlur = prefs.wallpaperBtnBlur
         railSize = prefs.railSize
         mapLeft = prefs.mapLeft
         animations = prefs.animations
@@ -262,7 +277,35 @@ internal object LauncherModel {
 
     fun chooseTheme(value: ThemeChoice) { theme = value; prefs.theme = value }
     /** Слайдер «Цвета» двигается: только состояние, без записи; запись - [saveColors] по отпусканию. */
-    fun editColors(set: ColorSet) { if (colorsEditDay) dayColors = set else nightColors = set }
+    fun editColors(set: ColorSet) {
+        // обои и свои цвета взаимоисключающие: правка цвета возвращает режим цветов
+        if (wallpaper.isNotEmpty()) { wallpaper = ""; prefs.wallpaper = "" }
+        if (colorsEditDay) dayColors = set else nightColors = set
+    }
+    /** Выбрана картинка обоев: режим цветов выключается, градиент больше не рисуется. */
+    fun chooseWallpaper(uri: String) {
+        if (uri.isEmpty()) return
+        wallpaper = uri
+        prefs.wallpaper = uri
+    }
+    fun removeWallpaper() { wallpaper = ""; prefs.wallpaper = "" }
+    fun editWallpaperDim(value: Int) { wallpaperDim = value; prefs.wallpaperDim = value }
+    fun editBrightness(value: Int) { brightness = value; prefs.brightness = value }
+    fun editWallpaperBlur(value: Int) { wallpaperBlur = value; prefs.wallpaperBlur = value }
+    fun editWallpaperBtnBlur(value: Int) { wallpaperBtnBlur = value; prefs.wallpaperBtnBlur = value }
+    /** Показать предпросмотр обрезанной картинки; прошлый неподтверждённый файл удаляем. */
+    fun previewWallpaper(path: String) {
+        wallpaperPending?.let { runCatching { java.io.File(it).delete() } }
+        wallpaperPending = path
+    }
+    fun confirmWallpaper() {
+        wallpaperPending?.let { chooseWallpaper(it) }
+        wallpaperPending = null
+    }
+    fun cancelWallpaperPreview() {
+        wallpaperPending?.let { runCatching { java.io.File(it).delete() } }
+        wallpaperPending = null
+    }
     fun saveColors() { prefs.nightColors = nightColors; prefs.dayColors = dayColors }
     fun resetColors() { editColors(if (colorsEditDay) ColorSet.DAY else ColorSet.NIGHT); saveColors() }
     /** Открыть «Цвета»: сначала настраивается тот набор, что сейчас на экране. */

@@ -119,7 +119,7 @@
     <string name="l_s_theme_light">Clair</string>
     <string name="l_s_theme_auto">Auto</string>
     <string name="l_s_theme_sub">Auto suit les phares</string>
-    <string name="l_s_colors">Couleurs</string>
+    <string name="l_s_colors">Couleurs et fond</string>
     <string name="l_s_colors_sub">Accent et fond, nuit et jour séparément</string>
     <string name="l_s_colors_night">Nuit</string>
     <string name="l_s_colors_day">Jour</string>
@@ -190,4 +190,17 @@
     <string name="l_notif_clear_all">Tout effacer</string>
     <string name="l_notif_dismiss">Ignorer</string>
     <string name="l_notif_open_in">Ouvrir dans %1$s</string>
+    <string name="l_s_wall">Fond d\'écran du bureau</string>
+    <string name="l_s_wall_sub_on">Fond activé, couleurs désactivées</string>
+    <string name="l_s_wall_sub_off">Image plein écran à la place du dégradé</string>
+    <string name="l_s_wall_pick">Choisir</string>
+    <string name="l_s_wall_change">Remplacer</string>
+    <string name="l_s_wall_remove">Retirer</string>
+    <string name="l_s_wall_dim">Luminosité</string>
+    <string name="l_s_wall_blur">Flou du fond</string>
+    <string name="l_s_wall_hint">Les couleurs sont désactivées tant qu\'un fond est défini. Retirez-le pour les retrouver.</string>
+    <string name="l_s_wall_back">Utiliser les couleurs</string>
+    <string name="l_s_wall_ok">Valider</string>
+    <string name="l_s_wall_cancel">Annuler</string>
+    <string name="l_s_wall_btn_blur">Flou des boutons</string>
 </resources>

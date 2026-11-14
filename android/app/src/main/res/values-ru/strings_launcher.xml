@@ -119,7 +119,7 @@
     <string name="l_s_theme_light">Светлая</string>
     <string name="l_s_theme_auto">Авто</string>
     <string name="l_s_theme_sub">Авто — по фарам</string>
-    <string name="l_s_colors">Цвета</string>
+    <string name="l_s_colors">Цвета и обои</string>
     <string name="l_s_colors_sub">Акцент и фон, отдельно ночью и днём</string>
     <string name="l_s_colors_night">Ночные</string>
     <string name="l_s_colors_day">Дневные</string>
@@ -190,4 +190,17 @@
     <string name="l_notif_clear_all">Очистить всё</string>
     <string name="l_notif_dismiss">Убрать</string>
     <string name="l_notif_open_in">Открыть в %1$s</string>
+    <string name="l_s_wall">Обои рабочего стола</string>
+    <string name="l_s_wall_sub_on">Обои включены, цвета недоступны</string>
+    <string name="l_s_wall_sub_off">Картинка на весь экран вместо градиента</string>
+    <string name="l_s_wall_pick">Выбрать</string>
+    <string name="l_s_wall_change">Заменить</string>
+    <string name="l_s_wall_remove">Убрать</string>
+    <string name="l_s_wall_dim">Яркость</string>
+    <string name="l_s_wall_blur">Размытие обоев</string>
+    <string name="l_s_wall_hint">Пока стоят обои, цвета недоступны. Уберите обои, чтобы вернуть цвета.</string>
+    <string name="l_s_wall_back">К цветам</string>
+    <string name="l_s_wall_ok">Готово</string>
+    <string name="l_s_wall_cancel">Отмена</string>
+    <string name="l_s_wall_btn_blur">Размытие кнопок</string>
 </resources>

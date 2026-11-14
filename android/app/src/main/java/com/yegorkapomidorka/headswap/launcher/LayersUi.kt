@@ -46,7 +46,7 @@ internal fun LayersCard(heightPx: Int, modifier: Modifier) {
     val headIcon = r(36)
     val headH = max(headIcon, (s.f2 * 1.25).roundToInt())
     val icon = max(1, min(r(112), heightPx - 2 * padV - headH - r(18)))
-    Box(modifier.clip(RoundedCornerShape(m.dp(s.radius))).background(Pal.SURFACE)) {
+    FrostedPanel(modifier, RoundedCornerShape(m.dp(s.radius))) {
         Column(Modifier.fillMaxSize().padding(horizontal = m.dp(r(24)), vertical = m.dp(padV)),
             verticalArrangement = Arrangement.spacedBy(m.dp(r(18)))) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(m.dp(r(14)))) {
@@ -81,7 +81,8 @@ private fun LayerSlot(l: Layer, sizePx: Int, removable: Boolean, onRemove: () ->
                 Box(Modifier.align(Alignment.Center).size(m.dp(r(38))).clip(CircleShape)
                     .background(if (pressed) Pal.SURFACE_PRESSED else pal.bgSolid)
                     .border(m.dp(max(1, r(2))), Pal.SEC, CircleShape), contentAlignment = Alignment.Center) {
-                    SvgIcon(Ico.CLOSE, r(20), Pal.SEC2, stroke = 3f)
+                    // крестик на тёмном кружке: серый на почти чёрном не виден, поэтому светлый
+                    SvgIcon(Ico.CLOSE, r(20), Color.White, stroke = 3f)
                 }
             }
         }
