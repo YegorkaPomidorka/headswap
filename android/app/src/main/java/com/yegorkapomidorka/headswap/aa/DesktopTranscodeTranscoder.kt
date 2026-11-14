@@ -21,6 +21,8 @@ class DesktopTranscodeTranscoder(
     private val baidu: Boolean = false,
     private val limitedRange: Boolean = false,
     private val pacer30: Boolean = false,
+    /** Интервал IDR финального энкодера (уходит в CarLife); промежуточный остаётся на 1 с. */
+    private val iFrameIntervalS: Int = AirIdrInterval.DEFAULT_S,
 ) : VideoTranscoder {
     private val finalTranscoder = AaTranscoder(
         width, height, fps, bitrate, out, log,
@@ -29,6 +31,7 @@ class DesktopTranscodeTranscoder(
         capabilityFps = capabilityFps, dumpTag = "desktop-final",
         limitedRange = limitedRange,
         pacer30 = pacer30,
+        iFrameIntervalS = iFrameIntervalS,
     )
 
     private lateinit var intermediateTranscoder: AaTranscoder

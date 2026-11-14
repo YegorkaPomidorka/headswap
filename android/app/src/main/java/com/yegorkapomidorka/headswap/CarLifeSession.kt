@@ -17,6 +17,7 @@ import com.yegorkapomidorka.headswap.aa.CallStateSource
 import com.yegorkapomidorka.headswap.aa.CarlifeLink
 import com.yegorkapomidorka.headswap.aa.FpsSetting
 import com.yegorkapomidorka.headswap.aa.IdrBitrateCeiling
+import com.yegorkapomidorka.headswap.aa.AirIdrInterval
 import com.yegorkapomidorka.headswap.aa.IdrThrottle
 import com.yegorkapomidorka.headswap.aa.CarlifeMediaInfo
 import com.yegorkapomidorka.headswap.aa.LinkVideoStats
@@ -1169,6 +1170,10 @@ class CarLifeSession(
                 "profile=${bitratePolicy.profile.name} adaptive=true", false)
         }
         val fps = thermalThrottle.capFps(if (mobis) AaBridgeCore.MOBIS_FPS else targetFps)
+        val idrIntervalS = AirIdrInterval.seconds(bridge.huVw20082120Only, air)
+        if (idrIntervalS != AirIdrInterval.DEFAULT_S) {
+            AppLog.i("BRIDGE ГУ VW 20082120 по воздуху: IDR энкодера раз в $idrIntervalS с (частые IDR 130-175 КБ рвали сессию)", false)
+        }
         val transcode = if (directSurface && bridge.desktopTranscode) {
             try {
                 DesktopTranscodeTranscoder(
@@ -1177,6 +1182,7 @@ class CarLifeSession(
                     baidu = mobis,
                     limitedRange = bridge.videoLimitedRange,
                     pacer30 = bridge.crvDesktopPacing,
+                    iFrameIntervalS = idrIntervalS,
                 ).also { it.start() }
             } catch (e: Exception) {
                 AppLog.e("BRIDGE desktop transcode не создан, fallback на прямое кодирование", e)
@@ -1192,6 +1198,7 @@ class CarLifeSession(
             capabilityFps = if (mobis) AaBridgeCore.MOBIS_FPS else targetFps,
             limitedRange = bridge.videoLimitedRange,
             pacer30 = bridge.crvDesktopPacing,
+            iFrameIntervalS = idrIntervalS,
         ).also { it.start() }
     } catch (e: Exception) {
         AppLog.e("BRIDGE транскодер не создан", e)
