@@ -358,6 +358,8 @@ class AaBridgeCore(
     private var vrReply = false                // поток ответа ассистента открыт в канале VR (VR_INIT ушёл)
     @Volatile var huVw20082120 = false        // VW (STATISTIC_INFO channel 20082120 h93, 20082122 h222): без heartbeat рвёт USB через 3,7-5,6 с PAUSE
         private set
+    @Volatile var huVw20082120Only = false    // строго channel 20082120 (4pda 12.11): по воздуху рвёт сессию на частых IDR 130-175 КБ, GOP 10 с
+        private set
     @Volatile var huVw20082138 = false         // VW ID (channel 20082138 кроме "VW BT 1420"; ID.6 Crozz: 20082128 + "VW BT 9491"; пресет ID. UNYX): IDR > ~600 КиБ рвёт USB EIO
         private set
     @Volatile var huKia20032131 = false        // Kia Seltos sm6150 (channel 20032131, h672): кнопка трубки на руле = LAUNCH_MODE_PHONE
@@ -600,6 +602,7 @@ class AaBridgeCore(
         huHondaVezel = false                   // STATISTIC_INFO придёт заново в этой сессии
         huHonda20772104 = false                // STATISTIC_INFO придёт заново в этой сессии
         huVw20082120 = false                   // HU_INFO / STATISTIC_INFO придут заново в этой сессии
+        huVw20082120Only = false               // STATISTIC_INFO придёт заново в этой сессии
         huHonda = false                        // STATISTIC_INFO придёт заново в этой сессии
         huVwBt1420 = false                     // HU_INFO придёт заново в этой сессии
         huVw20082138 = false                   // HU_INFO / STATISTIC_INFO придут заново в этой сессии
@@ -990,6 +993,7 @@ class AaBridgeCore(
         }
         if (channel == VW_20082120_CHANNEL || channel == VW_CNS3_20082122_CHANNEL || channel == VW_CNS3_20082134_CHANNEL ||
             channel == VW_CNS2_20082114_CHANNEL || channel == SKODA_CNS3_21290002_CHANNEL) huVw20082120 = true
+        if (channel == VW_20082120_CHANNEL) huVw20082120Only = true
         if (channel == VW_CNS2_20082114_CHANNEL || channel == SKODA_CNS3_21290002_CHANNEL) huIdleVideoHeartbeat = true
         if (channel == VW_CNS2_20082114_CHANNEL && !huVwCns2Delphi) {
             huVwCns2Delphi = true

@@ -55,6 +55,8 @@ class AaTranscoder(
      * backlight ~1.7 Hz; limited range renders the same on both.
      */
     private val limitedRange: Boolean = false,
+    /** KEY_I_FRAME_INTERVAL, секунды: 1 по умолчанию, длиннее для ГУ, которым тяжелы частые IDR по воздуху ([AirIdrInterval]). */
+    private val iFrameIntervalS: Int = AirIdrInterval.DEFAULT_S,
     /**
      * CR-V 2026 only: fixed 30-fps pacer on the VirtualDisplay input surface instead of the
      * generic high-fps gate. Other cars keep the previous desktop pacing.
@@ -294,7 +296,7 @@ class AaTranscoder(
         }
         f.setInteger(MediaFormat.KEY_BIT_RATE, bitrate)
         f.setInteger(MediaFormat.KEY_FRAME_RATE, fps)
-        f.setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, 1)
+        f.setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, iFrameIntervalS)
         // как у Baidu (Recorder.java:1364, MediaFormatUtils.java:48): на статичном экране кадр повторяется раз в 100 мс
         val repeat = Regex("""repeat=(\d+)""").find(tuning)?.groupValues?.get(1)?.toLong() ?: REPEAT_AFTER_US
         f.setLong(MediaFormat.KEY_REPEAT_PREVIOUS_FRAME_AFTER, repeat)
