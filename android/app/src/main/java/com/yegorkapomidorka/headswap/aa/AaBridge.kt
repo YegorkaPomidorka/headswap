@@ -150,8 +150,6 @@ class AaBridgeCore(
     // --- видео: перекодирование (по умолчанию в приложении) или passthrough ---
     /** Режим видео моста: true = AA -> декодер -> энкодер (кадры повторяются на статике), false = H.264 как есть. */
     @Volatile var transcodeEnabled = false
-    /** Desktop only: insert an intermediate H.264 encode/decode stage before the CarLife encoder. */
-    @Volatile var desktopTranscode = false
 
     /** Encode the final stream as limited range (16-235). Set per session from the car preset / manual choice. */
     @Volatile var videoLimitedRange = false

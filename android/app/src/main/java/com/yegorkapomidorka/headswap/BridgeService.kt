@@ -1161,7 +1161,6 @@ class BridgeService : Service() {
         val owner: BridgeHost = h
         // темп кадров CarLife, повтор статичных кадров и энкодер остаются как в основном видеоконвейере
         owner.core.transcodeEnabled = true
-        owner.core.desktopTranscode = dexPrefs.desktopTranscode
         owner.core.videoLimitedRange = dexPrefs.effectiveLimitedRange(aaPrefs.carPreset)
         owner.core.crvDesktopPacing = aaPrefs.carPreset?.settings?.crvDesktopPacing == true
         owner.core.spliceMs = 0L

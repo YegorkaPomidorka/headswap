@@ -8,7 +8,6 @@ import com.yegorkapomidorka.headswap.aa.CarlifeAudio
 import com.yegorkapomidorka.headswap.aa.AaTranscoder
 import com.yegorkapomidorka.headswap.aa.BitratePolicy
 import com.yegorkapomidorka.headswap.aa.BitrateProfile
-import com.yegorkapomidorka.headswap.aa.DesktopTranscodeTranscoder
 import com.yegorkapomidorka.headswap.aa.DesktopVideoQuality
 import com.yegorkapomidorka.headswap.aa.DupDownFilter
 import com.yegorkapomidorka.headswap.aa.DesktopVideoSelection
@@ -1169,21 +1168,7 @@ class CarLifeSession(
                 "profile=${bitratePolicy.profile.name} adaptive=true", false)
         }
         val fps = thermalThrottle.capFps(if (mobis) AaBridgeCore.MOBIS_FPS else targetFps)
-        val transcode = if (directSurface && bridge.desktopTranscode) {
-            try {
-                DesktopTranscodeTranscoder(
-                    mode.outW, mode.outH, fps, actualBps, out, { AppLog.i(it, false) },
-                    capabilityFps = if (mobis) AaBridgeCore.MOBIS_FPS else targetFps,
-                    baidu = mobis,
-                    limitedRange = bridge.videoLimitedRange,
-                    pacer30 = bridge.crvDesktopPacing,
-                ).also { it.start() }
-            } catch (e: Exception) {
-                AppLog.e("BRIDGE desktop transcode не создан, fallback на прямое кодирование", e)
-                null
-            }
-        } else null
-        transcode ?: AaTranscoder(
+        AaTranscoder(
             mode.outW, mode.outH, fps, actualBps, out, { AppLog.i(it, false) },
             srcWidth = if (directSurface) mode.outW else mode.aaW,
             srcHeight = if (directSurface) mode.outH else mode.aaH,
