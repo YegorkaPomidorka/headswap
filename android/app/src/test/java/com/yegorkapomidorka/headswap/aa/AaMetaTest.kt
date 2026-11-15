@@ -744,6 +744,23 @@ class AaMetaTest {
     }
 
     @Test
+    fun vw20082120OnlyFlagStrictlyByChannel() {
+        val r = Rig()
+        r.core.onHuInfo("Volkswagen", "xxx")
+        r.core.onHuStatistic("20082120")
+        assertTrue(r.core.huVw20082120Only)
+        r.core.onCarlifeClosed()
+        r.core.attach(MetaLink())
+        assertTrue("новая сессия - флаг заново", !r.core.huVw20082120Only)
+        for (other in listOf("20082122", "20082114", "20082138", "21290002")) {
+            val o = Rig()
+            o.core.onHuInfo("Volkswagen", "xxx")
+            o.core.onHuStatistic(other)
+            assertTrue("$other не 20082120", !o.core.huVw20082120Only)
+        }
+    }
+
+    @Test
     fun pauseHeartbeatForVwCns3Channel20082122() {
         val r = Rig()
         r.core.onHuInfo("Volkswagen", "CNS3")
