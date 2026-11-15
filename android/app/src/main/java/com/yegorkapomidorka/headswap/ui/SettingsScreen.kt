@@ -409,7 +409,6 @@ class SettingsSectionScreen(host: MainActivity, val section: SettingsSection) : 
     private var fpsSeg: Segmented? = null
     private var desktopFpsSeg: Segmented? = null
     private var desktopFpsNote: TextView? = null
-    private var desktopTranscodeSeg: Segmented? = null
     private var videoRangeSeg: Segmented? = null
     private var densityValue: TextView? = null
     private var densitySub: TextView? = null
@@ -923,20 +922,9 @@ class SettingsSectionScreen(host: MainActivity, val section: SettingsSection) : 
 
     private fun buildVideo() {
         val c = ctx
-        body.addView(c.sectionTitle(c.getString(R.string.set_mode)))
         val desktop = BridgeMode.effective(aa.bridgeMode, Build.VERSION.SDK_INT) == BridgeMode.DESKTOP
-        if (desktop) {
-            // «Свой лаунчер»: по умолчанию промежуточный H.264, как в AA transcode.
-            val dt = Segmented(c, listOf(
-                c.getString(R.string.set_desktop_direct_title),
-                c.getString(R.string.set_desktop_transcode_title),
-            ), 15f) { setDesktopTranscode(it == 1) }
-            desktopTranscodeSeg = dt
-            body.addView(dt.view, lp(MATCH, WRAP))
-            body.addView(c.text(c.getString(R.string.set_desktop_transcode_note), 13f, 400, c.clr(R.color.on2)).apply { setLineSpacing(0f, 1.4f) },
-                lp(MATCH, WRAP).margins(c, 8, 4, 8, 0))
-            refreshDesktopTranscode()
-        } else {
+        if (!desktop) {
+            body.addView(c.sectionTitle(c.getString(R.string.set_mode)))
             val seg = Segmented(c, listOf(c.getString(R.string.set_transcode_title), c.getString(R.string.set_direct_title)), 15f) { setTranscode(it == 0) }
             transcodeSeg = seg
             body.addView(seg.view, lp(MATCH, WRAP))
@@ -1288,15 +1276,6 @@ class SettingsSectionScreen(host: MainActivity, val section: SettingsSection) : 
     private fun setDesktopFps(f: FpsSetting) {
         DexPrefs(ctx).desktopFps = f
         refreshDesktopFps()
-    }
-
-    private fun setDesktopTranscode(on: Boolean) {
-        DexPrefs(ctx).desktopTranscode = on
-        refreshDesktopTranscode()
-    }
-
-    private fun refreshDesktopTranscode() {
-        desktopTranscodeSeg?.setSelected(if (DexPrefs(ctx).desktopTranscode) 1 else 0)
     }
 
     private fun setVideoRangeMode(mode: VideoRangeMode) {

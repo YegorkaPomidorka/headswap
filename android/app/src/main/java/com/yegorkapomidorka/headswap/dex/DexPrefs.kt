@@ -43,10 +43,6 @@ class DexPrefs(context: Context) {
     var desktopFps: FpsSetting
         get() = prefs.getString("desktop_fps", null).let { name -> FpsSetting.entries.firstOrNull { it.name == name } ?: FpsSetting.FPS30 }
         set(value) { prefs.edit().putString("desktop_fps", value.name).apply() }
-    /** Insert an intermediate H.264 encode/decode stage, matching the AA transcode path. */
-    var desktopTranscode: Boolean
-        get() = prefs.getBoolean("desktop_transcode", false)
-        set(value) { prefs.edit().putBoolean("desktop_transcode", value).apply() }
 
     /**
      * Final H.264 color range. AUTO follows the selected car preset: the CR-V 2026 head unit
