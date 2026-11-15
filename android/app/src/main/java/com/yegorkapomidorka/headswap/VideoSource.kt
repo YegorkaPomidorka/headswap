@@ -102,11 +102,33 @@ class VideoSource(
     private fun configureFallback(c: MediaCodec) {
         try {
             c.configure(format(withExtras = true), null, null, MediaCodec.CONFIGURE_FLAG_ENCODE)
+            return
         } catch (e: Exception) {
-            AppLog.e("configure с profile/CBR не прошёл, пробую минимальный формат", e)
+            AppLog.e("configure с profile/CBR не прошёл, пробую Baseline без CBR", e)
             c.reset()
-            c.configure(format(withExtras = false), null, null, MediaCodec.CONFIGURE_FLAG_ENCODE)
         }
+        // h1207: без профиля OMX.qcom (OPPO) отдаёт High + CABAC, level 1.0; ГУ Desay 20082133 цепляется за этот
+        // первый SPS/PPS и потом разбирает Baseline AA по нему — каша на весь экран. Держим Baseline до последнего.
+        for (level in listOf(MediaCodecInfo.CodecProfileLevel.AVCLevel31, 0)) {
+            try {
+                c.configure(formatBaseline(level), null, null, MediaCodec.CONFIGURE_FLAG_ENCODE)
+                AppLog.i("заглушка: энкодер Baseline без CBR${if (level != 0) ", level 3.1" else ", без level"}")
+                return
+            } catch (e: Exception) {
+                AppLog.e("configure Baseline без CBR (${if (level != 0) "level 3.1" else "без level"}) не прошёл", e)
+                c.reset()
+            }
+        }
+        AppLog.i("заглушка: Baseline не принят, минимальный формат (профиль на усмотрение энкодера)")
+        c.configure(format(withExtras = false), null, null, MediaCodec.CONFIGURE_FLAG_ENCODE)
+    }
+
+    private fun formatBaseline(level: Int): MediaFormat {
+        val f = format(withExtras = false)
+        f.setInteger(MediaFormat.KEY_PROFILE, MediaCodecInfo.CodecProfileLevel.AVCProfileBaseline)
+        if (level != 0) f.setInteger(MediaFormat.KEY_LEVEL, level)
+        f.setInteger(MediaFormat.KEY_MAX_B_FRAMES, 0)
+        return f
     }
 
     /** Как Baidu MediaFormatUtils :41-60: Baseline, VBR, level 256 (AVCLevel3), I-frame 1 с, повтор кадра 100 мс. */
