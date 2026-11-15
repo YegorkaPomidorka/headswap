@@ -193,7 +193,7 @@ internal class DelegatedInputGateway(context: Context) : IDelegatedInputGateway.
     private fun wakeForTouch(displayId: Int, isDown: Boolean) {
         val power = context.getSystemService(PowerManager::class.java) ?: return
         val interactive = runCatching { power.isInteractive }.getOrNull()
-        if (!TouchWakePolicy.shouldWake(Build.VERSION.SDK_INT, isDown, interactive)) return
+        if (!TouchWakePolicy.shouldWake(Build.VERSION.SDK_INT, isDown, interactive, Build.MANUFACTURER)) return
         val start = SystemClock.uptimeMillis()
         val sent = runCatching {
             for (action in intArrayOf(KeyEvent.ACTION_DOWN, KeyEvent.ACTION_UP)) {
