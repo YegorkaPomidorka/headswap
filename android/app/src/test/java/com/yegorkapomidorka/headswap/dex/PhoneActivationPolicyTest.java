@@ -22,6 +22,9 @@ public final class PhoneActivationPolicyTest {
         assertTrue(command, command.contains("--package " + APP + " --token " + TOKEN + " </dev/null"));
         assertFalse(command.contains("--audio"));
         assertTrue(PhoneActivationPolicy.dispatchCommand(APK, options(true), NONCE).contains("--token " + TOKEN + " --audio </dev/null"));
+        ManualAccessPolicy.Options vdm = new ManualAccessPolicy.Options(true, false, APP, TOKEN, true);
+        assertTrue(PhoneActivationPolicy.dispatchCommand(APK, vdm, NONCE).contains("--token " + TOKEN + " --audio --vdm </dev/null"));
+        assertFalse(PhoneActivationPolicy.dispatchCommand(APK, options(true), NONCE).contains("--vdm"));
         // the installed applicationId (a debug suffix, say) is passed as is, never a fixed name
         ManualAccessPolicy.Options suffixed = new ManualAccessPolicy.Options(false, false, APP + ".smoke", TOKEN);
         assertTrue(PhoneActivationPolicy.dispatchCommand(APK, suffixed, NONCE).contains("--package " + APP + ".smoke "));

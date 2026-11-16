@@ -44,6 +44,8 @@
     <string name="dev_section_desktop">Head unit desktop</string>
     <string name="dev_hide_status_title">Hide status bar</string>
     <string name="dev_hide_status_sub">For head units that already show their own bar with clock and icons on top (some VW). Notifications hang as a notch with a gold line: pull down for the shade</string>
+    <string name="dev_vdm_host_title">VirtualDevice host on Android 16</string>
+    <string name="dev_vdm_host_sub">For Samsung on Android 16, if the car screen goes dark together with the phone screen. Needs USB debugging. After switching, activate the desktop again.</string>
     <string name="dev_custom_w">Width</string>
     <string name="dev_custom_h">Height</string>
     <string name="dev_custom_hint">Width 640–2240, height 640–1080 (portrait: the other way round), even numbers</string>
