@@ -12,6 +12,7 @@ adb reverse) делает stand.ps1 -PrepareOnly, чтобы она жила в 
 """
 from __future__ import annotations
 
+import re
 import shutil
 import subprocess
 import sys
@@ -30,7 +31,8 @@ import carlife_hu as H          # noqa: E402
 import carlife_view as V        # noqa: E402
 
 from . import compare as C      # noqa: E402
-from .ocr import Rect, WinOcr, Word, find_in, lines_text   # noqa: E402
+from .ocr import Rect, WinOcr, Word, find_in, lines_text, truncated   # noqa: E402
+from .strings import Strings    # noqa: E402
 
 PKG = "com.yegorkapomidorka.headswap.smoke"
 REFS = HERE / "refs"
@@ -44,10 +46,13 @@ class StandError(AssertionError):
 class Stand:
     def __init__(self, out: Path, size: tuple[int, int] = (1280, 720), hu: str = "honda", mode: str = "desktop",
                  prepare: bool = True, update_refs: bool = False, refs: Path = REFS, echo: bool = False,
-                 animations: bool = False, quiet: float = 0.3, change_wait: float = 0.6):
+                 animations: bool = False, quiet: float = 0.3, change_wait: float = 0.6, lang: str = "ru"):
         """animations=False: на время прогона масштаб анимаций Android 0 (как в Espresso), после stop() прежний.
         quiet - сколько секунд экран не меняется, чтобы считаться готовым; change_wait - сколько после тапа ждать
-        первый изменившийся кадр (отклик ~0,1 с; тап, который экран не меняет, стоит столько)."""
+        первый изменившийся кадр (отклик ~0,1 с; тап, который экран не меняет, стоит столько).
+        lang - язык приложения (en ru ar fr zh-CN): ставится через per-app locale, строки сценария - self.R."""
+        self.lang = lang
+        self.R = Strings(lang)
         self.out = Path(out)
         self.animations, self.quiet, self.change_wait = animations, quiet, change_wait
         self._calm: tuple[int, np.ndarray] | None = None
@@ -85,7 +90,18 @@ class Stand:
         ffmpeg = V.find_ffmpeg()
         if not ffmpeg:
             raise StandError("нет ffmpeg в PATH (winget install Gyan.FFmpeg)")
-        if self.prepare:
+        self.ocr                            # нет языка OCR - падаем до подготовки телефона
+        # Язык надо поставить до старта процесса: от него зависят не только строки, но и набор навигаторов и
+        # раскладка, которые LauncherModel считает один раз. Поэтому смена языка = подготовка заново (force-stop +
+        # активация), даже с --no-prepare.
+        installed = "package:" in self._adb_out("shell", "pm", "path", PKG)
+        if not installed:
+            self._prepare()
+        prepare = self.prepare or not installed
+        if self._get_locale() != self._locale_tag():
+            self._set_locale(self._locale_tag())
+            prepare = True
+        if prepare:
             self._prepare()
         else:
             self._adb("reverse", "tcp:7240", "tcp:7240")
@@ -114,15 +130,17 @@ class Stand:
         self.act(f"first frame {w}x{h}")
         self.wait_ready()
 
-    # Пока мост показывает заглушку («Запускаю рабочий стол…»), касания он не принимает: в логе телефона их нет вовсе
+    # Пока мост показывает заглушку («Запускаю рабочий стол…»), касания он не принимает: в логе телефона их нет вовсе.
+    # Текст заглушки зашит по-русски (DelegatedDexConnector.status) на любом языке - ищем русским OCR.
     PLACEHOLDERS = ("Запускаю рабочий стол", "Ожидаю повторного подключения", "Запускаю")
 
     def wait_ready(self, timeout: float = 30.0):
         """Дождаться настоящего экрана вместо заглушки моста и дать ему успокоиться."""
         end = time.monotonic() + timeout
+        ru = self.ocr if self.lang == "ru" else WinOcr("ru")
         while True:
             f = self.settle(quiet=1.0)
-            words = self.ocr.read(f)
+            words = ru.read(f)
             if not any(find_in(words, p, partial=True) for p in self.PLACEHOLDERS):
                 self.act("screen ready: " + " | ".join(lines_text(words))[:200])
                 return
@@ -160,6 +178,23 @@ class Stand:
         if self.alog:
             self.alog.close()
             self.alog = None
+
+    def _locale_tag(self) -> str:
+        return "ar-u-nu-latn" if self.lang == "ar" else self.lang     # как AppLocale.applyTag
+
+    def _get_locale(self) -> str:
+        """Per-app язык smoke: «Locales for <pkg> for user 0 are [ru]» -> «ru», пусто = системный."""
+        out = self._adb_out("shell", "cmd", "locale", "get-app-locales", PKG)
+        m = re.search(r"\[(.*)\]", out)
+        return m.group(1).strip() if m else ""
+
+    def _set_locale(self, tag: str):
+        self._adb("shell", "cmd", "locale", "set-app-locales", PKG, "--locales", tag)
+        self.act(f"app locale {tag or 'system'}")
+
+    def _adb_out(self, *args: str) -> str:
+        r = subprocess.run(["adb", *args], capture_output=True, text=True, timeout=30)
+        return r.stdout
 
     ANIM_KEYS = ("animator_duration_scale", "transition_animation_scale", "window_animation_scale")
 
@@ -365,8 +400,13 @@ class Stand:
     @property
     def ocr(self) -> WinOcr:
         if self.ocrengine is None:
-            self.ocrengine = WinOcr("ru")
+            self.ocrengine = WinOcr(self.lang)
         return self.ocrengine
+
+    @property
+    def fuzz(self) -> int:
+        """Сколько букв OCR может ошибиться в фразе: 0 со своим движком, 1 с запасным (французский английским)."""
+        return 0 if self.ocr.native else 1
 
     def words(self, frame: np.ndarray | None = None, region: Rect | None = None) -> list[Word]:
         return self.ocr.read(self.settle() if frame is None else frame, region)
@@ -382,17 +422,20 @@ class Stand:
         while True:
             f = self.settle()
             words = self.ocr.read(f, region)
-            hits = find_in(words, text, partial)
+            hits = find_in(words, text, partial, self.fuzz)
             if len(hits) > index:
                 return hits[index]
             if time.monotonic() > end:
                 self.shot(f"no-text-{_slug(text)}", f)
+                cut = truncated(words, text)
+                if cut:
+                    raise StandError(f"текст {text!r} обрезан многоточием: на экране {cut!r}")
                 seen = " | ".join(lines_text(words)) or "(пусто)"
                 raise StandError(f"нет текста {text!r} за {timeout:g} с. На экране: {seen}")
             time.sleep(0.1)
 
     def has_text(self, text: str, region: Rect | None = None, partial: bool = False) -> bool:
-        return bool(find_in(self.words(None, region), text, partial))
+        return bool(find_in(self.words(None, region), text, partial, self.fuzz))
 
     def wait_text(self, text: str, timeout: float = 8.0, region: Rect | None = None, partial: bool = False):
         self.find_text(text, timeout, region, partial)
@@ -416,6 +459,11 @@ class Stand:
 
     @property
     def refs_dir(self) -> Path:
+        """Эталоны экранов: refs/<hu>-<W>x<H>/<язык>/; иконки общие для языков: refs/<hu>-<W>x<H>/icons/."""
+        return self.refs_size_dir / self.lang
+
+    @property
+    def refs_size_dir(self) -> Path:
         w, h = self.video_size
         return self.refs_root / f"{self.hu_profile}-{w}x{h}"
 
@@ -455,7 +503,7 @@ class Stand:
     def find_image(self, name: str, threshold: float = 0.9, timeout: float = 8.0,
                    region: Rect | None = None) -> Rect:
         """Иконка refs/<hu>-<W>x<H>/icons/<name>.png на экране (вырезать из эталона любым редактором)."""
-        tpl = C.load(self.refs_dir / "icons" / f"{name}.png")
+        tpl = C.load(self.refs_size_dir / "icons" / f"{name}.png")
         end = time.monotonic() + timeout
         while True:
             f = self.settle()

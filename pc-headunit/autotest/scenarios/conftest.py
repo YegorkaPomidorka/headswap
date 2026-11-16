@@ -20,6 +20,7 @@ if str(PC_HU) not in sys.path:
     sys.path.insert(0, str(PC_HU))
 
 from autotest.stand import Stand   # noqa: E402
+from autotest.strings import LANGS   # noqa: E402
 
 
 def pytest_addoption(parser):
@@ -30,16 +31,32 @@ def pytest_addoption(parser):
     g.addoption("--size", default="", help="WxH экрана ГУ (по умолчанию как в stand.ps1)")
     g.addoption("--stand-out", default="", help="каталог отчёта (по умолчанию out/autotest-<время>)")
     g.addoption("--animations", action="store_true", help="не выключать анимации Android на время прогона")
+    g.addoption("--lang", default="ru", help=f"языки через запятую ({','.join(LANGS)}) или all")
+
+
+def pytest_generate_tests(metafunc):
+    """Каждый сценарий - на каждом языке из --lang; стенд один на язык (смена языка = перезапуск приложения)."""
+    if "stand" in metafunc.fixturenames:
+        opt = metafunc.config.option.lang
+        langs = list(LANGS) if opt == "all" else [x.strip() for x in opt.split(",") if x.strip()]
+        bad = [x for x in langs if x not in LANGS]
+        if bad:
+            raise pytest.UsageError(f"--lang: нет языков {bad}, есть {', '.join(LANGS)}")
+        metafunc.parametrize("lang", langs, scope="session")
+
+
+_RUN = time.strftime("%Y%m%d-%H%M%S")
 
 
 @pytest.fixture(scope="session")
-def stand_session(request):
+def stand_session(request, lang):
     import carlife_view as V
     o = request.config.option
     size = V.parse_size(o.size) if o.size else ((1728, 648) if o.hu == "mazda" else (1280, 720))
-    out = Path(o.stand_out) if o.stand_out else PC_HU / "out" / ("autotest-" + time.strftime("%Y%m%d-%H%M%S"))
+    base = Path(o.stand_out) if o.stand_out else PC_HU / "out" / ("autotest-" + _RUN)
+    out = base / lang
     s = Stand(out, size, o.hu, prepare=not o.no_prepare, update_refs=o.update_refs,
-              animations=o.animations)
+              animations=o.animations, lang=lang)
     s.start()
     yield s
     s.stop()

@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import asyncio
 import re
+import unicodedata
 from dataclasses import dataclass
 
 import numpy as np
@@ -32,11 +33,26 @@ class Word:
 _HOMOGLYPHS = str.maketrans("асеорхукмтвн", "aceopxykmtbh")
 
 
+_CJK = "⺀-鿿豈-﫿＀-￯　-〿"
+_CJK_SPACE = re.compile(rf"(?<=[{_CJK}])\s+|\s+(?=[{_CJK}])")
+_RTL = re.compile(r"[֐-ࣿיִ-﷿ﹰ-﻿]")
+_PUNCT_END = ".…。:：!！"
+
+
 def norm(text: str) -> str:
-    """Для сравнения: регистр, ё/е, двойники кириллица/латиница, лишние пробелы. OCR путает регистр первой буквы
-    («домой») и буквы-двойники."""
-    t = text.casefold().replace("ё", "е").translate(_HOMOGLYPHS)
-    return re.sub(r"\s+", " ", t).strip()
+    """Для сравнения: регистр, диакритика (ё/е, é/e, харакат), двойники кириллица/латиница, лишние пробелы, пробелы
+    вокруг иероглифов, точка в конце. OCR путает регистр первой буквы («домой»), буквы-двойники, теряет акценты
+    (английский движок на французском) и режет китайскую фразу на слова-иероглифы."""
+    t = unicodedata.normalize("NFKD", text.casefold())
+    t = "".join(ch for ch in t if unicodedata.category(ch) != "Mn")
+    t = t.translate(_HOMOGLYPHS)
+    t = re.sub(r"\s+", " ", t).strip()
+    t = _CJK_SPACE.sub("", t)
+    return t.rstrip(_PUNCT_END).strip()
+
+
+def is_rtl(text: str) -> bool:
+    return bool(_RTL.search(text))
 
 
 def union(rects: list[Rect]) -> Rect:
@@ -47,9 +63,39 @@ def union(rects: list[Rect]) -> Rect:
     return x0, y0, x1 - x0, y1 - y0
 
 
-def find_in(words: list[Word], text: str, partial: bool = False) -> list[Rect]:
+def edit_distance(a: str, b: str) -> int:
+    prev = list(range(len(b) + 1))
+    for i, ca in enumerate(a, 1):
+        cur = [i]
+        for j, cb in enumerate(b, 1):
+            cur.append(min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (ca != cb)))
+        prev = cur
+    return prev[-1]
+
+
+def _match(got: str, want: str, partial: bool, fuzz: int) -> bool:
+    if got == want or (partial and want in got):
+        return True
+    if fuzz and len(want) >= 5 and not partial:
+        return abs(len(got) - len(want)) <= fuzz and edit_distance(got, want) <= fuzz
+    return False
+
+
+def truncated(words: list[Word], text: str) -> str | None:
+    """Строка OCR, которая похожа на обрезанную многоточием фразу text («Nothing is playi...»), или None."""
+    want = norm(text)
+    for line in lines_text(words):
+        t = line.strip()
+        m = re.match(r"^(.*?)\s*(\.{2,}|…)$", t)
+        if m and len(norm(m.group(1))) >= 4 and want.startswith(norm(m.group(1))) and norm(m.group(1)) != want:
+            return t
+    return None
+
+
+def find_in(words: list[Word], text: str, partial: bool = False, fuzz: int = 0) -> list[Rect]:
     """Где на кадре фраза text: подряд идущие слова одной строки, склеенные пробелом, равны фразе
-    (partial=True: фраза - подстрока склейки). Чистая функция, без OCR."""
+    (partial=True: фраза - подстрока склейки; fuzz - сколько букв OCR может ошибиться, для движка не своего языка).
+    Чистая функция, без OCR."""
     want = norm(text)
     if not want:
         return []
@@ -57,16 +103,20 @@ def find_in(words: list[Word], text: str, partial: bool = False) -> list[Rect]:
     for w in words:
         lines.setdefault(w.line, []).append(w)
     hits: list[Rect] = []
-    for ws in lines.values():
+    seqs = list(lines.values())
+    if is_rtl(text):                        # арабский: порядок слов в строке OCR не гарантирован - пробуем оба
+        seqs += [ws[::-1] for ws in lines.values() if len(ws) > 1]
+    for ws in seqs:
         n = len(ws)
         for i in range(n):
             for j in range(i, n):
                 got = norm(" ".join(w.text for w in ws[i:j + 1]))
-                if got == want or (partial and want in got):
+                if _match(got, want, partial, fuzz):
                     hits.append(union([w.rect for w in ws[i:j + 1]]))
                     break                   # самая короткая склейка от слова i
-                if len(got) > len(want) + 2 and not partial:
+                if len(got) > len(want) + 2 + fuzz and not partial:
                     break
+    hits = list(dict.fromkeys(hits))
     # partial: от разных i могли найтись вложенные рамки - оставляем самые узкие
     hits.sort(key=lambda r: r[2])
     out: list[Rect] = []
@@ -82,13 +132,36 @@ def _inside(a: Rect, b: Rect) -> bool:
     return a[0] >= b[0] and a[1] >= b[1] and a[0] + a[2] <= b[0] + b[2] and a[1] + a[3] <= b[1] + b[3]
 
 
+# язык приложения -> языки OCR Windows по порядку предпочтения (французский читает и английский движок, без акцентов)
+OCR_LANGS = {"ru": ("ru",), "en": ("en-US", "en"), "fr": ("fr-FR", "fr", "en-US"), "ar": ("ar-SA", "ar"),
+             "zh-CN": ("zh-Hans-CN", "zh-Hans", "zh-CN")}
+# пакеты OCR: Add-WindowsCapability -Online -Name <имя> (PowerShell от администратора)
+OCR_CAPS = {"fr": "Language.OCR~~~fr-FR~0.0.1.0", "ar": "Language.OCR~~~ar-SA~0.0.1.0",
+            "zh-CN": "Language.OCR~~~zh-CN~0.0.1.0", "en": "Language.OCR~~~en-US~0.0.1.0",
+            "ru": "Language.OCR~~~ru-RU~0.0.1.0"}
+
+
+def available_ocr() -> list[str]:
+    from winrt.windows.media.ocr import OcrEngine
+    return [lang.language_tag for lang in OcrEngine.available_recognizer_languages]
+
+
 class WinOcr:
     def __init__(self, lang: str = "ru"):
         from winrt.windows.globalization import Language
         from winrt.windows.media.ocr import OcrEngine
-        self.engine = OcrEngine.try_create_from_language(Language(lang))
+        self.engine = None
+        for tag in OCR_LANGS.get(lang, (lang,)):
+            self.engine = OcrEngine.try_create_from_language(Language(tag))
+            if self.engine is not None:
+                break
         if self.engine is None:
-            raise RuntimeError(f"Windows OCR: нет языка {lang!r} (Параметры > Время и язык > Язык, добавить русский)")
+            cap = OCR_CAPS.get(lang, f"Language.OCR~~~{lang}~0.0.1.0")
+            raise RuntimeError(f"Windows OCR: нет языка {lang!r} (есть {available_ocr()}); поставить в PowerShell "
+                               f"от администратора: Add-WindowsCapability -Online -Name \"{cap}\"")
+        self.lang = self.engine.recognizer_language.language_tag
+        # движок не своего языка (французский английским) путает буквы с акцентами: «Système» -> «Systöme»
+        self.native = self.lang.split("-")[0].lower() == lang.split("-")[0].lower()
         self.max_dim = int(OcrEngine.max_image_dimension)
 
     def read(self, rgb: np.ndarray, region: Rect | None = None) -> list[Word]:

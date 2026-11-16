@@ -38,6 +38,32 @@ def test_find_phrase_and_case():
     assert find_in(ws, "Навиг", partial=True) == [(70, 50, 90, 20)]
 
 
+def test_norm_languages():
+    assert norm("Système") == norm("Systeme")              # английский движок теряет акценты
+    assert norm("正在 启动 桌面。") == norm("正在启动桌面")     # иероглифы OCR режет на слова, точка в конце
+    assert find_in(words("Systöme"), "Système") == []
+    assert find_in(words("Systöme"), "Système", fuzz=1)
+    assert find_in(words("Sys"), "Système", fuzz=1) == []
+
+
+def test_truncated():
+    from autotest.ocr import truncated
+    assert truncated(words("Nothing is playi..."), "Nothing is playing") == "Nothing is playi..."
+    assert truncated(words("Nothing is playing"), "Nothing is playing") is None
+
+
+def test_strings_all_langs():
+    from autotest.strings import LANGS, Strings, format_android, unescape
+    assert unescape(r"Démarrage de l\'écran") == "Démarrage de l'écran"
+    assert unescape('"два  пробела"') == "два  пробела"
+    assert unescape("два \n  пробела") == "два пробела"
+    assert format_android("%1$s из %2$d, %%", "а", 3) == "а из 3, %"
+    for lang in LANGS:
+        R = Strings(lang)
+        assert R.l_sec_look and R.l_settings and R("l_music_idle")
+    assert Strings("ru").l_sec_look == "Вид" and Strings("en").l_sec_look == "Look"
+
+
 def test_find_order_top_to_bottom():
     ws = words("Медиа", "Медиа")
     assert [r[1] for r in find_in(ws, "медиа")] == [0, 50]
