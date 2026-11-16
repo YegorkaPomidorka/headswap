@@ -29,6 +29,7 @@ def pytest_addoption(parser):
     g.addoption("--hu", default="honda", choices=["honda", "mazda"])
     g.addoption("--size", default="", help="WxH экрана ГУ (по умолчанию как в stand.ps1)")
     g.addoption("--stand-out", default="", help="каталог отчёта (по умолчанию out/autotest-<время>)")
+    g.addoption("--animations", action="store_true", help="не выключать анимации Android на время прогона")
 
 
 @pytest.fixture(scope="session")
@@ -37,7 +38,8 @@ def stand_session(request):
     o = request.config.option
     size = V.parse_size(o.size) if o.size else ((1728, 648) if o.hu == "mazda" else (1280, 720))
     out = Path(o.stand_out) if o.stand_out else PC_HU / "out" / ("autotest-" + time.strftime("%Y%m%d-%H%M%S"))
-    s = Stand(out, size, o.hu, prepare=not o.no_prepare, update_refs=o.update_refs)
+    s = Stand(out, size, o.hu, prepare=not o.no_prepare, update_refs=o.update_refs,
+              animations=o.animations)
     s.start()
     yield s
     s.stop()

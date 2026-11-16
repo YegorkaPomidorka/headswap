@@ -43,8 +43,15 @@ class StandError(AssertionError):
 
 class Stand:
     def __init__(self, out: Path, size: tuple[int, int] = (1280, 720), hu: str = "honda", mode: str = "desktop",
-                 prepare: bool = True, update_refs: bool = False, refs: Path = REFS, echo: bool = False):
+                 prepare: bool = True, update_refs: bool = False, refs: Path = REFS, echo: bool = False,
+                 animations: bool = False, quiet: float = 0.3, change_wait: float = 0.6):
+        """animations=False: на время прогона масштаб анимаций Android 0 (как в Espresso), после stop() прежний.
+        quiet - сколько секунд экран не меняется, чтобы считаться готовым; change_wait - сколько после тапа ждать
+        первый изменившийся кадр (отклик ~0,1 с; тап, который экран не меняет, стоит столько)."""
         self.out = Path(out)
+        self.animations, self.quiet, self.change_wait = animations, quiet, change_wait
+        self._calm: tuple[int, np.ndarray] | None = None
+        self._anim_saved: dict[str, str] = {}
         self.size, self.hu_profile, self.mode = size, hu, mode
         self.prepare, self.update_refs, self.refs_root = prepare, update_refs, Path(refs)
         self.echo = echo
@@ -66,6 +73,13 @@ class Stand:
         self.stop()
 
     def start(self, session_timeout: float = 60.0, frame_timeout: float = 30.0):
+        try:
+            self._start(session_timeout, frame_timeout)
+        except BaseException:
+            self.stop()                     # вернуть анимации телефона, закрыть ffmpeg
+            raise
+
+    def _start(self, session_timeout: float, frame_timeout: float):
         self.out.mkdir(parents=True, exist_ok=True)
         self.alog = open(self.out / "actions.log", "a", encoding="utf-8")
         ffmpeg = V.find_ffmpeg()
@@ -75,6 +89,8 @@ class Stand:
             self._prepare()
         else:
             self._adb("reverse", "tcp:7240", "tcp:7240")
+        if not self.animations:
+            self._animations_off()
         self.hu = H.HeadUnit(H.Options(duration=float("inf"), out=self.out, size=self.size, hu=self.hu_profile,
                                        quiet=not self.echo))
         self.pipe = V.ViewPipeline(ffmpeg, 1.0, (100000, 100000), self.hu.log, DECODER_ARGS)
@@ -139,10 +155,38 @@ class Stand:
             self.worker.join(10)
         if self.pipe:
             self.pipe.close()
+        self._animations_restore()
         self._pull_phone_log()
         if self.alog:
             self.alog.close()
             self.alog = None
+
+    ANIM_KEYS = ("animator_duration_scale", "transition_animation_scale", "window_animation_scale")
+
+    def _animations_off(self):
+        """Compose и View берут длительность анимаций из animator_duration_scale: с 0 экран готов с первого кадра."""
+        for k in self.ANIM_KEYS:
+            old = self._adb("shell", "settings", "get", "global", k).strip()
+            try:
+                self._adb("shell", "settings", "put", "global", k, "0")
+            except StandError as e:
+                # Xiaomi: нужен пункт «Отладка по USB (настройки безопасности)», иначе WRITE_SECURE_SETTINGS нет
+                why = next((ln for ln in str(e).splitlines() if "denial" in ln), str(e).splitlines()[0])
+                self.act(f"animations stay on: {why.strip()[:160]}")
+                return
+            self._anim_saved[k] = old
+        self.act("animations off")
+
+    def _animations_restore(self):
+        for k, v in self._anim_saved.items():
+            try:
+                if v in ("", "null"):
+                    self._adb("shell", "settings", "delete", "global", k)
+                else:
+                    self._adb("shell", "settings", "put", "global", k, v)
+            except (StandError, OSError, subprocess.SubprocessError):
+                pass
+        self._anim_saved.clear()
 
     def _pull_phone_log(self):
         try:
@@ -166,7 +210,8 @@ class Stand:
             raise StandError(f"сессия ГУ закончилась (лог: {self.out / 'carlife_hu.log'})")
 
     def act(self, msg: str):
-        line = f"{time.strftime('%H:%M:%S')} {msg}"
+        t = time.time()
+        line = f"{time.strftime('%H:%M:%S', time.localtime(t))}.{int(t * 1000) % 1000:03d} {msg}"
         if self.alog:
             self.alog.write(line + "\n")
             self.alog.flush()
@@ -195,12 +240,37 @@ class Stand:
             raise StandError("кадров ещё нет")
         return got[1]
 
-    def settle(self, quiet: float = 0.8, timeout: float = 10.0) -> np.ndarray:
+    def settle(self, quiet: float | None = None, timeout: float = 10.0, change: float = 0.0,
+               before: np.ndarray | None = None) -> np.ndarray:
         """Дождаться, пока картинка не меняется quiet секунд (новых кадров нет или они такие же), и вернуть кадр.
-        Энкодер телефона на статичном экране может вообще не слать кадры - это тоже «успокоился»."""
-        end = time.monotonic() + timeout
-        seq, last = self._latest() or (0, None)
-        calm_since = time.monotonic()
+        Энкодер телефона на статичном экране может вообще не слать кадры - это тоже «успокоился».
+
+        change > 0 (после тапа): сначала до change секунд ждать кадр, отличный от before, - иначе тишина до прихода
+        отклика экрана (~0,1 с) сошла бы за «успокоился». Повторный settle без новых кадров возвращается сразу."""
+        quiet = self.quiet if quiet is None else quiet
+        start = time.monotonic()
+        end = start + timeout
+        got = self._latest()
+        if got is None:
+            last, seq = None, 0
+        else:
+            seq, last = got
+        if change > 0 and before is not None:
+            while last is None or C.same_frame(last, before):
+                self._alive()
+                if time.monotonic() - start >= change:
+                    break                   # тап экран не поменял: дальше обычная тишина
+                time.sleep(0.01)
+                got = self._latest(seq)
+                if got:
+                    seq, last = got
+            calm_since = time.monotonic()
+        elif self._calm is not None and last is not None and (
+                seq == self._calm[0] or C.same_frame(last, self._calm[1])):
+            self._calm = (seq, last)        # с прошлого settle экран не менялся
+            return last
+        else:
+            calm_since = start
         while True:
             self._alive()
             got = self._latest(seq)
@@ -210,13 +280,23 @@ class Stand:
                 if last is None or not C.same_frame(f, last):
                     last, calm_since = f, now
             if last is not None and now - calm_since >= quiet:
+                self._calm = (seq, last)
                 return last
             if now > end:
                 if last is None:
                     raise StandError("нет кадров")
                 self.act(f"settle: screen still moving after {timeout:g} s, taking the last frame")
+                self._calm = None
                 return last
-            time.sleep(0.04)
+            time.sleep(0.02)
+
+    def _after_input(self, before: np.ndarray | None):
+        self._calm = None
+        self.settle(change=self.change_wait, before=before)
+
+    def _before_input(self) -> np.ndarray | None:
+        got = self._latest()
+        return got[1] if got else None
 
     def shot(self, name: str, frame: np.ndarray | None = None) -> np.ndarray:
         """Сохранить кадр шагом отчёта: out/steps/NN-name.png."""
@@ -238,12 +318,12 @@ class Stand:
 
     def tap(self, x: int, y: int, hold: float = 0.06, settle: bool = True):
         self.act(f"tap {x},{y}")
+        before = self._before_input()
         self._touch(V.TOUCH_DOWN, x, y)
         time.sleep(hold)
         self._touch(V.TOUCH_UP, x, y)
         if settle:
-            time.sleep(0.15)
-            self.settle()
+            self._after_input(before)
 
     def long_press(self, x: int, y: int, hold: float = 1.0):
         self.act(f"long press {x},{y} {hold:g} s")
@@ -252,22 +332,22 @@ class Stand:
     def swipe(self, x1: int, y1: int, x2: int, y2: int, duration: float = 0.35, settle: bool = True):
         self.act(f"swipe {x1},{y1} -> {x2},{y2} {duration:g} s")
         steps = max(2, int(duration / V.MOVE_INTERVAL))
+        before = self._before_input()
         self._touch(V.TOUCH_DOWN, x1, y1)
         for i in range(1, steps + 1):
             time.sleep(duration / steps)
             self._touch(V.TOUCH_MOVE, round(x1 + (x2 - x1) * i / steps), round(y1 + (y2 - y1) * i / steps))
         self._touch(V.TOUCH_UP, x2, y2)
         if settle:
-            time.sleep(0.15)
-            self.settle()
+            self._after_input(before)
 
     def key(self, code: int, settle: bool = True):
         self._alive()
         self.act(f"hard key 0x{code:02X}")
+        before = self._before_input()
         self.hu.send_hard_key(code)
         if settle:
-            time.sleep(0.15)
-            self.settle()
+            self._after_input(before)
 
     def back(self):
         self.key(H.HARD_KEY_BACK)
@@ -300,7 +380,7 @@ class Stand:
         """Рамка фразы на экране; ждёт до timeout. index - какое по счёту вхождение (сверху вниз, слева направо)."""
         end = time.monotonic() + timeout
         while True:
-            f = self.settle(quiet=0.3)
+            f = self.settle()
             words = self.ocr.read(f, region)
             hits = find_in(words, text, partial)
             if len(hits) > index:
@@ -309,7 +389,7 @@ class Stand:
                 self.shot(f"no-text-{_slug(text)}", f)
                 seen = " | ".join(lines_text(words)) or "(пусто)"
                 raise StandError(f"нет текста {text!r} за {timeout:g} с. На экране: {seen}")
-            time.sleep(0.3)
+            time.sleep(0.1)
 
     def has_text(self, text: str, region: Rect | None = None, partial: bool = False) -> bool:
         return bool(find_in(self.words(None, region), text, partial))
@@ -323,7 +403,7 @@ class Stand:
             if time.monotonic() > end:
                 self.shot(f"still-text-{_slug(text)}")
                 raise StandError(f"текст {text!r} не пропал за {timeout:g} с")
-            time.sleep(0.3)
+            time.sleep(0.1)
 
     def tap_text(self, text: str, timeout: float = 8.0, region: Rect | None = None, partial: bool = False,
                  index: int = 0, dx: int = 0, dy: int = 0):
@@ -370,7 +450,7 @@ class Stand:
                 why = "размер кадра другой" if not d.same_size else f"отличается {d.ratio:.2%} пикселей (порог {max_ratio:.2%})"
                 self.act(f"check {name}: FAIL {why}")
                 raise StandError(f"экран не совпал с эталоном {name}: {why}; см. {fail}")
-            time.sleep(0.3)
+            time.sleep(0.1)
 
     def find_image(self, name: str, threshold: float = 0.9, timeout: float = 8.0,
                    region: Rect | None = None) -> Rect:
@@ -378,14 +458,14 @@ class Stand:
         tpl = C.load(self.refs_dir / "icons" / f"{name}.png")
         end = time.monotonic() + timeout
         while True:
-            f = self.settle(quiet=0.3)
+            f = self.settle()
             hit = C.find_image(f, tpl, threshold, region)
             if hit:
                 return hit[0]
             if time.monotonic() > end:
                 self.shot(f"no-icon-{name}", f)
                 raise StandError(f"нет иконки {name!r} за {timeout:g} с")
-            time.sleep(0.3)
+            time.sleep(0.1)
 
     def tap_image(self, name: str, threshold: float = 0.9, timeout: float = 8.0, region: Rect | None = None):
         x, y, w, h = self.find_image(name, threshold, timeout, region)
