@@ -206,11 +206,16 @@ object CarTrip {
     }
 }
 
-/** Касание окна навигатора -> onClick / onScroll приложения: протяжка начинается после [SLOP] px. */
-class CarTouch {
+/**
+ * Касание окна навигатора -> onClick / onScroll / onScale приложения (h1216). Протяжка начинается после [SLOP] px;
+ * два пальца - щипок: onScale с отношением расстояния между пальцами к прошлому событию (как ScaleGestureDetector);
+ * двойной тап - приближение в [DOUBLE_TAP_ZOOM] раза в точке тапа. После щипка тап не засчитывается.
+ */
+class CarTouch(private val now: () -> Long = System::currentTimeMillis) {
     sealed interface Out
     data class Click(val x: Float, val y: Float) : Out
     data class Scroll(val dx: Float, val dy: Float) : Out
+    data class Scale(val x: Float, val y: Float, val factor: Float) : Out
 
     private var downX = 0f
     private var downY = 0f
@@ -218,18 +223,83 @@ class CarTouch {
     private var lastY = 0f
     private var dragging = false
     private var down = false
+    /** В жесте были два пальца: тапа уже не будет. */
+    private var pinched = false
+    /** Расстояние между пальцами на прошлом событии щипка; 0 - ещё не задано (пальцы слишком близко). */
+    private var span = 0f
+    private var lastTapAt = 0L
+    private var lastTapX = 0f
+    private var lastTapY = 0f
 
-    /** action как у MotionEvent: 0 DOWN, 1 UP, 2 MOVE, 3 CANCEL; второй палец и прочее - мимо. */
-    fun feed(action: Int, x: Float, y: Float): Out? = when (action) {
-        0 -> { downX = x; downY = y; lastX = x; lastY = y; dragging = false; down = true; null }
-        2 -> if (!down) null else {
-            if (!dragging && (kotlin.math.abs(x - downX) > SLOP || kotlin.math.abs(y - downY) > SLOP)) dragging = true
-            if (dragging) Scroll(lastX - x, lastY - y).also { lastX = x; lastY = y } else null
+    /** Один палец (action как у MotionEvent: 0 DOWN, 1 UP, 2 MOVE, 3 CANCEL). */
+    fun feed(action: Int, x: Float, y: Float): Out? = feed(action, 0, floatArrayOf(x), floatArrayOf(y))
+
+    /** action как у MotionEvent (0/1/2/3, 5 POINTER_DOWN, 6 POINTER_UP), [index] - палец 5/6, координаты всех пальцев. */
+    fun feed(action: Int, index: Int, xs: FloatArray, ys: FloatArray): Out? {
+        if (xs.isEmpty() || xs.size != ys.size) return null
+        return when (action) {
+            0 -> { anchor(xs[0], ys[0]); down = true; pinched = false; span = 0f; null }
+            5 -> { if (down) { pinched = true; dragging = false; span = spanOf(xs, ys) }; null }
+            2 -> when {
+                !down -> null
+                xs.size >= 2 -> { pinched = true; dragging = false; scale(xs, ys) }
+                else -> one(xs[0], ys[0])
+            }
+            6 -> {
+                if (down) {
+                    // палец, который остался: следующий MOVE не должен дёрнуть карту
+                    val keep = if (xs.size >= 2 && index == 0) 1 else 0
+                    anchor(xs[keep], ys[keep]); span = 0f
+                }
+                null
+            }
+            1 -> {
+                val tap = down && !dragging && !pinched
+                down = false; dragging = false
+                if (tap) tap(xs[0], ys[0]) else null
+            }
+            3 -> { down = false; dragging = false; pinched = false; span = 0f; null }
+            else -> null
         }
-        1 -> if (down && !dragging) { down = false; Click(x, y) } else { down = false; null }
-        3 -> { down = false; dragging = false; null }
-        else -> null
     }
 
-    companion object { const val SLOP = 12f }
+    private fun anchor(x: Float, y: Float) { downX = x; downY = y; lastX = x; lastY = y; dragging = false }
+
+    private fun one(x: Float, y: Float): Out? {
+        if (!dragging && (kotlin.math.abs(x - downX) > SLOP || kotlin.math.abs(y - downY) > SLOP)) dragging = true
+        return if (dragging) Scroll(lastX - x, lastY - y).also { lastX = x; lastY = y } else null
+    }
+
+    private fun scale(xs: FloatArray, ys: FloatArray): Out? {
+        val s = spanOf(xs, ys)
+        val prev = span
+        span = s
+        if (s <= 0f || prev <= 0f || s == prev) return null
+        return Scale((xs[0] + xs[1]) / 2, (ys[0] + ys[1]) / 2, s / prev)
+    }
+
+    /** Расстояние между первыми двумя пальцами; ближе [MIN_SPAN] (ГУ кладёт второй палец в точку первого) - 0. */
+    private fun spanOf(xs: FloatArray, ys: FloatArray): Float {
+        if (xs.size < 2) return 0f
+        val s = kotlin.math.hypot(xs[1] - xs[0], ys[1] - ys[0])
+        return if (s >= MIN_SPAN) s else 0f
+    }
+
+    private fun tap(x: Float, y: Float): Out {
+        val t = now()
+        val double = lastTapAt > 0 && t - lastTapAt in 0..DOUBLE_TAP_MS &&
+            kotlin.math.abs(x - lastTapX) <= DOUBLE_TAP_SLOP && kotlin.math.abs(y - lastTapY) <= DOUBLE_TAP_SLOP
+        if (double) { lastTapAt = 0; return Scale(x, y, DOUBLE_TAP_ZOOM) }
+        lastTapAt = t; lastTapX = x; lastTapY = y
+        return Click(x, y)
+    }
+
+    companion object {
+        const val SLOP = 12f
+        const val MIN_SPAN = 20f
+        const val DOUBLE_TAP_MS = 300L
+        const val DOUBLE_TAP_SLOP = 60f
+        /** Двойной тап отдаём обычным onScale ×2: так его понимает любое приложение, без договорённостей о -1. */
+        const val DOUBLE_TAP_ZOOM = 2f
+    }
 }

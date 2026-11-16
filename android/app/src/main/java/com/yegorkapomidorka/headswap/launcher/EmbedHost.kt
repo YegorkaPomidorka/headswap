@@ -307,8 +307,15 @@ internal object EmbedHost {
             val w = projW
             val h = projH
             if (w > 0 && h > 0 && slot.interactive) {
-                val (x, y) = com.yegorkapomidorka.headswap.carapp.CarAreas.touch(ev.x, ev.y, viewW, viewH, w, h, navCrop)
-                CarAppHost.touch(action, x, y)
+                // все пальцы: щипок карты навигатора (h1216)
+                val crop = navCrop
+                val xs = FloatArray(count)
+                val ys = FloatArray(count)
+                for (i in 0 until count) {
+                    val (x, y) = com.yegorkapomidorka.headswap.carapp.CarAreas.touch(ev.getX(i), ev.getY(i), viewW, viewH, w, h, crop)
+                    xs[i] = x; ys[i] = y
+                }
+                CarAppHost.touch(action, if (action == 5 || action == 6) ev.actionIndex else 0, xs, ys)
             }
             return
         }
