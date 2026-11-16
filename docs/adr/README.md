@@ -63,3 +63,4 @@
 | 0033 | [На Android 17 экран рабочего стола держит shell-хост VirtualDevice; требуется отладка по USB](0033-android17-vdm-shell-host.md) | принято |
 | 0037 | [Шайба ГУ во встроенное окно на всю область идёт стрелками DPAD](0037-knob-into-windowed-apps.md) | принято |
 | 0039 | [Потолок desktop-битрейта берётся из режима видео, own IDR не отправляется при забитой очереди](0039-desktop-bitrate-and-own-idr.md) | принято |
+| 0041 | [В китайском интерфейсе навигаторы только Amap и Amap Auto](0041-amap-chinese-navigators.md) | принято |

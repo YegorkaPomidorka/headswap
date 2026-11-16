@@ -111,8 +111,8 @@ object NotificationsLogic {
     fun upsert(list: List<NotifEntry>, item: NotifEntry): List<NotifEntry> =
         sorted(list.filter { it.key != item.key } + item).take(MAX_ITEMS)
 
-    fun time(ms: Long, zone: ZoneId = ZoneId.systemDefault()): String =
-        DateTimeFormatter.ofPattern("HH:mm", Locale.ROOT).format(Instant.ofEpochMilli(ms).atZone(zone))
+    fun time(ms: Long, zone: ZoneId = ZoneId.systemDefault(), twelveHour: Boolean = false): String =
+        ClockFormat.format(Instant.ofEpochMilli(ms).atZone(zone), twelveHour)
 }
 
 /** Размеры язычка и шторки. Макет нарисован на 1280x720 (T 96); остальное пропорционально T. */

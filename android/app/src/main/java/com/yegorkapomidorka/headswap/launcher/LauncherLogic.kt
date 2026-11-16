@@ -115,12 +115,27 @@ object NavigatorPick {
     const val GOOGLE_MAPS = "com.google.android.apps.maps"
     const val DGIS = "ru.dublgis.dgismobile"
     const val WAZE = "com.waze"
+    /** Amap (高德地图), телефонный; идея из форка TNTfish/headswap. */
+    const val AMAP = "com.autonavi.minimap"
+    /** Amap Auto (高德地图车机版), версия для ГУ; ставится на телефон отдельно от [AMAP]. */
+    const val AMAP_AUTO = "com.autonavi.amapauto"
     val KNOWN = listOf(YANDEX_NAVI, YANDEX_MAPS, DGIS,
         GOOGLE_MAPS, WAZE, "app.organicmaps")
-    /** Арабский интерфейс (h1003): только Google Карты и Waze, Яндекса и 2ГИС нет ни в выборе, ни по умолчанию. */
+    /** Арабский и французский интерфейс (h1003): только Google Карты и Waze, Яндекса и 2ГИС нет ни в выборе, ни по умолчанию. */
     val KNOWN_AR = listOf(GOOGLE_MAPS, WAZE)
+    /** Китайский интерфейс: только Amap и Amap Auto, Google и Waze в Китае не работают (Егор 16.11). */
+    val KNOWN_ZH = listOf(AMAP, AMAP_AUTO)
 
-    fun known(arabic: Boolean): List<String> = if (arabic) KNOWN_AR else KNOWN
+    /** Плитки раздела «Навигатор» в порядке показа, по две в ряд; больше четырёх не влезает в пять рядов настроек. */
+    val TILES = listOf(YANDEX_NAVI, DGIS, YANDEX_MAPS, GOOGLE_MAPS)
+
+    /** [chinese] - китайский интерфейс, он же глобальный ([arabic] тогда тоже true, но решает [chinese]). */
+    fun known(arabic: Boolean, chinese: Boolean = false): List<String> = when {
+        chinese -> KNOWN_ZH
+        arabic -> KNOWN_AR
+        else -> KNOWN
+    }
+    fun tiles(arabic: Boolean, chinese: Boolean = false): List<String> = if (arabic || chinese) known(arabic, chinese) else TILES
 
     /** Машинная часть только с подпиской Яндекс Плюс (у Карт тот же NavigationCarAppService, что у Навигатора). */
     fun needsPlus(pkg: String?): Boolean = pkg == YANDEX_NAVI || pkg == YANDEX_MAPS
@@ -136,8 +151,9 @@ object NavigatorPick {
      * Подсказок на приборке нет совсем - только окно (h1003, стенд 09.11). Waze: свой хост Car App не пускает (HostValidator
      * со списком подписей gearhead, TEMPLATE_RENDERER засчитывает лишь на AAOS), а при теневой AA телефонный Waze уходит
      * в режим «на экране машины» - список манёвров без карты, и манёвров в AA не шлёт (навигатор AA - Google Карты).
+     * Amap и Amap Auto: машинной части Car App у них нет, без тумблера наш хост Car App их и не пробует.
      */
-    fun noHints(pkg: String?): Boolean = pkg == WAZE
+    fun noHints(pkg: String?): Boolean = pkg == WAZE || pkg == AMAP || pkg == AMAP_AUTO
 
     /**
      * Теневая AA нужна только Google Картам с включёнными подсказками: свой хост Car App они не пускают, а манёвры AA
@@ -147,11 +163,15 @@ object NavigatorPick {
     fun shadowWanted(metaNavi: Boolean, navPkg: String?, hints: (String) -> Boolean): Boolean =
         metaNavi && navPkg == GOOGLE_MAPS && hints(navPkg)
 
-    fun defaultFor(installed: Set<String>, arabic: Boolean = false): String? = known(arabic).firstOrNull { it in installed }
+    fun defaultFor(installed: Set<String>, arabic: Boolean = false, chinese: Boolean = false): String? =
+        known(arabic, chinese).firstOrNull { it in installed }
 
-    /** Сохранённый, пока он установлен (в арабском - только из [KNOWN_AR]); иначе по умолчанию. null - выбрать нечего. */
-    fun effective(saved: String?, installed: Set<String>, arabic: Boolean = false): String? =
-        saved?.takeIf { it in installed && (!arabic || it in KNOWN_AR) } ?: defaultFor(installed, arabic)
+    /**
+     * Сохранённый, пока он установлен (в арабском - только из [KNOWN_AR], в китайском - из [KNOWN_ZH]); иначе по умолчанию.
+     * null - выбрать нечего.
+     */
+    fun effective(saved: String?, installed: Set<String>, arabic: Boolean = false, chinese: Boolean = false): String? =
+        saved?.takeIf { it in installed && (!(arabic || chinese) || it in known(arabic, chinese)) } ?: defaultFor(installed, arabic, chinese)
 }
 
 /** Ответы taskState дочернего дисплея и решения по ним (EmbedHost): что делать после Back и при повторном показе. */

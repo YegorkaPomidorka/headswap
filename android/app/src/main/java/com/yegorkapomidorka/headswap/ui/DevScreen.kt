@@ -98,6 +98,7 @@ class DevScreen(host: MainActivity) : Screen(host) {
         body.addView(
             group(listOf(
                 row(c.getString(R.string.dev_meta_music_title), c.getString(R.string.dev_meta_music_sub), aa.metaMusic) { aa.metaMusic = it },
+                row(c.getString(R.string.dev_meta_art16k_title), c.getString(R.string.dev_meta_art16k_sub), aa.metaArt16k) { aa.metaArt16k = it },
                 row(c.getString(R.string.dev_meta_navi_title), c.getString(R.string.dev_meta_navi_sub), aa.metaNavi) { aa.metaNavi = it },
                 row(c.getString(R.string.dev_meta_icon_title), c.getString(R.string.dev_meta_icon_sub), aa.naviIcon) { aa.naviIcon = it },
                 row(c.getString(R.string.dev_meta_time_title), c.getString(R.string.dev_meta_time_sub), aa.naviTime) { aa.naviTime = it },

@@ -8,7 +8,6 @@ import com.yegorkapomidorka.headswap.aa.CarlifeAudio
 import com.yegorkapomidorka.headswap.aa.AaTranscoder
 import com.yegorkapomidorka.headswap.aa.BitratePolicy
 import com.yegorkapomidorka.headswap.aa.BitrateProfile
-import com.yegorkapomidorka.headswap.aa.DesktopTranscodeTranscoder
 import com.yegorkapomidorka.headswap.aa.DesktopVideoQuality
 import com.yegorkapomidorka.headswap.aa.DupDownFilter
 import com.yegorkapomidorka.headswap.aa.DesktopVideoSelection
@@ -49,6 +48,8 @@ class SessionConfig(
     val fpsSetting: FpsSetting = FpsSetting.DEFAULT,
     /** Трек, обложка и прогресс из AA (MEDIA_INFO / MEDIA_PROGRESS_BAR). */
     val metaMusic: Boolean = true,
+    /** Обложка в MEDIA_INFO не больше [MetaImages.MAX_BYTES_16K] (приборки, которые не берут ~25 КБ). */
+    val metaArt16k: Boolean = false,
     /** Подсказки поворотов из AA (NAVI_NEXT_TURN_INFO по подписке ГУ moduleID=0). */
     val metaNavi: Boolean = true,
     /** Поле 6 NAVI_NEXT_TURN_INFO: иконка и/или time. */
@@ -1098,7 +1099,7 @@ class CarLifeSession(
                 else -> {
                     val t = SystemClock.elapsedRealtime()
                     // Mazda 20622111 (h359): пакет > ~16 КиБ вешает USB, обложка 24 КБ убила сессию через 3 с после картинки
-                    val limit = if (bridge.huMazda20622111) AaBridgeCore.MAZDA_20622111_ART_BYTES else MetaImages.MAX_BYTES
+                    val limit = MetaImages.artLimit(cfg.metaArt16k, bridge.huMazda20622111)
                     val j = MetaImages.albumJpeg(art, limit) ?: ByteArray(0)
                     AppLog.i("метаданные: обложка ${PbText.blob(art)} -> ${PbText.blob(j)} за ${SystemClock.elapsedRealtime() - t} мс", ui = false)
                     lastArtSrc = art
@@ -1169,21 +1170,7 @@ class CarLifeSession(
                 "profile=${bitratePolicy.profile.name} adaptive=true", false)
         }
         val fps = thermalThrottle.capFps(if (mobis) AaBridgeCore.MOBIS_FPS else targetFps)
-        val transcode = if (directSurface && bridge.desktopTranscode) {
-            try {
-                DesktopTranscodeTranscoder(
-                    mode.outW, mode.outH, fps, actualBps, out, { AppLog.i(it, false) },
-                    capabilityFps = if (mobis) AaBridgeCore.MOBIS_FPS else targetFps,
-                    baidu = mobis,
-                    limitedRange = bridge.videoLimitedRange,
-                    pacer30 = bridge.crvDesktopPacing,
-                ).also { it.start() }
-            } catch (e: Exception) {
-                AppLog.e("BRIDGE desktop transcode не создан, fallback на прямое кодирование", e)
-                null
-            }
-        } else null
-        transcode ?: AaTranscoder(
+        AaTranscoder(
             mode.outW, mode.outH, fps, actualBps, out, { AppLog.i(it, false) },
             srcWidth = if (directSurface) mode.outW else mode.aaW,
             srcHeight = if (directSurface) mode.outH else mode.aaH,

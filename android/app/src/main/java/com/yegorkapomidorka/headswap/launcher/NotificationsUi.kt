@@ -110,7 +110,7 @@ fun NotificationsOverlay() {
     val spec = if (nt >= bs.t) bs else {
         val q = nt.toFloat() / bs.t
         fun sc(v: Int) = max(1, Math.round(v * q))
-        LauncherSpec(bs.w, bs.h, nt, sc(bs.g), sc(bs.m), sc(bs.f1), sc(bs.f2), sc(bs.f3), bs.railSize)
+        LauncherSpec(bs.w, bs.h, nt, sc(bs.g), sc(bs.m), sc(bs.f1), sc(bs.f2), sc(bs.f3), bs.railSize, bs.twelveHour)
     }
     val density = LocalDensity.current
     val metrics = remember(spec, density) { if (spec === bs) base else LauncherMetrics(spec, density) }
@@ -407,7 +407,7 @@ private fun NotifRow(item: NotifItem, expanded: Boolean) {
                         Txt(e.who, s.f2, color = Pal.TEXT, weight = FontWeight.Bold)
                         Txt(e.text, s.f2, color = Pal.SEC2, maxLines = if (expanded) 40 else 2)
                     }
-                    Txt(NotificationsLogic.time(e.postTime), max(14, Math.round(s.f2 * 0.8f)), color = Pal.SEC2, weight = FontWeight.SemiBold, mono = true)
+                    Txt(NotificationsLogic.time(e.postTime, twelveHour = LauncherModel.clock12h), max(14, Math.round(s.f2 * 0.8f)), color = Pal.SEC2, weight = FontWeight.SemiBold, mono = true)
                 }
             }
             val dismiss = stringResource(R.string.l_notif_dismiss)

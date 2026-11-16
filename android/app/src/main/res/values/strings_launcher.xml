@@ -138,6 +138,7 @@
     <string name="l_s_rail_cut">Compact</string>
     <string name="l_s_anim">Button animations</string>
     <string name="l_s_battery">Phone battery</string>
+    <string name="l_s_clock12">12-hour clock</string>
     <string name="l_s_map_scale">Map scale</string>
     <string name="l_s_map_scale_sub">Only for %1$s · applies immediately</string>
     <string name="l_s_scale_smaller">Smaller</string>
@@ -168,6 +169,8 @@
     <string name="l_nav_2gis">2GIS</string>
     <string name="l_nav_yandex_maps">Yandex Maps</string>
     <string name="l_nav_google_maps">Google Maps</string>
+    <string name="l_nav_amap">Amap</string>
+    <string name="l_nav_amap_auto">Amap Auto</string>
     <string name="l_nav_waze" translatable="false">Waze</string>
     <!-- навигатор на своём хосте Car App -->
     <string name="l_u_m">m</string>

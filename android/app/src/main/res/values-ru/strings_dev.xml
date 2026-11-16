@@ -16,6 +16,8 @@
     <string name="dev_meta_time_sub">int32 time до манёвра, с (как apollo-DuerOS)</string>
     <string name="dev_meta_progress_title">Прогресс в секундах</string>
     <string name="dev_meta_progress_sub">MEDIA_PROGRESS_BAR в с вместо мс (если на ГУ в 1000 раз больше)</string>
+    <string name="dev_meta_art16k_title">Обложка трека не больше 16 КБ</string>
+    <string name="dev_meta_art16k_sub">Для приборок, которые не показывают обложку (например Honda CR-V 2026, SEMIDRIVE X9). Качество на ГУ ниже</string>
 
     <string name="dev_section_music_chunk">Размер пакета музыки (эксперимент)</string>
     <string name="dev_music_chunk_note">Мельче — меньше буфер на ГУ, но больше пакетов по USB. Если звук заикается, верните «Как отдаёт Android Auto»</string>

@@ -58,6 +58,8 @@ internal object LauncherModel {
     var animations by mutableStateOf(true)
     /** Заряд телефона в строке статуса ([LauncherPrefs.showBattery]). */
     var showBattery by mutableStateOf(true)
+    /** Часы в 12-часовом формате ([LauncherPrefs.clock12h]). */
+    var clock12h by mutableStateOf(false)
     var autoplay by mutableStateOf(true)
     /** «Уведомления» телефона на экране ГУ (слушатель - [NotificationsRepo]). */
     var notifications by mutableStateOf(true)
@@ -187,6 +189,7 @@ internal object LauncherModel {
         mapLeft = prefs.mapLeft
         animations = prefs.animations
         showBattery = prefs.showBattery
+        clock12h = prefs.clock12h
         autoplay = prefs.autoplay
         notifications = prefs.notifications
         NotificationsRepo.setEnabled(notifications)
@@ -271,6 +274,7 @@ internal object LauncherModel {
     fun chooseMapLeft(left: Boolean) { mapLeft = left; prefs.mapLeft = left }
     fun chooseAnimations(on: Boolean) { animations = on; prefs.animations = on }
     fun chooseShowBattery(on: Boolean) { showBattery = on; prefs.showBattery = on }
+    fun chooseClock12h(on: Boolean) { clock12h = on; prefs.clock12h = on }
     fun chooseAutoplay(on: Boolean) { autoplay = on; prefs.autoplay = on }
     /** Из «Для разработчиков» на телефоне: лаунчер мог ещё не стартовать, поэтому префы — своим экземпляром. */
     fun chooseHideStatusBar(ctx: Context, on: Boolean) { hideStatusBar = on; LauncherPrefs(ctx.applicationContext).hideStatusBar = on }
@@ -358,9 +362,11 @@ internal object LauncherModel {
     val installedPackages: Set<String> get() = catalog.mapTo(HashSet()) { it.packageName }
     /** Интерфейс на арабском или французском (h1003): навигаторы - Google Карты и Waze, без Я.Музыки. */
     val arabic: Boolean get() = com.yegorkapomidorka.headswap.AppLocale.usesGlobalApps(appCtx)
+    /** Китайский интерфейс: навигаторы только Amap (он же [arabic] - глобальный по остальным сервисам). */
+    val chinese: Boolean get() = com.yegorkapomidorka.headswap.AppLocale.usesChineseApps(appCtx)
     val onlinePlayers: List<String> get() = PlayerChip.online(arabic)
-    val navigatorPkg: String? get() = NavigatorPick.effective(savedNavigator, installedPackages, arabic)
-    val installedNavigators: List<String> get() = NavigatorPick.known(arabic).filter { it in installedPackages }
+    val navigatorPkg: String? get() = NavigatorPick.effective(savedNavigator, installedPackages, arabic, chinese)
+    val installedNavigators: List<String> get() = NavigatorPick.known(arabic, chinese).filter { it in installedPackages }
 
     /** Предыдущий экран лаунчера для «Назад»; после самого «Назад» пуст, чтобы не ходить по кругу. */
     var previous: Area? = null

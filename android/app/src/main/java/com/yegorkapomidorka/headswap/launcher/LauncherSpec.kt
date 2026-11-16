@@ -15,6 +15,8 @@ class LauncherSpec(
     val w: Int, val h: Int, val t: Int, val g: Int, val m: Int, val f1: Int, val f2: Int, val f3: Int,
     /** Выбранный размер боковой панели (настройка «Боковая панель»); эффективный - [rs]. */
     val railSize: RailSize = RailSize.NORMAL,
+    /** Часы 12 ч ([LauncherPrefs.clock12h]): в «Средней» рейке добавляют AM/PM и меняют высоту блока часов. */
+    val twelveHour: Boolean = false,
 ) {
     val wide = w >= 1500
     /** Узкая лента вроде 1280x480: нижнего ряда нет, приложения сеткой справа. */
@@ -58,9 +60,26 @@ class LauncherSpec(
     val sepW = r(clockHr * 0.5)
     val sepH = max(3, b4)
     val clockGap = max(4, g4)
+    /** «Средняя» при 12 ч: на месте чёрточки «—PM—» (Егор 16.11). */
+    val clockAmPm = clockStacked && twelveHour
+    val amPmFs = r(clockHr * 0.45)
+    /** Чёрточки по бокам AM/PM короче обычной: строка «—PM—» должна влезть в ширину рейки. */
+    val amPmSepW = max(4, r(sepW * 0.6))
+    /** «—PM—» одной строкой, если влезает (моноширинные 2 знака ~1,2 кегля); иначе столбиком: чёрточка, PM, чёрточка. */
+    val amPmInline = 2 * amPmSepW + 2 * clockGap + r(amPmFs * 1.25) <= rail - 2 * g4
+    /** «Обычная» при 12 ч: под временем плашка AM/PM с золотой обводкой (вариант E, Егор 16.11). */
+    val clockRailAmPm = clockInRail && twelveHour
+    val railAmPmFs = r(f1 * 0.4)
+    val amPmPillPadV = max(2, r(railAmPmFs * 0.15))
+    val amPmPillPadH = max(4, r(railAmPmFs * 0.6))
+    val amPmPillBorder = max(1, r(f1 * 0.04))
+    val amPmPillH = railAmPmFs + 2 * amPmPillPadV + 2 * amPmPillBorder
     /** Высота блока часов в рейке. */
     val clockH = when {
+        clockRailAmPm -> f1 + clockGap + amPmPillH
         clockInRail -> f1
+        clockAmPm && amPmInline -> 2 * clockHr + max(sepH, amPmFs) + 2 * clockGap
+        clockAmPm -> 2 * clockHr + amPmFs + 2 * sepH + 4 * clockGap
         clockStacked -> 2 * clockHr + sepH + 2 * clockGap
         else -> 0
     }
@@ -131,9 +150,10 @@ class LauncherSpec(
     private fun r(v: Double) = v.roundToInt()
 
     override fun equals(other: Any?) = other is LauncherSpec && w == other.w && h == other.h && t == other.t &&
-        g == other.g && m == other.m && f1 == other.f1 && f2 == other.f2 && f3 == other.f3 && railSize == other.railSize
-    override fun hashCode() = listOf(w, h, t, g, m, f1, f2, f3, railSize).hashCode()
-    override fun toString() = "LauncherSpec(${w}x$h T=$t rail=$railSize)"
+        g == other.g && m == other.m && f1 == other.f1 && f2 == other.f2 && f3 == other.f3 && railSize == other.railSize &&
+        twelveHour == other.twelveHour
+    override fun hashCode() = listOf(w, h, t, g, m, f1, f2, f3, railSize, twelveHour).hashCode()
+    override fun toString() = "LauncherSpec(${w}x$h T=$t rail=$railSize${if (twelveHour) " 12h" else ""})"
 }
 
 object LauncherSpecs {
@@ -161,22 +181,23 @@ object LauncherSpecs {
     )
 
     /** Точная строка таблицы либо ближайшая по высоте и пропорции, масштабированная линейно. */
-    fun forSize(width: Int, height: Int, railSize: RailSize = RailSize.NORMAL): LauncherSpec {
+    fun forSize(width: Int, height: Int, railSize: RailSize = RailSize.NORMAL, twelveHour: Boolean = false): LauncherSpec {
         val w = max(1, width)
         val h = max(1, height)
         val table = if (h > w) PORTRAIT_TABLE else TABLE
-        table.firstOrNull { it[0] == w && it[1] == h }?.let { return of(it, 1.0, railSize = railSize) }
+        table.firstOrNull { it[0] == w && it[1] == h }?.let { return of(it, 1.0, railSize = railSize, twelveHour = twelveHour) }
         val aspect = w.toDouble() / h
         val near = table.minBy { row ->
             abs(ln(h.toDouble() / row[1])) + abs(ln(aspect / (row[0].toDouble() / row[1])))
         }
         // линейно по меньшему из отношений, чтобы раскладка гарантированно влезала
         val k = min(w.toDouble() / near[0], h.toDouble() / near[1])
-        return of(near, k, w, h, railSize)
+        return of(near, k, w, h, railSize, twelveHour)
     }
 
-    private fun of(row: IntArray, k: Double, w: Int = row[0], h: Int = row[1], railSize: RailSize = RailSize.NORMAL): LauncherSpec {
+    private fun of(row: IntArray, k: Double, w: Int = row[0], h: Int = row[1], railSize: RailSize = RailSize.NORMAL,
+                   twelveHour: Boolean = false): LauncherSpec {
         fun s(i: Int) = if (k == 1.0) row[i] else max(1, (row[i] * k).roundToInt())
-        return LauncherSpec(w, h, s(2), s(3), s(4), s(5), s(6), s(7), railSize)
+        return LauncherSpec(w, h, s(2), s(3), s(4), s(5), s(6), s(7), railSize, twelveHour)
     }
 }

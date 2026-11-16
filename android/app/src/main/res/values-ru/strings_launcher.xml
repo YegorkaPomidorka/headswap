@@ -138,6 +138,7 @@
     <string name="l_s_rail_cut">Обрезанная</string>
     <string name="l_s_anim">Анимации кнопок</string>
     <string name="l_s_battery">Заряд телефона</string>
+    <string name="l_s_clock12">12-часовой формат времени</string>
     <string name="l_s_map_scale">Масштаб карты</string>
     <string name="l_s_map_scale_sub">Только для %1$s · меняется сразу</string>
     <string name="l_s_scale_smaller">Мельче</string>
@@ -168,6 +169,8 @@
     <string name="l_nav_2gis">2ГИС</string>
     <string name="l_nav_yandex_maps">Яндекс Карты</string>
     <string name="l_nav_google_maps">Google Карты</string>
+    <string name="l_nav_amap">Amap</string>
+    <string name="l_nav_amap_auto">Amap Auto</string>
     <!-- навигатор на своём хосте Car App -->
     <string name="l_u_m">м</string>
     <string name="l_u_km">км</string>
