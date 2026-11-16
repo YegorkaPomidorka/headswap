@@ -6,6 +6,30 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class LauncherSpecTest {
+    /** Спека с 12 ч не равна спеке с 24 ч: иначе remember в LauncherRoot не перестраивает рейку и «—AM—» залипает. */
+    @Test fun twelveHourChangesSpecEquality() {
+        val a = LauncherSpecs.forSize(1280, 720, RailSize.MEDIUM, twelveHour = false)
+        val b = LauncherSpecs.forSize(1280, 720, RailSize.MEDIUM, twelveHour = true)
+        assertFalse(a == b)
+        assertFalse(a.clockAmPm)
+        assertTrue(b.clockAmPm)
+        assertTrue(b.amPmInline)
+    }
+
+    @Test fun normalRailTwelveHourReservesAmPmLine() {
+        val a = LauncherSpecs.forSize(1280, 720, RailSize.NORMAL, twelveHour = false)
+        val b = LauncherSpecs.forSize(1280, 720, RailSize.NORMAL, twelveHour = true)
+        assertTrue(b.clockRailAmPm)
+        assertEquals(a.clockH + b.clockGap + b.amPmPillH, b.clockH)
+    }
+
+    /** «—PM—» одной строкой влезает в «Среднюю» рейку на всех экранах таблицы. */
+    @Test fun amPmInlineFitsOnAllLandscapeSizes() {
+        for (row in LauncherSpecs.TABLE) {
+            val s = LauncherSpecs.forSize(row[0], row[1], RailSize.MEDIUM, twelveHour = true)
+            assertTrue("${row[0]}x${row[1]}", !s.clockAmPm || s.amPmInline)
+        }
+    }
     @Test fun tableRowsComeBackExactly() {
         for (row in LauncherSpecs.TABLE) {
             val s = LauncherSpecs.forSize(row[0], row[1])

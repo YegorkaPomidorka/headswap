@@ -120,6 +120,7 @@
     <string name="l_s_rail_cut">مضغوط</string>
     <string name="l_s_anim">حركات الأزرار</string>
     <string name="l_s_battery">بطارية الهاتف</string>
+    <string name="l_s_clock12">نظام 12 ساعة</string>
     <string name="l_s_map_scale">مقياس الخريطة</string>
     <string name="l_s_map_scale_sub">لـ %1$s فقط · يُطبَّق فورًا</string>
     <string name="l_s_scale_smaller">أصغر</string>

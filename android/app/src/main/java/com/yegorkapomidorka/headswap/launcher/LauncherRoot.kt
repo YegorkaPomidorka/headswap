@@ -1,6 +1,7 @@
 package com.yegorkapomidorka.headswap.launcher
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -62,7 +63,7 @@ fun LauncherRoot(connected: Boolean) {
     val localeDir = LocalLayoutDirection.current
     LaunchedEffect(Unit) {
         while (true) {
-            model.status = withContext(Dispatchers.Default) { StatusReader.read(model.context) }
+            model.status = withContext(Dispatchers.Default) { StatusReader.read(model.context, model.clock12h) }
             // режим фар от ГУ для темы «Авто»
             model.huTheme = CarLifeState.huTheme
             delay(1000)
@@ -92,7 +93,8 @@ fun LauncherRoot(connected: Boolean) {
         val w = constraints.maxWidth
         val h = constraints.maxHeight
         val railSize = model.railSize
-        val spec = remember(w, h, railSize) { LauncherSpecs.forSize(w, h, railSize) }
+        val twelveHour = model.clock12h
+        val spec = remember(w, h, railSize, twelveHour) { LauncherSpecs.forSize(w, h, railSize, twelveHour) }
         val metrics = remember(spec, density) { LauncherMetrics(spec, density) }
         // раскладка плашек в портрете своя ([LauncherModel.layout]): флаг ведёт модель, спека у каждого экрана своя
         SideEffect { model.portrait = spec.portrait }
@@ -199,7 +201,17 @@ private fun Rail() {
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.SpaceBetween,
         ) {
-            if (s.clockInRail) Txt(status.time, s.f1, color = Pal.RAIL, weight = FontWeight.SemiBold, mono = true)
+            if (s.clockInRail && !s.clockRailAmPm) Txt(status.time, s.f1, color = Pal.RAIL, weight = FontWeight.SemiBold, mono = true)
+            // 12 ч: «9:05», под ним плашка AM/PM с золотой обводкой
+            if (s.clockRailAmPm) Column(horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(m.dp(s.clockGap))) {
+                Txt(status.time, s.f1, color = Pal.RAIL, weight = FontWeight.SemiBold, mono = true)
+                Box(Modifier.height(m.dp(s.amPmPillH)).border(m.dp(s.amPmPillBorder), accent, RoundedCornerShape(m.dp(s.amPmPillH)))
+                    .padding(horizontal = m.dp(s.amPmPillPadH)), contentAlignment = Alignment.Center) {
+                    Txt(if (status.pm) "PM" else "AM", s.railAmPmFs, Modifier.wrapContentHeight(unbounded = true),
+                        color = accent, weight = FontWeight.Bold, mono = true)
+                }
+            }
             // «Средняя»: часы, золотая чёрточка и минуты столбиком; в «Маленькой» и «Обрезанной» часов нет
             if (s.clockStacked) {
                 val parts = status.time.split(":", limit = 2)
@@ -210,7 +222,26 @@ private fun Rail() {
                         Txt(parts[0], s.clockHr, Modifier.wrapContentHeight(unbounded = true), color = Pal.RAIL,
                             weight = FontWeight.SemiBold, mono = true)
                     }
-                    Box(Modifier.width(m.dp(s.sepW)).height(m.dp(s.sepH)).clip(RoundedCornerShape(m.dp(s.sepH))).background(accent))
+                    if (!s.clockAmPm) Box(Modifier.width(m.dp(s.sepW)).height(m.dp(s.sepH)).clip(RoundedCornerShape(m.dp(s.sepH))).background(accent))
+                    else {
+                        // 12 ч: «—PM—» на месте чёрточки; не влезает в ширину рейки - столбиком
+                        val dash = @Composable {
+                            Box(Modifier.width(m.dp(s.amPmSepW)).height(m.dp(s.sepH)).clip(RoundedCornerShape(m.dp(s.sepH))).background(accent))
+                        }
+                        val label = @Composable {
+                            Box(Modifier.height(m.dp(s.amPmFs)), contentAlignment = Alignment.Center) {
+                                Txt(if (status.pm) "PM" else "AM", s.amPmFs, Modifier.wrapContentHeight(unbounded = true),
+                                    color = accent, weight = FontWeight.Bold, mono = true)
+                            }
+                        }
+                        if (s.amPmInline) Ltr {
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(m.dp(s.clockGap))) {
+                                dash(); label(); dash()
+                            }
+                        } else Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(m.dp(s.clockGap))) {
+                            dash(); label(); dash()
+                        }
+                    }
                     Box(Modifier.height(m.dp(s.clockHr)), contentAlignment = Alignment.Center) {
                         Txt(parts.getOrElse(1) { "" }, s.clockHr, Modifier.wrapContentHeight(unbounded = true), color = Pal.SEC2,
                             weight = FontWeight.SemiBold, mono = true)
@@ -388,7 +419,13 @@ fun StatusBar(title: String? = null, showNet: Boolean = true) {
     ) {
         // в узкой рейке часов нет: время слева, прижато к краю (перед заголовком, если он есть)
         if (s.clockInStatus) {
-            Txt(st.time, s.statusFs, Modifier.busy { timeX = it }, color = Pal.TEXT, weight = FontWeight.SemiBold, mono = true)
+            // 12 ч: «9:17 PM», AM/PM тем же кеглем, золотом (вариант J, Егор 16.11)
+            if (s.twelveHour) Ltr {
+                Row(Modifier.busy { timeX = it }, horizontalArrangement = Arrangement.spacedBy(m.dp(maxOf(4, s.statusFs / 4)))) {
+                    Txt(st.time, s.statusFs, color = Pal.TEXT, weight = FontWeight.SemiBold, mono = true)
+                    Txt(if (st.pm) "PM" else "AM", s.statusFs, color = LocalAccent.current, weight = FontWeight.SemiBold, mono = true)
+                }
+            } else Txt(st.time, s.statusFs, Modifier.busy { timeX = it }, color = Pal.TEXT, weight = FontWeight.SemiBold, mono = true)
             if (title == null) Spacer(Modifier.weight(1f))
         }
         // заголовок экрана у начала (слева; в RTL справа), статус у конца; сам ряд значков всегда слева направо (создан внутри Ltr)
