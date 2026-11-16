@@ -28,9 +28,15 @@ class Word:
         return x + w // 2, y + h // 2
 
 
+# OCR путает одинаковые на вид кириллицу и латиницу («1280х720» с кириллической х): сравниваем по латинскому двойнику
+_HOMOGLYPHS = str.maketrans("асеорхукмтвн", "aceopxykmtbh")
+
+
 def norm(text: str) -> str:
-    """Для сравнения: регистр, ё/е, лишние пробелы. OCR путает регистр первой буквы («домой»)."""
-    return re.sub(r"\s+", " ", text.casefold().replace("ё", "е")).strip()
+    """Для сравнения: регистр, ё/е, двойники кириллица/латиница, лишние пробелы. OCR путает регистр первой буквы
+    («домой») и буквы-двойники."""
+    t = text.casefold().replace("ё", "е").translate(_HOMOGLYPHS)
+    return re.sub(r"\s+", " ", t).strip()
 
 
 def union(rects: list[Rect]) -> Rect:

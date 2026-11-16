@@ -96,6 +96,24 @@ class Stand:
             time.sleep(0.1)
         w, h = self.video_size
         self.act(f"first frame {w}x{h}")
+        self.wait_ready()
+
+    # Пока мост показывает заглушку («Запускаю рабочий стол…»), касания он не принимает: в логе телефона их нет вовсе
+    PLACEHOLDERS = ("Запускаю рабочий стол", "Ожидаю повторного подключения", "Запускаю")
+
+    def wait_ready(self, timeout: float = 30.0):
+        """Дождаться настоящего экрана вместо заглушки моста и дать ему успокоиться."""
+        end = time.monotonic() + timeout
+        while True:
+            f = self.settle(quiet=1.0)
+            words = self.ocr.read(f)
+            if not any(find_in(words, p, partial=True) for p in self.PLACEHOLDERS):
+                self.act("screen ready: " + " | ".join(lines_text(words))[:200])
+                return
+            if time.monotonic() > end:
+                self.shot("not-ready", f)
+                raise StandError(f"за {timeout:g} с мост не сменил заглушку на экран: {' | '.join(lines_text(words))}")
+            time.sleep(0.3)
 
     def _work(self):
         try:
@@ -328,7 +346,10 @@ class Stand:
         ref_path = self.refs_dir / f"{name}.png"
         if self.update_refs or not ref_path.exists():
             f = self.settle()
-            C.save(ref_path, f)
+            ref = f.copy()
+            for x, y, w, h in masks:        # маски при сравнении не смотрятся; закрашиваем, чтобы личное не ушло в репо
+                ref[max(0, y):y + h, max(0, x):x + w] = 0
+            C.save(ref_path, ref)
             self.shot(name, f)
             self.created.append(str(ref_path))
             self.act(f"ref saved {ref_path}")

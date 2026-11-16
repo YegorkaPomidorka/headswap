@@ -24,7 +24,9 @@ def words(*lines):
 
 
 def test_norm():
-    assert norm("  Ёлка   ДОМОЙ ") == "елка домой"
+    assert norm("  Ёлка   ДОМОЙ ") == norm("елка домой")
+    assert norm("1280х720") == norm("1280x720")         # кириллическая х
+    assert norm("Настройки") != norm("Навигатор")
 
 
 def test_find_phrase_and_case():
