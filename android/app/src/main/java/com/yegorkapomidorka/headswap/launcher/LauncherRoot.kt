@@ -1,6 +1,7 @@
 package com.yegorkapomidorka.headswap.launcher
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -37,8 +38,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.boundsInRoot
-import androidx.compose.ui.layout.layout
-import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
@@ -203,19 +202,14 @@ private fun Rail() {
             verticalArrangement = Arrangement.SpaceBetween,
         ) {
             if (s.clockInRail && !s.clockRailAmPm) Txt(status.time, s.f1, color = Pal.RAIL, weight = FontWeight.SemiBold, mono = true)
-            // 12 ч: «9:05», под двоеточием мелко AM/PM. Подпись нулевой ширины по центру колонки двоеточия: шире «:», но строку не раздвигает
-            if (s.clockRailAmPm) Ltr {
-                val parts = status.time.split(":", limit = 2)
-                Row(verticalAlignment = Alignment.Top) {
-                    Txt(parts[0], s.f1, color = Pal.RAIL, weight = FontWeight.SemiBold, mono = true)
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Txt(":", s.f1, color = Pal.RAIL, weight = FontWeight.SemiBold, mono = true)
-                        Txt(if (status.pm) "PM" else "AM", s.railAmPmFs, Modifier.layout { measurable, c ->
-                            val p = measurable.measure(c.copy(minWidth = 0, maxWidth = Constraints.Infinity))
-                            layout(0, p.height) { p.place(-p.width / 2, 0) }
-                        }, color = accent, weight = FontWeight.Bold, mono = true)
-                    }
-                    Txt(parts.getOrElse(1) { "" }, s.f1, color = Pal.RAIL, weight = FontWeight.SemiBold, mono = true)
+            // 12 ч: «9:05», под ним плашка AM/PM с золотой обводкой
+            if (s.clockRailAmPm) Column(horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(m.dp(s.clockGap))) {
+                Txt(status.time, s.f1, color = Pal.RAIL, weight = FontWeight.SemiBold, mono = true)
+                Box(Modifier.height(m.dp(s.amPmPillH)).border(m.dp(s.amPmPillBorder), accent, RoundedCornerShape(m.dp(s.amPmPillH)))
+                    .padding(horizontal = m.dp(s.amPmPillPadH)), contentAlignment = Alignment.Center) {
+                    Txt(if (status.pm) "PM" else "AM", s.railAmPmFs, Modifier.wrapContentHeight(unbounded = true),
+                        color = accent, weight = FontWeight.Bold, mono = true)
                 }
             }
             // «Средняя»: часы, золотая чёрточка и минуты столбиком; в «Маленькой» и «Обрезанной» часов нет
