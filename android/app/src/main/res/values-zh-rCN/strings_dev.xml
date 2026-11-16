@@ -16,6 +16,8 @@
     <string name="dev_meta_time_sub">int32，距下一机动点的时间，单位秒（与 apollo-DuerOS 一致）</string>
     <string name="dev_meta_progress_title">进度以秒为单位</string>
     <string name="dev_meta_progress_sub">MEDIA_PROGRESS_BAR 使用秒而非毫秒（如果车机显示的进度大了 1000 倍）</string>
+    <string name="dev_meta_art16k_title">曲目封面不超过 16 KB</string>
+    <string name="dev_meta_art16k_sub">适用于不显示封面的仪表盘（例如 Honda CR-V 2026、SEMIDRIVE X9）。车机上的封面画质会降低</string>
 
     <string name="dev_section_music_chunk">音乐数据包大小（实验性）</string>
     <string name="dev_music_chunk_note">数据包越小，车机上的缓冲越小，但通过 USB 传输的包越多。如果声音卡顿，请切换回“与 Android Auto 发送的一致”</string>

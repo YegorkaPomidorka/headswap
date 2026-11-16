@@ -7,6 +7,7 @@ import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.RectF
+import com.yegorkapomidorka.headswap.aa.AaBridgeCore
 import com.yegorkapomidorka.headswap.aa.AaMeta
 import java.io.ByteArrayOutputStream
 import kotlin.math.cos
@@ -19,9 +20,29 @@ import kotlin.math.sin
  */
 object MetaImages {
     const val MAX_BYTES = 30720
+    /** Лимит по переключателю «Обложка трека не больше 16 КБ»: приборка Honda CR-V 2026 (SEMIDRIVE X9) ~25 КБ не показывает. */
+    const val MAX_BYTES_16K = 16384
     private const val ART_SIDE = 256
     private const val ART_SMALL = 160
     private const val ICON = 128
+
+    /** Лимит обложки для MEDIA_INFO: Mazda 20622111 строже всех, дальше переключатель 16 КБ, иначе [MAX_BYTES]. */
+    fun artLimit(art16k: Boolean, mazda20622111: Boolean): Int = when {
+        mazda20622111 -> AaBridgeCore.MAZDA_20622111_ART_BYTES
+        art16k -> MAX_BYTES_16K
+        else -> MAX_BYTES
+    }
+
+    /** Качество 90, 80 ... 10: первый результат [encode] строго меньше [maxBytes]; null, если не влез ни один. */
+    internal inline fun fitQuality(maxBytes: Int, encode: (Int) -> ByteArray): ByteArray? {
+        var q = 90
+        while (q >= 10) {
+            val out = encode(q)
+            if (out.size < maxBytes) return out
+            q -= 10
+        }
+        return null
+    }
 
     /** Обложка -> JPEG; null, если картинка не декодируется или не влезает в лимит [maxBytes] даже 160x160 q10. */
     fun albumJpeg(src: ByteArray, maxBytes: Int = MAX_BYTES): ByteArray? {
@@ -36,16 +57,9 @@ object MetaImages {
                         drawColor(Color.BLACK)
                         drawBitmap(scaled, 0f, 0f, null)
                     }
-                    var q = 90
-                    while (q >= 10) {
-                        val out = compress(opaque, Bitmap.CompressFormat.JPEG, q)
-                        if (out.size < maxBytes) {
-                            opaque.recycle()
-                            return out
-                        }
-                        q -= 10
-                    }
+                    val out = fitQuality(maxBytes) { q -> compress(opaque, Bitmap.CompressFormat.JPEG, q) }
                     opaque.recycle()
+                    if (out != null) return out
                 } finally {
                     if (scaled !== bmp) scaled.recycle()
                 }
