@@ -362,9 +362,11 @@ internal object LauncherModel {
     val installedPackages: Set<String> get() = catalog.mapTo(HashSet()) { it.packageName }
     /** Интерфейс на арабском или французском (h1003): навигаторы - Google Карты и Waze, без Я.Музыки. */
     val arabic: Boolean get() = com.yegorkapomidorka.headswap.AppLocale.usesGlobalApps(appCtx)
+    /** Китайский интерфейс: навигаторы только Amap (он же [arabic] - глобальный по остальным сервисам). */
+    val chinese: Boolean get() = com.yegorkapomidorka.headswap.AppLocale.usesChineseApps(appCtx)
     val onlinePlayers: List<String> get() = PlayerChip.online(arabic)
-    val navigatorPkg: String? get() = NavigatorPick.effective(savedNavigator, installedPackages, arabic)
-    val installedNavigators: List<String> get() = NavigatorPick.known(arabic).filter { it in installedPackages }
+    val navigatorPkg: String? get() = NavigatorPick.effective(savedNavigator, installedPackages, arabic, chinese)
+    val installedNavigators: List<String> get() = NavigatorPick.known(arabic, chinese).filter { it in installedPackages }
 
     /** Предыдущий экран лаунчера для «Назад»; после самого «Назад» пуст, чтобы не ходить по кругу. */
     var previous: Area? = null

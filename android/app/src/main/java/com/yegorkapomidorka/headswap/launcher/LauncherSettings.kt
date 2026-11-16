@@ -823,7 +823,7 @@ private fun NavigatorTiles(d: SettingsDims, rowH: Int, modifier: Modifier) {
     val model = LauncherModel
     val installed = model.installedPackages
     Column(modifier, verticalArrangement = Arrangement.spacedBy(m.dp(d.gap))) {
-        for (row in NavigatorPick.tiles(model.arabic).chunked(2)) {
+        for (row in NavigatorPick.tiles(model.arabic, model.chinese).chunked(2)) {
             Row(Modifier.height(m.dp(rowH)).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(m.dp(d.gap))) {
                 for (pkg in row) {
                     val has = pkg in installed

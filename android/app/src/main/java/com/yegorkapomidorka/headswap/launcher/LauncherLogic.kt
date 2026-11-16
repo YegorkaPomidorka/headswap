@@ -121,18 +121,21 @@ object NavigatorPick {
     const val AMAP_AUTO = "com.autonavi.amapauto"
     val KNOWN = listOf(YANDEX_NAVI, YANDEX_MAPS, DGIS,
         GOOGLE_MAPS, WAZE, "app.organicmaps")
-    /**
-     * Глобальный интерфейс (ar/fr/zh, h1003): Яндекса и 2ГИС нет ни в выборе, ни по умолчанию. Amap - для китайских ГУ
-     * (zh тоже в этой ветке, поэтому в ru/en его нет). Плитки 2x2 - больше четырёх не влезает в пять рядов настроек.
-     */
-    val KNOWN_AR = listOf(GOOGLE_MAPS, WAZE, AMAP, AMAP_AUTO)
+    /** Арабский и французский интерфейс (h1003): только Google Карты и Waze, Яндекса и 2ГИС нет ни в выборе, ни по умолчанию. */
+    val KNOWN_AR = listOf(GOOGLE_MAPS, WAZE)
+    /** Китайский интерфейс: только Amap и Amap Auto, Google и Waze в Китае не работают (Егор 16.11). */
+    val KNOWN_ZH = listOf(AMAP, AMAP_AUTO)
 
-    /** Плитки раздела «Навигатор» в порядке показа, по две в ряд: столько же рядов, сколько у ru/en. */
+    /** Плитки раздела «Навигатор» в порядке показа, по две в ряд; больше четырёх не влезает в пять рядов настроек. */
     val TILES = listOf(YANDEX_NAVI, DGIS, YANDEX_MAPS, GOOGLE_MAPS)
-    val TILES_AR = KNOWN_AR
 
-    fun known(arabic: Boolean): List<String> = if (arabic) KNOWN_AR else KNOWN
-    fun tiles(arabic: Boolean): List<String> = if (arabic) TILES_AR else TILES
+    /** [chinese] - китайский интерфейс, он же глобальный ([arabic] тогда тоже true, но решает [chinese]). */
+    fun known(arabic: Boolean, chinese: Boolean = false): List<String> = when {
+        chinese -> KNOWN_ZH
+        arabic -> KNOWN_AR
+        else -> KNOWN
+    }
+    fun tiles(arabic: Boolean, chinese: Boolean = false): List<String> = if (arabic || chinese) known(arabic, chinese) else TILES
 
     /** Машинная часть только с подпиской Яндекс Плюс (у Карт тот же NavigationCarAppService, что у Навигатора). */
     fun needsPlus(pkg: String?): Boolean = pkg == YANDEX_NAVI || pkg == YANDEX_MAPS
@@ -160,11 +163,15 @@ object NavigatorPick {
     fun shadowWanted(metaNavi: Boolean, navPkg: String?, hints: (String) -> Boolean): Boolean =
         metaNavi && navPkg == GOOGLE_MAPS && hints(navPkg)
 
-    fun defaultFor(installed: Set<String>, arabic: Boolean = false): String? = known(arabic).firstOrNull { it in installed }
+    fun defaultFor(installed: Set<String>, arabic: Boolean = false, chinese: Boolean = false): String? =
+        known(arabic, chinese).firstOrNull { it in installed }
 
-    /** Сохранённый, пока он установлен (в арабском - только из [KNOWN_AR]); иначе по умолчанию. null - выбрать нечего. */
-    fun effective(saved: String?, installed: Set<String>, arabic: Boolean = false): String? =
-        saved?.takeIf { it in installed && (!arabic || it in KNOWN_AR) } ?: defaultFor(installed, arabic)
+    /**
+     * Сохранённый, пока он установлен (в арабском - только из [KNOWN_AR], в китайском - из [KNOWN_ZH]); иначе по умолчанию.
+     * null - выбрать нечего.
+     */
+    fun effective(saved: String?, installed: Set<String>, arabic: Boolean = false, chinese: Boolean = false): String? =
+        saved?.takeIf { it in installed && (!(arabic || chinese) || it in known(arabic, chinese)) } ?: defaultFor(installed, arabic, chinese)
 }
 
 /** Ответы taskState дочернего дисплея и решения по ним (EmbedHost): что делать после Back и при повторном показе. */
