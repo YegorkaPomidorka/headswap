@@ -29,7 +29,10 @@ param(
     [string[]]$HuArgs = @(),
     [string]$Out = '',
     [switch]$NoView,
-    [switch]$Audio      # activation with --audio: desktop sound capture over the CarLife MEDIA channel (ADR 0025)
+    [switch]$Audio,     # activation with --audio: desktop sound capture over the CarLife MEDIA channel (ADR 0025)
+    # autotests (autotest/stand.py): build/install/prefs/activation + adb reverse, then exit; the caller starts the
+    # emulator and BridgeService itself
+    [switch]$PrepareOnly
 )
 # Continue: in Windows PowerShell 5.1 any stderr line of a native command (adb progress) is an error record;
 # failures are checked by exit code below.
@@ -108,8 +111,9 @@ $act = & adb shell "CLASSPATH=$apkPath app_process / com.yegorkapomidorka.headsw
 if (($act -join "`n") -notmatch 'HEADSWAP_READY') { $act | Select-Object -Last 10 | Write-Host; throw 'Activation failed' }
 
 # 4. emulator + bridge + view
-Step "emulator for $Duration s, out: $Out"
 AdbOk reverse tcp:7240 tcp:7240 | Out-Null
+if ($PrepareOnly) { Step 'prepared: start the emulator, then BridgeService with debug_tcp 7240'; exit 0 }
+Step "emulator for $Duration s, out: $Out"
 $env:PYTHONIOENCODING = 'utf-8'
 if (-not $Size) { $Size = if ($Hu -eq 'mazda') { '1728x648' } else { '1280x720' } }
 $pyArgs = @('carlife_hu.py', '--duration', $Duration, '--out', "`"$Out`"", '--size', $Size, '--hu', $Hu)

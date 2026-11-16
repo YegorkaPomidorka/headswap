@@ -1,0 +1,376 @@
+"""Стенд для автотестов: эмулятор ГУ CarLife в этом процессе + мост Headswap на телефоне по USB.
+
+Стенд тот же, что у stand.ps1, только без окна: кадры декодирует ffmpeg в numpy (размер видео 1:1, координаты касаний =
+пиксели кадра), а касания и кнопки шлёт тест. Подготовку телефона (сборка smoke, установка, bridgeMode, активация,
+adb reverse) делает stand.ps1 -PrepareOnly, чтобы она жила в одном месте.
+
+    with Stand(out) as s:
+        s.tap_text("Настройки")
+        s.check("settings")             # сравнение с эталоном refs/<hu>-<W>x<H>/settings.png
+
+Порядок запуска как у run_view в carlife_hu.py: listen() -> run() в нити -> BridgeService по adb.
+"""
+from __future__ import annotations
+
+import shutil
+import subprocess
+import sys
+import threading
+import time
+from pathlib import Path
+
+import numpy as np
+
+HERE = Path(__file__).resolve().parent
+PC_HU = HERE.parent
+if str(PC_HU) not in sys.path:
+    sys.path.insert(0, str(PC_HU))
+
+import carlife_hu as H          # noqa: E402
+import carlife_view as V        # noqa: E402
+
+from . import compare as C      # noqa: E402
+from .ocr import Rect, WinOcr, Word, find_in, lines_text   # noqa: E402
+
+PKG = "com.yegorkapomidorka.headswap.smoke"
+REFS = HERE / "refs"
+DECODER_ARGS = ("-threads", "1")    # без многопоточного декодера ffmpeg не держит у себя последние кадры
+
+
+class StandError(AssertionError):
+    """Сценарий не прошёл: не нашёлся текст, кадр не совпал с эталоном, сессия упала."""
+
+
+class Stand:
+    def __init__(self, out: Path, size: tuple[int, int] = (1280, 720), hu: str = "honda", mode: str = "desktop",
+                 prepare: bool = True, update_refs: bool = False, refs: Path = REFS, echo: bool = False):
+        self.out = Path(out)
+        self.size, self.hu_profile, self.mode = size, hu, mode
+        self.prepare, self.update_refs, self.refs_root = prepare, update_refs, Path(refs)
+        self.echo = echo
+        self.hu: H.HeadUnit | None = None
+        self.pipe: V.ViewPipeline | None = None
+        self.worker: threading.Thread | None = None
+        self.ocrengine: WinOcr | None = None
+        self.step = 0
+        self.created: list[str] = []        # эталоны, созданные в этом прогоне (тест с ними не считается пройденным)
+        self.alog = None
+
+    # ---- запуск ----
+
+    def __enter__(self) -> "Stand":
+        self.start()
+        return self
+
+    def __exit__(self, *exc):
+        self.stop()
+
+    def start(self, session_timeout: float = 60.0, frame_timeout: float = 30.0):
+        self.out.mkdir(parents=True, exist_ok=True)
+        self.alog = open(self.out / "actions.log", "a", encoding="utf-8")
+        ffmpeg = V.find_ffmpeg()
+        if not ffmpeg:
+            raise StandError("нет ffmpeg в PATH (winget install Gyan.FFmpeg)")
+        if self.prepare:
+            self._prepare()
+        else:
+            self._adb("reverse", "tcp:7240", "tcp:7240")
+        self.hu = H.HeadUnit(H.Options(duration=float("inf"), out=self.out, size=self.size, hu=self.hu_profile,
+                                       quiet=not self.echo))
+        self.pipe = V.ViewPipeline(ffmpeg, 1.0, (100000, 100000), self.hu.log, DECODER_ARGS)
+        self.hu.video_sink, self.hu.size_sink = self.pipe.on_video, self.pipe.set_video_size
+        self.hu.listen()
+        self.worker = threading.Thread(target=self._work, name="hu-session", daemon=True)
+        self.worker.start()
+        time.sleep(0.5)
+        self._adb("shell", "am", "start-foreground-service", "-n", f"{PKG}/com.yegorkapomidorka.headswap.BridgeService",
+                  "--ei", "debug_tcp", "7240")
+        self.act("bridge started")
+        if not self.hu.session_up.wait(session_timeout):
+            raise StandError(f"мост не подключился за {session_timeout:g} с (лог: {self.out / 'carlife_hu.log'})")
+        end = time.monotonic() + frame_timeout
+        while self.pipe.latest.get(0) is None:
+            self._alive()
+            if time.monotonic() > end:
+                raise StandError(f"нет кадров {frame_timeout:g} с после подключения моста")
+            time.sleep(0.1)
+        w, h = self.video_size
+        self.act(f"first frame {w}x{h}")
+
+    def _work(self):
+        try:
+            self.hu.run()
+        except BaseException as e:      # noqa: BLE001 - в тест уйдёт через _alive()
+            self.hu.log(f"autotest: session error {e!r}")
+            self.hu.finish("error")
+
+    def _prepare(self):
+        ps = shutil.which("pwsh") or shutil.which("powershell")
+        cmd = [ps, "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", str(PC_HU / "stand.ps1"), "-PrepareOnly",
+               "-Mode", self.mode, "-Out", str(self.out)]
+        self.act("stand.ps1 -PrepareOnly")
+        r = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace")
+        (self.out / "prepare.log").write_text(r.stdout + r.stderr, encoding="utf-8")
+        if r.returncode != 0:
+            raise StandError(f"stand.ps1 -PrepareOnly упал ({r.returncode}), см. {self.out / 'prepare.log'}")
+
+    def stop(self):
+        if self.hu:
+            self.hu.finish("autotest done")
+        if self.worker:
+            self.worker.join(10)
+        if self.pipe:
+            self.pipe.close()
+        self._pull_phone_log()
+        if self.alog:
+            self.alog.close()
+            self.alog = None
+
+    def _pull_phone_log(self):
+        try:
+            r = subprocess.run(["adb", "shell", "ls", "-t", f"/sdcard/Android/data/{PKG}/files/"],
+                               capture_output=True, text=True, timeout=10)
+            name = (r.stdout.split() or [""])[0].strip()
+            if name:
+                subprocess.run(["adb", "pull", f"/sdcard/Android/data/{PKG}/files/{name}", str(self.out / name)],
+                               capture_output=True, timeout=30)
+        except (OSError, subprocess.SubprocessError):
+            pass
+
+    def _adb(self, *args: str):
+        r = subprocess.run(["adb", *args], capture_output=True, text=True, timeout=30)
+        if r.returncode != 0:
+            raise StandError(f"adb {' '.join(args)}: {r.returncode} {r.stderr.strip()}")
+        return r.stdout
+
+    def _alive(self):
+        if self.hu is None or self.hu.stop.is_set():
+            raise StandError(f"сессия ГУ закончилась (лог: {self.out / 'carlife_hu.log'})")
+
+    def act(self, msg: str):
+        line = f"{time.strftime('%H:%M:%S')} {msg}"
+        if self.alog:
+            self.alog.write(line + "\n")
+            self.alog.flush()
+        if self.hu:
+            self.hu.log(f"autotest: {msg}")
+
+    # ---- кадры ----
+
+    @property
+    def video_size(self) -> tuple[int, int]:
+        got = self.pipe.latest.get(0) if self.pipe else None
+        return got[2] if got else self.size
+
+    def _latest(self, after: int = 0):
+        got = self.pipe.latest.get(after)
+        if got is None:
+            return None
+        seq, data, (w, h) = got
+        return seq, np.frombuffer(data, np.uint8).reshape(h, w, 3)
+
+    def frame(self) -> np.ndarray:
+        """Последний декодированный кадр (H, W, 3) RGB, без ожидания."""
+        self._alive()
+        got = self._latest()
+        if got is None:
+            raise StandError("кадров ещё нет")
+        return got[1]
+
+    def settle(self, quiet: float = 0.8, timeout: float = 10.0) -> np.ndarray:
+        """Дождаться, пока картинка не меняется quiet секунд (новых кадров нет или они такие же), и вернуть кадр.
+        Энкодер телефона на статичном экране может вообще не слать кадры - это тоже «успокоился»."""
+        end = time.monotonic() + timeout
+        seq, last = self._latest() or (0, None)
+        calm_since = time.monotonic()
+        while True:
+            self._alive()
+            got = self._latest(seq)
+            now = time.monotonic()
+            if got:
+                seq, f = got
+                if last is None or not C.same_frame(f, last):
+                    last, calm_since = f, now
+            if last is not None and now - calm_since >= quiet:
+                return last
+            if now > end:
+                if last is None:
+                    raise StandError("нет кадров")
+                self.act(f"settle: screen still moving after {timeout:g} s, taking the last frame")
+                return last
+            time.sleep(0.04)
+
+    def shot(self, name: str, frame: np.ndarray | None = None) -> np.ndarray:
+        """Сохранить кадр шагом отчёта: out/steps/NN-name.png."""
+        f = self.settle() if frame is None else frame
+        self.step += 1
+        C.save(self.out / "steps" / f"{self.step:02d}-{name}.png", f)
+        return f
+
+    # ---- ввод ----
+
+    def _touch(self, action: int, x: int, y: int):
+        self._alive()
+        if not self.hu.session_up.is_set():
+            raise StandError("касание до подключения моста")
+        w, h = self.video_size
+        if not (0 <= x < w and 0 <= y < h):
+            raise StandError(f"касание {x},{y} вне кадра {w}x{h}")
+        self.hu.send_touch_event(action, int(x), int(y))
+
+    def tap(self, x: int, y: int, hold: float = 0.06, settle: bool = True):
+        self.act(f"tap {x},{y}")
+        self._touch(V.TOUCH_DOWN, x, y)
+        time.sleep(hold)
+        self._touch(V.TOUCH_UP, x, y)
+        if settle:
+            time.sleep(0.15)
+            self.settle()
+
+    def long_press(self, x: int, y: int, hold: float = 1.0):
+        self.act(f"long press {x},{y} {hold:g} s")
+        self.tap(x, y, hold=hold)
+
+    def swipe(self, x1: int, y1: int, x2: int, y2: int, duration: float = 0.35, settle: bool = True):
+        self.act(f"swipe {x1},{y1} -> {x2},{y2} {duration:g} s")
+        steps = max(2, int(duration / V.MOVE_INTERVAL))
+        self._touch(V.TOUCH_DOWN, x1, y1)
+        for i in range(1, steps + 1):
+            time.sleep(duration / steps)
+            self._touch(V.TOUCH_MOVE, round(x1 + (x2 - x1) * i / steps), round(y1 + (y2 - y1) * i / steps))
+        self._touch(V.TOUCH_UP, x2, y2)
+        if settle:
+            time.sleep(0.15)
+            self.settle()
+
+    def key(self, code: int, settle: bool = True):
+        self._alive()
+        self.act(f"hard key 0x{code:02X}")
+        self.hu.send_hard_key(code)
+        if settle:
+            time.sleep(0.15)
+            self.settle()
+
+    def back(self):
+        self.key(H.HARD_KEY_BACK)
+
+    def home(self):
+        self.key(H.HARD_KEY_HOME)
+
+    def voice(self):
+        self._alive()
+        self.act("voice key")
+        self.hu.send_voice_key()
+
+    # ---- текст ----
+
+    @property
+    def ocr(self) -> WinOcr:
+        if self.ocrengine is None:
+            self.ocrengine = WinOcr("ru")
+        return self.ocrengine
+
+    def words(self, frame: np.ndarray | None = None, region: Rect | None = None) -> list[Word]:
+        return self.ocr.read(self.settle() if frame is None else frame, region)
+
+    def text(self, frame: np.ndarray | None = None, region: Rect | None = None) -> list[str]:
+        """Текст экрана по строкам."""
+        return lines_text(self.words(frame, region))
+
+    def find_text(self, text: str, timeout: float = 8.0, region: Rect | None = None, partial: bool = False,
+                  index: int = 0) -> Rect:
+        """Рамка фразы на экране; ждёт до timeout. index - какое по счёту вхождение (сверху вниз, слева направо)."""
+        end = time.monotonic() + timeout
+        while True:
+            f = self.settle(quiet=0.3)
+            words = self.ocr.read(f, region)
+            hits = find_in(words, text, partial)
+            if len(hits) > index:
+                return hits[index]
+            if time.monotonic() > end:
+                self.shot(f"no-text-{_slug(text)}", f)
+                seen = " | ".join(lines_text(words)) or "(пусто)"
+                raise StandError(f"нет текста {text!r} за {timeout:g} с. На экране: {seen}")
+            time.sleep(0.3)
+
+    def has_text(self, text: str, region: Rect | None = None, partial: bool = False) -> bool:
+        return bool(find_in(self.words(None, region), text, partial))
+
+    def wait_text(self, text: str, timeout: float = 8.0, region: Rect | None = None, partial: bool = False):
+        self.find_text(text, timeout, region, partial)
+
+    def wait_no_text(self, text: str, timeout: float = 8.0, region: Rect | None = None, partial: bool = False):
+        end = time.monotonic() + timeout
+        while self.has_text(text, region, partial):
+            if time.monotonic() > end:
+                self.shot(f"still-text-{_slug(text)}")
+                raise StandError(f"текст {text!r} не пропал за {timeout:g} с")
+            time.sleep(0.3)
+
+    def tap_text(self, text: str, timeout: float = 8.0, region: Rect | None = None, partial: bool = False,
+                 index: int = 0, dx: int = 0, dy: int = 0):
+        """Тапнуть в центр надписи (dx, dy - сдвиг, например на иконку над подписью)."""
+        x, y, w, h = self.find_text(text, timeout, region, partial, index)
+        self.act(f"tap text {text!r}")
+        self.tap(x + w // 2 + dx, y + h // 2 + dy)
+
+    # ---- эталоны ----
+
+    @property
+    def refs_dir(self) -> Path:
+        w, h = self.video_size
+        return self.refs_root / f"{self.hu_profile}-{w}x{h}"
+
+    def check(self, name: str, masks: tuple[Rect, ...] | list[Rect] = (), max_ratio: float = 0.01, tol: int = 24,
+              timeout: float = 8.0):
+        """Экран совпадает с эталоном refs/<hu>-<W>x<H>/<name>.png. Ждёт совпадения до timeout (анимации, догрузка).
+        Эталона нет или --update-refs: кадр сохраняется эталоном, тест помечается «эталон создан», не «прошёл»."""
+        ref_path = self.refs_dir / f"{name}.png"
+        if self.update_refs or not ref_path.exists():
+            f = self.settle()
+            C.save(ref_path, f)
+            self.shot(name, f)
+            self.created.append(str(ref_path))
+            self.act(f"ref saved {ref_path}")
+            return
+        ref = C.load(ref_path)
+        end = time.monotonic() + timeout
+        while True:
+            f = self.settle()
+            d = C.diff(f, ref, masks, tol)
+            if d.ratio <= max_ratio:
+                self.shot(name, f)
+                self.act(f"check {name}: ok, {d.ratio:.4f}")
+                return
+            if time.monotonic() > end:
+                fail = self.out / "fail"
+                C.save(fail / f"{name}-actual.png", f)
+                C.save(fail / f"{name}-diff.png", C.overlay(f, d, masks))
+                why = "размер кадра другой" if not d.same_size else f"отличается {d.ratio:.2%} пикселей (порог {max_ratio:.2%})"
+                self.act(f"check {name}: FAIL {why}")
+                raise StandError(f"экран не совпал с эталоном {name}: {why}; см. {fail}")
+            time.sleep(0.3)
+
+    def find_image(self, name: str, threshold: float = 0.9, timeout: float = 8.0,
+                   region: Rect | None = None) -> Rect:
+        """Иконка refs/<hu>-<W>x<H>/icons/<name>.png на экране (вырезать из эталона любым редактором)."""
+        tpl = C.load(self.refs_dir / "icons" / f"{name}.png")
+        end = time.monotonic() + timeout
+        while True:
+            f = self.settle(quiet=0.3)
+            hit = C.find_image(f, tpl, threshold, region)
+            if hit:
+                return hit[0]
+            if time.monotonic() > end:
+                self.shot(f"no-icon-{name}", f)
+                raise StandError(f"нет иконки {name!r} за {timeout:g} с")
+            time.sleep(0.3)
+
+    def tap_image(self, name: str, threshold: float = 0.9, timeout: float = 8.0, region: Rect | None = None):
+        x, y, w, h = self.find_image(name, threshold, timeout, region)
+        self.act(f"tap icon {name!r}")
+        self.tap(x + w // 2, y + h // 2)
+
+
+def _slug(text: str) -> str:
+    return "".join(ch if ch.isalnum() else "_" for ch in text)[:40]
