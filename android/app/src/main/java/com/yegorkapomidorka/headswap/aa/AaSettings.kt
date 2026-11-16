@@ -185,6 +185,11 @@ class AaPrefs(ctx: Context) {
         get() = sp.getBoolean("metaMusic", true)
         set(v) = sp.edit().putBoolean("metaMusic", v).apply()
 
+    /** Обложка трека в MEDIA_INFO не больше 16 КБ вместо 30 КБ (приборка Honda CR-V 2026, SEMIDRIVE X9, h219/h606). По умолчанию выкл. Читается на подключение. */
+    var metaArt16k: Boolean
+        get() = sp.getBoolean("metaArt16k", false)
+        set(v) = sp.edit().putBoolean("metaArt16k", v).apply()
+
     /** Подсказки поворотов из AA -> NAVI_NEXT_TURN_INFO (если ГУ подписалась). Читается на подключение. */
     var metaNavi: Boolean
         get() = sp.getBoolean("metaNavi", true)

@@ -17,6 +17,8 @@
     <string name="dev_meta_time_sub">int32 time to the maneuver, s (like apollo-DuerOS)</string>
     <string name="dev_meta_progress_title">Progress in seconds</string>
     <string name="dev_meta_progress_sub">MEDIA_PROGRESS_BAR in s instead of ms (if the head unit shows 1000× too much)</string>
+    <string name="dev_meta_art16k_title">Track cover up to 16 KB</string>
+    <string name="dev_meta_art16k_sub">For clusters that don\'t show the cover (e.g. Honda CR-V 2026, SEMIDRIVE X9). Lower quality on the head unit</string>
 
     <string name="dev_section_music_chunk">Music packet size (experimental)</string>
     <string name="dev_music_chunk_note">Smaller means a smaller buffer on the head unit but more packets over USB. If the sound stutters, switch back to “As Android Auto sends it”</string>

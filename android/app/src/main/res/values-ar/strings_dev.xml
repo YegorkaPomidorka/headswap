@@ -16,6 +16,8 @@
     <string name="dev_meta_time_sub">int32 time حتى المناورة، بالثواني (مثل apollo-DuerOS)</string>
     <string name="dev_meta_progress_title">التقدّم بالثواني</string>
     <string name="dev_meta_progress_sub">MEDIA_PROGRESS_BAR بالثواني بدل المللي ثانية (إذا عرضت شاشة السيارة قيمة أكبر 1000 مرة)</string>
+    <string name="dev_meta_art16k_title">غلاف المقطع بحد أقصى 16 كيلوبايت</string>
+    <string name="dev_meta_art16k_sub">للوحات العدادات التي لا تعرض الغلاف (مثل Honda CR-V 2026، SEMIDRIVE X9). جودة أقل على شاشة السيارة</string>
 
     <string name="dev_section_music_chunk">حجم حزمة الموسيقى (تجريبي)</string>
     <string name="dev_music_chunk_note">كلما صغر الحجم صغرت الذاكرة المؤقتة في شاشة السيارة وزادت الحزم عبر USB. إذا تقطّع الصوت، فارجع إلى «كما يرسله Android Auto»</string>
