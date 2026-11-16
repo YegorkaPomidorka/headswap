@@ -419,7 +419,13 @@ fun StatusBar(title: String? = null, showNet: Boolean = true) {
     ) {
         // в узкой рейке часов нет: время слева, прижато к краю (перед заголовком, если он есть)
         if (s.clockInStatus) {
-            Txt(st.time, s.statusFs, Modifier.busy { timeX = it }, color = Pal.TEXT, weight = FontWeight.SemiBold, mono = true)
+            // 12 ч: «9:17 PM», AM/PM тем же кеглем, золотом (вариант J, Егор 16.11)
+            if (s.twelveHour) Ltr {
+                Row(Modifier.busy { timeX = it }, horizontalArrangement = Arrangement.spacedBy(m.dp(maxOf(4, s.statusFs / 4)))) {
+                    Txt(st.time, s.statusFs, color = Pal.TEXT, weight = FontWeight.SemiBold, mono = true)
+                    Txt(if (st.pm) "PM" else "AM", s.statusFs, color = LocalAccent.current, weight = FontWeight.SemiBold, mono = true)
+                }
+            } else Txt(st.time, s.statusFs, Modifier.busy { timeX = it }, color = Pal.TEXT, weight = FontWeight.SemiBold, mono = true)
             if (title == null) Spacer(Modifier.weight(1f))
         }
         // заголовок экрана у начала (слева; в RTL справа), статус у конца; сам ряд значков всегда слева направо (создан внутри Ltr)
