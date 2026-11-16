@@ -142,9 +142,10 @@ class LauncherSpec(
     private fun r(v: Double) = v.roundToInt()
 
     override fun equals(other: Any?) = other is LauncherSpec && w == other.w && h == other.h && t == other.t &&
-        g == other.g && m == other.m && f1 == other.f1 && f2 == other.f2 && f3 == other.f3 && railSize == other.railSize
-    override fun hashCode() = listOf(w, h, t, g, m, f1, f2, f3, railSize).hashCode()
-    override fun toString() = "LauncherSpec(${w}x$h T=$t rail=$railSize)"
+        g == other.g && m == other.m && f1 == other.f1 && f2 == other.f2 && f3 == other.f3 && railSize == other.railSize &&
+        twelveHour == other.twelveHour
+    override fun hashCode() = listOf(w, h, t, g, m, f1, f2, f3, railSize, twelveHour).hashCode()
+    override fun toString() = "LauncherSpec(${w}x$h T=$t rail=$railSize${if (twelveHour) " 12h" else ""})"
 }
 
 object LauncherSpecs {
