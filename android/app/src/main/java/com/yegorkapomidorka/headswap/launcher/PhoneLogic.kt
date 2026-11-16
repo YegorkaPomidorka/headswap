@@ -80,11 +80,12 @@ object PhoneLogic {
     }
 
     /** «14:02» сегодня, «вчера», иначе «31.10». */
-    fun whenLabel(nowMs: Long, thenMs: Long, zone: ZoneId = ZoneId.systemDefault(), yesterday: String = "вчера"): String {
+    fun whenLabel(nowMs: Long, thenMs: Long, zone: ZoneId = ZoneId.systemDefault(), yesterday: String = "вчера",
+                  twelveHour: Boolean = false): String {
         val now = Instant.ofEpochMilli(nowMs).atZone(zone).toLocalDate()
         val then = Instant.ofEpochMilli(thenMs).atZone(zone)
         return when (then.toLocalDate()) {
-            now -> then.format(DateTimeFormatter.ofPattern("HH:mm", Locale.ROOT))
+            now -> ClockFormat.format(then, twelveHour)
             now.minusDays(1) -> yesterday
             else -> then.format(DateTimeFormatter.ofPattern("dd.MM", Locale.ROOT))
         }

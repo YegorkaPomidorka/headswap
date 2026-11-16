@@ -255,10 +255,12 @@ fun LauncherSettingsScreen() {
                             }
                         }
                         SettingsPage.HOME -> if (s.portrait) {
-                            // «Раскладка» четыре ряда, «Слои» два; без прокрутки (семь рядов)
+                            // «Раскладка» четыре ряда, «Слои» два, «12 ч» в седьмом; без прокрутки (семь рядов)
                             Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(m.dp(gap))) {
                                 PortraitLayoutCard(d, Modifier.fillMaxWidth().height(m.dp(cellH(0, 4))))
                                 LayersCard(cellH(4, 2), Modifier.fillMaxWidth().height(m.dp(cellH(4, 2))))
+                                SwitchCard(stringResource(R.string.l_s_clock12), model.clock12h, d,
+                                    Modifier.fillMaxWidth().height(m.dp(cellH(6)))) { model.chooseClock12h(it) }
                             }
                         } else {
                             // «Раскладка» ужата до 0,87 высоты, чтобы снизу выглядывала шапка «Слои» - видно, что есть
@@ -272,6 +274,9 @@ fun LauncherSettingsScreen() {
                                 verticalArrangement = Arrangement.spacedBy(m.dp(gap))) {
                                 MapSideCard(d, Modifier.fillMaxWidth().height(m.dp(layoutH)))
                                 LayersCard(layersH, Modifier.fillMaxWidth().height(m.dp(layersH)))
+                                // во «Виде» все пять рядов заняты: формат часов - здесь, под «Слоями», в обеих ориентациях
+                                SwitchCard(stringResource(R.string.l_s_clock12), model.clock12h, d,
+                                    Modifier.fillMaxWidth().height(m.dp(rowH))) { model.chooseClock12h(it) }
                             }
                         }
                         SettingsPage.SYSTEM -> {

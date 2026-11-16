@@ -407,7 +407,7 @@ private fun NotifRow(item: NotifItem, expanded: Boolean) {
                         Txt(e.who, s.f2, color = Pal.TEXT, weight = FontWeight.Bold)
                         Txt(e.text, s.f2, color = Pal.SEC2, maxLines = if (expanded) 40 else 2)
                     }
-                    Txt(NotificationsLogic.time(e.postTime), max(14, Math.round(s.f2 * 0.8f)), color = Pal.SEC2, weight = FontWeight.SemiBold, mono = true)
+                    Txt(NotificationsLogic.time(e.postTime, twelveHour = LauncherModel.clock12h), max(14, Math.round(s.f2 * 0.8f)), color = Pal.SEC2, weight = FontWeight.SemiBold, mono = true)
                 }
             }
             val dismiss = stringResource(R.string.l_notif_dismiss)

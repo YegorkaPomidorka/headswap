@@ -62,7 +62,7 @@ fun LauncherRoot(connected: Boolean) {
     val localeDir = LocalLayoutDirection.current
     LaunchedEffect(Unit) {
         while (true) {
-            model.status = withContext(Dispatchers.Default) { StatusReader.read(model.context) }
+            model.status = withContext(Dispatchers.Default) { StatusReader.read(model.context, model.clock12h) }
             // режим фар от ГУ для темы «Авто»
             model.huTheme = CarLifeState.huTheme
             delay(1000)

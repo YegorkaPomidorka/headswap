@@ -26,13 +26,12 @@ data class StatusInfo(
 
 internal object StatusReader {
     // цифры всегда латинские (и при арабском языке): Locale.ROOT, названия дней - в языке приложения
-    private val timeFormat = DateTimeFormatter.ofPattern("HH:mm", Locale.ROOT)
     private val dateFormat = DateTimeFormatter.ofPattern("dd.MM", Locale.ROOT)
 
-    fun read(ctx: Context, now: LocalDateTime = LocalDateTime.now()): StatusInfo {
+    fun read(ctx: Context, twelveHour: Boolean = false, now: LocalDateTime = LocalDateTime.now()): StatusInfo {
         val battery = BatteryLogic.read(ctx)
         return StatusInfo(
-            time = now.format(timeFormat),
+            time = ClockFormat.format(now, twelveHour),
             date = weekday(now.dayOfWeek, appLocale(ctx)) + " " + now.format(dateFormat),
             net = network(ctx),
             signal = signal(ctx),

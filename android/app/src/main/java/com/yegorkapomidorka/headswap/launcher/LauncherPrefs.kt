@@ -75,6 +75,11 @@ class LauncherPrefs(private val context: Context) {
         get() = prefs.getBoolean("show_battery", true)
         set(value) { prefs.edit().putBoolean("show_battery", value).apply() }
 
+    /** Часы 12 ч «2:05» вместо 24 ч ([ClockFormat]); пока не выбирали - как в настройках телефона. */
+    var clock12h: Boolean
+        get() = prefs.getBoolean("clock_12h", !android.text.format.DateFormat.is24HourFormat(context))
+        set(value) { prefs.edit().putBoolean("clock_12h", value).apply() }
+
     /** «Включать музыку автоматически»: при старте сессии сразу играет, как в Android Auto. */
     var autoplay: Boolean
         get() = prefs.getBoolean("autoplay", true)

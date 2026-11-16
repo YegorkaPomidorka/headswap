@@ -58,6 +58,8 @@ internal object LauncherModel {
     var animations by mutableStateOf(true)
     /** Заряд телефона в строке статуса ([LauncherPrefs.showBattery]). */
     var showBattery by mutableStateOf(true)
+    /** Часы в 12-часовом формате ([LauncherPrefs.clock12h]). */
+    var clock12h by mutableStateOf(false)
     var autoplay by mutableStateOf(true)
     /** «Уведомления» телефона на экране ГУ (слушатель - [NotificationsRepo]). */
     var notifications by mutableStateOf(true)
@@ -187,6 +189,7 @@ internal object LauncherModel {
         mapLeft = prefs.mapLeft
         animations = prefs.animations
         showBattery = prefs.showBattery
+        clock12h = prefs.clock12h
         autoplay = prefs.autoplay
         notifications = prefs.notifications
         NotificationsRepo.setEnabled(notifications)
@@ -271,6 +274,7 @@ internal object LauncherModel {
     fun chooseMapLeft(left: Boolean) { mapLeft = left; prefs.mapLeft = left }
     fun chooseAnimations(on: Boolean) { animations = on; prefs.animations = on }
     fun chooseShowBattery(on: Boolean) { showBattery = on; prefs.showBattery = on }
+    fun chooseClock12h(on: Boolean) { clock12h = on; prefs.clock12h = on }
     fun chooseAutoplay(on: Boolean) { autoplay = on; prefs.autoplay = on }
     /** Из «Для разработчиков» на телефоне: лаунчер мог ещё не стартовать, поэтому префы — своим экземпляром. */
     fun chooseHideStatusBar(ctx: Context, on: Boolean) { hideStatusBar = on; LauncherPrefs(ctx.applicationContext).hideStatusBar = on }
