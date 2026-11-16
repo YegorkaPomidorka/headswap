@@ -114,6 +114,8 @@ class Stand:
         self.hu.listen()
         self.worker = threading.Thread(target=self._work, name="hu-session", daemon=True)
         self.worker.start()
+        # играющая музыка меняет главный экран и порядок плееров в настройках; autoplay выключает stand.ps1
+        subprocess.run(["adb", "shell", "cmd", "media_session", "dispatch", "pause"], capture_output=True, timeout=15)
         time.sleep(0.5)
         self._adb("shell", "am", "start-foreground-service", "-n", f"{PKG}/com.yegorkapomidorka.headswap.BridgeService",
                   "--ei", "debug_tcp", "7240")
@@ -403,6 +405,22 @@ class Stand:
         if self.ocrengine is None:
             self.ocrengine = WinOcr(self.lang)
         return self.ocrengine
+
+    # ---- RTL ----
+
+    @property
+    def rtl(self) -> bool:
+        """Арабский: лаунчер зеркалится (рейка и часы справа)."""
+        return self.lang == "ar"
+
+    def at(self, x: int, y: int) -> tuple[int, int]:
+        """Точка сценария, записанная для LTR, на текущем экране: в RTL отражена по горизонтали."""
+        return (self.video_size[0] - 1 - x, y) if self.rtl else (x, y)
+
+    def area(self, r: Rect) -> Rect:
+        """Рамка (x, y, w, h) сценария для LTR на текущем экране (маски, region)."""
+        x, y, w, h = r
+        return (self.video_size[0] - x - w, y, w, h) if self.rtl else r
 
     @property
     def fuzz(self) -> int:

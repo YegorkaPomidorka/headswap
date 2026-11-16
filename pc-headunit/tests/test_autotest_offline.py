@@ -46,6 +46,13 @@ def test_norm_languages():
     assert find_in(words("Sys"), "Système", fuzz=1) == []
 
 
+def test_wrapped_label():
+    ws = [Word("Анимации", (500, 600, 120, 24), 0), Word("кнопок", (500, 630, 90, 24), 1),
+          Word("Средняя", (900, 600, 100, 24), 2)]
+    assert find_in(ws, "Анимации кнопок") == [(500, 600, 120, 54)]
+    assert find_in(ws, "Анимации Средняя") == []          # соседняя колонка - не перенос
+
+
 def test_truncated():
     from autotest.ocr import truncated
     assert truncated(words("Nothing is playi..."), "Nothing is playing") == "Nothing is playi..."

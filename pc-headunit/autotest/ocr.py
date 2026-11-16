@@ -104,6 +104,7 @@ def find_in(words: list[Word], text: str, partial: bool = False, fuzz: int = 0) 
         lines.setdefault(w.line, []).append(w)
     hits: list[Rect] = []
     seqs = list(lines.values())
+    seqs += _wrapped(lines)                 # подпись, перенесённая на вторую строку («Анимации / кнопок»)
     if is_rtl(text):                        # арабский: порядок слов в строке OCR не гарантирован - пробуем оба
         seqs += [ws[::-1] for ws in lines.values() if len(ws) > 1]
     for ws in seqs:
@@ -127,6 +128,23 @@ def find_in(words: list[Word], text: str, partial: bool = False, fuzz: int = 0) 
     return out
 
 
+def _wrapped(lines: dict[int, list[Word]]) -> list[list[Word]]:
+    """Пары строк OCR, где вторая стоит прямо под первой (зазор меньше высоты строки, колонки пересекаются):
+    склейка «верхняя + нижняя» как одна строка."""
+    boxes = {k: union([w.rect for w in ws]) for k, ws in lines.items() if ws}
+    out: list[list[Word]] = []
+    for a, ra in boxes.items():
+        for b, rb in boxes.items():
+            if a == b:
+                continue
+            gap = rb[1] - (ra[1] + ra[3])
+            hmax = max(ra[3], rb[3])
+            overlap = min(ra[0] + ra[2], rb[0] + rb[2]) - max(ra[0], rb[0])
+            if -hmax * 0.3 <= gap <= hmax * 0.8 and overlap > 0:
+                out.append(lines[a] + lines[b])
+    return out
+
+
 def _inside(a: Rect, b: Rect) -> bool:
     """a целиком внутри b."""
     return a[0] >= b[0] and a[1] >= b[1] and a[0] + a[2] <= b[0] + b[2] and a[1] + a[3] <= b[1] + b[3]
@@ -147,7 +165,8 @@ def available_ocr() -> list[str]:
 
 
 class WinOcr:
-    def __init__(self, lang: str = "ru"):
+    def __init__(self, lang: str = "ru", upscale: float = 1.5):
+        self.upscale = upscale
         from winrt.windows.globalization import Language
         from winrt.windows.media.ocr import OcrEngine
         self.engine = None
@@ -172,11 +191,13 @@ class WinOcr:
             rgb = rgb[y:y + h, x:x + w]
             ox, oy = x, y
         h, w = rgb.shape[:2]
-        scale = 1.0
-        if max(w, h) > self.max_dim:            # движок не берёт кадры больше max_image_dimension
+        # Увеличение: на 1280x720 арабский и китайский движки теряют отдельные короткие слова («النظام», «主题»),
+        # при x1,5 находят все; кадр не больше max_image_dimension.
+        scale = min(self.upscale, self.max_dim / max(w, h))
+        if abs(scale - 1.0) > 1e-3:
             import cv2
-            scale = self.max_dim / max(w, h)
-            rgb = cv2.resize(rgb, (int(w * scale), int(h * scale)), interpolation=cv2.INTER_AREA)
+            rgb = cv2.resize(rgb, (int(w * scale), int(h * scale)),
+                             interpolation=cv2.INTER_CUBIC if scale > 1 else cv2.INTER_AREA)
             h, w = rgb.shape[:2]
         bgra = np.empty((h, w, 4), np.uint8)
         bgra[:, :, 0] = rgb[:, :, 2]

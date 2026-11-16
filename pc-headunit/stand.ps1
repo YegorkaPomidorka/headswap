@@ -105,6 +105,21 @@ if ($Mode -ne 'keep') {
     AdbOk shell rm /data/local/tmp/hs_aa.xml
 }
 
+if ($PrepareOnly) {
+    # autotests: no music autostart on connect, otherwise the last player starts and the home screen and the
+    # music settings (player order) differ from run to run
+    Step 'autotest defaults: launcher autoplay=false'
+    $xml = (& adb shell run-as $Pkg cat shared_prefs/headswap_launcher.xml 2>$null) -join "`n"
+    if ($xml -notmatch '<map') { $xml = "<?xml version='1.0' encoding='utf-8' standalone='yes' ?>`n<map>`n</map>" }
+    $xml = [regex]::Replace($xml, '\s*<boolean name="autoplay" value="[^"]*" />', '')
+    $xml = $xml.Replace('</map>', "    <boolean name=`"autoplay`" value=`"false`" />`n</map>")
+    $tmp = Join-Path $Out 'headswap_launcher.xml'
+    [IO.File]::WriteAllText($tmp, $xml.Replace("`r", '') + "`n")
+    AdbOk push $tmp /data/local/tmp/hs_launcher.xml 2>$null | Out-Null
+    AdbOk shell "run-as $Pkg sh -c 'cat /data/local/tmp/hs_launcher.xml > shared_prefs/headswap_launcher.xml'"
+    AdbOk shell rm /data/local/tmp/hs_launcher.xml
+}
+
 Step 'activation (ManualAccessLauncher)'
 $apkPath = ((& adb shell pm path $Pkg) -replace 'package:', '').Trim()
 $act = & adb shell "CLASSPATH=$apkPath app_process / com.yegorkapomidorka.headswap.dex.ManualAccessLauncher --package $Pkg --token $token$(if ($Audio) { ' --audio' })" 2>&1
