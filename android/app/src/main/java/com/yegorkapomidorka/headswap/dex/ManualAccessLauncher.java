@@ -46,10 +46,11 @@ public final class ManualAccessLauncher {
         try {
             ManualAccessPolicy.Options options = ManualAccessPolicy.Options.parse(args);
             if (options.help) {
-                System.out.println("HeadSwap ADB activation: --package <id> --token <token> [--audio]\n"
+                System.out.println("HeadSwap ADB activation: --package <id> --token <token> [--audio] [--vdm]\n"
                     + "Готовую команду с пакетом и токеном показывает приложение HeadSwap.\n"
                     + "Основной доступ включает управление текущей музыкой: пауза при отключении USB и продолжение той же сессии после готовности CarLife.\n"
                     + "Для USB-звука передайте --audio.\n"
+                    + "Для хоста VirtualDevice на Samsung с Android 16 передайте --vdm.\n"
                     + "Служебные API доступны только в активированном процессе HeadSwap.");
                 return 0;
             }
@@ -170,7 +171,7 @@ public final class ManualAccessLauncher {
     }
 
     private static void startVdmHost(ManualAccessPolicy.Options options, int appPid) {
-        if (Build.VERSION.SDK_INT < VdmHostPolicy.MIN_SDK) return;
+        if (!VdmHostPolicy.supported(Build.VERSION.SDK_INT, Build.MANUFACTURER, options.vdm)) return;
         try {
             String apk = System.getProperty("java.class.path");
             String command = VdmHostPolicy.startCommand(apk, options.packageName, appPid);

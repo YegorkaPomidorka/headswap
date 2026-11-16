@@ -23,14 +23,17 @@ class ActivationToken(context: Context) {
     /** False when no token was ever issued, so a checking instrumentation never creates one itself. */
     fun matches(given: String?): Boolean = ManualAccessPolicy.tokensMatch(prefs.getString(KEY, null), given)
 
-    fun options(audio: Boolean): ManualAccessPolicy.Options =
-        ManualAccessPolicy.Options(audio, false, app.packageName, current())
+    /** [vdm]: тумблер «Хост VirtualDevice на Android 16» (h1091), см. [VdmDesktop.activationFlag]. */
+    fun options(audio: Boolean, vdm: Boolean = false): ManualAccessPolicy.Options =
+        ManualAccessPolicy.Options(audio, false, app.packageName, current(), vdm)
 
     /** Typed after `adb -d shell`; carries the installed applicationId, the APK path and the token. */
-    fun shellCommand(audio: Boolean): String = ManualAccessPolicy.shellCommand(app.applicationInfo.sourceDir, options(audio))
+    fun shellCommand(audio: Boolean, vdm: Boolean = false): String =
+        ManualAccessPolicy.shellCommand(app.applicationInfo.sourceDir, options(audio, vdm))
 
     /** Complete line for the computer, ready to paste. */
-    fun adbCommand(audio: Boolean): String = ManualAccessPolicy.adbCommand(app.applicationInfo.sourceDir, options(audio))
+    fun adbCommand(audio: Boolean, vdm: Boolean = false): String =
+        ManualAccessPolicy.adbCommand(app.applicationInfo.sourceDir, options(audio, vdm))
 
     // commit(), not apply(): the instrumentation restarts the process and must find the file on disk.
     private fun store(value: String): String {
