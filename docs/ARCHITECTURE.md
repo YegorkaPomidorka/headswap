@@ -27,13 +27,15 @@
 
 - Один gradle-модуль `:app` (`android/`), minSdk 29, target 37, JDK 17.
 - **Без AndroidX и Compose.** `MainActivity : android.app.Activity`, экраны строятся кодом (`ui/Kit.kt`, `ui/Screen.kt`).
-  Строки: `res/values` (en) и `res/values-ru`, обе правятся вместе.
+  Строки: `res/values` (en), `values-ru`, `values-ar`, `values-fr`, `values-zh-rCN` — правятся вместе. Тексты, которые видит
+  ГУ (заглушка моста, ошибки рабочего стола), тоже из ресурсов, не литералами в коде.
 - Варианты: `debug`, `release`, `smoke` (buildType: debug с суффиксом `.smoke`, ставится рядом с release).
   Flavors нет. `-Pwlbeta=false` выключает воздух.
 - Сертификаты AA (`assets/aa/{hur,jvc}`) в git нет. Задача `syncAaCerts` берёт их из основного checkout, release без них падает.
   Подпись release — `~/.android-keys/headswap-release.properties`.
 - Тесты: `cd android; ./gradlew testDebugUnitTest` (JUnit4, `android/app/src/test/...`). Python: `pc-headunit/tests/`,
-  `python -X utf8 -m unittest tools/test_logdiag.py`.
+  `python -X utf8 -m unittest tools/test_logdiag.py`. UI на стенде ГУ (телефон по USB):
+  `cd pc-headunit; python -m pytest autotest/scenarios --lang all` — README в `pc-headunit/autotest/`, ADR 0042.
 
 ## Пакеты
 
@@ -47,7 +49,7 @@
 | `$P/diag/` | `LogDiag` — Kotlin-порт `tools/logdiag.py`, те же правила. |
 | `$P/update/` | `UpdateLogic` (GitHub releases/latest, чистая), `Updater` (скачать, SHA-256, PackageInstaller). ADR 0012. |
 | `src/debug`, `src/release` | `DebugTransport.kt`: в debug — TCP к эмулятору ГУ, в release — заглушка. |
-| `pc-headunit/` | Python. `hu.py` — AA-ГУ для ПК (эталоны `golden.txt` для тестов). `carlife_hu.py` — эмулятор ГУ CarLife для проверки моста. |
+| `pc-headunit/` | Python. `hu.py` — AA-ГУ для ПК (эталоны `golden.txt` для тестов). `carlife_hu.py` — эмулятор ГУ CarLife для проверки моста. `stand.ps1` — стенд одной командой (smoke на телефоне + окно ГУ; `-PrepareOnly` — только подготовка телефона). `autotest/` — автотесты UI без LLM: `Stand` (тапы, кнопки ГУ, OCR Windows, сравнение с эталонами `refs/<hu>-<W>x<H>/<язык>/`), `strings.py` (строки по ключам из `res/values*`), сценарии pytest в `autotest/scenarios`. |
 | `tools/` | `logdiag.py` + `logdiag_rules.json` (причина обрыва по логу), `logdigest.py` (сводка лога). |
 
 Три файла-ядра большие: `AaBridge.kt` (~2800 строк), `CarLifeSession.kt` (~1500), `BridgeService.kt` (~1100).
@@ -199,6 +201,8 @@ CONTROL0, SENSOR1, VIDEO2, INPUT3, SPEECH4, SYSTEM5, MEDIA6, MIC7, BT8, MEDIA_PL
 | Обрывы по воздуху | `MultiSocketTransport`, `P2pJoin`, `CarNetwork`, строки `WL`; VPN рвёт сокеты |
 | Звук молчит / приглушён | `AaAudio`, AUDIO_TRANSMISSION_MODE, TTS_STOP; источник на ГУ |
 | Нет подсказок на приборке | подписка ГУ, `MetaRelay.sendNaviTurn`, `HondaClusterRoad` |
+| Текст на ГУ не на языке интерфейса | заглушка: `DelegatedDexConnector.text()` (`desk_ph_*`, `desk_err_*`), режим AA — тексты `AaBridgeCore` из `BridgeService` (`aa_ph_*`); язык — `AppLocale` |
+| Автотест стенда падает | `out/autotest-*/<язык>/`: `steps/`, `fail/*-diff.png`, `actions.log`; «обрезан многоточием» — баг вёрстки; README `pc-headunit/autotest` |
 | Клавиатура на ГУ разделена пополам | плотность рабочего стола `DesktopGeometryPolicy.density` (короткая сторона < 600 dp), ADR 0023 |
 | Главный: не та раскладка, плашка не листается «Слоями», ⇄ не там | prefs `home_layout`/`card_view`/`small_view` → `LauncherModel.tiles`, что листают «Слои» - prefs `layer_list` (`Layer`/`LayerList` в `HomeTilesLogic.kt`, настройки «Экран» → `LayersCard` и выбор по «+» `LayerPickerScreen` в `LayersUi.kt`; приложение плашки - prefs `tile_app`, окно по `appCardRect`, ADR 0030), правила в `HomeTilesLogic`, окна плашек в `EmbedUi.EmbedLayers` (плашка-приложение - слот app по `appCardRect`), ⇄ и «Слои» ленты - `HomeTileButtons`, ADR 0027 |
 | Рабочий стол не того цвета / золото там, где должен быть свой акцент | prefs `colors_night`/`colors_day` → `LauncherModel.palette` → `LauncherColors.palette` (набор по умолчанию = `Palettes.DARK/LIGHT`), акцент - `LocalAccent` = `LauncherPalette.accent`; страница `SettingsPage.COLORS`; ADR 0036 |
