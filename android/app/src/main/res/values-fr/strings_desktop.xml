@@ -18,6 +18,28 @@
     <string name="aa_ph_start_server">Lancez le serveur de l\'unité principale dans Android Auto</string>
     <string name="aa_ph_wait_frame">Android Auto : en attente d\'une image…</string>
     <string name="aa_ph_lost">Android Auto déconnecté, reconnexion…</string>
+    <!-- ошибки рабочего стола: на заглушке ГУ и в статусе на телефоне (DelegatedDexConnector) -->
+    <string name="desk_err_open_service">Impossible d\'ouvrir le service du bureau : %1$s</string>
+    <string name="desk_err_service_null">Le service du bureau est indisponible. Activez l\'accès depuis un ordinateur</string>
+    <string name="desk_err_prepare">Impossible de préparer le bureau</string>
+    <string name="desk_err_bind">Android n\'a pas démarré le service du bureau</string>
+    <string name="desk_err_access">L\'accès depuis un ordinateur est indisponible</string>
+    <string name="desk_err_access_ended">Accès terminé. Connectez le téléphone à un ordinateur pour réactiver</string>
+    <string name="desk_err_no_first_frame">Le bureau n\'a pas envoyé la première image en 30 secondes</string>
+    <string name="desk_err_generic">Erreur du bureau</string>
+    <string name="desk_err_service_timeout">Le service du bureau n\'a pas répondu en 12 secondes</string>
+    <string name="desk_err_stopped">Connexion arrêtée</string>
+    <string name="desk_err_service_unavailable">Le service du bureau est indisponible</string>
+    <string name="desk_err_need_android_desktop">L\'accès depuis un ordinateur nécessite le mode Android Desktop</string>
+    <string name="desk_err_version">La version du service du bureau ne correspond pas à l\'application</string>
+    <string name="desk_err_display">Impossible de créer un écran séparé</string>
+    <string name="desk_err_session_ended">Session terminée</string>
+    <string name="desk_err_screen">Erreur de création de l\'écran</string>
+    <string name="desk_err_close_unconfirmed">Le service n\'a pas confirmé la fermeture de l\'écran. Quittez HeadSwap avant de vous reconnecter</string>
+    <string name="desk_err_input">Impossible de transmettre les commandes au bureau : %1$s</string>
+    <string name="desk_err_input_queue">La file des commandes est pleine. Reconnectez-vous</string>
+    <string name="desk_err_service_died">Le service du bureau s\'est arrêté ; l\'accès depuis un ordinateur est conservé</string>
+    <string name="desk_err_activate">Activez l\'accès depuis un ordinateur</string>
 
     <!-- Activation from the phone itself (wireless debugging), Settings - Mode -->
     <string name="pa_title">Activer Headswap</string>

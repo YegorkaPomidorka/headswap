@@ -18,6 +18,28 @@
     <string name="aa_ph_start_server">请在 Android Auto 中启动主机服务器</string>
     <string name="aa_ph_wait_frame">Android Auto：正在等待画面…</string>
     <string name="aa_ph_lost">Android Auto 已断开，正在重新连接…</string>
+    <!-- ошибки рабочего стола: на заглушке ГУ и в статусе на телефоне (DelegatedDexConnector) -->
+    <string name="desk_err_open_service">无法打开桌面服务：%1$s</string>
+    <string name="desk_err_service_null">桌面服务不可用。请从电脑激活访问权限</string>
+    <string name="desk_err_prepare">无法准备桌面</string>
+    <string name="desk_err_bind">Android 未启动桌面服务</string>
+    <string name="desk_err_access">电脑访问权限不可用</string>
+    <string name="desk_err_access_ended">访问已结束。请将手机连接电脑重新激活</string>
+    <string name="desk_err_no_first_frame">桌面在 30 秒内未发送第一帧</string>
+    <string name="desk_err_generic">桌面错误</string>
+    <string name="desk_err_service_timeout">桌面服务在 12 秒内未响应</string>
+    <string name="desk_err_stopped">连接已停止</string>
+    <string name="desk_err_service_unavailable">桌面服务不可用</string>
+    <string name="desk_err_need_android_desktop">电脑访问需要 Android Desktop 模式</string>
+    <string name="desk_err_version">桌面服务版本与应用不匹配</string>
+    <string name="desk_err_display">无法创建独立屏幕</string>
+    <string name="desk_err_session_ended">会话已结束</string>
+    <string name="desk_err_screen">创建屏幕出错</string>
+    <string name="desk_err_close_unconfirmed">服务未确认关闭屏幕。请先退出 HeadSwap 再重新连接</string>
+    <string name="desk_err_input">无法将控制传递给桌面：%1$s</string>
+    <string name="desk_err_input_queue">控制队列已满。请重新连接</string>
+    <string name="desk_err_service_died">桌面服务已结束；电脑访问权限仍保留</string>
+    <string name="desk_err_activate">请从电脑激活访问权限</string>
 
     <!-- 在手机上自行激活（无线调试），设置 - 模式 -->
     <string name="pa_title">激活 Headswap</string>

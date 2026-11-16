@@ -18,6 +18,28 @@
     <string name="aa_ph_start_server">شغّل خادم الوحدة الرئيسية في Android Auto</string>
     <string name="aa_ph_wait_frame">Android Auto: بانتظار إطار…</string>
     <string name="aa_ph_lost">انقطع Android Auto، جارٍ إعادة الاتصال…</string>
+    <!-- ошибки рабочего стола: на заглушке ГУ и в статусе на телефоне (DelegatedDexConnector) -->
+    <string name="desk_err_open_service">تعذّر فتح خدمة سطح المكتب: %1$s</string>
+    <string name="desk_err_service_null">خدمة سطح المكتب غير متاحة. فعّل الوصول من الكمبيوتر</string>
+    <string name="desk_err_prepare">تعذّر تجهيز سطح المكتب</string>
+    <string name="desk_err_bind">لم يشغّل Android خدمة سطح المكتب</string>
+    <string name="desk_err_access">الوصول من الكمبيوتر غير متاح</string>
+    <string name="desk_err_access_ended">انتهى الوصول. وصّل الهاتف بالكمبيوتر لإعادة التفعيل</string>
+    <string name="desk_err_no_first_frame">لم يرسل سطح المكتب الإطار الأول خلال 30 ثانية</string>
+    <string name="desk_err_generic">خطأ في سطح المكتب</string>
+    <string name="desk_err_service_timeout">لم تستجب خدمة سطح المكتب خلال 12 ثانية</string>
+    <string name="desk_err_stopped">تم إيقاف الاتصال</string>
+    <string name="desk_err_service_unavailable">خدمة سطح المكتب غير متاحة</string>
+    <string name="desk_err_need_android_desktop">يتطلب الوصول من الكمبيوتر وضع Android Desktop</string>
+    <string name="desk_err_version">إصدار خدمة سطح المكتب لا يطابق التطبيق</string>
+    <string name="desk_err_display">تعذّر إنشاء شاشة منفصلة</string>
+    <string name="desk_err_session_ended">انتهت الجلسة</string>
+    <string name="desk_err_screen">خطأ في إنشاء الشاشة</string>
+    <string name="desk_err_close_unconfirmed">لم تؤكد الخدمة إغلاق الشاشة. أغلق HeadSwap قبل إعادة الاتصال</string>
+    <string name="desk_err_input">تعذّر تمرير التحكم إلى سطح المكتب: %1$s</string>
+    <string name="desk_err_input_queue">قائمة أوامر التحكم ممتلئة. اتصل مرة أخرى</string>
+    <string name="desk_err_service_died">توقفت خدمة سطح المكتب؛ تم الاحتفاظ بالوصول من الكمبيوتر</string>
+    <string name="desk_err_activate">فعّل الوصول من الكمبيوتر</string>
 
     <!-- Activation from the phone itself (wireless debugging), Settings - Mode -->
     <string name="pa_title">تفعيل Headswap</string>
