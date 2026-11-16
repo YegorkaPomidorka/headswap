@@ -1217,8 +1217,9 @@ class BridgeService : Service() {
             val lp = com.yegorkapomidorka.headswap.launcher.LauncherPrefs(this)
             val pick = com.yegorkapomidorka.headswap.launcher.NavigatorPick
             val arabic = AppLocale.usesGlobalApps(this)
-            val installed = pick.known(arabic).filterTo(HashSet()) { packageManager.getLaunchIntentForPackage(it) != null }
-            if (pick.shadowWanted(aaPrefs.metaNavi, pick.effective(lp.navigator, installed, arabic), lp::navHints)) AaShadowNav.start(this)
+            val chinese = AppLocale.usesChineseApps(this)
+            val installed = pick.known(arabic, chinese).filterTo(HashSet()) { packageManager.getLaunchIntentForPackage(it) != null }
+            if (pick.shadowWanted(aaPrefs.metaNavi, pick.effective(lp.navigator, installed, arabic, chinese), lp::navHints)) AaShadowNav.start(this)
             else if (aaPrefs.metaNavi) AppLog.i("SHADOWNAV не стартую: у навигатора выключены подсказки на приборке", false)
             core.touchDecimationProvider = { aaPrefs.touchDecimation }
             core.dupDownFilterProvider = { aaPrefs.dupDownFilter }

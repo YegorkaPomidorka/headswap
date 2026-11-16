@@ -392,6 +392,44 @@ class LauncherLogicTest {
         assertEquals(NavigatorPick.DGIS, NavigatorPick.effective(NavigatorPick.DGIS, all))
     }
 
+    @Test fun chineseNavigatorsAreOnlyAmap() {
+        assertEquals(listOf(NavigatorPick.AMAP, NavigatorPick.AMAP_AUTO), NavigatorPick.tiles(true, chinese = true))
+        // ни Google, ни Waze: ни в плитках, ни по умолчанию, ни сохранённым
+        val all = setOf(NavigatorPick.GOOGLE_MAPS, NavigatorPick.WAZE, NavigatorPick.AMAP, NavigatorPick.AMAP_AUTO)
+        assertEquals(NavigatorPick.AMAP, NavigatorPick.defaultFor(all, arabic = true, chinese = true))
+        assertNull(NavigatorPick.defaultFor(setOf(NavigatorPick.GOOGLE_MAPS, NavigatorPick.WAZE), arabic = true, chinese = true))
+        assertEquals(NavigatorPick.AMAP, NavigatorPick.effective(NavigatorPick.GOOGLE_MAPS, all, arabic = true, chinese = true))
+        // две версии независимы: сохранённая держится, удалённая уступает другой
+        assertEquals(NavigatorPick.AMAP_AUTO, NavigatorPick.effective(NavigatorPick.AMAP_AUTO, all, arabic = true, chinese = true))
+        assertEquals(NavigatorPick.AMAP_AUTO, NavigatorPick.effective(NavigatorPick.AMAP, setOf(NavigatorPick.AMAP_AUTO), arabic = true, chinese = true))
+    }
+
+    @Test fun amapOnlyInChineseBranch() {
+        for (arabic in listOf(false, true)) {
+            assertFalse(NavigatorPick.AMAP in NavigatorPick.tiles(arabic) || NavigatorPick.AMAP_AUTO in NavigatorPick.tiles(arabic))
+            assertFalse(NavigatorPick.AMAP in NavigatorPick.known(arabic) || NavigatorPick.AMAP_AUTO in NavigatorPick.known(arabic))
+        }
+        assertEquals(listOf(NavigatorPick.GOOGLE_MAPS, NavigatorPick.WAZE), NavigatorPick.tiles(true))
+    }
+
+    @Test fun amapIsWindowOnlyAndNeverWakesShadowAa() {
+        assertTrue(NavigatorPick.noHints(NavigatorPick.AMAP))
+        assertTrue(NavigatorPick.noHints(NavigatorPick.AMAP_AUTO))
+        val nav = NavigatorPick.effective(NavigatorPick.AMAP, setOf(NavigatorPick.GOOGLE_MAPS, NavigatorPick.AMAP), arabic = true, chinese = true)
+        assertEquals(NavigatorPick.AMAP, nav)
+        assertFalse(NavigatorPick.shadowWanted(true, nav) { true })
+    }
+
+    @Test fun navigatorTilesFitTwoRowsAndAreKnown() {
+        // плиток по две в ряд, рядов под них в настройках два (пять рядов: плитки, подсказки, масштаб, перезапуск)
+        for ((arabic, chinese) in listOf(false to false, true to false, true to true)) {
+            val tiles = NavigatorPick.tiles(arabic, chinese)
+            assertTrue(tiles.size <= 4)
+            assertEquals(tiles.size, tiles.distinct().size)
+            for (pkg in tiles) assertEquals(pkg, NavigatorPick.effective(pkg, setOf(pkg), arabic, chinese))
+        }
+    }
+
     @Test fun arabicHidesYandexMusic() {
         val ar = PlayerChip.online(true)
         val inst = setOf(PlayerChip.YANDEX, PlayerChip.VK)

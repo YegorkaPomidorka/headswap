@@ -47,15 +47,31 @@ object AppLocale {
     private val GLOBAL_APPS_LANGS = setOf("ar", "fr", "zh")
 
     /**
-     * Интерфейс на языке из [GLOBAL_APPS_LANGS] (выбран явно или «Системный» при такой системе). Без IPC: на 33+
-     * per-app язык уже в конфигурации контекста, ниже - выбор из prefs или язык системы.
+     * Language тега, а не весь тег: на Android 10–12 в prefs лежит «zh-CN», и без разбора китайский интерфейс
+     * не попадал ни в глобальную ветку, ни в китайскую. Фикс из форка TNTfish/headswap.
      */
-    fun usesGlobalApps(ctx: Context): Boolean {
-        if (Build.VERSION.SDK_INT >= 33) return ctx.resources.configuration.locales[0]?.language in GLOBAL_APPS_LANGS
+    internal fun languageOf(tag: String?): String? = tag?.let { Locale.forLanguageTag(it).language }
+
+    internal fun usesGlobalAppsForLanguage(tag: String?): Boolean = languageOf(tag) in GLOBAL_APPS_LANGS
+
+    /** Китайский интерфейс: навигаторы только Amap и Amap Auto (Егор 16.11), остальное - как в глобальной ветке. */
+    internal fun usesChineseAppsForLanguage(tag: String?): Boolean = languageOf(tag) == "zh"
+
+    /**
+     * Язык интерфейса (выбран явно или «Системный» - язык системы). Без IPC: на 33+ per-app язык уже в конфигурации
+     * контекста, ниже - выбор из prefs или язык системы.
+     */
+    private fun uiLanguage(ctx: Context): String? {
+        if (Build.VERSION.SDK_INT >= 33) return ctx.resources.configuration.locales[0]?.language
         val t = stored(ctx)
-        val lang = if (t == SYSTEM) android.content.res.Resources.getSystem().configuration.locales[0]?.language else t
-        return lang in GLOBAL_APPS_LANGS
+        return if (t == SYSTEM) android.content.res.Resources.getSystem().configuration.locales[0]?.language else t
     }
+
+    /** Интерфейс на языке из [GLOBAL_APPS_LANGS]. */
+    fun usesGlobalApps(ctx: Context): Boolean = usesGlobalAppsForLanguage(uiLanguage(ctx))
+
+    /** Китайский интерфейс ([usesChineseAppsForLanguage]); он же и глобальный. */
+    fun usesChineseApps(ctx: Context): Boolean = usesChineseAppsForLanguage(uiLanguage(ctx))
 
     /** Нужен ли ручной recreate() после [set]. */
     val needsRecreate: Boolean get() = Build.VERSION.SDK_INT < 33
