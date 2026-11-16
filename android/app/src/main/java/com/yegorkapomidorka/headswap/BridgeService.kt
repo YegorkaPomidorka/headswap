@@ -65,6 +65,7 @@ import com.yegorkapomidorka.headswap.link.Tcp6Listener
 import com.yegorkapomidorka.headswap.link.TransportCaps
 import com.yegorkapomidorka.headswap.link.bt.CarBtState
 import com.yegorkapomidorka.headswap.link.bt.CarlifeBtProbe
+import com.yegorkapomidorka.headswap.link.car.AirAutoOffQuirk
 import com.yegorkapomidorka.headswap.link.car.AutoOffDebounce
 import com.yegorkapomidorka.headswap.link.car.BT_HINT_MS
 import com.yegorkapomidorka.headswap.link.car.BtReconnectHint
@@ -732,6 +733,11 @@ class BridgeService : Service() {
 
     /** Машина ушла по Bluetooth и новый ACL_CONNECTED не пришёл: авторежим выключаем. USB-сессию не трогаем никогда. */
     private fun applyAutoOff() {
+        if (AirAutoOffQuirk.ignoreBtAutoOff(AaPrefs(this).lastAirHuVw20082120, wifiBMode, autoStarted)) {
+            // VW 20082120: ACL мигает при подключении, а ГУ после ранней EOF переподключается сама - ждём дальше (ADR 0041)
+            WLog.ev(WLog.TRIGGER, "auto-off", "ignored" to "vw20082120", "session" to (session != null))
+            return
+        }
         autoMode = false
         cancelHint()
         if (session != null) {
@@ -1451,6 +1457,15 @@ class BridgeService : Service() {
         if (sessionMode == BridgeMode.DESKTOP) onDesktopSessionClosing(s)
         session = null
         markCarSeen()
+        run {
+            val prefs = AaPrefs(this)
+            val was = prefs.lastAirHuVw20082120
+            val now = AirAutoOffQuirk.remember(was, s.isAir, s.huStatisticChannel)
+            if (now != was) {
+                prefs.lastAirHuVw20082120 = now
+                WLog.ev(WLog.TRIGGER, "air-hu-vw20082120", "value" to now)
+            }
+        }
         CarLifeState.wirelessSession = false
         if (dongle != null && !stopRequested) {
             // свисток: ServerSocket живёт дальше, стик подключится заново; сервис не гасим

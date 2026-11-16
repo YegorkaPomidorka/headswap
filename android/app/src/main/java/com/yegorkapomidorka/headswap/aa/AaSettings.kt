@@ -16,6 +16,11 @@ class AaPrefs(ctx: Context) {
         get() = sp.getString("certSet", "jvc") ?: "jvc"
         set(v) = sp.edit().putString("certSet", v).apply()
 
+    /** Последняя ГУ по воздуху - VW 20082120 ([com.yegorkapomidorka.headswap.link.car.AirAutoOffQuirk]). */
+    var lastAirHuVw20082120: Boolean
+        get() = sp.getBoolean("lastAirHuVw20082120", false)
+        set(v) = sp.edit().putBoolean("lastAirHuVw20082120", v).apply()
+
     /** Звук AA -> CarLife по USB; по умолчанию вкл. */
     var usbAudio: Boolean
         get() = sp.getBoolean("usbAudio", true)

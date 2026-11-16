@@ -84,6 +84,9 @@ class CarLifeSession(
 
     /** Воздух (6 сокетов): своя лесенка битрейта, PAUSE-keepalive чаще, WL-строки видео. USB и tcp-debug - как было. */
     private val air = transport.caps == TransportCaps.TCP6
+
+    /** STATISTIC_INFO channel ГУ этой сессии, null - не пришёл. */
+    val huStatisticChannel: String? get() = bridge.huStatisticChannel
     private val bitrateProfile = if (air) BitrateProfile.WIFI else BitrateProfile.USB
     private val legacyBitratePolicy = BitratePolicy(mode.bitrate, profile = bitrateProfile)
     private val surfaceBitratePolicy: BitratePolicy by lazy { DesktopVideoQuality.bitratePolicy(bitrateProfile, mode.bitrate, crv = bridge.crvDesktopPacing) }

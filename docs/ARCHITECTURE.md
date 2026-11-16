@@ -123,6 +123,7 @@ CONTROL0, SENSOR1, VIDEO2, INPUT3, SPEECH4, SYSTEM5, MEDIA6, MIC7, BT8, MEDIA_PL
 | `huDesayG6S` | Mazda CX-5 Desay G6S, ch 20622116 | без маршрутного NAVI=1; на PAUSE пустой VIDEO_DATA (USB) / heartbeat (воздух) |
 | `huHonda` | ch 2077xxxx/2083xxxx | roadName под приборку, ждать подписку, перевзвод NAVI |
 | `huVw20082120` | ch 20082120/22/34/14, 21290002 | **по смыслу «heartbeat на PAUSE каждые 100 мс»**, имя историческое (ADR 0007) |
+| `huVw20082120Only` | строго ch 20082120 | по воздуху IDR энкодера раз в 10 с (`AirIdrInterval`, ADR 0040); prefs `lastAirHuVw20082120` — отбой по Bluetooth не гасит ожидание по воздуху (`AirAutoOffQuirk`, ADR 0041) |
 | `huIdleVideoHeartbeat` | 20082114, 21290002 | heartbeat и без PAUSE после 1 с без кадров |
 | `huVwCns2Delphi` | 20082114 | речь в канал VR, пейсер тача, свои кнопки звонка |
 | `huVwBt1420` | «VW BT 1420» | воздух: heartbeat на PAUSE, тёплое возобновление |
