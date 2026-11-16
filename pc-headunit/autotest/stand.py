@@ -131,17 +131,18 @@ class Stand:
         self.wait_ready()
 
     # Пока мост показывает заглушку («Запускаю рабочий стол…»), касания он не принимает: в логе телефона их нет вовсе.
-    # Текст заглушки зашит по-русски (DelegatedDexConnector.status) на любом языке - ищем русским OCR.
-    PLACEHOLDERS = ("Запускаю рабочий стол", "Ожидаю повторного подключения", "Запускаю")
+    # Тексты заглушки (DelegatedDexConnector, AaBridgeCore): ищем начало фразы, «готов» идёт с размером экрана.
+    PLACEHOLDER_KEYS = ("desk_ph_starting", "desk_ph_wait_usb", "desk_connecting", "desk_waiting_frame")
 
     def wait_ready(self, timeout: float = 30.0):
         """Дождаться настоящего экрана вместо заглушки моста и дать ему успокоиться."""
         end = time.monotonic() + timeout
-        ru = self.ocr if self.lang == "ru" else WinOcr("ru")
+        w, h = self.size
+        marks = [self.R(k).rstrip("…. ") for k in self.PLACEHOLDER_KEYS] + [self.R("desk_ph_ready", w, h).split(",")[0]]
         while True:
             f = self.settle(quiet=1.0)
-            words = ru.read(f)
-            if not any(find_in(words, p, partial=True) for p in self.PLACEHOLDERS):
+            words = self.ocr.read(f)
+            if not any(find_in(words, p, partial=True, fuzz=self.fuzz) for p in marks):
                 self.act("screen ready: " + " | ".join(lines_text(words))[:200])
                 return
             if time.monotonic() > end:

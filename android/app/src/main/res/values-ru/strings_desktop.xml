@@ -9,6 +9,15 @@
     <string name="desk_recovering">Восстанавливаю рабочий стол (%1$d/2)…</string>
     <string name="desk_recovery_stopped">Восстановление остановлено. Проверьте USB, доступ к рабочему столу и разблокировку телефона</string>
     <string name="desk_recovery_screen_busy">Предыдущий экран ещё не освобождён; автоматический запуск отменён</string>
+    <!-- заглушка моста на ГУ (DelegatedDexConnector, AaBridgeCore в режиме AA) -->
+    <string name="desk_ph_starting">Запускаю рабочий стол…</string>
+    <string name="desk_ph_ready">Рабочий стол %1$d×%2$d готов, ожидаю видео…</string>
+    <string name="desk_ph_wait_usb">Ожидаю повторного подключения USB CarLife…</string>
+    <string name="desk_ph_stopped">Рабочий стол остановлен</string>
+    <string name="aa_ph_connecting">Подключаю Android Auto…</string>
+    <string name="aa_ph_start_server">Запустите сервер ГУ в Android Auto</string>
+    <string name="aa_ph_wait_frame">Android Auto: жду кадр…</string>
+    <string name="aa_ph_lost">Android Auto отключился, переподключаю…</string>
 
     <!-- Активация с самого телефона (беспроводная отладка), Настройки - Режим -->
     <string name="pa_title">Активируйте Headswap</string>

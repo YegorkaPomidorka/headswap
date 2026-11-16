@@ -13,7 +13,9 @@ import android.os.IBinder
 import android.os.Looper
 import android.view.KeyEvent
 import android.view.MotionEvent
+import com.yegorkapomidorka.headswap.AppLocale
 import com.yegorkapomidorka.headswap.AppLog
+import com.yegorkapomidorka.headswap.R
 import com.yegorkapomidorka.headswap.embed.EmbeddedSessionRegistry
 import com.yegorkapomidorka.headswap.aa.AaBridgeCore
 import com.yegorkapomidorka.headswap.aa.AaLifecycle
@@ -108,7 +110,7 @@ class DelegatedDexConnector(context: Context, private val core: AaBridgeCore,
                 core.peer = this
                 core.enableDesktopSurface(this)
                 core.desktopMedia = DesktopMediaControl(context)
-                status("Запускаю рабочий стол…")
+                status(text(R.string.desk_ph_starting))
             } catch (e: Exception) { fail(e.message ?: "Не удалось подготовить рабочий стол"); return }
         }
         main.post {
@@ -169,7 +171,7 @@ class DelegatedDexConnector(context: Context, private val core: AaBridgeCore,
                 DexState.displayId = id
                 EmbeddedSessionRegistry.activate(this, remote, id, this.input)
             }
-            status("Рабочий стол ${input.width}×${input.height} готов, ожидаю видео…")
+            status(text(R.string.desk_ph_ready, input.width, input.height))
             AppLog.i("DESKTOP mode=$desktopMode delegated display=$id generation=$generation native=${input.width}x${input.height} density=$density preview=false singleEncode=true", false)
         } catch (e: Exception) {
             if (!stopping.get()) {
@@ -224,7 +226,7 @@ class DelegatedDexConnector(context: Context, private val core: AaBridgeCore,
         this.generation = 0
         retiringGeneration = 0
         displayId = -1
-        if (!stopping.get()) status("Ожидаю повторного подключения USB CarLife…")
+        if (!stopping.get()) status(text(R.string.desk_ph_wait_usb))
     }
 
     override fun onFirstFrame(generation: Long) {
@@ -354,7 +356,7 @@ class DelegatedDexConnector(context: Context, private val core: AaBridgeCore,
                 DexState.running = false
                 DexState.displayId = -1
                 DexState.error = failure
-                status(failure ?: "Рабочий стол остановлен")
+                status(failure ?: text(R.string.desk_ph_stopped))
                 finished.countDown()
             }
         }
@@ -379,6 +381,9 @@ class DelegatedDexConnector(context: Context, private val core: AaBridgeCore,
             }
         }
     }
+
+    /** Текст заглушки на языке интерфейса (на Android 10-12 язык из prefs, см. AppLocale.wrap). */
+    private fun text(id: Int, vararg args: Any): String = AppLocale.wrap(context).getString(id, *args)
 
     private fun status(text: String, placeholder: Boolean = true) {
         DexState.status = text

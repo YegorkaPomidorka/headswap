@@ -10,6 +10,15 @@
     <string name="desk_recovering">Restoring the desktop (%1$d/2)…</string>
     <string name="desk_recovery_stopped">Restore stopped. Check USB, desktop access and unlock the phone</string>
     <string name="desk_recovery_screen_busy">The previous screen is not released yet; automatic restore cancelled</string>
+    <!-- заглушка моста на ГУ (DelegatedDexConnector, AaBridgeCore в режиме AA) -->
+    <string name="desk_ph_starting">Starting the desktop…</string>
+    <string name="desk_ph_ready">Desktop %1$d×%2$d is ready, waiting for video…</string>
+    <string name="desk_ph_wait_usb">Waiting for USB CarLife to reconnect…</string>
+    <string name="desk_ph_stopped">Desktop stopped</string>
+    <string name="aa_ph_connecting">Connecting Android Auto…</string>
+    <string name="aa_ph_start_server">Start the head unit server in Android Auto</string>
+    <string name="aa_ph_wait_frame">Android Auto: waiting for a frame…</string>
+    <string name="aa_ph_lost">Android Auto disconnected, reconnecting…</string>
 
     <!-- Activation from the phone itself (wireless debugging), Settings - Mode -->
     <string name="pa_title">Activate Headswap</string>

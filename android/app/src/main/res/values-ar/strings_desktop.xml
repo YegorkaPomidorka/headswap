@@ -9,6 +9,15 @@
     <string name="desk_recovering">جارٍ استعادة سطح المكتب (%1$d/2)…</string>
     <string name="desk_recovery_stopped">توقفت الاستعادة. تحقق من USB والوصول إلى سطح المكتب وافتح قفل الهاتف</string>
     <string name="desk_recovery_screen_busy">لم يتم تحرير الشاشة السابقة بعد؛ أُلغيت الاستعادة التلقائية</string>
+    <!-- заглушка моста на ГУ (DelegatedDexConnector, AaBridgeCore в режиме AA) -->
+    <string name="desk_ph_starting">جارٍ تشغيل سطح المكتب…</string>
+    <string name="desk_ph_ready">سطح المكتب %1$d×%2$d جاهز، بانتظار الفيديو…</string>
+    <string name="desk_ph_wait_usb">بانتظار إعادة اتصال USB CarLife…</string>
+    <string name="desk_ph_stopped">تم إيقاف سطح المكتب</string>
+    <string name="aa_ph_connecting">جارٍ توصيل Android Auto…</string>
+    <string name="aa_ph_start_server">شغّل خادم الوحدة الرئيسية في Android Auto</string>
+    <string name="aa_ph_wait_frame">Android Auto: بانتظار إطار…</string>
+    <string name="aa_ph_lost">انقطع Android Auto، جارٍ إعادة الاتصال…</string>
 
     <!-- Activation from the phone itself (wireless debugging), Settings - Mode -->
     <string name="pa_title">تفعيل Headswap</string>

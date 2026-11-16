@@ -9,6 +9,15 @@
     <string name="desk_recovering">正在恢复桌面（%1$d/2）…</string>
     <string name="desk_recovery_stopped">恢复已停止。请检查 USB、桌面访问权限，并解锁手机</string>
     <string name="desk_recovery_screen_busy">上一个屏幕尚未释放，已取消自动恢复</string>
+    <!-- заглушка моста на ГУ (DelegatedDexConnector, AaBridgeCore в режиме AA) -->
+    <string name="desk_ph_starting">正在启动桌面…</string>
+    <string name="desk_ph_ready">桌面 %1$d×%2$d 已就绪，正在等待视频…</string>
+    <string name="desk_ph_wait_usb">正在等待 USB CarLife 重新连接…</string>
+    <string name="desk_ph_stopped">桌面已停止</string>
+    <string name="aa_ph_connecting">正在连接 Android Auto…</string>
+    <string name="aa_ph_start_server">请在 Android Auto 中启动主机服务器</string>
+    <string name="aa_ph_wait_frame">Android Auto：正在等待画面…</string>
+    <string name="aa_ph_lost">Android Auto 已断开，正在重新连接…</string>
 
     <!-- 在手机上自行激活（无线调试），设置 - 模式 -->
     <string name="pa_title">激活 Headswap</string>
