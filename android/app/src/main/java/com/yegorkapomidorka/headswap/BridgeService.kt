@@ -1473,6 +1473,12 @@ class BridgeService : Service() {
             CarLifeState.status = CarLifeState.wireless!!
             WLog.ev(WLog.TCP, "dongle-rearm", "after" to reason)
         }
+        if (!autoMode && !stopRequested &&
+            AirAutoOffQuirk.ignoreBtAutoOff(AaPrefs(this).lastAirHuVw20082120, wifiBMode, autoStarted)) {
+            // отбой пришёл во время первой сессии, ГУ узнали только сейчас: авторежим возвращаем, ждём дальше (ADR 0041)
+            autoMode = true
+            WLog.ev(WLog.TRIGGER, "auto-off", "ignored" to "vw20082120", "after" to "session")
+        }
         if (wifiBMode && autoStarted && !autoMode && !stopRequested) {
             // машина ушла по Bluetooth, пока шла беспроводная сессия (ГУ держала Wi-Fi): ожидание заново не начинаем
             wifiBMode = false
