@@ -1355,7 +1355,14 @@ class BridgeService : Service() {
             AaState.cert = loaded.creds.certSet + if (loaded.error != null) " (ОТКАТ с ${loaded.requested})" else ""
             AaState.status = "мост: старт"
             val log = { line: String, ui: Boolean -> AppLog.i(line, ui) }
-            val core = AaBridgeCore(log, clockUs = { SystemClock.elapsedRealtimeNanos() / 1_000 })
+            val core = AaBridgeCore(
+                log,
+                clockUs = { SystemClock.elapsedRealtimeNanos() / 1_000 },
+                connectingText = getString(R.string.aa_ph_connecting),
+                waitingText = getString(R.string.aa_ph_wait_frame),
+                disconnectedText = getString(R.string.aa_ph_lost),
+                startServerText = getString(R.string.aa_ph_start_server),
+            )
             core.micModeProvider = { aaPrefs.micMode }
             val audio = getSystemService(AudioManager::class.java)
             core.phoneCallProvider = {

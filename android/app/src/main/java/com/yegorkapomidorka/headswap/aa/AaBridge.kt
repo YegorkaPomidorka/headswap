@@ -109,6 +109,8 @@ class AaBridgeCore(
     private val connectingText: String = TEXT_CONNECTING,
     private val waitingText: String = TEXT_WAIT_FRAME,
     private val disconnectedText: String = TEXT_AA_LOST,
+    /** «Запустите сервер ГУ» на заглушке; в приложении из ресурсов (язык интерфейса), в тестах константа. */
+    val startServerText: String = TEXT_START_SERVER,
 ) : AaVideoSink, AaAudioSink, AaMicSink, AaMetaSink, TranscodeOutput, RefPictureSink {
     enum class Source { PLACEHOLDER, AA }
 
@@ -3407,7 +3409,7 @@ class AaConnector(
                 else -> failures.reset()
             }
             // на ГУ «Запустите сервер ГУ» только когда он правда не отвечает; короткий отказ после ByeBye - «Подключаю»
-            if (failures.needsStart()) core.showStatus(AaBridgeCore.TEXT_START_SERVER)
+            if (failures.needsStart()) core.showStatus(core.startServerText)
             if (!s.connected) {
                 if (!unavailableLogged) {
                     log("BRIDGE сервер ГУ Android Auto недоступен (connection refused), повторяю каждые ${retryMs / 1000.0} с", true)
