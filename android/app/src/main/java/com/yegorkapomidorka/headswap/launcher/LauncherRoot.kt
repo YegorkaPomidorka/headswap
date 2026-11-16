@@ -37,6 +37,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.layout.layout
+import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
@@ -200,7 +202,22 @@ private fun Rail() {
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.SpaceBetween,
         ) {
-            if (s.clockInRail) Txt(status.time, s.f1, color = Pal.RAIL, weight = FontWeight.SemiBold, mono = true)
+            if (s.clockInRail && !s.clockRailAmPm) Txt(status.time, s.f1, color = Pal.RAIL, weight = FontWeight.SemiBold, mono = true)
+            // 12 ч: «9:05», под двоеточием мелко AM/PM. Подпись нулевой ширины по центру колонки двоеточия: шире «:», но строку не раздвигает
+            if (s.clockRailAmPm) Ltr {
+                val parts = status.time.split(":", limit = 2)
+                Row(verticalAlignment = Alignment.Top) {
+                    Txt(parts[0], s.f1, color = Pal.RAIL, weight = FontWeight.SemiBold, mono = true)
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Txt(":", s.f1, color = Pal.RAIL, weight = FontWeight.SemiBold, mono = true)
+                        Txt(if (status.pm) "PM" else "AM", s.railAmPmFs, Modifier.layout { measurable, c ->
+                            val p = measurable.measure(c.copy(minWidth = 0, maxWidth = Constraints.Infinity))
+                            layout(0, p.height) { p.place(-p.width / 2, 0) }
+                        }, color = accent, weight = FontWeight.Bold, mono = true)
+                    }
+                    Txt(parts.getOrElse(1) { "" }, s.f1, color = Pal.RAIL, weight = FontWeight.SemiBold, mono = true)
+                }
+            }
             // «Средняя»: часы, золотая чёрточка и минуты столбиком; в «Маленькой» и «Обрезанной» часов нет
             if (s.clockStacked) {
                 val parts = status.time.split(":", limit = 2)

@@ -16,6 +16,13 @@ class LauncherSpecTest {
         assertTrue(b.amPmInline)
     }
 
+    @Test fun normalRailTwelveHourReservesAmPmLine() {
+        val a = LauncherSpecs.forSize(1280, 720, RailSize.NORMAL, twelveHour = false)
+        val b = LauncherSpecs.forSize(1280, 720, RailSize.NORMAL, twelveHour = true)
+        assertTrue(b.clockRailAmPm)
+        assertEquals(a.clockH + b.railAmPmFs, b.clockH)
+    }
+
     /** «—PM—» одной строкой влезает в «Среднюю» рейку на всех экранах таблицы. */
     @Test fun amPmInlineFitsOnAllLandscapeSizes() {
         for (row in LauncherSpecs.TABLE) {

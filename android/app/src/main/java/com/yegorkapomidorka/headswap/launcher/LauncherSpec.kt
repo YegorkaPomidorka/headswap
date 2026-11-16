@@ -67,8 +67,12 @@ class LauncherSpec(
     val amPmSepW = max(4, r(sepW * 0.6))
     /** «—PM—» одной строкой, если влезает (моноширинные 2 знака ~1,2 кегля); иначе столбиком: чёрточка, PM, чёрточка. */
     val amPmInline = 2 * amPmSepW + 2 * clockGap + r(amPmFs * 1.25) <= rail - 2 * g4
+    /** «Обычная» при 12 ч: AM/PM мелко прямо под двоеточием (Егор 16.11). */
+    val clockRailAmPm = clockInRail && twelveHour
+    val railAmPmFs = r(f1 * 0.4)
     /** Высота блока часов в рейке. */
     val clockH = when {
+        clockRailAmPm -> f1 + railAmPmFs
         clockInRail -> f1
         clockAmPm && amPmInline -> 2 * clockHr + max(sepH, amPmFs) + 2 * clockGap
         clockAmPm -> 2 * clockHr + amPmFs + 2 * sepH + 4 * clockGap
