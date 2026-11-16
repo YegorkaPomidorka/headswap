@@ -92,7 +92,8 @@ fun LauncherRoot(connected: Boolean) {
         val w = constraints.maxWidth
         val h = constraints.maxHeight
         val railSize = model.railSize
-        val spec = remember(w, h, railSize) { LauncherSpecs.forSize(w, h, railSize) }
+        val twelveHour = model.clock12h
+        val spec = remember(w, h, railSize, twelveHour) { LauncherSpecs.forSize(w, h, railSize, twelveHour) }
         val metrics = remember(spec, density) { LauncherMetrics(spec, density) }
         // раскладка плашек в портрете своя ([LauncherModel.layout]): флаг ведёт модель, спека у каждого экрана своя
         SideEffect { model.portrait = spec.portrait }
@@ -210,7 +211,26 @@ private fun Rail() {
                         Txt(parts[0], s.clockHr, Modifier.wrapContentHeight(unbounded = true), color = Pal.RAIL,
                             weight = FontWeight.SemiBold, mono = true)
                     }
-                    Box(Modifier.width(m.dp(s.sepW)).height(m.dp(s.sepH)).clip(RoundedCornerShape(m.dp(s.sepH))).background(accent))
+                    if (!s.clockAmPm) Box(Modifier.width(m.dp(s.sepW)).height(m.dp(s.sepH)).clip(RoundedCornerShape(m.dp(s.sepH))).background(accent))
+                    else {
+                        // 12 ч: «—PM—» на месте чёрточки; не влезает в ширину рейки - столбиком
+                        val dash = @Composable {
+                            Box(Modifier.width(m.dp(s.amPmSepW)).height(m.dp(s.sepH)).clip(RoundedCornerShape(m.dp(s.sepH))).background(accent))
+                        }
+                        val label = @Composable {
+                            Box(Modifier.height(m.dp(s.amPmFs)), contentAlignment = Alignment.Center) {
+                                Txt(if (status.pm) "PM" else "AM", s.amPmFs, Modifier.wrapContentHeight(unbounded = true),
+                                    color = accent, weight = FontWeight.Bold, mono = true)
+                            }
+                        }
+                        if (s.amPmInline) Ltr {
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(m.dp(s.clockGap))) {
+                                dash(); label(); dash()
+                            }
+                        } else Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(m.dp(s.clockGap))) {
+                            dash(); label(); dash()
+                        }
+                    }
                     Box(Modifier.height(m.dp(s.clockHr)), contentAlignment = Alignment.Center) {
                         Txt(parts.getOrElse(1) { "" }, s.clockHr, Modifier.wrapContentHeight(unbounded = true), color = Pal.SEC2,
                             weight = FontWeight.SemiBold, mono = true)

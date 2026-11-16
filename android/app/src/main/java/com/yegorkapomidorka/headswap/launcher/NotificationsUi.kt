@@ -110,7 +110,7 @@ fun NotificationsOverlay() {
     val spec = if (nt >= bs.t) bs else {
         val q = nt.toFloat() / bs.t
         fun sc(v: Int) = max(1, Math.round(v * q))
-        LauncherSpec(bs.w, bs.h, nt, sc(bs.g), sc(bs.m), sc(bs.f1), sc(bs.f2), sc(bs.f3), bs.railSize)
+        LauncherSpec(bs.w, bs.h, nt, sc(bs.g), sc(bs.m), sc(bs.f1), sc(bs.f2), sc(bs.f3), bs.railSize, bs.twelveHour)
     }
     val density = LocalDensity.current
     val metrics = remember(spec, density) { if (spec === bs) base else LauncherMetrics(spec, density) }

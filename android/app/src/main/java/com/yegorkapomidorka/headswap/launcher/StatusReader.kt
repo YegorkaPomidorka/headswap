@@ -17,6 +17,8 @@ import java.util.Locale
 /** Рейка и строка статуса: время, сеть, Bluetooth, Wi-Fi и громкость медиа телефона. Ничего не нажимается. */
 data class StatusInfo(
     val time: String = "--:--", val date: String = "", val net: String = NetLabel.NONE,
+    /** После полудня: «PM» в «Средней» рейке при 12 ч ([LauncherSpec.clockAmPm]). */
+    val pm: Boolean = false,
     /** Уровень сотового сигнала 0..4 для столбиков в рейке; -1 - не сотовая сеть или уровень неизвестен. */
     val signal: Int = -1,
     val bluetooth: Boolean = false, val wifi: Boolean = false, val volume: Int = 0,
@@ -32,6 +34,7 @@ internal object StatusReader {
         val battery = BatteryLogic.read(ctx)
         return StatusInfo(
             time = ClockFormat.format(now, twelveHour),
+            pm = now.hour >= 12,
             date = weekday(now.dayOfWeek, appLocale(ctx)) + " " + now.format(dateFormat),
             net = network(ctx),
             signal = signal(ctx),
