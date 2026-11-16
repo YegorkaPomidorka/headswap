@@ -47,6 +47,13 @@ object AppLocale {
     private val GLOBAL_APPS_LANGS = setOf("ar", "fr", "zh")
 
     /**
+     * По language тега, а не по всему тегу: на Android 10–12 в prefs лежит «zh-CN», и без разбора китайский интерфейс
+     * попадал в ветку ru/en (без Amap). Фикс из форка TNTfish/headswap.
+     */
+    internal fun usesGlobalAppsForLanguage(tag: String?): Boolean =
+        tag?.let { Locale.forLanguageTag(it).language } in GLOBAL_APPS_LANGS
+
+    /**
      * Интерфейс на языке из [GLOBAL_APPS_LANGS] (выбран явно или «Системный» при такой системе). Без IPC: на 33+
      * per-app язык уже в конфигурации контекста, ниже - выбор из prefs или язык системы.
      */
@@ -54,7 +61,7 @@ object AppLocale {
         if (Build.VERSION.SDK_INT >= 33) return ctx.resources.configuration.locales[0]?.language in GLOBAL_APPS_LANGS
         val t = stored(ctx)
         val lang = if (t == SYSTEM) android.content.res.Resources.getSystem().configuration.locales[0]?.language else t
-        return lang in GLOBAL_APPS_LANGS
+        return usesGlobalAppsForLanguage(lang)
     }
 
     /** Нужен ли ручной recreate() после [set]. */

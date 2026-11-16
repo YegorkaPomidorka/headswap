@@ -392,6 +392,38 @@ class LauncherLogicTest {
         assertEquals(NavigatorPick.DGIS, NavigatorPick.effective(NavigatorPick.DGIS, all))
     }
 
+    @Test fun amapOnlyInGlobalBranchAndSelectable() {
+        assertTrue(NavigatorPick.AMAP in NavigatorPick.tiles(true) && NavigatorPick.AMAP_AUTO in NavigatorPick.tiles(true))
+        assertFalse(NavigatorPick.AMAP in NavigatorPick.tiles(false) || NavigatorPick.AMAP_AUTO in NavigatorPick.tiles(false))
+        // старые умолчания глобальной ветки не сдвинулись: Google, потом Waze
+        val all = setOf(NavigatorPick.GOOGLE_MAPS, NavigatorPick.WAZE, NavigatorPick.AMAP, NavigatorPick.AMAP_AUTO)
+        assertEquals(NavigatorPick.GOOGLE_MAPS, NavigatorPick.defaultFor(all, arabic = true))
+        assertEquals(NavigatorPick.AMAP, NavigatorPick.defaultFor(setOf(NavigatorPick.AMAP, NavigatorPick.AMAP_AUTO), arabic = true))
+        // две версии независимы: сохранённая держится, удалённая уступает другой
+        for (pkg in listOf(NavigatorPick.AMAP, NavigatorPick.AMAP_AUTO)) assertEquals(pkg, NavigatorPick.effective(pkg, all, arabic = true))
+        assertEquals(NavigatorPick.AMAP_AUTO, NavigatorPick.effective(NavigatorPick.AMAP, setOf(NavigatorPick.AMAP_AUTO), arabic = true))
+    }
+
+    @Test fun amapIsWindowOnlyAndNeverWakesShadowAa() {
+        assertTrue(NavigatorPick.noHints(NavigatorPick.AMAP))
+        assertTrue(NavigatorPick.noHints(NavigatorPick.AMAP_AUTO))
+        // сохранён Amap при установленных Google: выбор не откатывается на Google, теневая AA не нужна
+        val installed = setOf(NavigatorPick.GOOGLE_MAPS, NavigatorPick.AMAP)
+        val nav = NavigatorPick.effective(NavigatorPick.AMAP, installed, arabic = true)
+        assertEquals(NavigatorPick.AMAP, nav)
+        assertFalse(NavigatorPick.shadowWanted(true, nav) { true })
+    }
+
+    @Test fun navigatorTilesFitTwoRowsAndAreKnown() {
+        // плиток по две в ряд, рядов под них в настройках два (пять рядов: плитки, подсказки, масштаб, перезапуск)
+        for (arabic in listOf(false, true)) {
+            val tiles = NavigatorPick.tiles(arabic)
+            assertTrue(tiles.size <= 4)
+            assertEquals(tiles.size, tiles.distinct().size)
+            for (pkg in tiles) assertEquals(pkg, NavigatorPick.effective(pkg, setOf(pkg), arabic))
+        }
+    }
+
     @Test fun arabicHidesYandexMusic() {
         val ar = PlayerChip.online(true)
         val inst = setOf(PlayerChip.YANDEX, PlayerChip.VK)

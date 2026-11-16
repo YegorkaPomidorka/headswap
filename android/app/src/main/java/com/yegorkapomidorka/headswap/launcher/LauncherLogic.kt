@@ -115,12 +115,24 @@ object NavigatorPick {
     const val GOOGLE_MAPS = "com.google.android.apps.maps"
     const val DGIS = "ru.dublgis.dgismobile"
     const val WAZE = "com.waze"
+    /** Amap (高德地图), телефонный; идея из форка TNTfish/headswap. */
+    const val AMAP = "com.autonavi.minimap"
+    /** Amap Auto (高德地图车机版), версия для ГУ; ставится на телефон отдельно от [AMAP]. */
+    const val AMAP_AUTO = "com.autonavi.amapauto"
     val KNOWN = listOf(YANDEX_NAVI, YANDEX_MAPS, DGIS,
         GOOGLE_MAPS, WAZE, "app.organicmaps")
-    /** Арабский интерфейс (h1003): только Google Карты и Waze, Яндекса и 2ГИС нет ни в выборе, ни по умолчанию. */
-    val KNOWN_AR = listOf(GOOGLE_MAPS, WAZE)
+    /**
+     * Глобальный интерфейс (ar/fr/zh, h1003): Яндекса и 2ГИС нет ни в выборе, ни по умолчанию. Amap - для китайских ГУ
+     * (zh тоже в этой ветке, поэтому в ru/en его нет). Плитки 2x2 - больше четырёх не влезает в пять рядов настроек.
+     */
+    val KNOWN_AR = listOf(GOOGLE_MAPS, WAZE, AMAP, AMAP_AUTO)
+
+    /** Плитки раздела «Навигатор» в порядке показа, по две в ряд: столько же рядов, сколько у ru/en. */
+    val TILES = listOf(YANDEX_NAVI, DGIS, YANDEX_MAPS, GOOGLE_MAPS)
+    val TILES_AR = KNOWN_AR
 
     fun known(arabic: Boolean): List<String> = if (arabic) KNOWN_AR else KNOWN
+    fun tiles(arabic: Boolean): List<String> = if (arabic) TILES_AR else TILES
 
     /** Машинная часть только с подпиской Яндекс Плюс (у Карт тот же NavigationCarAppService, что у Навигатора). */
     fun needsPlus(pkg: String?): Boolean = pkg == YANDEX_NAVI || pkg == YANDEX_MAPS
@@ -136,8 +148,9 @@ object NavigatorPick {
      * Подсказок на приборке нет совсем - только окно (h1003, стенд 09.11). Waze: свой хост Car App не пускает (HostValidator
      * со списком подписей gearhead, TEMPLATE_RENDERER засчитывает лишь на AAOS), а при теневой AA телефонный Waze уходит
      * в режим «на экране машины» - список манёвров без карты, и манёвров в AA не шлёт (навигатор AA - Google Карты).
+     * Amap и Amap Auto: машинной части Car App у них нет, без тумблера наш хост Car App их и не пробует.
      */
-    fun noHints(pkg: String?): Boolean = pkg == WAZE
+    fun noHints(pkg: String?): Boolean = pkg == WAZE || pkg == AMAP || pkg == AMAP_AUTO
 
     /**
      * Теневая AA нужна только Google Картам с включёнными подсказками: свой хост Car App они не пускают, а манёвры AA
