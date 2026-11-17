@@ -346,6 +346,9 @@ internal object LauncherModel {
         // Яндекс берёт dpi только при старте сессии (стенд 04.11: новые dpi на той же сессии не меняют карту)
         if (com.yegorkapomidorka.headswap.carapp.CarScaleRestart.needed(pkg)) EmbedHost.restartCar()
     }
+    /** Плеер, подсвеченный на чипе: выбранный, а при «Плеере телефона» - свой из первого слота. null - любая сессия. */
+    val selectedPlayer: String? get() = musicPlayer ?: localPlayer ?: lastLocalPlayer
+
     fun chooseMusicPlayer(pkg: String?) { musicPlayer = pkg; prefs.musicPlayer = pkg; noteOnlinePlayer(pkg) }
     /**
      * Выбрали или услышали [pkg]: онлайн-плеер становится вторым слотом чипа, свой - иконкой первого.
