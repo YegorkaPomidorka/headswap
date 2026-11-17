@@ -106,13 +106,11 @@ if ($Mode -ne 'keep') {
 }
 
 if ($PrepareOnly) {
-    # autotests: no music autostart on connect, otherwise the last player starts and the home screen and the
-    # music settings (player order) differ from run to run
-    Step 'autotest defaults: launcher autoplay=false'
-    $xml = (& adb shell run-as $Pkg cat shared_prefs/headswap_launcher.xml 2>$null) -join "`n"
-    if ($xml -notmatch '<map') { $xml = "<?xml version='1.0' encoding='utf-8' standalone='yes' ?>`n<map>`n</map>" }
-    $xml = [regex]::Replace($xml, '\s*<boolean name="autoplay" value="[^"]*" />', '')
-    $xml = $xml.Replace('</map>', "    <boolean name=`"autoplay`" value=`"false`" />`n</map>")
+    # autotests: launcher prefs are reset to defaults (theme, colors, rail size/style, navigator, date/clock format),
+    # otherwise the screens and reference frames depend on what the phone was last set to; no music autostart on
+    # connect, otherwise the last player starts and the home screen and the music settings (player order) differ
+    Step 'autotest defaults: launcher prefs reset, autoplay=false'
+    $xml = "<?xml version='1.0' encoding='utf-8' standalone='yes' ?>`n<map>`n    <boolean name=`"autoplay`" value=`"false`" />`n</map>"
     $tmp = Join-Path $Out 'headswap_launcher.xml'
     [IO.File]::WriteAllText($tmp, $xml.Replace("`r", '') + "`n")
     AdbOk push $tmp /data/local/tmp/hs_launcher.xml 2>$null | Out-Null

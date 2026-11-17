@@ -127,6 +127,11 @@ class LauncherSpec(
     private val railFree = h - navH - g - (g + g8) - clockH
     val rb = if (portrait) rbCap else max(1, min(rbCap, floor((railFree - railButtons * g4) / railButtons.toDouble()).toInt()))
     val ric = min(ic, r(rb * 0.5))
+    // Стеклянная рейка ([RailStyle.GLASS]): круглая линза навигации диаметром rb по центру нижнего ряда плиток
+    // (того же ряда высотой navH, что был у золотого блока) и черта над ней посередине зазора между рядами.
+    val lensCenterY = h - navH / 2
+    val lensTop = lensCenterY - rb / 2
+    val dividerY = h - navH - g / 2
     /** Панель «Назад / Домой / Недавние» под окном чужого лаунчера: высота как у круглой кнопки рейки (60-110 px по таблице). */
     val barH = rb
     val barIc = r(barH * 0.42)

@@ -157,28 +157,35 @@ fun LauncherSettingsScreen() {
             ) {
                     when (shownPage) {
                         SettingsPage.LOOK -> if (s.portrait) {
+                            // «Стиль панели» в портрете скрыт: стекло только на боковой рейке. Семь рядов: тема, «Цвета» на три,
+                            // размер панели, два тумблера, часы и дата
                             ThemeCard(d, cell(0).fillMaxWidth())
                             ColorsBlock(d, cell(1, 3).fillMaxWidth())
-                            RailSizeCard(d, cell(4, 2).fillMaxWidth())
+                            RailSizeCard(d, cell(4).fillMaxWidth())
+                            Row(cell(5).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(m.dp(d.gap))) {
+                                AnimBatteryCards(d, Modifier.weight(1f).fillMaxHeight())
+                            }
                             Row(cell(6).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(m.dp(d.gap))) {
-                                SwitchCard(stringResource(R.string.l_s_anim), model.animations, d, Modifier.weight(1f).fillMaxHeight()) {
-                                    model.chooseAnimations(it)
-                                }
-                                SwitchCard(stringResource(R.string.l_s_battery), model.showBattery, d, Modifier.weight(1f).fillMaxHeight()) {
-                                    model.chooseShowBattery(it)
-                                }
+                                ClockDateCards(d, Modifier.weight(1f).fillMaxHeight())
                             }
                         } else {
-                            ThemeCard(d, cell(0).fillMaxWidth())
-                            Placed(1) { ColorsLinkCard(d, Modifier) }
-                            RailSizeCard(d, cell(2, 2).fillMaxWidth())
-                            // ряд 4 пополам: анимации | заряд телефона в строке статуса (свободных рядов нет)
-                            Row(cell(4).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(m.dp(d.gap))) {
-                                SwitchCard(stringResource(R.string.l_s_anim), model.animations, d, Modifier.weight(1f).fillMaxHeight()) {
-                                    model.chooseAnimations(it)
+                            // шесть рядов одной высоты на всю область (общая сетка из пяти рядов у «Вида» не годится)
+                            val rows6 = 6
+                            val rowH6 = (h - (rows6 - 1) * gap) / rows6
+                            val d6 = SettingsDims(s, rowH6)
+                            // подпись под названием, пока влезает по высоте ряда
+                            val subFits = rowH6 >= ((s.f2 + d6.sub) * 1.25).roundToInt() + 4 + 2 * d6.padV
+                            Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(m.dp(gap))) {
+                                val row = Modifier.fillMaxWidth().weight(1f)
+                                ThemeCard(d6, row, subFits)
+                                ColorsLinkCard(d6, row, subFits)
+                                RailSizeCard(d6, row)
+                                RailStyleCard(d6, row)
+                                Row(row, horizontalArrangement = Arrangement.spacedBy(m.dp(gap))) {
+                                    AnimBatteryCards(d6, Modifier.weight(1f).fillMaxHeight())
                                 }
-                                SwitchCard(stringResource(R.string.l_s_battery), model.showBattery, d, Modifier.weight(1f).fillMaxHeight()) {
-                                    model.chooseShowBattery(it)
+                                Row(row, horizontalArrangement = Arrangement.spacedBy(m.dp(gap))) {
+                                    ClockDateCards(d6, Modifier.weight(1f).fillMaxHeight())
                                 }
                             }
                         }
@@ -253,12 +260,10 @@ fun LauncherSettingsScreen() {
                             }
                         }
                         SettingsPage.HOME -> if (s.portrait) {
-                            // «Раскладка» четыре ряда, «Слои» два, «12 ч» в седьмом; без прокрутки (семь рядов)
+                            // «Раскладка» четыре ряда, «Слои» три; без прокрутки (семь рядов)
                             Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(m.dp(gap))) {
                                 PortraitLayoutCard(d, Modifier.fillMaxWidth().height(m.dp(cellH(0, 4))))
-                                LayersCard(cellH(4, 2), Modifier.fillMaxWidth().height(m.dp(cellH(4, 2))))
-                                SwitchCard(stringResource(R.string.l_s_clock12), model.clock12h, d,
-                                    Modifier.fillMaxWidth().height(m.dp(cellH(6)))) { model.chooseClock12h(it) }
+                                LayersCard(cellH(4, 3), Modifier.fillMaxWidth().height(m.dp(cellH(4, 3))))
                             }
                         } else {
                             // «Раскладка» ужата до 0,87 высоты, чтобы снизу выглядывала шапка «Слои» - видно, что есть
@@ -272,9 +277,6 @@ fun LauncherSettingsScreen() {
                                 verticalArrangement = Arrangement.spacedBy(m.dp(gap))) {
                                 MapSideCard(d, Modifier.fillMaxWidth().height(m.dp(layoutH)))
                                 LayersCard(layersH, Modifier.fillMaxWidth().height(m.dp(layersH)))
-                                // во «Виде» все пять рядов заняты: формат часов - здесь, под «Слоями», в обеих ориентациях
-                                SwitchCard(stringResource(R.string.l_s_clock12), model.clock12h, d,
-                                    Modifier.fillMaxWidth().height(m.dp(rowH))) { model.chooseClock12h(it) }
                             }
                         }
                         SettingsPage.SYSTEM -> {
@@ -394,29 +396,44 @@ private fun Card(modifier: Modifier, content: @Composable () -> Unit) {
     Box(modifier.clip(RoundedCornerShape(m.dp(m.spec.radius))).background(Pal.SURFACE)) { content() }
 }
 
-/** «Тема»: название с подписью слева, три пилюли справа. 1 ряд (второй отдан «Цветам»). */
+/** Строка «Вида»: карточка на ряд, название (и серая подпись) слева, управление справа. */
 @Composable
-private fun ThemeCard(d: SettingsDims, modifier: Modifier) {
+private fun LookRow(label: String, sub: String?, d: SettingsDims, modifier: Modifier, control: @Composable RowScope.() -> Unit) {
     val m = LocalMetrics.current
     val s = m.spec
-    val model = LauncherModel
     Card(modifier) {
         Row(Modifier.fillMaxSize().padding(start = m.dp(d.padStart), end = m.dp(d.padEnd)), verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(m.dp(s.g))) {
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(m.dp(4))) {
-                Txt(stringResource(R.string.l_s_theme), s.f2, ellipsis = false)
-                Txt(stringResource(R.string.l_s_theme_sub), d.sub, color = Pal.SEC)
+                Txt(label, s.f2, ellipsis = false)
+                if (sub != null) Txt(sub, d.sub, color = Pal.SEC)
             }
-            for ((choice, res) in listOf(ThemeChoice.DARK to R.string.l_s_theme_dark, ThemeChoice.LIGHT to R.string.l_s_theme_light,
-                ThemeChoice.AUTO to R.string.l_s_theme_auto)) {
-                val label = stringResource(res)
-                Pill(label, model.theme == choice, d) { model.chooseTheme(choice) }
+            control()
+        }
+    }
+}
+
+/**
+ * Сегментированный переключатель: капсула высотой с контрол ряда, внутри варианты; выбранный - золото .32 с обводкой 2px
+ * ([OptionBox]). Один на все строки «Вида»; [fs] - кегль подписей (в узких местах мельче обычного).
+ */
+@Composable
+private fun <T> Segmented(options: List<Pair<T, String>>, selected: T, d: SettingsDims, fs: Int, onSelect: (T) -> Unit) {
+    val m = LocalMetrics.current
+    val shape = RoundedCornerShape(m.dp(d.ctl / 2))
+    Row(Modifier.height(m.dp(d.ctl)).clip(shape).background(LocalPalette.current.btnSet)) {
+        for ((value, label) in options) {
+            OptionBox(selected == value, Modifier.fillMaxHeight(), shape, label, unselected = Color.Transparent,
+                onTap = { onSelect(value) }) {
+                Box(Modifier.fillMaxHeight().padding(horizontal = m.dp(d.pillPad * 3 / 4)), contentAlignment = Alignment.Center) {
+                    Txt(label, fs, weight = FontWeight.SemiBold, ellipsis = false)
+                }
             }
         }
     }
 }
 
-/** Пилюля-вариант высотой с контрол ряда. */
+/** Пилюля-вариант высотой с контрол ряда («Ночные» / «Дневные» в «Цветах»). */
 @Composable
 private fun Pill(label: String, selected: Boolean, d: SettingsDims, onTap: () -> Unit) {
     val m = LocalMetrics.current
@@ -428,9 +445,44 @@ private fun Pill(label: String, selected: Boolean, d: SettingsDims, onTap: () ->
     }
 }
 
+/** «Тема»: название с подписью слева, сегмент «Тёмная / Светлая / Авто» справа. */
+@Composable
+private fun ThemeCard(d: SettingsDims, modifier: Modifier, withSub: Boolean = true) {
+    val model = LauncherModel
+    LookRow(stringResource(R.string.l_s_theme), stringResource(R.string.l_s_theme_sub).takeIf { withSub }, d, modifier) {
+        Segmented(listOf(ThemeChoice.DARK to stringResource(R.string.l_s_theme_dark), ThemeChoice.LIGHT to stringResource(R.string.l_s_theme_light),
+            ThemeChoice.AUTO to stringResource(R.string.l_s_theme_auto)), model.theme, d, LocalMetrics.current.spec.f2) { model.chooseTheme(it) }
+    }
+}
+
+/** «Анимации кнопок» и «Заряд телефона»: два тумблера в одном ряду пополам (вызывать внутри Row). */
+@Composable
+private fun RowScope.AnimBatteryCards(d: SettingsDims, modifier: Modifier) {
+    val model = LauncherModel
+    SwitchCard(stringResource(R.string.l_s_anim), model.animations, d, modifier) { model.chooseAnimations(it) }
+    SwitchCard(stringResource(R.string.l_s_battery), model.showBattery, d, modifier) { model.chooseShowBattery(it) }
+}
+
+/** «12-часовой формат» (тумблер) и «Дата» (сегмент ДД.ММ / ММ.ДД): пополам в одном ряду (вызывать внутри Row). */
+@Composable
+private fun RowScope.ClockDateCards(d: SettingsDims, modifier: Modifier) {
+    val model = LauncherModel
+    SwitchCard(stringResource(R.string.l_s_clock12), model.clock12h, d, modifier) { model.chooseClock12h(it) }
+    Card(modifier) {
+        val m = LocalMetrics.current
+        val s = m.spec
+        Row(Modifier.fillMaxSize().padding(start = m.dp(d.padStart), end = m.dp(d.padEnd)), verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(m.dp(s.g))) {
+            Txt(stringResource(R.string.l_s_date), s.f2, Modifier.weight(1f), ellipsis = false)
+            Segmented(listOf(false to stringResource(R.string.l_s_date_dmy), true to stringResource(R.string.l_s_date_mdy)),
+                model.dateMdy, d, (s.f2 * 0.85f).roundToInt()) { model.chooseDateMdy(it) }
+        }
+    }
+}
+
 /** «Цвета» в «Виде»: подпись, миниатюры ночного и дневного набора, шеврон; тап открывает [SettingsPage.COLORS]. */
 @Composable
-private fun ColorsLinkCard(d: SettingsDims, modifier: Modifier) {
+private fun ColorsLinkCard(d: SettingsDims, modifier: Modifier, withSub: Boolean = true) {
     val m = LocalMetrics.current
     val s = m.spec
     val model = LauncherModel
@@ -442,7 +494,7 @@ private fun ColorsLinkCard(d: SettingsDims, modifier: Modifier) {
             horizontalArrangement = Arrangement.spacedBy(m.dp(s.g))) {
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(m.dp(4))) {
                 Txt(label, s.f2, ellipsis = false)
-                Txt(stringResource(R.string.l_s_colors_sub), d.sub, color = Pal.SEC)
+                if (withSub) Txt(stringResource(R.string.l_s_colors_sub), d.sub, color = Pal.SEC)
             }
             ColorsSwatch(LauncherColors.palette(false, model.nightColors), d)
             ColorsSwatch(LauncherColors.palette(true, model.dayColors), d)
@@ -595,114 +647,35 @@ private fun ColorSlider(value: Int, top: Int, d: SettingsDims, track: Brush, mod
     }
 }
 
-/** «Боковая панель»: размер рейки, миниатюры вариантов на равную ширину. «Обрезанная» - только на экранах высотой 480. 2 ряда. */
+/**
+ * «Размер панели»: сегмент вариантов рейки. «Обрезанная» - только на экранах высотой 480. В портрете панель нижняя
+ * (заголовок свой, «Обрезанной» нет).
+ */
 @Composable
 private fun RailSizeCard(d: SettingsDims, modifier: Modifier) {
     val m = LocalMetrics.current
     val s = m.spec
     val model = LauncherModel
-    Card(modifier) {
-        Column(
-            Modifier.fillMaxSize().padding(start = m.dp(d.padStart), end = m.dp(d.padEnd), top = m.dp(d.padV), bottom = m.dp(d.padV)),
-            verticalArrangement = Arrangement.spacedBy(m.dp(s.g4)),
-        ) {
-            // в портрете панель нижняя (h921): свой заголовок, миниатюра - полоска у низа, «Обрезанной» нет
-            Txt(stringResource(if (s.portrait) R.string.l_s_rail_bottom else R.string.l_s_rail), s.f2)
-            Row(Modifier.weight(1f).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(m.dp(s.g8))) {
-                val options = listOfNotNull(
-                    if (s.h480) RailSize.CUT to R.string.l_s_rail_cut else null,
-                    RailSize.SMALL to R.string.l_s_rail_small,
-                    RailSize.MEDIUM to R.string.l_s_rail_medium,
-                    RailSize.NORMAL to R.string.l_s_rail_normal,
-                )
-                // сохранённая «Обрезанная» в портрете работает как «Маленькая» ([LauncherSpec.rs])
-                val current = if (s.portrait) s.rs else model.railSize
-                for ((v, res) in options) {
-                    val label = stringResource(res)
-                    OptionBox(current == v, Modifier.weight(1f).fillMaxHeight(), RoundedCornerShape(m.dp(s.radius)), label,
-                        unselected = LocalPalette.current.btnSet, onTap = { model.chooseRailSize(v) }) {
-                        Column(Modifier.fillMaxSize().padding(m.dp(s.g4)), horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.spacedBy(m.dp(s.g4))) {
-                            if (s.portrait) BottomRailMiniature(v, current == v, Modifier.weight(1f).fillMaxWidth())
-                            else RailMiniature(v, Modifier.weight(1f).fillMaxWidth())
-                            Txt(label, (s.f2 * 0.85).roundToInt(), weight = FontWeight.SemiBold, ellipsis = false)
-                        }
-                    }
-                }
-            }
-        }
+    val options = listOfNotNull(
+        if (s.h480) RailSize.CUT to stringResource(R.string.l_s_rail_cut) else null,
+        RailSize.SMALL to stringResource(R.string.l_s_rail_small),
+        RailSize.MEDIUM to stringResource(R.string.l_s_rail_medium),
+        RailSize.NORMAL to stringResource(R.string.l_s_rail_normal),
+    )
+    // сохранённая «Обрезанная» в портрете работает как «Маленькая» ([LauncherSpec.rs])
+    val current = if (s.portrait) s.rs else model.railSize
+    LookRow(stringResource(if (s.portrait) R.string.l_s_rail_bottom else R.string.l_s_rail_size), null, d, modifier) {
+        Segmented(options, current, d, if (options.size > 3) (s.f2 * 0.8f).roundToInt() else (s.f2 * 0.9f).roundToInt()) { model.chooseRailSize(it) }
     }
 }
 
-/** Нижняя панель портрета (Settings.dc.html): полоска с закруглением сверху у низа миниатюры, высота по размеру панели; выбранная - акцентом. */
+/** «Стиль панели»: «Сплошная» или «Стекло» (только боковая рейка, в портрете строки нет). */
 @Composable
-private fun BottomRailMiniature(size: RailSize, selected: Boolean, modifier: Modifier) {
-    val m = LocalMetrics.current
-    val k = m.spec.t / 96.0
-    val h = when (size) {
-        RailSize.NORMAL -> 38
-        RailSize.MEDIUM -> 28
-        RailSize.SMALL, RailSize.CUT -> 18
-    }
-    val corner = m.dp(max(1, (6 * k).roundToInt()))
-    Box(modifier, contentAlignment = Alignment.BottomCenter) {
-        Box(Modifier.fillMaxWidth(0.7f).height(m.dp(max(1, (h * k).roundToInt()))).clip(RoundedCornerShape(topStart = corner, topEnd = corner))
-            .background(if (selected) LocalAccent.current else LocalPalette.current.fg2.copy(alpha = 0.35f)))
-    }
-}
-
-/**
- * Миниатюра главного для варианта панели: у начала строки (слева, в RTL справа) рейка (кнопки точками, золотой блок
- * навигации внизу, часы чертами), за ней музыка с картой и нижний ряд. В «Маленькой» и «Обрезанной» время - чертой сверху слева в правой части.
- */
-@Composable
-private fun RailMiniature(size: RailSize, modifier: Modifier) {
-    val m = LocalMetrics.current
-    val k = m.spec.t / 96.0
-    fun r(v: Int) = max(1, (v * k).roundToInt())
-    val pal = LocalPalette.current
-    val accent = LocalAccent.current
-    val gap = m.dp(r(4))
-    val small = RoundedCornerShape(gap)
-    val frac = when (size) {
-        RailSize.NORMAL -> 0.15f
-        RailSize.MEDIUM -> 0.11f
-        RailSize.SMALL -> 0.07f
-        RailSize.CUT -> 0.08f
-    }
-    val inStatus = size == RailSize.SMALL || size == RailSize.CUT
-    val mark = pal.fg2
-    Row(modifier.clip(RoundedCornerShape(m.dp(r(6)))).background(pal.mini)) {
-        Column(Modifier.weight(frac).fillMaxHeight().background(pal.btn2), horizontalAlignment = Alignment.CenterHorizontally) {
-            Column(Modifier.weight(0.8f).fillMaxWidth().padding(vertical = gap), horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.SpaceEvenly) {
-                when (size) {
-                    RailSize.NORMAL -> Box(Modifier.fillMaxWidth(0.6f).height(m.dp(r(2))).background(mark))
-                    RailSize.MEDIUM -> {
-                        Box(Modifier.fillMaxWidth(0.5f).height(m.dp(r(2))).background(mark))
-                        Box(Modifier.fillMaxWidth(0.3f).height(m.dp(r(2))).background(accent))
-                        Box(Modifier.fillMaxWidth(0.5f).height(m.dp(r(2))).background(mark.copy(alpha = 0.6f)))
-                    }
-                    else -> Unit
-                }
-                repeat(4) { Box(Modifier.size(m.dp(r(4))).clip(CircleShape).background(mark.copy(alpha = 0.6f))) }
-            }
-            Box(Modifier.weight(0.2f).fillMaxWidth().background(accent))
-        }
-        Column(Modifier.weight(1f - frac).fillMaxHeight().padding(gap), verticalArrangement = Arrangement.spacedBy(gap)) {
-            if (inStatus) Box(Modifier.fillMaxWidth(0.25f).height(m.dp(r(2))).background(mark))
-            // рейка стоит у начала строки (в RTL справа), плашки за ней - физически, карта справа, как в главном по умолчанию
-            Ltr {
-                Row(Modifier.weight(2f).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(gap)) {
-                    Box(Modifier.weight(0.33f).fillMaxHeight().clip(small).background(Color(0xFF6B5520)))
-                    Box(Modifier.weight(0.67f).fillMaxHeight().clip(small).background(accent))
-                }
-                Row(Modifier.weight(1f).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(gap)) {
-                    Box(Modifier.weight(0.67f).fillMaxHeight().clip(small).background(pal.btn2))
-                    Box(Modifier.weight(0.33f).fillMaxHeight().clip(small).background(pal.btn2))
-                }
-            }
-        }
+private fun RailStyleCard(d: SettingsDims, modifier: Modifier) {
+    val model = LauncherModel
+    LookRow(stringResource(R.string.l_s_rail_style), null, d, modifier) {
+        Segmented(listOf(RailStyle.SOLID to stringResource(R.string.l_s_style_solid), RailStyle.GLASS to stringResource(R.string.l_s_style_glass)),
+            model.railStyle, d, LocalMetrics.current.spec.f2) { model.chooseRailStyle(it) }
     }
 }
 
