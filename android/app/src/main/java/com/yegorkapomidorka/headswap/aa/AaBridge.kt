@@ -354,6 +354,9 @@ class AaBridgeCore(
     private var naviShownSinceRaise = false   // Honda: после последнего NAVI=1 уже был SHOW (переход 0->1 приборкой «израсходован»)
     @Volatile var huVwBt1420 = false           // VW BT 1420 (Павел, канал 20082138): по воздуху без heartbeat на PAUSE рвёт CarLife через ~1 мин
     @Volatile var huVwCns2Delphi = false       // VW CNS2 Delphi 20082114 (h425): речь AA в голосовой сессии молчит в TTS, шлём в VR
+    @Volatile var huVwCns3_20082122 = false    // VW CNS3 20082122 (Tharu XR, h602/h1239): звонок по флажку сообщаем ГУ, как на Delphi
+    /** Звонок (флажок «Сообщать ГУ о звонках») сообщаем ГУ и глушим MEDIA: VW CNS2 Delphi (h425), VW CNS3 20082122 (h1239). */
+    val huReportsCalls: Boolean get() = huVwCns2Delphi || huVwCns3_20082122
     @Volatile var huIdleVideoHeartbeat = false // 20082114 (h425), Skoda CNS3 21290002 (h625): без видео 5-6 с рвёт USB и вне PAUSE
     private var vrReply = false                // поток ответа ассистента открыт в канале VR (VR_INIT ушёл)
     @Volatile var huVw20082120 = false        // VW (STATISTIC_INFO channel 20082120 h93, 20082122 h222): без heartbeat рвёт USB через 3,7-5,6 с PAUSE
@@ -613,6 +616,7 @@ class AaBridgeCore(
         huMazda20622111 = false                // STATISTIC_INFO придёт заново в этой сессии
         huMobisNx4c = false                    // HU_INFO / STATISTIC_INFO придут заново в этой сессии
         huVwCns2Delphi = false                 // STATISTIC_INFO придёт заново в этой сессии
+        huVwCns3_20082122 = false              // STATISTIC_INFO придёт заново в этой сессии
         huIdleVideoHeartbeat = false           // STATISTIC_INFO придёт заново в этой сессии
         vrReply = false
         touchDecimator.reset()
@@ -991,6 +995,10 @@ class AaBridgeCore(
         if (channel == VW_20082120_CHANNEL || channel == VW_CNS3_20082122_CHANNEL || channel == VW_CNS3_20082134_CHANNEL ||
             channel == VW_CNS2_20082114_CHANNEL || channel == SKODA_CNS3_21290002_CHANNEL) huVw20082120 = true
         if (channel == VW_CNS2_20082114_CHANNEL || channel == SKODA_CNS3_21290002_CHANNEL) huIdleVideoHeartbeat = true
+        if (channel == VW_CNS3_20082122_CHANNEL && !huVwCns3_20082122) {
+            huVwCns3_20082122 = true
+            log("BRIDGE ГУ VW CNS3 20082122: звонок по флажку сообщаю ГУ (MODULE_STATUS PHONE + TELE_STATE), MEDIA на паузу", true)
+        }
         if (channel == VW_CNS2_20082114_CHANNEL && !huVwCns2Delphi) {
             huVwCns2Delphi = true
             log("BRIDGE ГУ VW CNS2 Delphi 20082114: ответ ассистента в канал VR, антидребезг кнопки голоса", true)
@@ -1827,7 +1835,7 @@ class AaBridgeCore(
         if (prev == call) return
         if (call != PhoneCall.IDLE) {
             when {
-                !huVwCns2Delphi -> log("BRIDGE звонок ${call.name} (телефония): не VW CNS2 Delphi, MEDIA не трогаю", true)
+                !huReportsCalls -> log("BRIDGE звонок ${call.name} (телефония): ГУ не VW CNS2 Delphi/CNS3 20082122, MEDIA не трогаю", true)
                 !carlifeStarted -> log("BRIDGE звонок ${call.name} (телефония): CarLife ещё не START, гасить нечего", true)
                 huPausedAa -> log("BRIDGE звонок ${call.name} (телефония): MEDIA уже на паузе", true)
                 else -> muteMedia(call, "телефония")
