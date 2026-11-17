@@ -127,6 +127,7 @@ CONTROL0, SENSOR1, VIDEO2, INPUT3, SPEECH4, SYSTEM5, MEDIA6, MIC7, BT8, MEDIA_PL
 | `huVw20082120` | ch 20082120/22/34/14, 21290002 | **по смыслу «heartbeat на PAUSE каждые 100 мс»**, имя историческое (ADR 0007) |
 | `huIdleVideoHeartbeat` | 20082114, 21290002 | heartbeat и без PAUSE после 1 с без кадров |
 | `huVwCns2Delphi` | 20082114 | речь в канал VR, пейсер тача, свои кнопки звонка |
+| `huVwCns3_20082122` | 20082122 (Tharu XR) | вместе с Delphi (`huReportsCalls`): по флажку «Сообщать ГУ о звонках» MODULE_STATUS PHONE + TELE_STATE и пауза MEDIA (ADR 0045) |
 | `huVwBt1420` | «VW BT 1420» | воздух: heartbeat на PAUSE, тёплое возобновление |
 | `huVw20082138` | VW ID (20082138, 20082128+«VW BT 9491», пресет ID. UNYX) | потолок битрейта по IDR (ADR 0008) |
 | `huHyundaiCn7` | product `wp_cn7cpe_cn` | музыка 32 кГц; рабочий стол после HFP-звонка ждёт MUSIC=1 от ГУ до 5 с (`BT_HFP_INDICATION`, ADR 0044) |
