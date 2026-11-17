@@ -57,7 +57,8 @@ internal object MusicController {
     /** Открыть приложение плеера на ГУ, когда [startPlayer] не разбудил его в фоне (ставит карточка музыки). */
     @Volatile var launchApp: ((String) -> Unit)? = null
 
-    fun refresh(ctx: Context, preferred: String?) {
+    /** [preferred] - выбранный на чипе плеер, [chip] - плееры слотов чипа: только их сессии попадают в карточку. */
+    fun refresh(ctx: Context, preferred: String?, chip: Set<String> = emptySet()) {
         if (ctx.checkSelfPermission(Manifest.permission.MEDIA_CONTENT_CONTROL) != PackageManager.PERMISSION_GRANTED) {
             controller = null
             if (state.access || state.hasSession) state = MusicState(access = false)
@@ -76,7 +77,7 @@ internal object MusicController {
         checkPending(sessions)
         // выбран плеер - карточка только его, чужие сессии не берём (Play и обложка вели в Telegram, поездки 16-17.11)
         val c = MusicLogic.pickSession(sessions, { it.packageName }, { it.playbackState?.state == PlaybackState.STATE_PLAYING },
-            preferred, chosenOnly = true)
+            preferred, chosenOnly = true, chip = chip)
         controller = c
         if (c == null) { state = MusicState(access = true); return }
         val md = c.metadata

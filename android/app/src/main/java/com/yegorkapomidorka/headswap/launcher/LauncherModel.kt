@@ -347,7 +347,7 @@ internal object LauncherModel {
         if (com.yegorkapomidorka.headswap.carapp.CarScaleRestart.needed(pkg)) EmbedHost.restartCar()
     }
     /** Плеер, подсвеченный на чипе: выбранный, а при «Плеере телефона» - свой из первого слота. null - любая сессия. */
-    val selectedPlayer: String? get() = musicPlayer ?: localPlayer
+    val selectedPlayer: String? get() = musicPlayer ?: localPlayer ?: lastLocalPlayer
 
     fun chooseMusicPlayer(pkg: String?) { musicPlayer = pkg; prefs.musicPlayer = pkg; noteOnlinePlayer(pkg) }
     /**

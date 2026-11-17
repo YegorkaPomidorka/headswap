@@ -124,10 +124,11 @@ object MusicLogic {
      * в Teams Play и обложка вели туда (поездки 16-17.11, Егор: «Play всегда вызывает выбранный»).
      */
     fun <T> pickSession(sessions: List<T>, pkgOf: (T) -> String, playing: (T) -> Boolean, preferred: String?,
-                        chosenOnly: Boolean = false): T? {
-        if (chosenOnly && preferred != null) {
+                        chosenOnly: Boolean = false, chip: Set<String> = emptySet()): T? {
+        if (chosenOnly) {
+            // заиграл другой плеер с чипа (Я.Музыку включили на телефоне) - карточка его, выбор переключит карточка
             val own = sessions.filter { pkgOf(it) == preferred }
-            return own.firstOrNull(playing) ?: own.firstOrNull()
+            return own.firstOrNull(playing) ?: sessions.firstOrNull { playing(it) && pkgOf(it) in chip } ?: own.firstOrNull()
         }
         val live = sessions.filter(playing)
         return live.firstOrNull { pkgOf(it) == preferred } ?: live.firstOrNull()

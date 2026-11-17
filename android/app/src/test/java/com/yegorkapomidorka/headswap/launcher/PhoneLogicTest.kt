@@ -153,7 +153,14 @@ class PhoneLogicTest {
         // выбрана Музыка Xiaomi - Яндекс её не подменяет
         assertEquals("com.miui.player",
             MusicLogic.pickSession(listOf(S(ya, true), S("com.miui.player", false)), { it.pkg }, { it.playing }, "com.miui.player", chosenOnly = true)?.pkg)
-        // «Плеер телефона» (ничего не выбрано) - любая сессия, как раньше
-        assertEquals("org.telegram.messenger", MusicLogic.pickSession(idle, { it.pkg }, { it.playing }, null, chosenOnly = true)?.pkg)
+        // ничего не выбрано - чужие всё равно не берём
+        assertNull(MusicLogic.pickSession(idle, { it.pkg }, { it.playing }, null, chosenOnly = true))
+        // выбрана «нота» (Музыка Xiaomi), а на телефоне заиграла Я.Музыка со второго слота - карточка её
+        val chip = setOf("com.miui.player", ya)
+        assertEquals(ya, MusicLogic.pickSession(listOf(S("com.miui.player", false), S(ya, true)), { it.pkg }, { it.playing },
+            "com.miui.player", chosenOnly = true, chip = chip)?.pkg)
+        // играющий Telegram не с чипа - нет
+        assertEquals("com.miui.player", MusicLogic.pickSession(listOf(S("com.miui.player", false), S("org.telegram.messenger", true)),
+            { it.pkg }, { it.playing }, "com.miui.player", chosenOnly = true, chip = chip)?.pkg)
     }
 }

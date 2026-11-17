@@ -88,10 +88,14 @@ fun MusicCard(modifier: Modifier) {
     val m = LocalMetrics.current
     val s = m.spec
     val ctx = model.context
-    LaunchedEffect(model.selectedPlayer) {
+    // плееры чипа: только их сессии попадают в карточку (Telegram, Teams - нет); второй слот без закрепления - любой онлайн
+    val chip = PlayerChip.slots(model.installedPackages, model.musicPlayer, model.lastOnlinePlayer, model.localPlayer,
+        model.onlinePlayer, model.onlinePlayers).mapNotNull { it.pkg }.toSet() +
+        listOfNotNull(model.lastLocalPlayer) + (if (model.onlinePlayer == null) model.onlinePlayers else emptyList())
+    LaunchedEffect(model.selectedPlayer, chip) {
         MusicController.launchApp = { LauncherActions.openPlayerApp(it) }
         while (true) {
-            withContext(Dispatchers.Default) { MusicController.refresh(ctx, model.selectedPlayer) }
+            withContext(Dispatchers.Default) { MusicController.refresh(ctx, model.selectedPlayer, chip) }
             delay(1000)
         }
     }
@@ -99,6 +103,11 @@ fun MusicCard(modifier: Modifier) {
     val player = st.pkg ?: model.selectedPlayer
     // играет онлайн-плеер - он и становится вторым слотом чипа
     LaunchedEffect(st.pkg) { model.noteOnlinePlayer(st.pkg) }
+    // заиграл другой плеер чипа (Я.Музыку включили на телефоне) - выбор переключается на него и запоминается
+    LaunchedEffect(st.pkg, st.playing) {
+        val pkg = st.pkg
+        if (st.playing && pkg != null && pkg != model.selectedPlayer && pkg in chip) LauncherActions.adoptPlayer(pkg)
+    }
     val colors = MusicColors.of(LocalAccent.current)
     CardBox(modifier, background = Color.Transparent) {
         Box(Modifier.fillMaxSize().musicBackground(colors))
