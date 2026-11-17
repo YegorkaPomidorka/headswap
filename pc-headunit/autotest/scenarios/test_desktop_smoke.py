@@ -12,6 +12,7 @@ import numpy as np
 
 import pytest
 
+from autotest.ocr import WinOcr, lines_text
 from autotest.stand import StandError
 
 CLOCK = (0, 0, 150, 90)                 # часы в углу
@@ -103,8 +104,17 @@ def _phone_now(fmt):
     return subprocess.run(["adb", "shell", "date", fmt], capture_output=True, text=True, timeout=10).stdout.strip()
 
 
+_digits_ocr = None
+
+
 def _region_digits(stand, rect):
-    return re.sub(r"\D", "", "".join(stand.text(region=stand.area(rect))))
+    """Цифры в рамке английским OCR: цифры часов латинские на любом языке, а арабский движок «7:36» с «PM» под ним
+    не читает совсем (пустая строка)."""
+    global _digits_ocr
+    if _digits_ocr is None:
+        _digits_ocr = WinOcr("en")
+    words = _digits_ocr.read(stand.settle(), stand.area(rect))
+    return re.sub(r"\D", "", "".join(lines_text(words)))
 
 
 def _switch_diff(stand, ref):
