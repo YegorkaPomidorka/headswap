@@ -119,14 +119,19 @@ object MusicLogic {
 
     /**
      * Подбор сессии: играющая (выбранный плеер среди играющих первым), иначе выбранный плеер, иначе первая.
-     * [chosenOnly] (карточка музыки с выбранным плеером): чужая сессия на паузе выбранный плеер не подменяет - без неё
-     * null, и Play запускает выбранный. Иначе после голосового в Telegram или звонка в Teams Play и обложка вели туда.
+     * [chosenOnly] (карточка музыки с выбранным на чипе плеером): только сессия выбранного, чужие (даже играющие) карточку
+     * не занимают - нет его сессии, null, и Play запускает выбранный. Иначе после голосового в Telegram или звонка
+     * в Teams Play и обложка вели туда (поездки 16-17.11, Егор: «Play всегда вызывает выбранный»).
      */
     fun <T> pickSession(sessions: List<T>, pkgOf: (T) -> String, playing: (T) -> Boolean, preferred: String?,
                         chosenOnly: Boolean = false): T? {
+        if (chosenOnly && preferred != null) {
+            val own = sessions.filter { pkgOf(it) == preferred }
+            return own.firstOrNull(playing) ?: own.firstOrNull()
+        }
         val live = sessions.filter(playing)
         return live.firstOrNull { pkgOf(it) == preferred } ?: live.firstOrNull()
             ?: sessions.firstOrNull { pkgOf(it) == preferred }
-            ?: sessions.firstOrNull().takeUnless { chosenOnly && preferred != null }
+            ?: sessions.firstOrNull()
     }
 }

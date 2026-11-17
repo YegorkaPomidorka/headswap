@@ -74,7 +74,7 @@ internal object MusicController {
             return
         }.filter { it.packageName != ctx.packageName }
         checkPending(sessions)
-        // выбран плеер - чужая сессия на паузе его не подменяет (Play и обложка вели в Telegram, поездки 16-17.11)
+        // выбран плеер - карточка только его, чужие сессии не берём (Play и обложка вели в Telegram, поездки 16-17.11)
         val c = MusicLogic.pickSession(sessions, { it.packageName }, { it.playbackState?.state == PlaybackState.STATE_PLAYING },
             preferred, chosenOnly = true)
         controller = c

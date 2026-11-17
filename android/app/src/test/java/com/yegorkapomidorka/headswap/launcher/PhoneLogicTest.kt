@@ -146,9 +146,13 @@ class PhoneLogicTest {
         assertEquals("org.telegram.messenger", MusicLogic.pickSession(idle, { it.pkg }, { it.playing }, ya)?.pkg)
         // выбранный на паузе среди чужих на паузе - выбранный
         assertEquals(ya, MusicLogic.pickSession(idle + S(ya, false), { it.pkg }, { it.playing }, ya, chosenOnly = true)?.pkg)
-        // чужая играет (голосовое) - показываем её, Pause ставит её на паузу
-        assertEquals("org.telegram.messenger",
+        // чужая даже играет (голосовое) - карточка всё равно у выбранного
+        assertEquals(ya,
             MusicLogic.pickSession(listOf(S("org.telegram.messenger", true), S(ya, false)), { it.pkg }, { it.playing }, ya, chosenOnly = true)?.pkg)
+        assertNull(MusicLogic.pickSession(listOf(S("org.telegram.messenger", true)), { it.pkg }, { it.playing }, ya, chosenOnly = true))
+        // выбрана Музыка Xiaomi - Яндекс её не подменяет
+        assertEquals("com.miui.player",
+            MusicLogic.pickSession(listOf(S(ya, true), S("com.miui.player", false)), { it.pkg }, { it.playing }, "com.miui.player", chosenOnly = true)?.pkg)
         // «Плеер телефона» (ничего не выбрано) - любая сессия, как раньше
         assertEquals("org.telegram.messenger", MusicLogic.pickSession(idle, { it.pkg }, { it.playing }, null, chosenOnly = true)?.pkg)
     }
