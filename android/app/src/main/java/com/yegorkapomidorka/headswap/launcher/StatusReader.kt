@@ -28,14 +28,18 @@ data class StatusInfo(
 
 internal object StatusReader {
     // цифры всегда латинские (и при арабском языке): Locale.ROOT, названия дней - в языке приложения
-    private val dateFormat = DateTimeFormatter.ofPattern("dd.MM", Locale.ROOT)
+    private val dateDm = DateTimeFormatter.ofPattern("dd.MM", Locale.ROOT)
+    private val dateMd = DateTimeFormatter.ofPattern("MM.dd", Locale.ROOT)
 
-    fun read(ctx: Context, twelveHour: Boolean = false, now: LocalDateTime = LocalDateTime.now()): StatusInfo {
+    /** «16.11» или «11.16» ([LauncherPrefs.dateMdy]); день недели добавляет [read]. */
+    fun formatDate(now: LocalDateTime, mdy: Boolean): String = now.format(if (mdy) dateMd else dateDm)
+
+    fun read(ctx: Context, twelveHour: Boolean = false, dateMdy: Boolean = false, now: LocalDateTime = LocalDateTime.now()): StatusInfo {
         val battery = BatteryLogic.read(ctx)
         return StatusInfo(
             time = ClockFormat.format(now, twelveHour),
             pm = now.hour >= 12,
-            date = weekday(now.dayOfWeek, appLocale(ctx)) + " " + now.format(dateFormat),
+            date = weekday(now.dayOfWeek, appLocale(ctx)) + " " + formatDate(now, dateMdy),
             net = network(ctx),
             signal = signal(ctx),
             bluetooth = runCatching { ctx.getSystemService(BluetoothManager::class.java)?.adapter?.isEnabled == true }

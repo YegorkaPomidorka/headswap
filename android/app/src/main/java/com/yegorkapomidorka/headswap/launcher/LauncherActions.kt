@@ -328,10 +328,17 @@ object LauncherActions {
         home()
     }
 
-    /** Блок навигации рейки и тап по карточке: навигатор на всю область справа от рейки. */
+    /**
+     * Блок навигации рейки и тап по карточке: навигатор на всю область справа от рейки. Повторное нажатие, когда он уже
+     * развёрнут на весь экран, сворачивает его: на главный, как лого на не-главном экране ([logo]).
+     */
     fun openNavigator() {
         if (!model.launchDebounce.allow(model.now())) return
-        if (model.navigatorPkg == null) openNavigatorChoice() else openNavigatorWindow()
+        when {
+            model.navigatorPkg == null -> openNavigatorChoice()
+            model.area == Area.Navigator -> home()
+            else -> openNavigatorWindow()
+        }
     }
 
     /** Навигатор на всю область. Повторный тап, когда он уже развёрнут, заново проверяет его задачу (после Back она могла уйти). */

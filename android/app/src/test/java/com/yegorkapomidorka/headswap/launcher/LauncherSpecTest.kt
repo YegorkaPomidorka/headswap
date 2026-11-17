@@ -228,4 +228,25 @@ class LauncherSpecTest {
         // меньше любой строки таблицы не падает в ноль
         assertTrue(LauncherSpecs.forSize(320, 200).t >= 1)
     }
+
+    /** Линза стеклянной рейки: центр - в центре нижнего ряда плиток, черта - посередине зазора над рядом (1280x720: 652 и 574). */
+    @Test fun glassLensAndDividerGeometry() {
+        val s = LauncherSpecs.forSize(1280, 720)
+        assertEquals(652, s.lensCenterY)
+        assertEquals(574, s.dividerY)
+        assertEquals(s.lensCenterY, s.lensTop + s.rb / 2)
+        for (row in LauncherSpecs.TABLE) {
+            val sp = LauncherSpecs.forSize(row[0], row[1])
+            // центр линзы - середина нижнего ряда (высота navH, прибит к низу), черта - середина зазора g над ним
+            assertEquals("${row[0]}x${row[1]}", sp.h - sp.navH / 2, sp.lensCenterY)
+            assertEquals("${row[0]}x${row[1]}", sp.h - sp.navH - sp.g / 2, sp.dividerY)
+            assertTrue("${row[0]}x${row[1]}", sp.dividerY < sp.lensTop)
+        }
+    }
+
+    @Test fun railStyleRestore() {
+        assertEquals(RailStyle.SOLID, RailStyle.restore(null))
+        assertEquals(RailStyle.SOLID, RailStyle.restore("мусор"))
+        assertEquals(RailStyle.GLASS, RailStyle.restore("GLASS"))
+    }
 }
