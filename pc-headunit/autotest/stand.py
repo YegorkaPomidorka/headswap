@@ -164,8 +164,10 @@ class Stand:
         cmd = [ps, "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", str(PC_HU / "stand.ps1"), "-PrepareOnly",
                "-Mode", self.mode, "-Out", str(self.out)]
         self.act("stand.ps1 -PrepareOnly")
-        r = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace")
-        (self.out / "prepare.log").write_text(r.stdout + r.stderr, encoding="utf-8")
+        # вывод в файл, не в pipe: gradle-демон, которого запускает сборка, наследует дескриптор и живёт часами,
+        # а capture_output ждёт закрытия pipe - pytest висел после конца stand.ps1
+        with open(self.out / "prepare.log", "wb") as log:
+            r = subprocess.run(cmd, stdin=subprocess.DEVNULL, stdout=log, stderr=subprocess.STDOUT)
         if r.returncode != 0:
             raise StandError(f"stand.ps1 -PrepareOnly упал ({r.returncode}), см. {self.out / 'prepare.log'}")
 
