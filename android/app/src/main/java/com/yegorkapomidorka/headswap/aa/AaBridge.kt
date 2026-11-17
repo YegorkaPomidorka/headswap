@@ -482,7 +482,10 @@ class AaBridgeCore(
     private var lastHuResumeMs = NEVER         // когда по MUSIC=1 от ГУ слали AA KEYCODE 126
     @Volatile private var lastUserInputMs = NEVER   // последний тач DOWN / клавиша / шайба / голос с ГУ
     @Volatile private var lastVoiceKeyMs = NEVER    // последний KEYCODE_SEARCH в AA (антидребезг h425)
-    private var lastHfpConnectMs = NEVER       // ГУ прислало BT_HFP_CONNECTION=connected (дальше AA сам запускает автоплей по BT)
+    private var cn7CallActive = false          // CN7 (h1049): ГУ прислала BT_HFP_INDICATION 1..3, конца (4) ещё не было
+    private var cn7CallEndMs = NEVER           // CN7: когда пришёл BT_HFP_INDICATION 4; NEVER - не ждём MUSIC=1
+    private var cn7HoldLogged = false
+    private var lastHfpConnectMs = NEVER      // ГУ прислало BT_HFP_CONNECTION=connected (дальше AA сам запускает автоплей по BT)
     private var lastPauseKeyMs = NEVER         // когда последний раз слали AA KEYCODE 127 (desktop: паузу плееру телефона)
     private var lastDesktopPlayCheckMs = NEVER // desktop: когда спрашивали «играет ли плеер» при закрытом MEDIA
     private var lastExternalStopMs = NEVER     // плеер AA встал не от нашего 127 и не от ввода пользователя (Honda 20772104)
@@ -594,7 +597,10 @@ class AaBridgeCore(
         exitPending = false
         huPausedAa = false
         callPausedAa = false
-        telephonyCall = null                   // CarLifeSession.calls пришлёт текущее состояние заново
+        cn7CallActive = false
+        cn7CallEndMs = NEVER
+        cn7HoldLogged = false
+        telephonyCall = null                  // CarLifeSession.calls пришлёт текущее состояние заново
         resumeOnHuMusic = false
         lastHuResumeMs = NEVER
         lastExternalStopMs = NEVER
@@ -787,6 +793,9 @@ class AaBridgeCore(
         if (status == 1 && huPausedAa) {
             huPausedAa = false
             callPausedAa = false
+            if (cn7CallEndMs != NEVER) log("BRIDGE CN7: ГУ вернула MUSIC=1 через ${clockMs() - cn7CallEndMs} мс после звонка", true)
+            cn7CallActive = false
+            cn7CallEndMs = NEVER
             if (HU_MUSIC_RESUME_ENABLED && resumeOnHuMusic && (huDesayG6S || huHondaVezel)) {
                 resumeOnHuMusic = false
                 lastHuResumeMs = now
@@ -810,10 +819,50 @@ class AaBridgeCore(
         if (now - lastPauseKeyMs < DESKTOP_RESUME_GUARD_MS || now - lastDesktopPlayCheckMs < DESKTOP_PLAY_CHECK_MS) return
         lastDesktopPlayCheckMs = now
         if (!media.isPlaying()) return
+        if (cn7CallHold(now)) return
         huPausedAa = false
         callPausedAa = false
         resumeOnHuMusic = false
         log("BRIDGE плеер телефона снова играет после MUSIC=0: MEDIA снова пересылаю", true)
+    }
+
+    /**
+     * h1049, Hyundai CN7 (Desktop): на звонке ГУ шлёт MUSIC=0 и уходит на HFP. Если плеер телефона заиграл раньше, чем
+     * ГУ закрыла звонок, и мы сами прислали MEDIA INIT + MUSIC=1 (через 0,1 с после HFP f1=4), ГУ остаётся на BT Audio
+     * навсегда (лог 17.11 14:28, 14:35). Когда мост молчал, ГУ сама вернула MUSIC=1 через 0,8 с (лог 17.11 09:54).
+     * Поэтому на CN7 во время звонка и CN7_CALL_HOLD_MS после него ждём MUSIC=1 от ГУ, потом - как раньше.
+     */
+    private fun cn7CallHold(now: Long): Boolean {
+        if (!CN7_CALL_HOLD_ENABLED || !huHyundaiCn7) return false
+        val hold = cn7CallActive || (cn7CallEndMs != NEVER && now - cn7CallEndMs < CN7_CALL_HOLD_MS)
+        if (hold && !cn7HoldLogged) {
+            cn7HoldLogged = true
+            log("BRIDGE CN7: плеер играет, но звонок ${if (cn7CallActive) "идёт" else "закончен ${ago(cn7CallEndMs)}"}: жду MUSIC=1 от ГУ, MEDIA INIT не шлю", true)
+        }
+        if (!hold && cn7CallEndMs != NEVER) {
+            log("BRIDGE CN7: MUSIC=1 от ГУ за $CN7_CALL_HOLD_MS мс после звонка не пришёл, MEDIA пересылаю сам", true)
+            cn7CallEndMs = NEVER
+        }
+        return hold
+    }
+
+    /** BT_HFP_INDICATION от ГУ (схемы нет): f1 1 входящий, 2 исходящий, 3 разговор, 4 звонок закончен (логи h1049). */
+    @Synchronized
+    fun onHuBtHfpIndication(state: Int?) {
+        if (!huHyundaiCn7) return
+        if (state == 4) {
+            if (cn7CallActive) {
+                cn7CallActive = false
+                cn7CallEndMs = clockMs()
+                cn7HoldLogged = false
+                log("BRIDGE CN7: HFP звонок закончен, $CN7_CALL_HOLD_MS мс жду MUSIC=1 от ГУ", true)
+            }
+        } else if (state in 1..3 && !cn7CallActive) {
+            cn7CallActive = true
+            cn7CallEndMs = NEVER
+            cn7HoldLogged = false
+            log("BRIDGE CN7: HFP звонок (f1=$state), MEDIA после него только по MUSIC=1 от ГУ", true)
+        }
     }
 
     private fun sendPauseKey(p: AaPeer) {
@@ -3146,6 +3195,10 @@ class AaBridgeCore(
 
         /** Desktop: после нашей паузы плеер ещё доигрывает хвост - «снова играет» не раньше этого. */
         const val DESKTOP_RESUME_GUARD_MS = 2_000L
+
+        /** h1049 CN7: после конца HFP-звонка ждём MUSIC=1 от ГУ (сама вернула через 0,8 с), потом MEDIA шлём сами. */
+        @Volatile @JvmStatic var CN7_CALL_HOLD_ENABLED = true
+        const val CN7_CALL_HOLD_MS = 5_000L
 
         /** Desktop: «играет ли плеер» - binder-вызов, при закрытом MEDIA спрашиваем не чаще раза в секунду. */
         const val DESKTOP_PLAY_CHECK_MS = 1_000L

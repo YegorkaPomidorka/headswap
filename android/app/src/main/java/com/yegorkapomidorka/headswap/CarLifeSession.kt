@@ -563,6 +563,11 @@ class CarLifeSession(
                 val state = PbReader.parse(m.body)?.let { PbReader.int(it, 1) }
                 bridge.onHuBtHfpConnection(state)
             }
+            Msg.BT_HFP_INDICATION -> {
+                // схемы нет; f1: 1 входящий, 2 исходящий, 3 разговор, 4 звонок закончен (логи h1049, Hyundai CN7)
+                val state = PbReader.parse(m.body)?.let { PbReader.int(it, 1) }
+                bridge.onHuBtHfpIndication(state)
+            }
             Msg.LAUNCH_MODE_PHONE -> bridge.onCarlifeLaunchPhone()
             Msg.HU_GEAR_INFO -> {
                 val gear = PbReader.parse(m.body)?.let { PbReader.int(it, 1) }

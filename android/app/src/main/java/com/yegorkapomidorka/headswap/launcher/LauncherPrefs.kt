@@ -31,6 +31,15 @@ enum class RailSize {
     }
 }
 
+/** Стиль боковой рейки: сплошная панель с золотым блоком навигации или стеклянная колонка на всю высоту (только альбом). */
+enum class RailStyle {
+    SOLID, GLASS;
+
+    companion object {
+        fun restore(name: String?): RailStyle = entries.firstOrNull { it.name == name } ?: SOLID
+    }
+}
+
 /** Настройки лаунчера - SharedPreferences, как остальной проект (DexPrefs/AaSettings). */
 class LauncherPrefs(private val context: Context) {
     private val prefs = context.getSharedPreferences("headswap_launcher", Context.MODE_PRIVATE)
@@ -56,6 +65,11 @@ class LauncherPrefs(private val context: Context) {
         get() = RailSize.restore(prefs.getString("rail_size", null))
         set(value) { prefs.edit().putString("rail_size", value.name).apply() }
 
+    /** «Стиль панели» ([RailStyle]); стекло действует только на боковой рейке, в портрете игнорируется. */
+    var railStyle: RailStyle
+        get() = RailStyle.restore(prefs.getString("rail_style", null))
+        set(value) { prefs.edit().putString("rail_style", value.name).apply() }
+
     /**
      * «Карта на главном» слева, физически. Новый ключ: старый right_hand двигал рейку.
      * По умолчанию на арабском (RTL) карта слева: весь главный - зеркало LTR, рейка справа, как в макете.
@@ -79,6 +93,11 @@ class LauncherPrefs(private val context: Context) {
     var clock12h: Boolean
         get() = prefs.getBoolean("clock_12h", !android.text.format.DateFormat.is24HourFormat(context))
         set(value) { prefs.edit().putBoolean("clock_12h", value).apply() }
+
+    /** Дата в строке статуса «ММ.ДД» вместо «ДД.ММ» ([DateFormatChoice]). */
+    var dateMdy: Boolean
+        get() = prefs.getBoolean("date_mdy", false)
+        set(value) { prefs.edit().putBoolean("date_mdy", value).apply() }
 
     /** «Включать музыку автоматически»: при старте сессии сразу играет, как в Android Auto. */
     var autoplay: Boolean

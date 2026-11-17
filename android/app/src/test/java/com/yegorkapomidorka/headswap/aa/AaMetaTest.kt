@@ -1697,6 +1697,59 @@ class AaMetaTest {
         assertTrue(media.calls.isEmpty())
     }
 
+    private fun cn7CallRig(): Pair<Rig, FakeDesktopMedia> {
+        // h1049 (лог 17.11 14:27): звонок, MUSIC=0, плеер стоит; HFP 1 -> 3 -> 4, после звонка плеер заиграл сам
+        val r = Rig()
+        val media = FakeDesktopMedia(playing = false)
+        r.core.desktopMedia = media
+        r.core.onHuInfo("QTI", "sm6150_au for arm64", "wp_cn7cpe_cn")
+        r.start()
+        r.core.onHuBtHfpIndication(1)
+        assertFalse(r.core.onCarlifeMusicControl(0))
+        r.core.onHuBtHfpIndication(3)
+        r.now += AaBridgeCore.DESKTOP_RESUME_GUARD_MS
+        r.core.onHuBtHfpIndication(4)
+        media.playing = true
+        return r to media
+    }
+
+    @Test
+    fun cn7AfterCallWaitsForHuMusicOn() {
+        val (r, _) = cn7CallRig()
+        r.now += 100
+        r.core.onAudioData(M.CH_AUDIO_MEDIA, ByteArray(640), 0)
+        assertEquals("сразу после звонка MEDIA сами не шлём", 0, r.link.audio.count { it == CarlifeAudio.MEDIA_DATA })
+        r.now += 700
+        r.core.onCarlifeMusicControl(1)
+        r.core.onAudioData(M.CH_AUDIO_MEDIA, ByteArray(640), 0)
+        assertEquals("ГУ вернула MUSIC=1 - MEDIA идёт", 1, r.link.audio.count { it == CarlifeAudio.MEDIA_DATA })
+    }
+
+    @Test
+    fun cn7AfterCallFallsBackWithoutHuMusicOn() {
+        val (r, _) = cn7CallRig()
+        r.now += AaBridgeCore.CN7_CALL_HOLD_MS
+        r.core.onAudioData(M.CH_AUDIO_MEDIA, ByteArray(640), 0)
+        r.core.onAudioData(M.CH_AUDIO_MEDIA, ByteArray(640), 0)
+        assertTrue("MUSIC=1 не пришёл - как раньше, MEDIA шлём сами", r.link.audio.count { it == CarlifeAudio.MEDIA_DATA } >= 1)
+    }
+
+    @Test
+    fun cn7CallHoldOnlyOnCn7() {
+        val r = Rig()
+        val media = FakeDesktopMedia(playing = false)
+        r.core.desktopMedia = media
+        r.start()
+        r.core.onHuBtHfpIndication(1)
+        r.core.onCarlifeMusicControl(0)
+        r.core.onHuBtHfpIndication(4)
+        media.playing = true
+        r.now += AaBridgeCore.DESKTOP_RESUME_GUARD_MS
+        r.core.onAudioData(M.CH_AUDIO_MEDIA, ByteArray(640), 0)
+        r.core.onAudioData(M.CH_AUDIO_MEDIA, ByteArray(640), 0)
+        assertTrue("не CN7 - поведение прежнее", r.link.audio.count { it == CarlifeAudio.MEDIA_DATA } >= 1)
+    }
+
     @Test
     fun desktopTailAfterOurPauseStaysDroppedWithinGuard() {
         val r = Rig()
