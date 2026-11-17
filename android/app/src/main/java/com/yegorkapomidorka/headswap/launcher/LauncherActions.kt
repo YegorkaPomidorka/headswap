@@ -110,7 +110,11 @@ object LauncherActions {
 
     /** Тап по телу карточки музыки: приложение плеера на весь экран справа от рейки. */
     fun openMusicApp() {
-        val pkg = MusicController.state.pkg ?: model.musicPlayer ?: return
+        openPlayerApp(MusicController.state.pkg ?: model.selectedPlayer ?: return)
+    }
+
+    /** Приложение плеера [pkg] на весь экран справа от рейки (и когда Play не разбудил его в фоне). Главный поток. */
+    fun openPlayerApp(pkg: String) {
         val entry = model.catalog.firstOrNull { it.packageName == pkg } ?: return
         openApp(AppRef(entry.packageName, entry.className))
     }
@@ -300,7 +304,7 @@ object LauncherActions {
 
     /** Кнопка MEDIA ГУ: плеер на весь экран; плеер не выбран или не установлен - выбор плеера. */
     fun openMusic() {
-        val pkg = MusicController.state.pkg ?: model.musicPlayer
+        val pkg = MusicController.state.pkg ?: model.selectedPlayer
         if (pkg == null || model.catalog.none { it.packageName == pkg }) openPlayers() else openMusicApp()
     }
 
@@ -310,7 +314,7 @@ object LauncherActions {
         if (!model.autoplay || display < 0 || display == model.autoplayedDisplay) return
         model.autoplayedDisplay = display
         val st = MusicController.state
-        val pkg = model.musicPlayer ?: model.localPlayer
+        val pkg = model.selectedPlayer
         AppLog.i("LAUNCHER автозапуск музыки: ${if (st.playing) "уже играет" else st.pkg ?: pkg ?: "плеера нет"}", false)
         if (st.playing) return
         if (st.hasSession) MusicController.playPause(model.context, null) else pkg?.let { MusicController.startPlayer(model.context, it) }

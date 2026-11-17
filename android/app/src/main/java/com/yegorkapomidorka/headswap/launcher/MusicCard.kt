@@ -88,14 +88,15 @@ fun MusicCard(modifier: Modifier) {
     val m = LocalMetrics.current
     val s = m.spec
     val ctx = model.context
-    LaunchedEffect(model.musicPlayer) {
+    LaunchedEffect(model.selectedPlayer) {
+        MusicController.launchApp = { LauncherActions.openPlayerApp(it) }
         while (true) {
-            withContext(Dispatchers.Default) { MusicController.refresh(ctx, model.musicPlayer) }
+            withContext(Dispatchers.Default) { MusicController.refresh(ctx, model.selectedPlayer) }
             delay(1000)
         }
     }
     val st = MusicController.state
-    val player = st.pkg ?: model.musicPlayer
+    val player = st.pkg ?: model.selectedPlayer
     // играет онлайн-плеер - он и становится вторым слотом чипа
     LaunchedEffect(st.pkg) { model.noteOnlinePlayer(st.pkg) }
     val colors = MusicColors.of(LocalAccent.current)

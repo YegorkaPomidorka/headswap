@@ -136,4 +136,20 @@ class PhoneLogicTest {
         assertEquals("a", MusicLogic.pickSession(list.map { it.copy(playing = false) }, { it.pkg }, { it.playing }, null)?.pkg)
         assertNull(MusicLogic.pickSession(emptyList<S>(), { it.pkg }, { it.playing }, "a"))
     }
+
+    @Test fun chosenPlayerNotReplacedByIdleForeignSession() {
+        data class S(val pkg: String, val playing: Boolean)
+        val ya = "ru.yandex.music"
+        // поездки 16-17.11: Я.Музыка не запущена, у Telegram и Teams сессии на паузе - карточка брала их
+        val idle = listOf(S("org.telegram.messenger", false), S("com.microsoft.teams", false))
+        assertNull(MusicLogic.pickSession(idle, { it.pkg }, { it.playing }, ya, chosenOnly = true))
+        assertEquals("org.telegram.messenger", MusicLogic.pickSession(idle, { it.pkg }, { it.playing }, ya)?.pkg)
+        // выбранный на паузе среди чужих на паузе - выбранный
+        assertEquals(ya, MusicLogic.pickSession(idle + S(ya, false), { it.pkg }, { it.playing }, ya, chosenOnly = true)?.pkg)
+        // чужая играет (голосовое) - показываем её, Pause ставит её на паузу
+        assertEquals("org.telegram.messenger",
+            MusicLogic.pickSession(listOf(S("org.telegram.messenger", true), S(ya, false)), { it.pkg }, { it.playing }, ya, chosenOnly = true)?.pkg)
+        // «Плеер телефона» (ничего не выбрано) - любая сессия, как раньше
+        assertEquals("org.telegram.messenger", MusicLogic.pickSession(idle, { it.pkg }, { it.playing }, null, chosenOnly = true)?.pkg)
+    }
 }

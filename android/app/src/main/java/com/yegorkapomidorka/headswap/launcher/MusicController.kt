@@ -11,8 +11,13 @@ import android.media.browse.MediaBrowser
 import android.media.session.MediaController
 import android.media.session.MediaSessionManager
 import android.media.session.PlaybackState
+import android.os.Handler
+import android.os.Looper
+import android.os.SystemClock
 import android.service.media.MediaBrowserService
 import android.util.Log
+import android.view.KeyEvent
+import com.yegorkapomidorka.headswap.AppLog
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -44,6 +49,13 @@ internal object MusicController {
     @Volatile private var controller: MediaController? = null
     private var lastArt: Bitmap? = null
     private var lastArtImage: ImageBitmap? = null
+    private const val LAUNCH_AFTER_MS = 4000L
+    private const val PENDING_MS = 15000L
+    private class Pending(val pkg: String, val launchAt: Long, val giveUpAt: Long) { var launched = false }
+    @Volatile private var pending: Pending? = null
+    private val main = Handler(Looper.getMainLooper())
+    /** Открыть приложение плеера на ГУ, когда [startPlayer] не разбудил его в фоне (ставит карточка музыки). */
+    @Volatile var launchApp: ((String) -> Unit)? = null
 
     fun refresh(ctx: Context, preferred: String?) {
         if (ctx.checkSelfPermission(Manifest.permission.MEDIA_CONTENT_CONTROL) != PackageManager.PERMISSION_GRANTED) {
@@ -61,7 +73,10 @@ internal object MusicController {
             Log.w(TAG, "sessions: ${e.javaClass.simpleName}")
             return
         }.filter { it.packageName != ctx.packageName }
-        val c = MusicLogic.pickSession(sessions, { it.packageName }, { it.playbackState?.state == PlaybackState.STATE_PLAYING }, preferred)
+        checkPending(sessions)
+        // выбран плеер - чужая сессия на паузе его не подменяет (Play и обложка вели в Telegram, поездки 16-17.11)
+        val c = MusicLogic.pickSession(sessions, { it.packageName }, { it.playbackState?.state == PlaybackState.STATE_PLAYING },
+            preferred, chosenOnly = true)
         controller = c
         if (c == null) { state = MusicState(access = true); return }
         val md = c.metadata
@@ -132,17 +147,30 @@ internal object MusicController {
         if (s != null) runCatching { s.transportControls.play() } else startPlayer(ctx, pkg)
     }
 
-    /** Сделать плеер текущим: если сессия уже есть - играть, иначе разбудить его MediaBrowserService и нажать play. */
+    /**
+     * Сделать плеер текущим: если сессия уже есть - играть. Иначе будим его тремя путями: MediaBrowserService (чужих
+     * пускает не всякий: у Яндекс Музыки остался один Media3LibraryService, и он отказывает), MEDIA_BUTTON PLAY на его
+     * ресивер (возобновление воспроизведения Media3) и, если за [LAUNCH_AFTER_MS] сессии нет, - открыть приложение на
+     * ГУ ([launchApp]). Появилась сессия, а плеер стоит - [checkPending] нажимает play. Главный поток.
+     */
     fun startPlayer(ctx: Context, pkg: String) {
         // Только главный поток (у MediaBrowser Handler); любое исключение здесь убило бы весь процесс моста.
         try {
             controller?.takeIf { it.packageName == pkg }?.let { it.transportControls.play(); return }
-            // у Яндекс Музыки два сервиса, Media3LibraryService чужих не пускает (стенд 07.11): пробуем по очереди
+            sessionsOf(ctx, pkg).firstOrNull()?.let {
+                AppLog.i("MUSIC $pkg: play в его сессию", false)
+                it.transportControls.play()
+                return
+            }
+            val now = SystemClock.uptimeMillis()
+            pending = Pending(pkg, now + LAUNCH_AFTER_MS, now + PENDING_MS)
             val services = ctx.packageManager.queryIntentServices(Intent(MediaBrowserService.SERVICE_INTERFACE), 0)
                 .filter { it.serviceInfo.packageName == pkg }.map { it.serviceInfo.name }
+            AppLog.i("MUSIC запуск $pkg: сессии нет, браузер (${services.size}) + MEDIA_BUTTON", false)
             connectPlay(ctx, pkg, services, 0)
+            mediaButtonPlay(ctx, pkg)
         } catch (e: Exception) {
-            Log.w(TAG, "startPlayer $pkg: ${e.javaClass.simpleName}")
+            AppLog.i("MUSIC запуск $pkg: ${e.javaClass.simpleName}: ${e.message}", false)
         }
     }
 
@@ -151,14 +179,51 @@ internal object MusicController {
         lateinit var browser: MediaBrowser
         browser = MediaBrowser(ctx, ComponentName(pkg, name), object : MediaBrowser.ConnectionCallback() {
             override fun onConnected() {
+                AppLog.i("MUSIC $pkg/$name: браузер подключился, play", false)
                 runCatching { MediaController(ctx, browser.sessionToken).transportControls.play() }
                 runCatching { browser.disconnect() }
             }
             override fun onConnectionFailed() {
-                Log.w(TAG, "player $pkg/$name refused the browser connection")
+                AppLog.i("MUSIC $pkg/$name: браузер не пустил", false)
                 runCatching { connectPlay(ctx, pkg, services, i + 1) }
             }
         }, null)
         browser.connect()
+    }
+
+    /** PLAY на MEDIA_BUTTON-ресивер [pkg]: так система возобновляет плеер, которого нет среди сессий. */
+    private fun mediaButtonPlay(ctx: Context, pkg: String) {
+        val receiver = runCatching {
+            ctx.packageManager.queryBroadcastReceivers(Intent(Intent.ACTION_MEDIA_BUTTON).setPackage(pkg), 0).firstOrNull()
+        }.getOrNull()?.activityInfo?.name
+        if (receiver == null) { AppLog.i("MUSIC $pkg: MEDIA_BUTTON-ресивера нет", false); return }
+        for (action in intArrayOf(KeyEvent.ACTION_DOWN, KeyEvent.ACTION_UP)) {
+            val intent = Intent(Intent.ACTION_MEDIA_BUTTON).setComponent(ComponentName(pkg, receiver))
+                .putExtra(Intent.EXTRA_KEY_EVENT, KeyEvent(action, KeyEvent.KEYCODE_MEDIA_PLAY))
+                .addFlags(Intent.FLAG_INCLUDE_STOPPED_PACKAGES)
+            runCatching { ctx.sendBroadcast(intent) }
+                .onFailure { AppLog.i("MUSIC $pkg: MEDIA_BUTTON ${it.javaClass.simpleName}", false); return }
+        }
+        AppLog.i("MUSIC $pkg: MEDIA_BUTTON PLAY -> $receiver", false)
+    }
+
+    /** Ждём сессию запущенного плеера: появилась - play (если стоит); нет к сроку - открыть приложение, потом сдаться. */
+    private fun checkPending(sessions: List<MediaController>) {
+        val p = pending ?: return
+        val now = SystemClock.uptimeMillis()
+        val s = sessions.firstOrNull { it.packageName == p.pkg }
+        when {
+            s != null -> {
+                pending = null
+                if (s.playbackState?.state == PlaybackState.STATE_PLAYING) AppLog.i("MUSIC ${p.pkg}: заиграл", false)
+                else { AppLog.i("MUSIC ${p.pkg}: сессия появилась, play", false); runCatching { s.transportControls.play() } }
+            }
+            now >= p.giveUpAt -> { pending = null; AppLog.i("MUSIC ${p.pkg}: сессия так и не появилась", false) }
+            now >= p.launchAt && !p.launched -> {
+                p.launched = true
+                AppLog.i("MUSIC ${p.pkg}: сессии нет - открываю приложение", false)
+                main.post { launchApp?.invoke(p.pkg) }
+            }
+        }
     }
 }
