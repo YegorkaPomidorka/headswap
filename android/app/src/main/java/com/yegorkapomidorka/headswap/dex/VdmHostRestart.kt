@@ -34,8 +34,15 @@ internal object VdmHostRestart {
      * дальше слушает этот порт и на loopback - к нему ходим без Wi-Fi. Свойство живёт до перезагрузки телефона.
      */
     const val FIXED_TCP_PORT = 5555
-    /** Закреплённый порт только на Samsung: проверен там (h768); Pixel adbd при смене USB-режима не перезапускает. */
-    private val pinPort = Build.MANUFACTURER.equals("samsung", ignoreCase = true)
+    /**
+     * Закреплённый порт на Samsung (h768) и Honor (h1063: хост гибнет при подключении ГУ, без Wi-Fi не поднимается);
+     * Pixel adbd при смене USB-режима не перезапускает.
+     */
+    private val pinPort = restartsAdbdOnUsb(Build.MANUFACTURER)
+
+    /** Производители, у которых adbd (а с ним хост) перезапускается при смене USB-режима. */
+    fun restartsAdbdOnUsb(maker: String?): Boolean =
+        maker.equals("samsung", ignoreCase = true) || maker.equals("honor", ignoreCase = true)
 
     private val busy = AtomicBoolean(false)
     @Volatile private var pendingUntil = 0L

@@ -48,11 +48,12 @@ internal object VdmDesktop {
 
     /**
      * Отладка по USB выключена: без неё Samsung при подключении ГУ кабелем останавливает adbd, а с ним shell-хост
-     * (h768, h821, SM-S942B; с галочкой SM-S942B не гаснет). Активация и главный экран на 17 её требуют - только на Samsung:
-     * Pixel 7 Pro (h966) с включённой галочкой получал «выключено», и активация не начиналась вовсе.
+     * (h768, h821, SM-S942B; с галочкой SM-S942B не гаснет). Активация и главный экран на 17 её требуют - только на Samsung
+     * и Honor (h1063, тот же обрыв хоста): Pixel 7 Pro (h966) с включённой галочкой получал «выключено», и активация не
+     * начиналась вовсе.
      */
     fun usbDebugMissing(context: android.content.Context): Boolean = supported &&
-        Build.MANUFACTURER.equals("samsung", ignoreCase = true) &&
+        VdmHostRestart.restartsAdbdOnUsb(Build.MANUFACTURER) &&
         android.provider.Settings.Global.getInt(context.contentResolver, android.provider.Settings.Global.ADB_ENABLED, 0) == 0
 
     /** Сырые значения для лога активации: на Pixel проверка ошибалась, видно ли там 0 или null (h966). */
