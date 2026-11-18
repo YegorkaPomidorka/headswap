@@ -48,8 +48,8 @@ enum class CarPreset(val titleRes: Int, val settings: CarSettings = CarSettings(
     HONDA_CRV_2026_HYBRID(R.string.car_honda_crv_2026_hybrid, CarSettings(
         transcode = true, videoMode = VideoMode.WIDE_HD, fps = FpsSetting.FPS30, desktopFps = FpsSetting.FPS30,
         limitedRange = true, crvDesktopPacing = true)),
-    /** Машина Егора: 1920×1080, 30 кадров. */
-    HONDA_VEZEL_2022(R.string.car_honda_vezel_2022, CarSettings(videoMode = VideoMode.R1080)),
+    /** Машина Егора: 1280×720. */
+    HONDA_VEZEL_2022(R.string.car_honda_vezel_2022, CarSettings(videoMode = VideoMode.R720)),
     /** ГУ CN7: прямой проброс моргает и гаснет (h638), канал слабый - перекодирование 1280×480 на 15 кадрах. */
     HYUNDAI_ELANTRA_7(R.string.car_hyundai_elantra_7, KOREAN.copy(transcode = true, videoMode = VideoMode.WIDE, fps = FpsSetting.FPS15)),
     /** HSAE, вертикальный экран: 1280×480 работает шустро (h86). */
