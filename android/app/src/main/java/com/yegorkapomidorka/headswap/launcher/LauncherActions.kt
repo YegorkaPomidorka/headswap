@@ -18,6 +18,8 @@ object LauncherActions {
 
     /** Домой, единственная точка возврата на главный экран. */
     fun home() { if (model.foreign != null) ForeignActions.home() else model.home() }
+    /** Выход в меню ГУ: долгое нажатие логотипа и двойное «Домой» на шайбе (ADR 0048). */
+    fun huDesktop() { com.yegorkapomidorka.headswap.BridgeService.requestHuDesktop(model.context) }
     fun openPicker() { model.pickerForLayers = false; model.go(Area.Picker) }
     /** «+» в «Слоях» (настройки «Экран»): тот же выбор приложения, выбранное уходит в слои, Назад - в настройки. */
     fun openLayerPicker() { model.pickerForLayers = true; model.go(Area.Picker) }
