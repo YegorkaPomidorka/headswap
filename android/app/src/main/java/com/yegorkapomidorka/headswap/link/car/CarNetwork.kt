@@ -6,6 +6,7 @@ import android.net.LinkProperties
 import android.net.Network
 import android.net.NetworkCapabilities
 import android.net.NetworkRequest
+import android.net.wifi.WifiInfo
 import android.net.wifi.WifiManager
 import android.net.wifi.WifiNetworkSpecifier
 import android.os.Build
@@ -26,7 +27,8 @@ enum class CarNetState(val label: String) {
  * сети (bindProcessToNetwork не используем). Колбэки приходят на главной нити. Запрос держится, пока не вызван [release]
  * (или сеть не пропала: тогда [state] сбрасывается в IDLE и вызывающий решает, просить ли заново).
  * Первая попытка WPA2, при отказе с паролем - одна повторная WPA3; без пароля сеть открытая.
- * SSID и пароль в WL не попадают, из исключений в лог идёт только имя класса.
+ * Если телефон уже в этой сети, запрос не шлём: specifier поднимает второе подключение с новой MAC, и ГУ
+ * заводит ещё один CarLife-девайс (ADR 0043). SSID и пароль в WL не попадают, из исключений в лог идёт только имя класса.
  *
  * [onState] - зеркало состояния для отчёта: пишет только экземпляр сервиса, проверка из настроек его не передаёт.
  */
@@ -76,8 +78,14 @@ class CarNetwork(ctx: Context, private val onState: (CarNetState) -> Unit = {}) 
     ) {
         if (state == CarNetState.REQUESTING || state == CarNetState.AVAILABLE) return
         logStaConcurrency()
+        val p = Params(ssid, pass, timeoutMs, onAvailable, onUnavailable, onLost)
+        val saved = savedCar(ssid)
+        if (saved != null) {
+            adopt(p, saved.first, saved.second)
+            return
+        }
         val first = CarSecPolicy.first(rememberedSec(ssid), pass.isNotEmpty())
-        start(Params(ssid, pass, timeoutMs, onAvailable, onUnavailable, onLost), Sec.entries.first { it.label == first })
+        start(p, Sec.entries.first { it.label == first })
     }
 
     /** Удачная защита из [CarWifi], если просим именно сохранённую сеть машины. */
@@ -94,6 +102,51 @@ class CarNetwork(ctx: Context, private val onState: (CarNetState) -> Unit = {}) 
         current = null
         ifaceName = null
         if (state != CarNetState.IDLE) state = CarNetState.IDLE
+    }
+
+    /**
+     * Уже ассоциированы с SSID машины и есть IPv4: эту сеть и держим. Имя сети видно с NEARBY_WIFI_DEVICES;
+     * не видно — null, и вызывающий идёт в specifier как раньше.
+     */
+    @Suppress("DEPRECATION") // снимок сетей на момент запроса; колбэк здесь ещё не за что держать
+    private fun savedCar(ssid: String): Pair<Network, LinkProperties>? {
+        if (Build.VERSION.SDK_INT < 31) return null
+        return try {
+            cm.allNetworks.firstNotNullOfOrNull { n ->
+                val caps = cm.getNetworkCapabilities(n) ?: return@firstNotNullOfOrNull null
+                if (!caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)) return@firstNotNullOfOrNull null
+                val info = caps.transportInfo as? WifiInfo ?: return@firstNotNullOfOrNull null
+                if (!CarNetPolicy.sameWifiSsid(info.ssid, ssid)) return@firstNotNullOfOrNull null
+                val lp = cm.getLinkProperties(n) ?: return@firstNotNullOfOrNull null
+                if (lp.interfaceName.isNullOrEmpty()) return@firstNotNullOfOrNull null
+                if (lp.linkAddresses.none { it.address is java.net.Inet4Address }) return@firstNotNullOfOrNull null
+                n to lp
+            }
+        } catch (e: Exception) {
+            WLog.ev(NET, "car-saved-fail", "err" to e.javaClass.simpleName)
+            null
+        }
+    }
+
+    /** Следим за уже поднятой сетью, без WifiNetworkSpecifier. */
+    private fun adopt(p: Params, network: Network, lp: LinkProperties) {
+        val c = Cb(p, Sec.WPA2, adopted = true)
+        cb = c
+        c.net = network
+        c.ready = true
+        current = network
+        ifaceName = lp.interfaceName
+        state = CarNetState.AVAILABLE
+        val req = NetworkRequest.Builder().addTransportType(NetworkCapabilities.TRANSPORT_WIFI).build()
+        try {
+            cm.registerNetworkCallback(req, c, handler)
+            c.registered = true
+        } catch (e: Exception) {
+            WLog.ev(NET, "car-watch-fail", "err" to e.javaClass.simpleName)
+        }
+        val addr = lp.linkAddresses.firstOrNull { it.address is java.net.Inet4Address }?.address?.hostAddress
+        WLog.ev(NET, "car-available", "iface" to lp.interfaceName, "sec" to "saved", "addr" to addr, "held" to "saved")
+        p.onAvailable(network)
     }
 
     private fun start(p: Params, sec: Sec) {
@@ -134,10 +187,10 @@ class CarNetwork(ctx: Context, private val onState: (CarNetState) -> Unit = {}) 
         p.onUnavailable("error:$err")
     }
 
-    private inner class Cb(val p: Params, val sec: Sec) : ConnectivityManager.NetworkCallback() {
+    private inner class Cb(val p: Params, val sec: Sec, private val adopted: Boolean = false) : ConnectivityManager.NetworkCallback() {
         var registered = false
-        private var net: Network? = null
-        private var ready = false
+        var net: Network? = null
+        var ready = false
 
         /** Колбэк прошлой попытки или уже снятый запрос. */
         private fun stale() = cb !== this
@@ -152,7 +205,8 @@ class CarNetwork(ctx: Context, private val onState: (CarNetState) -> Unit = {}) 
         }
 
         override fun onAvailable(network: Network) {
-            if (!stale()) net = network
+            if (adopted || stale()) return
+            net = network
         }
 
         /** Имя интерфейса берём отсюда: в onAvailable LinkProperties ещё нет. */

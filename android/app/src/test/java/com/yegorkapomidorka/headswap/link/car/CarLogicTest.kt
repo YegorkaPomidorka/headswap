@@ -172,6 +172,15 @@ class CarLogicTest {
         assertFalse(CarNetPolicy.shouldRelease(CarNetEvent.SESSION_END))
     }
 
+    @Test
+    fun savedCarWifiIsRecognizedWithOrWithoutQuotes() {
+        assertTrue(CarNetPolicy.sameWifiSsid("\"CAR-WIFI\"", "CAR-WIFI"))
+        assertTrue(CarNetPolicy.sameWifiSsid("CAR-WIFI", "CAR-WIFI"))
+        assertFalse(CarNetPolicy.sameWifiSsid("<unknown ssid>", "CAR-WIFI"))
+        assertFalse(CarNetPolicy.sameWifiSsid(null, "CAR-WIFI"))
+        assertFalse(CarNetPolicy.sameWifiSsid("\"OTHER\"", "CAR-WIFI"))
+    }
+
     /** Все условия выполнены; тесты по одному ломают по условию. */
     private fun btHint(
         waiting: Boolean = true,

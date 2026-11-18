@@ -122,6 +122,20 @@ object CarNetPolicy {
         CarNetEvent.AUTO_OFF, CarNetEvent.STOP, CarNetEvent.USB_WINS, CarNetEvent.DESTROY -> true
         CarNetEvent.SESSION_START, CarNetEvent.SESSION_END -> false
     }
+
+    /**
+     * Телефон уже в Wi-Fi машины ([reported] — SSID из WifiInfo, в кавычках или как есть).
+     * WifiNetworkSpecifier в этом случае поднимает второе подключение и другую MAC: ГУ заводит новый CarLife-девайс.
+     * `<unknown ssid>` — не видим имя, запрос нужен как раньше.
+     */
+    fun sameWifiSsid(reported: String?, wanted: String): Boolean {
+        if (reported.isNullOrEmpty() || reported == UNKNOWN_WIFI_SSID || wanted.isEmpty()) return false
+        val bare = if (reported.length >= 2 && reported.startsWith("\"") && reported.endsWith("\""))
+            reported.substring(1, reported.length - 1) else reported
+        return bare == wanted
+    }
+
+    private const val UNKNOWN_WIFI_SSID = "<unknown ssid>"
 }
 
 /** Чистая логика подсказки «переподключи Bluetooth»: без android.*, проверяется JVM-тестами. */

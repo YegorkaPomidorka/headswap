@@ -65,7 +65,8 @@
 **2. Транспорт воздуха.** Телефон слушает 6 портов (CMD 7240, VIDEO 8240, MEDIA 9240, TTS 9241, VR 9242, TOUCH 9340),
 ГУ подключается клиентом. Как телефон и ГУ оказываются в одной сети:
 (a) BT RFCOMM `carlife` + вход в P2P-группу ГУ (Mazda G6S); (b) хотспот телефона + маяк `HotspotBeacon`;
-(c) «Wi-Fi машины» — телефон входит в сеть ГУ (`CarNetwork`, VW). ADR 0014.
+(c) «Wi-Fi машины» — телефон входит в сеть ГУ (`CarNetwork`, VW). Если он уже в этом SSID, specifier не шлём:
+второе подключение меняет MAC и ГУ заводит новый девайс (ADR 0043). ADR 0014.
 
 **3. Сессия CarLife** (`CarLifeSession.onCmd`):
 HU_PROTOCOL_VERSION → стартовая пачка (`Handshake.startBatch`) → HU_INFO и STATISTIC_INFO (тут определяется ГУ, см. ниже) →
