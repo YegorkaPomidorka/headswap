@@ -182,6 +182,7 @@ class CarLifeSession(
     private var vKeys = 0L
     @Volatile private var vMaxWin = 0        // макс. кадр за окно статистики, Б (h1111)
     @Volatile private var vMaxKeyWin = 0     // макс. ключевой кадр за окно статистики, Б
+    @Volatile private var vSplitWin = 0      // кадров, порезанных на куски за окно статистики
     private var vBeats = 0L
     private var vDropped = 0L
     private var audioTx = 0L
@@ -835,7 +836,11 @@ class CarLifeSession(
     private val huSmallPackets get() = bridge.huMazda20622111 || bridge.huBonAuto20362105
 
     private fun sendVideoData(data: ByteArray) {
+        // размер кадра целиком, до нарезки: на TX видны только куски, там максимум всегда упирается в лимит (h1063)
+        if (data.size > vMaxWin) vMaxWin = data.size
+        if (data.size > vMaxKeyWin && AnnexB.nalTypes(data).contains(5)) vMaxKeyWin = data.size
         val max = AaBridgeCore.MAZDA_20622111_MAX_VIDEO_PACKET
+        if (huSmallPackets && data.size > max) vSplitWin++
         if (!huSmallPackets || data.size <= max) {
             send(Ch.VIDEO, Wire.dataInner(Msg.VIDEO_DATA, videoTimeMs(), data))
             return
@@ -1351,8 +1356,6 @@ class CarLifeSession(
             if (vFrames == 1L) WLog.ev(WLog.HS, "first-video", "bytes" to m.data.size)
             val key = AnnexB.nalTypes(m.data).contains(5)
             if (key) vKeys++
-            if (m.data.size > vMaxWin) vMaxWin = m.data.size
-            if (key && m.data.size > vMaxKeyWin) vMaxKeyWin = m.data.size
             val nals = AnnexB.nalTypes(m.data)
             if (vFrames <= 5 || key) {
                 AppLog.msg("TX", chan, inner.size, m.type, m.declaredLen, "nal=$nals", inner, ui = vFrames <= 5)
@@ -1497,9 +1500,11 @@ class CarLifeSession(
             CarLifeState.status = "ГУ молчит, байт от него нет"
         }
         if (now - lastStatsAt >= 5000 && (vFrames > 0 || vBeats > 0)) {
-            AppLog.i("видео: отправлено кадров=$vFrames (ключевых=$vKeys) байт=$vBytes heartbeat=$vBeats сброшено=$vDropped очередь=${transport.queueSize(Ch.VIDEO)} (+${vFrames - lastStatsFrames} за ${(now - lastStatsAt) / 1000}с) макс кадр=$vMaxWin Б, макс ключевой=$vMaxKeyWin Б")
+            AppLog.i("видео: отправлено кадров=$vFrames (ключевых=$vKeys) байт=$vBytes heartbeat=$vBeats сброшено=$vDropped очередь=${transport.queueSize(Ch.VIDEO)} (+${vFrames - lastStatsFrames} за ${(now - lastStatsAt) / 1000}с) макс кадр=$vMaxWin Б, макс ключевой=$vMaxKeyWin Б" +
+                if (huSmallPackets) ", порезано кадров=$vSplitWin" else "")
             vMaxWin = 0
             vMaxKeyWin = 0
+            vSplitWin = 0
             lastStatsAt = now
             lastStatsFrames = vFrames
             CarLifeState.video = "$chosen; кадров=$vFrames hb=$vBeats"
