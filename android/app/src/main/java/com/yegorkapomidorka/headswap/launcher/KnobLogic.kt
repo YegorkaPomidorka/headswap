@@ -36,6 +36,15 @@ object KnobLogic {
         else -> null
     }
 
+    /** Окно двойного «Домой», мс: успеть двумя нажатиями подряд, но не поймать два отдельных возврата домой. */
+    const val DOUBLE_HOME_MS = 700L
+
+    /**
+     * Второе «Домой» подряд - выход в меню ГУ (ADR 0047). ГУ шлёт на нажатие один код без отпускания, удержание не
+     * отличить; [previousMs] = 0 - предыдущего нажатия нет или оно уже сработало как двойное.
+     */
+    fun doubleHome(previousMs: Long, nowMs: Long): Boolean = previousMs > 0 && nowMs - previousMs in 0..DOUBLE_HOME_MS
+
     /** Движение фокуса: первое после касания только показывает рамку, не сдвигая её (как в AA). */
     fun moves(k: Knob) = k in setOf(Knob.NEXT, Knob.PREVIOUS, Knob.UP, Knob.DOWN, Knob.LEFT, Knob.RIGHT)
 }

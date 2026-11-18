@@ -47,4 +47,14 @@ class KnobLogicTest {
         assertNull(KnobLogic.windowKey(Knob.NAVI))
         assertNull(KnobLogic.windowKey(Knob.MUSIC))
     }
+
+    @Test fun secondHomeWithinWindowIsDouble() {
+        assertFalse(KnobLogic.doubleHome(0, 5_000)) // первое нажатие
+        assertTrue(KnobLogic.doubleHome(5_000, 5_300))
+        assertTrue(KnobLogic.doubleHome(5_000, 5_000 + KnobLogic.DOUBLE_HOME_MS))
+        assertFalse(KnobLogic.doubleHome(5_000, 5_001 + KnobLogic.DOUBLE_HOME_MS))
+        // Захар, h829: два «Назад» с шагом 0,999 с - обычные отдельные нажатия, такое двойным не считаем
+        assertFalse(KnobLogic.doubleHome(5_000, 5_999))
+        assertFalse(KnobLogic.doubleHome(5_000, 4_000)) // часы не идут назад, но и не падаем
+    }
 }

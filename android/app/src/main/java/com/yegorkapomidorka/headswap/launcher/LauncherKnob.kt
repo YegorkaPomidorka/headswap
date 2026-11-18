@@ -114,6 +114,8 @@ object LauncherKnob : DesktopKeys.Sink {
         return sent
     }
 
+    private var lastHome = 0L // только главный поток
+
     private fun run(k: Knob) {
         when (k) {
             Knob.OK -> {
@@ -123,7 +125,18 @@ object LauncherKnob : DesktopKeys.Sink {
                     t.tap()
                 } else reveal()
             }
-            Knob.HOME -> act(k) { LauncherActions.home() }
+            Knob.HOME -> {
+                val now = android.os.SystemClock.uptimeMillis()
+                if (KnobLogic.doubleHome(lastHome, now)) {
+                    lastHome = 0
+                    visible = false
+                    AppLog.i("LAUNCHER кнопка ГУ HOME дважды за ${KnobLogic.DOUBLE_HOME_MS} мс: меню ГУ", false)
+                    LauncherActions.huDesktop()
+                } else {
+                    lastHome = now
+                    act(k) { LauncherActions.home() }
+                }
+            }
             Knob.NAVI -> act(k) { LauncherActions.openNavigator() }
             Knob.MUSIC -> act(k) { LauncherActions.openMusic() }
             else -> if (!visible || target == null) reveal() else {
