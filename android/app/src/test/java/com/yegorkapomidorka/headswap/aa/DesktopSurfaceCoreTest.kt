@@ -153,6 +153,30 @@ class DesktopSurfaceCoreTest {
         assertEquals(2, f.link.transport.sent.size)
     }
 
+    @Test fun hyundaiCn7GetsSpsPpsOnEveryIdrAndSyncFrameOnFrameRateChange() = Fixture().use { f ->
+        val generation = f.start()
+        val encoder = f.link.encoders.single()
+        f.core.desktopSurfaceReady(generation)
+        encoder.output.onEncoderConfig(cfg)
+        encoder.output.onEncoderFrame(idr, true)
+        f.event("first")
+        encoder.output.onEncoderFrame(idr, true)
+        assertArrayEquals("Other head units keep bare periodic IDR", idr, f.link.transport.sent.last())
+        val before = encoder.fake.syncs.get()
+        f.core.onCarlifeFrameRateChange()
+        assertEquals(before, encoder.fake.syncs.get())
+
+        f.core.onHuInfo("QTI", "sm6150_au for arm64", AaBridgeCore.HYUNDAI_CN7_PRODUCT)
+        encoder.output.onEncoderFrame(idr, true)
+        assertArrayEquals(cfg + idr, f.link.transport.sent.last())
+        encoder.output.onEncoderFrame(cfg + idr, true)
+        assertArrayEquals("No double SPS/PPS", cfg + idr, f.link.transport.sent.last())
+        encoder.output.onEncoderFrame(p, false)
+        assertArrayEquals(p, f.link.transport.sent.last())
+        f.core.onCarlifeFrameRateChange()
+        assertEquals(before + 1, encoder.fake.syncs.get())
+    }
+
     @Test fun usbReconnectClosesProducerBeforeEncoderAndBeforeCreatingNextEncoder() = Fixture().use { f ->
         val oldGeneration = f.start()
         val old = f.link.encoders.single()

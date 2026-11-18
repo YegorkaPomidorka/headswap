@@ -3021,7 +3021,9 @@ class AaBridgeCore(
             if (huVw20082138 || huMobisNx4c) link.onEncodedKeyFrame(payload.size)
             return
         }
-        if (!link.sendVideo(data)) {
+        // CN7 после камеры заднего хода сбрасывает декодер без START и ждёт SPS/PPS: голый IDR даёт зелёный экран (h1254)
+        val out = if (idr && huHyundaiCn7 && !(AnnexB.startsWithSps(data) && 8 in types)) encCsd?.let { AnnexB.glue(it, data) } ?: data else data
+        if (!link.sendVideo(out)) {
             // кадр не принят (очередь CarLife переполнена): дальше P нельзя, до следующего IDR всё выбрасывается выше
             outGotIdr = false
             encDropped++
@@ -3031,7 +3033,19 @@ class AaBridgeCore(
         sent++
         if (idr) idrSent++
         AaState.bridgeSent = sent
-        if (idr && (huVw20082138 || huMobisNx4c)) link.onEncodedKeyFrame(data.size)
+        if (idr && (huVw20082138 || huMobisNx4c)) link.onEncodedKeyFrame(out.size)
+    }
+
+    /**
+     * FRAME_RATE_CHANGE от ГУ. На Hyundai CN7 он приходит вокруг камеры заднего хода, START после него бывает не всегда (h1254):
+     * сразу просим у энкодера ключевой кадр, SPS/PPS к нему приклеит [onEncoderFrame].
+     */
+    @Synchronized
+    fun onCarlifeFrameRateChange() {
+        if (!huHyundaiCn7) return
+        val t = transcoder ?: return
+        t.requestSyncFrame()
+        log("BRIDGE ГУ Hyundai CN7: FRAME_RATE_CHANGE, прошу у энкодера IDR с SPS/PPS", true)
     }
 
     /**

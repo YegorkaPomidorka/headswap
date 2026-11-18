@@ -533,6 +533,7 @@ class CarLifeSession(
                     else Handshake.frameRateChangeAllowed(fps)
                 if (allowed) {
                     onFrameRateChange(fps)
+                    bridge.onCarlifeFrameRateChange()
                     sendCmd(Msg.VIDEO_ENCODER_FRAME_RATE_CHANGE_DONE, Msgs.frameRate(fps))
                 } else {
                     AppLog.i("видео: FRAME_RATE_CHANGE fps=$fps вне 3..${if (cfg.desktopVideo != null) 60 else 30}, игнор")
