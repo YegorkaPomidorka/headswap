@@ -133,6 +133,7 @@ CONTROL0, SENSOR1, VIDEO2, INPUT3, SPEECH4, SYSTEM5, MEDIA6, MIC7, BT8, MEDIA_PL
 | `huHyundaiCn7` | product `wp_cn7cpe_cn` | музыка 32 кГц; рабочий стол после HFP-звонка ждёт MUSIC=1 от ГУ до 5 с (`BT_HFP_INDICATION`, ADR 0044) |
 | `huPioneerRm56` | Pioneer RM56E8B | перекодирование, 800 кбит/с, ≤10 fps, музыка 22 кГц |
 | `huMazda20622111` | ch 20622111 | VIDEO_DATA ≤ 15000 Б, 1,5 Мбит/с, обложка ≤ 12 КБ (ADR 0009) |
+| `huBonAuto20362105` | Bon-Auto (Outlander), ch 20362105 | как Mazda: VIDEO_DATA ≤ 15000 Б, обложка ≤ 12 КБ; потолок 1 Мбит/с (ADR 0047) |
 | `huMobisNx4c` | board/model CCNC, ch 20022188 | «режим Baidu»: AOA одним write, 20 fps, свой потолок IDR |
 
 **Добавить ГУ:**
@@ -195,7 +196,7 @@ CONTROL0, SENSOR1, VIDEO2, INPUT3, SPEECH4, SYSTEM5, MEDIA6, MIC7, BT8, MEDIA_PL
 | Маршрут от Алисы не в плитке / висит на телефоне | `LauncherActions.assistantOpened`, `carapp/RouteIntent`, `CarAppSession.newIntent` (повторный getTemplate), `PhoneAssistant.closePhoneTasks`; в логе `ASSIST маршрут`, `CARAPP onNewIntent`; ADR 0026 |
 | «Алиса только голосом»: молчит на блокировке / плашка врёт | `LauncherActions.voiceOnly` (скрытый слот `alice`, слой 1×1, `assistantHidden`), `PhoneAssistant.watch` (перенос MainActivity Яндекса), `launcher/AliceVoice` (состояния по микрофону, речи и `DesktopAudioState.level`), `AliceVoiceUi`; в логе `ASSIST скрытая`, `ASSIST плашка`; ADR 0034 |
 | Gemini голосом: молчит / маршрут или музыка не туда | `LauncherActions.voiceOnly` (`gemini()`: нет Яндекса → KEYCODE_VOICE_ASSIST через `DesktopKeys.injectKey`), `PhoneAssistant.watchPhone` (Google Карты → `RouteIntent.googleMapsDir`, YouTube Music → `musicFromGemini`), голос USAGE_ASSISTANT в `DesktopAudioLoopback`; в логе `ASSIST Gemini`, `ASSIST YouTube Music`, `ASSIST маршрут`; ADR 0035 |
-| USB встаёт после большого пакета | нарезка `Wire.CHUNK`, `huMazda20622111`; ADR 0009 |
+| USB встаёт после большого пакета | нарезка `Wire.CHUNK`, `huMazda20622111`, `huBonAuto20362105`; ADR 0009, 0047 |
 | Чёрный экран после камеры заднего хода | свой IDR (`IdrSplice`); ADR 0005 |
 | Поля, растянуто, не тот размер | `VideoMode`, `SpsCrop`, VIDEO_ENCODER_INIT в логе |
 | AA не подключается, `нет VERSION_RESPONSE` | сервер 5277 заглох: ADR 0003; база кейсов (память `hu/`) |

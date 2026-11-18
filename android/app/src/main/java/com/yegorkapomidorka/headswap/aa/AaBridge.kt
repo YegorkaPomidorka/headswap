@@ -373,6 +373,8 @@ class AaBridgeCore(
         private set
     @Volatile var huMazda20622111 = false      // Mazda Connect 2 из Китая (channel 20622111, h238/h359): VIDEO_DATA > ~16 КиБ вешает чтение USB
         private set
+    @Volatile var huBonAuto20362105 = false    // Bon-Auto (Mitsubishi Outlander, channel 20362105, h1063/h1111): низ кадра - каша при любом разрешении, EIO; пробуем потолок битрейта
+        private set
     @Volatile var huMobisNx4c = false          // Hyundai Tucson NX4 (Mobis CCNC, channel 20022188, h242): всё как у Baidu (запись AOA, keepalive, MIC, энкодер 20 fps)
         private set
     @Volatile var musicRateProvider: () -> MusicRate = { MusicRate.DEFAULT }
@@ -620,6 +622,7 @@ class AaBridgeCore(
         huHyundaiCn7 = false                   // HU_INFO придёт заново в этой сессии
         huPioneerRm56 = false                  // HU_INFO придёт заново в этой сессии
         huMazda20622111 = false                // STATISTIC_INFO придёт заново в этой сессии
+        huBonAuto20362105 = false              // STATISTIC_INFO придёт заново в этой сессии
         huMobisNx4c = false                    // HU_INFO / STATISTIC_INFO придут заново в этой сессии
         huVwCns2Delphi = false                 // STATISTIC_INFO придёт заново в этой сессии
         huVwCns3_20082122 = false              // STATISTIC_INFO придёт заново в этой сессии
@@ -1040,6 +1043,10 @@ class AaBridgeCore(
         if (channel == MAZDA_20622111_CHANNEL && !huMazda20622111) {
             huMazda20622111 = true
             log("BRIDGE ГУ Mazda 20622111: VIDEO_DATA режу на куски ≤ $MAZDA_20622111_MAX_VIDEO_PACKET Б, потолок ${MAZDA_20622111_CEILING_BPS / 1000} кбит/с", true)
+        }
+        if (channel == BONAUTO_20362105_CHANNEL && !huBonAuto20362105) {
+            huBonAuto20362105 = true
+            log("BRIDGE ГУ Bon-Auto 20362105: потолок битрейта ${BONAUTO_20362105_CEILING_BPS / 1000} кбит/с (h1111)", true)
         }
         if (channel == VW_20082120_CHANNEL || channel == VW_CNS3_20082122_CHANNEL || channel == VW_CNS3_20082134_CHANNEL ||
             channel == VW_CNS2_20082114_CHANNEL || channel == SKODA_CNS3_21290002_CHANNEL) huVw20082120 = true
@@ -3305,6 +3312,9 @@ class AaBridgeCore(
         const val MAZDA_20622111_MAX_VIDEO_PACKET = 15_000
         const val MAZDA_20622111_ART_BYTES = 12_000          // обложка в MEDIA_INFO: весь пакет должен остаться < 15000 Б
         const val MAZDA_20622111_CEILING_BPS = 1_500_000  // IDR поменьше на случай, если ГУ не склеивает куски
+        /** Bon-Auto (Mitsubishi Outlander, h1063/h1111): низ кадра - каша при любом разрешении, EIO; гипотеза - ГУ не переваривает большие кадры. */
+        const val BONAUTO_20362105_CHANNEL = "20362105"
+        const val BONAUTO_20362105_CEILING_BPS = 1_000_000
         const val KIA_20032131_CHANNEL = "20032131"       // Kia Seltos 2026 Китай, QTI sm6150_au madison (h672)
         const val VW_20082120_CHANNEL = "20082120"        // VW, protocol 1.0, versionName="RADIO" (h93)
         const val VW_CNS3_20082122_CHANNEL = "20082122"   // VW CNS3 (Tharu и др.): рвёт USB через ~5,6 с PAUSE без heartbeat (h222)
