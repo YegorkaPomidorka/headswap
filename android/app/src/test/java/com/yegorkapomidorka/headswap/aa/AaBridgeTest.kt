@@ -891,6 +891,23 @@ class AaBridgeAudioTest {
     }
 
     @Test
+    fun telephonyRingingPausesMediaOnVwCns3_20082122() {
+        // h1239: VW CNS3 20082122 (Tharu XR) - звонок по флажку глушит MEDIA, как на Delphi
+        core.peer = FakePeer()
+        core.onHuStatistic("20082122")
+        assertTrue(core.huReportsCalls)
+        core.onCarlifeStart()
+        core.onMediaStatus(AaMediaStatus(2, "YandexMusic", 10, null, null, null))
+        core.onAudioData(AapMessages.CH_AUDIO_MEDIA, pcm(100), 1)
+        core.onPhoneCallState(1)
+        core.onAudioData(AapMessages.CH_AUDIO_MEDIA, pcm(100), 2)                   // хвост буфера AA
+        core.onPhoneCallState(0)                                                    // плеер играет - пауза снята
+        core.onAudioData(AapMessages.CH_AUDIO_MEDIA, pcm(100), 3)
+        assertEquals(listOf(0x30001, 0x30006, 0x30003, 0x30001, 0x30006), link.audio.map { it.type })
+        assertEquals(1, link.mediaDrops)
+    }
+
+    @Test
     fun telephonyRingingDoesNotTouchMediaOnOtherHu() {
         core.peer = FakePeer()
         core.onCarlifeStart()

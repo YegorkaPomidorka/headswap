@@ -66,7 +66,7 @@
 ГУ подключается клиентом. Как телефон и ГУ оказываются в одной сети:
 (a) BT RFCOMM `carlife` + вход в P2P-группу ГУ (Mazda G6S); (b) хотспот телефона + маяк `HotspotBeacon`;
 (c) «Wi-Fi машины» — телефон входит в сеть ГУ (`CarNetwork`, VW). Если он уже в этом SSID, specifier не шлём:
-второе подключение меняет MAC и ГУ заводит новый девайс (ADR 0043). ADR 0014.
+второе подключение меняет MAC и ГУ заводит новый девайс (ADR 0049). ADR 0014.
 
 **3. Сессия CarLife** (`CarLifeSession.onCmd`):
 HU_PROTOCOL_VERSION → стартовая пачка (`Handshake.startBatch`) → HU_INFO и STATISTIC_INFO (тут определяется ГУ, см. ниже) →
@@ -128,11 +128,13 @@ CONTROL0, SENSOR1, VIDEO2, INPUT3, SPEECH4, SYSTEM5, MEDIA6, MIC7, BT8, MEDIA_PL
 | `huVw20082120` | ch 20082120/22/34/14, 21290002 | **по смыслу «heartbeat на PAUSE каждые 100 мс»**, имя историческое (ADR 0007) |
 | `huIdleVideoHeartbeat` | 20082114, 21290002 | heartbeat и без PAUSE после 1 с без кадров |
 | `huVwCns2Delphi` | 20082114 | речь в канал VR, пейсер тача, свои кнопки звонка |
+| `huVwCns3_20082122` | 20082122 (Tharu XR) | вместе с Delphi (`huReportsCalls`): по флажку «Сообщать ГУ о звонках» MODULE_STATUS PHONE + TELE_STATE и пауза MEDIA (ADR 0045) |
 | `huVwBt1420` | «VW BT 1420» | воздух: heartbeat на PAUSE, тёплое возобновление |
 | `huVw20082138` | VW ID (20082138, 20082128+«VW BT 9491», пресет ID. UNYX) | потолок битрейта по IDR (ADR 0008) |
-| `huHyundaiCn7` | product `wp_cn7cpe_cn` | музыка 32 кГц |
+| `huHyundaiCn7` | product `wp_cn7cpe_cn` | музыка 32 кГц; рабочий стол после HFP-звонка ждёт MUSIC=1 от ГУ до 5 с (`BT_HFP_INDICATION`, ADR 0044) |
 | `huPioneerRm56` | Pioneer RM56E8B | перекодирование, 800 кбит/с, ≤10 fps, музыка 22 кГц |
 | `huMazda20622111` | ch 20622111 | VIDEO_DATA ≤ 15000 Б, 1,5 Мбит/с, обложка ≤ 12 КБ (ADR 0009) |
+| `huBonAuto20362105` | Bon-Auto (Outlander), ch 20362105 | как Mazda: VIDEO_DATA ≤ 15000 Б, обложка ≤ 12 КБ; потолок 1 Мбит/с (ADR 0047) |
 | `huMobisNx4c` | board/model CCNC, ch 20022188 | «режим Baidu»: AOA одним write, 20 fps, свой потолок IDR |
 
 **Добавить ГУ:**
@@ -183,7 +185,7 @@ CONTROL0, SENSOR1, VIDEO2, INPUT3, SPEECH4, SYSTEM5, MEDIA6, MIC7, BT8, MEDIA_PL
   USB-режима; `VdmHostRestart` поднимает его через свою беспроводную отладку, для этого на 17 нужна «Отладка по USB» (требуем только на Samsung). ADR 0033.
 - Пароли, SSID, ключи в лог не пишутся.
 - Рубильники экспериментов в companion `AaBridgeCore`: `PAUSE_KEEPALIVE_ENABLED`, `NAVI_STATUS_ENABLED`,
-  `MODULE_MUSIC_ENABLED`, `ROUTE_NAVI_STATUS_ENABLED`, `AIR_WARM_RESUME_ENABLED`.
+  `MODULE_MUSIC_ENABLED`, `ROUTE_NAVI_STATUS_ENABLED`, `AIR_WARM_RESUME_ENABLED`, `CN7_CALL_HOLD_ENABLED`.
 
 ## Симптом → куда смотреть
 
@@ -195,7 +197,7 @@ CONTROL0, SENSOR1, VIDEO2, INPUT3, SPEECH4, SYSTEM5, MEDIA6, MIC7, BT8, MEDIA_PL
 | Маршрут от Алисы не в плитке / висит на телефоне | `LauncherActions.assistantOpened`, `carapp/RouteIntent`, `CarAppSession.newIntent` (повторный getTemplate), `PhoneAssistant.closePhoneTasks`; в логе `ASSIST маршрут`, `CARAPP onNewIntent`; ADR 0026 |
 | «Алиса только голосом»: молчит на блокировке / плашка врёт | `LauncherActions.voiceOnly` (скрытый слот `alice`, слой 1×1, `assistantHidden`), `PhoneAssistant.watch` (перенос MainActivity Яндекса), `launcher/AliceVoice` (состояния по микрофону, речи и `DesktopAudioState.level`), `AliceVoiceUi`; в логе `ASSIST скрытая`, `ASSIST плашка`; ADR 0034 |
 | Gemini голосом: молчит / маршрут или музыка не туда | `LauncherActions.voiceOnly` (`gemini()`: нет Яндекса → KEYCODE_VOICE_ASSIST через `DesktopKeys.injectKey`), `PhoneAssistant.watchPhone` (Google Карты → `RouteIntent.googleMapsDir`, YouTube Music → `musicFromGemini`), голос USAGE_ASSISTANT в `DesktopAudioLoopback`; в логе `ASSIST Gemini`, `ASSIST YouTube Music`, `ASSIST маршрут`; ADR 0035 |
-| USB встаёт после большого пакета | нарезка `Wire.CHUNK`, `huMazda20622111`; ADR 0009 |
+| USB встаёт после большого пакета | нарезка `Wire.CHUNK`, `huMazda20622111`, `huBonAuto20362105`; ADR 0009, 0047 |
 | Чёрный экран после камеры заднего хода | свой IDR (`IdrSplice`); ADR 0005 |
 | Поля, растянуто, не тот размер | `VideoMode`, `SpsCrop`, VIDEO_ENCODER_INIT в логе |
 | AA не подключается, `нет VERSION_RESPONSE` | сервер 5277 заглох: ADR 0003; база кейсов (память `hu/`) |
@@ -206,8 +208,10 @@ CONTROL0, SENSOR1, VIDEO2, INPUT3, SPEECH4, SYSTEM5, MEDIA6, MIC7, BT8, MEDIA_PL
 | Автотест стенда падает | `out/autotest-*/<язык>/`: `steps/`, `fail/*-diff.png`, `actions.log`; «обрезан многоточием» — баг вёрстки; README `pc-headunit/autotest` |
 | Клавиатура на ГУ разделена пополам | плотность рабочего стола `DesktopGeometryPolicy.density` (короткая сторона < 600 dp), ADR 0023 |
 | Главный: не та раскладка, плашка не листается «Слоями», ⇄ не там | prefs `home_layout`/`card_view`/`small_view` → `LauncherModel.tiles`, что листают «Слои» - prefs `layer_list` (`Layer`/`LayerList` в `HomeTilesLogic.kt`, настройки «Экран» → `LayersCard` и выбор по «+» `LayerPickerScreen` в `LayersUi.kt`; приложение плашки - prefs `tile_app`, окно по `appCardRect`, ADR 0030), правила в `HomeTilesLogic`, окна плашек в `EmbedUi.EmbedLayers` (плашка-приложение - слот app по `appCardRect`), ⇄ и «Слои» ленты - `HomeTileButtons`, ADR 0027 |
+| Рейка: стекло/сплошная, линза навигации не там, повторный тап навигатора, «Вид», формат даты | prefs `rail_style` (`RailStyle`) → `LauncherModel.railStyle`, `Rail(glass)`/`NavLens`/`glassRail` в `LauncherRoot.kt`, геометрия линзы и черты - `LauncherSpec.lensCenterY`/`dividerY`; стекла в портрете нет; повторный тап навигатора - `LauncherActions.openNavigator` (на весь экран → домой); «Вид» - `SettingsPage.LOOK` (`LookRow`/`Segmented`), в нём же 12 ч (`clock_12h`) и дата `date_mdy` → `StatusReader.formatDate`, ADR 0043 |
 | Рабочий стол не того цвета / золото там, где должен быть свой акцент | prefs `colors_night`/`colors_day` → `LauncherModel.palette` → `LauncherColors.palette` (набор по умолчанию = `Palettes.DARK/LIGHT`), акцент - `LocalAccent` = `LauncherPalette.accent`; страница `SettingsPage.COLORS`; ADR 0036 |
-| Шайба/кнопки ГУ не действуют в своём лаунчере | `DelegatedDexConnector.sendRotary/sendKey` → `DesktopKeys.sink` → `launcher/LauncherKnob` (фокус в `Pressable`), коды в `KnobLogic`, ADR 0024; в окне на всю область - `LauncherKnob.toWindow` → `EmbedHost.key` → `injectChildKey`, в логе `LAUNCHER шайба: клавиши идут в окно`, ADR 0037 |
+| Карточка музыки: Play/обложка ведут не в тот плеер, Play не запускает выбранный | выбор - `LauncherModel.selectedPlayer` (чип `PlayerChip.slots`), подбор сессии `MusicLogic.pickSession(chosenOnly, chip)` в `MusicController.refresh` - только плееры чипа; заигравший плеер чипа становится выбором (`LauncherActions.adoptPlayer`); запуск - `MusicController.startPlayer` (MediaBrowser + MEDIA_BUTTON, через 4 с `openPlayerApp`); в логе `MUSIC`, `LAUNCHER плеер`; ADR 0046 |
+| Шайба/кнопки ГУ не действуют в своём лаунчере | `DelegatedDexConnector.sendRotary/sendKey` → `DesktopKeys.sink` → `launcher/LauncherKnob` (фокус в `Pressable`), коды в `KnobLogic`, ADR 0024; в окне на всю область - `LauncherKnob.toWindow` → `EmbedHost.key` → `injectChildKey`, в логе `LAUNCHER шайба: клавиши идут в окно`, ADR 0037; два «Домой» за 700 мс - меню ГУ (`KnobLogic.doubleHome` → `LauncherActions.huDesktop`, в логе `HOME дважды`), ADR 0048 |
 | Рабочий стол: громкость двумя пальцами не работает | `VolumeSwipe` (зона 30% справа, шаг 1/12 высоты) в `AaBridgeCore.onCarlifeTouch`, тумблер `AaPrefs.volumeSwipe` / `huHondaVezel`, `DesktopMediaControl.adjustVolume`; в логе `жест громкости`, `BRIDGE громкость`; ADR 0038 |
 | 2ГИС на рабочем столе: нет лимита/камер, заставка висит, «Перезапустите 2ГИС» | `carapp/CarAppSession` (области, порядок stop), кнопка «Перезапустить навигатор»; ADR 0021 |
 | Навигатор окном вместо хоста, в логе `handshake: отказ ... Unknown host` | TEMPLATE_RENDERER в манифесте; ADR 0022 |
