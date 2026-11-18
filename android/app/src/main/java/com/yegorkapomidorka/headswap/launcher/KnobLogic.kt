@@ -40,7 +40,7 @@ object KnobLogic {
     const val DOUBLE_HOME_MS = 700L
 
     /**
-     * Второе «Домой» подряд - выход в меню ГУ (ADR 0047). ГУ шлёт на нажатие один код без отпускания, удержание не
+     * Второе «Домой» подряд - выход в меню ГУ (ADR 0048). ГУ шлёт на нажатие один код без отпускания, удержание не
      * отличить; [previousMs] = 0 - предыдущего нажатия нет или оно уже сработало как двойное.
      */
     fun doubleHome(previousMs: Long, nowMs: Long): Boolean = previousMs > 0 && nowMs - previousMs in 0..DOUBLE_HOME_MS
