@@ -128,7 +128,6 @@
     <string name="l_s_colors_bg_hue">Teinte du fond</string>
     <string name="l_s_colors_bg_sat">Saturation du fond</string>
     <string name="l_s_colors_hint">Tant que cet écran est ouvert, le bureau affiche les couleurs que vous modifiez. Les couleurs de nuit s\'affichent avec le thème sombre, celles de jour avec le thème clair.</string>
-    <string name="l_s_rail">Panneau latéral</string>
     <string name="l_s_rail_bottom">Panneau du bas</string>
     <string name="l_s_layout_tile_top">Tuile en haut</string>
     <string name="l_s_layout_music_top">Musique en haut</string>
@@ -138,6 +137,14 @@
     <string name="l_s_rail_cut">Compact</string>
     <string name="l_s_anim">Animations des boutons</string>
     <string name="l_s_battery">Batterie du téléphone</string>
+    <string name="l_s_clock12">Horloge 12 h</string>
+    <string name="l_s_rail_size">Taille du panneau</string>
+    <string name="l_s_rail_style">Style du panneau</string>
+    <string name="l_s_style_solid">Plein</string>
+    <string name="l_s_style_glass">Verre</string>
+    <string name="l_s_date">Date</string>
+    <string name="l_s_date_dmy">JJ.MM</string>
+    <string name="l_s_date_mdy">MM.JJ</string>
     <string name="l_s_map_scale">Échelle</string>
     <string name="l_s_map_scale_sub">Uniquement pour %1$s · s\'applique immédiatement</string>
     <string name="l_s_scale_smaller">Plus petite</string>
@@ -168,6 +175,8 @@
     <string name="l_nav_2gis">2GIS</string>
     <string name="l_nav_yandex_maps">Yandex Maps</string>
     <string name="l_nav_google_maps">Google Maps</string>
+    <string name="l_nav_amap">Amap</string>
+    <string name="l_nav_amap_auto">Amap Auto</string>
     <!-- навигатор на своём хосте Car App -->
     <string name="l_u_m">m</string>
     <string name="l_u_km">km</string>

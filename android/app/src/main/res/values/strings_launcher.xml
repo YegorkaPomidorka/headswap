@@ -128,7 +128,6 @@
     <string name="l_s_colors_bg_hue">Background hue</string>
     <string name="l_s_colors_bg_sat">Background saturation</string>
     <string name="l_s_colors_hint">While this screen is open, the desktop shows the colors you are editing. Night colors show in the dark theme, day colors in the light one.</string>
-    <string name="l_s_rail">Side panel</string>
     <string name="l_s_rail_bottom">Bottom panel</string>
     <string name="l_s_layout_tile_top">Tile on top</string>
     <string name="l_s_layout_music_top">Music on top</string>
@@ -138,6 +137,14 @@
     <string name="l_s_rail_cut">Compact</string>
     <string name="l_s_anim">Button animations</string>
     <string name="l_s_battery">Phone battery</string>
+    <string name="l_s_clock12">12-hour clock</string>
+    <string name="l_s_rail_size">Panel size</string>
+    <string name="l_s_rail_style">Panel style</string>
+    <string name="l_s_style_solid">Solid</string>
+    <string name="l_s_style_glass">Glass</string>
+    <string name="l_s_date">Date</string>
+    <string name="l_s_date_dmy">DD.MM</string>
+    <string name="l_s_date_mdy">MM.DD</string>
     <string name="l_s_map_scale">Map scale</string>
     <string name="l_s_map_scale_sub">Only for %1$s · applies immediately</string>
     <string name="l_s_scale_smaller">Smaller</string>
@@ -168,6 +175,8 @@
     <string name="l_nav_2gis">2GIS</string>
     <string name="l_nav_yandex_maps">Yandex Maps</string>
     <string name="l_nav_google_maps">Google Maps</string>
+    <string name="l_nav_amap">Amap</string>
+    <string name="l_nav_amap_auto">Amap Auto</string>
     <string name="l_nav_waze" translatable="false">Waze</string>
     <!-- навигатор на своём хосте Car App -->
     <string name="l_u_m">m</string>

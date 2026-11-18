@@ -39,14 +39,14 @@ class DexPrefs(context: Context) {
     var desktopComponent: String?
         get() = prefs.getString("desktop_component", null)?.takeIf(DesktopPick::isComponent)
         set(value) { prefs.edit().putString("desktop_component", value?.takeIf(DesktopPick::isComponent)).apply() }
+    /** «Хост VirtualDevice на Android 16» (Для разработчиков, h1091): только Samsung на 16, по умолчанию выключен. */
+    var vdmHostOnAndroid16: Boolean
+        get() = prefs.getBoolean("vdm_host_android16", false)
+        set(value) { prefs.edit().putBoolean("vdm_host_android16", value).apply() }
     /** Direct desktop has an independent 30 fps default; the AA preferences are unchanged. */
     var desktopFps: FpsSetting
         get() = prefs.getString("desktop_fps", null).let { name -> FpsSetting.entries.firstOrNull { it.name == name } ?: FpsSetting.FPS30 }
         set(value) { prefs.edit().putString("desktop_fps", value.name).apply() }
-    /** Insert an intermediate H.264 encode/decode stage, matching the AA transcode path. */
-    var desktopTranscode: Boolean
-        get() = prefs.getBoolean("desktop_transcode", false)
-        set(value) { prefs.edit().putBoolean("desktop_transcode", value).apply() }
 
     /**
      * Final H.264 color range. AUTO follows the selected car preset: the CR-V 2026 head unit

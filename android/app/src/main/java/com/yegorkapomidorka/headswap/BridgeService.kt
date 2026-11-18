@@ -1006,7 +1006,7 @@ class BridgeService : Service() {
         val screenOn = getSystemService(PowerManager::class.java).isInteractive
         val cfg = SessionConfig(
             screenOn, aaPrefs.micVrStatus, aaPrefs.fpsSetting,
-            metaMusic = aaPrefs.metaMusic, metaNavi = aaPrefs.metaNavi, naviField6 = aaPrefs.naviField6,
+            metaMusic = aaPrefs.metaMusic, metaArt16k = aaPrefs.metaArt16k, metaNavi = aaPrefs.metaNavi, naviField6 = aaPrefs.naviField6,
         )
         MetaRelay.PROGRESS_UNIT = if (aaPrefs.progressSeconds) 1 else 1000
         applyVideoTime(aaPrefs)
@@ -1133,7 +1133,7 @@ class BridgeService : Service() {
             screenOn, false, dexPrefs.desktopFps,
             // ПРОБНИК: навигация из теневой AA-сессии (AaShadowNav), без неё подписку ГУ просто никто не кормит.
             // Музыку кормит DesktopMediaMeta из MediaSession (h1054); с false MEDIA_INFO резался в sendMediaInfo
-            metaMusic = aaPrefs.metaMusic, metaNavi = aaPrefs.metaNavi, naviField6 = aaPrefs.naviField6, desktopVideo = desktopVideo,
+            metaMusic = aaPrefs.metaMusic, metaArt16k = aaPrefs.metaArt16k, metaNavi = aaPrefs.metaNavi, naviField6 = aaPrefs.naviField6, desktopVideo = desktopVideo,
         )
         MetaRelay.PROGRESS_UNIT = if (aaPrefs.progressSeconds) 1 else 1000
         applyVideoTime(aaPrefs)
@@ -1161,7 +1161,6 @@ class BridgeService : Service() {
         val owner: BridgeHost = h
         // темп кадров CarLife, повтор статичных кадров и энкодер остаются как в основном видеоконвейере
         owner.core.transcodeEnabled = true
-        owner.core.desktopTranscode = dexPrefs.desktopTranscode
         owner.core.videoLimitedRange = dexPrefs.effectiveLimitedRange(aaPrefs.carPreset)
         owner.core.crvDesktopPacing = aaPrefs.carPreset?.settings?.crvDesktopPacing == true
         owner.core.spliceMs = 0L
@@ -1218,8 +1217,9 @@ class BridgeService : Service() {
             val lp = com.yegorkapomidorka.headswap.launcher.LauncherPrefs(this)
             val pick = com.yegorkapomidorka.headswap.launcher.NavigatorPick
             val arabic = AppLocale.usesGlobalApps(this)
-            val installed = pick.known(arabic).filterTo(HashSet()) { packageManager.getLaunchIntentForPackage(it) != null }
-            if (pick.shadowWanted(aaPrefs.metaNavi, pick.effective(lp.navigator, installed, arabic), lp::navHints)) AaShadowNav.start(this)
+            val chinese = AppLocale.usesChineseApps(this)
+            val installed = pick.known(arabic, chinese).filterTo(HashSet()) { packageManager.getLaunchIntentForPackage(it) != null }
+            if (pick.shadowWanted(aaPrefs.metaNavi, pick.effective(lp.navigator, installed, arabic, chinese), lp::navHints)) AaShadowNav.start(this)
             else if (aaPrefs.metaNavi) AppLog.i("SHADOWNAV не стартую: у навигатора выключены подсказки на приборке", false)
             core.touchDecimationProvider = { aaPrefs.touchDecimation }
             core.dupDownFilterProvider = { aaPrefs.dupDownFilter }
@@ -1355,7 +1355,14 @@ class BridgeService : Service() {
             AaState.cert = loaded.creds.certSet + if (loaded.error != null) " (ОТКАТ с ${loaded.requested})" else ""
             AaState.status = "мост: старт"
             val log = { line: String, ui: Boolean -> AppLog.i(line, ui) }
-            val core = AaBridgeCore(log, clockUs = { SystemClock.elapsedRealtimeNanos() / 1_000 })
+            val core = AaBridgeCore(
+                log,
+                clockUs = { SystemClock.elapsedRealtimeNanos() / 1_000 },
+                connectingText = getString(R.string.aa_ph_connecting),
+                waitingText = getString(R.string.aa_ph_wait_frame),
+                disconnectedText = getString(R.string.aa_ph_lost),
+                startServerText = getString(R.string.aa_ph_start_server),
+            )
             core.micModeProvider = { aaPrefs.micMode }
             val audio = getSystemService(AudioManager::class.java)
             core.phoneCallProvider = {

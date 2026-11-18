@@ -27,13 +27,15 @@
 
 - Один gradle-модуль `:app` (`android/`), minSdk 29, target 37, JDK 17.
 - **Без AndroidX и Compose.** `MainActivity : android.app.Activity`, экраны строятся кодом (`ui/Kit.kt`, `ui/Screen.kt`).
-  Строки: `res/values` (en) и `res/values-ru`, обе правятся вместе.
+  Строки: `res/values` (en), `values-ru`, `values-ar`, `values-fr`, `values-zh-rCN` — правятся вместе. Тексты, которые видит
+  ГУ (заглушка моста, ошибки рабочего стола), тоже из ресурсов, не литералами в коде.
 - Варианты: `debug`, `release`, `smoke` (buildType: debug с суффиксом `.smoke`, ставится рядом с release).
   Flavors нет. `-Pwlbeta=false` выключает воздух.
 - Сертификаты AA (`assets/aa/{hur,jvc}`) в git нет. Задача `syncAaCerts` берёт их из основного checkout, release без них падает.
   Подпись release — `~/.android-keys/headswap-release.properties`.
 - Тесты: `cd android; ./gradlew testDebugUnitTest` (JUnit4, `android/app/src/test/...`). Python: `pc-headunit/tests/`,
-  `python -X utf8 -m unittest tools/test_logdiag.py`.
+  `python -X utf8 -m unittest tools/test_logdiag.py`. UI на стенде ГУ (телефон по USB):
+  `cd pc-headunit; python -m pytest autotest/scenarios --lang all` — README в `pc-headunit/autotest/`, ADR 0042.
 
 ## Пакеты
 
@@ -47,7 +49,7 @@
 | `$P/diag/` | `LogDiag` — Kotlin-порт `tools/logdiag.py`, те же правила. |
 | `$P/update/` | `UpdateLogic` (GitHub releases/latest, чистая), `Updater` (скачать, SHA-256, PackageInstaller). ADR 0012. |
 | `src/debug`, `src/release` | `DebugTransport.kt`: в debug — TCP к эмулятору ГУ, в release — заглушка. |
-| `pc-headunit/` | Python. `hu.py` — AA-ГУ для ПК (эталоны `golden.txt` для тестов). `carlife_hu.py` — эмулятор ГУ CarLife для проверки моста. |
+| `pc-headunit/` | Python. `hu.py` — AA-ГУ для ПК (эталоны `golden.txt` для тестов). `carlife_hu.py` — эмулятор ГУ CarLife для проверки моста. `stand.ps1` — стенд одной командой (smoke на телефоне + окно ГУ; `-PrepareOnly` — только подготовка телефона). `autotest/` — автотесты UI без LLM: `Stand` (тапы, кнопки ГУ, OCR Windows, сравнение с эталонами `refs/<hu>-<W>x<H>/<язык>/`), `strings.py` (строки по ключам из `res/values*`), сценарии pytest в `autotest/scenarios`. |
 | `tools/` | `logdiag.py` + `logdiag_rules.json` (причина обрыва по логу), `logdigest.py` (сводка лога). |
 
 Три файла-ядра большие: `AaBridge.kt` (~2800 строк), `CarLifeSession.kt` (~1500), `BridgeService.kt` (~1100).
@@ -125,9 +127,10 @@ CONTROL0, SENSOR1, VIDEO2, INPUT3, SPEECH4, SYSTEM5, MEDIA6, MIC7, BT8, MEDIA_PL
 | `huVw20082120` | ch 20082120/22/34/14, 21290002 | **по смыслу «heartbeat на PAUSE каждые 100 мс»**, имя историческое (ADR 0007) |
 | `huIdleVideoHeartbeat` | 20082114, 21290002 | heartbeat и без PAUSE после 1 с без кадров |
 | `huVwCns2Delphi` | 20082114 | речь в канал VR, пейсер тача, свои кнопки звонка |
+| `huVwCns3_20082122` | 20082122 (Tharu XR) | вместе с Delphi (`huReportsCalls`): по флажку «Сообщать ГУ о звонках» MODULE_STATUS PHONE + TELE_STATE и пауза MEDIA (ADR 0045) |
 | `huVwBt1420` | «VW BT 1420» | воздух: heartbeat на PAUSE, тёплое возобновление |
 | `huVw20082138` | VW ID (20082138, 20082128+«VW BT 9491», пресет ID. UNYX) | потолок битрейта по IDR (ADR 0008) |
-| `huHyundaiCn7` | product `wp_cn7cpe_cn` | музыка 32 кГц |
+| `huHyundaiCn7` | product `wp_cn7cpe_cn` | музыка 32 кГц; рабочий стол после HFP-звонка ждёт MUSIC=1 от ГУ до 5 с (`BT_HFP_INDICATION`, ADR 0044) |
 | `huPioneerRm56` | Pioneer RM56E8B | перекодирование, 800 кбит/с, ≤10 fps, музыка 22 кГц |
 | `huMazda20622111` | ch 20622111 | VIDEO_DATA ≤ 15000 Б, 1,5 Мбит/с, обложка ≤ 12 КБ (ADR 0009) |
 | `huMobisNx4c` | board/model CCNC, ch 20022188 | «режим Baidu»: AOA одним write, 20 fps, свой потолок IDR |
@@ -180,7 +183,7 @@ CONTROL0, SENSOR1, VIDEO2, INPUT3, SPEECH4, SYSTEM5, MEDIA6, MIC7, BT8, MEDIA_PL
   USB-режима; `VdmHostRestart` поднимает его через свою беспроводную отладку, для этого на 17 нужна «Отладка по USB» (требуем только на Samsung). ADR 0033.
 - Пароли, SSID, ключи в лог не пишутся.
 - Рубильники экспериментов в companion `AaBridgeCore`: `PAUSE_KEEPALIVE_ENABLED`, `NAVI_STATUS_ENABLED`,
-  `MODULE_MUSIC_ENABLED`, `ROUTE_NAVI_STATUS_ENABLED`, `AIR_WARM_RESUME_ENABLED`.
+  `MODULE_MUSIC_ENABLED`, `ROUTE_NAVI_STATUS_ENABLED`, `AIR_WARM_RESUME_ENABLED`, `CN7_CALL_HOLD_ENABLED`.
 
 ## Симптом → куда смотреть
 
@@ -199,9 +202,13 @@ CONTROL0, SENSOR1, VIDEO2, INPUT3, SPEECH4, SYSTEM5, MEDIA6, MIC7, BT8, MEDIA_PL
 | Обрывы по воздуху | `MultiSocketTransport`, `P2pJoin`, `CarNetwork`, строки `WL`; VPN рвёт сокеты |
 | Звук молчит / приглушён | `AaAudio`, AUDIO_TRANSMISSION_MODE, TTS_STOP; источник на ГУ |
 | Нет подсказок на приборке | подписка ГУ, `MetaRelay.sendNaviTurn`, `HondaClusterRoad` |
+| Текст на ГУ не на языке интерфейса | заглушка: `DelegatedDexConnector.text()` (`desk_ph_*`, `desk_err_*`), режим AA — тексты `AaBridgeCore` из `BridgeService` (`aa_ph_*`); язык — `AppLocale` |
+| Автотест стенда падает | `out/autotest-*/<язык>/`: `steps/`, `fail/*-diff.png`, `actions.log`; «обрезан многоточием» — баг вёрстки; README `pc-headunit/autotest` |
 | Клавиатура на ГУ разделена пополам | плотность рабочего стола `DesktopGeometryPolicy.density` (короткая сторона < 600 dp), ADR 0023 |
 | Главный: не та раскладка, плашка не листается «Слоями», ⇄ не там | prefs `home_layout`/`card_view`/`small_view` → `LauncherModel.tiles`, что листают «Слои» - prefs `layer_list` (`Layer`/`LayerList` в `HomeTilesLogic.kt`, настройки «Экран» → `LayersCard` и выбор по «+» `LayerPickerScreen` в `LayersUi.kt`; приложение плашки - prefs `tile_app`, окно по `appCardRect`, ADR 0030), правила в `HomeTilesLogic`, окна плашек в `EmbedUi.EmbedLayers` (плашка-приложение - слот app по `appCardRect`), ⇄ и «Слои» ленты - `HomeTileButtons`, ADR 0027 |
+| Рейка: стекло/сплошная, линза навигации не там, повторный тап навигатора, «Вид», формат даты | prefs `rail_style` (`RailStyle`) → `LauncherModel.railStyle`, `Rail(glass)`/`NavLens`/`glassRail` в `LauncherRoot.kt`, геометрия линзы и черты - `LauncherSpec.lensCenterY`/`dividerY`; стекла в портрете нет; повторный тап навигатора - `LauncherActions.openNavigator` (на весь экран → домой); «Вид» - `SettingsPage.LOOK` (`LookRow`/`Segmented`), в нём же 12 ч (`clock_12h`) и дата `date_mdy` → `StatusReader.formatDate`, ADR 0043 |
 | Рабочий стол не того цвета / золото там, где должен быть свой акцент | prefs `colors_night`/`colors_day` → `LauncherModel.palette` → `LauncherColors.palette` (набор по умолчанию = `Palettes.DARK/LIGHT`), акцент - `LocalAccent` = `LauncherPalette.accent`; страница `SettingsPage.COLORS`; ADR 0036 |
+| Карточка музыки: Play/обложка ведут не в тот плеер, Play не запускает выбранный | выбор - `LauncherModel.selectedPlayer` (чип `PlayerChip.slots`), подбор сессии `MusicLogic.pickSession(chosenOnly, chip)` в `MusicController.refresh` - только плееры чипа; заигравший плеер чипа становится выбором (`LauncherActions.adoptPlayer`); запуск - `MusicController.startPlayer` (MediaBrowser + MEDIA_BUTTON, через 4 с `openPlayerApp`); в логе `MUSIC`, `LAUNCHER плеер`; ADR 0046 |
 | Шайба/кнопки ГУ не действуют в своём лаунчере | `DelegatedDexConnector.sendRotary/sendKey` → `DesktopKeys.sink` → `launcher/LauncherKnob` (фокус в `Pressable`), коды в `KnobLogic`, ADR 0024; в окне на всю область - `LauncherKnob.toWindow` → `EmbedHost.key` → `injectChildKey`, в логе `LAUNCHER шайба: клавиши идут в окно`, ADR 0037 |
 | Рабочий стол: громкость двумя пальцами не работает | `VolumeSwipe` (зона 30% справа, шаг 1/12 высоты) в `AaBridgeCore.onCarlifeTouch`, тумблер `AaPrefs.volumeSwipe` / `huHondaVezel`, `DesktopMediaControl.adjustVolume`; в логе `жест громкости`, `BRIDGE громкость`; ADR 0038 |
 | 2ГИС на рабочем столе: нет лимита/камер, заставка висит, «Перезапустите 2ГИС» | `carapp/CarAppSession` (области, порядок stop), кнопка «Перезапустить навигатор»; ADR 0021 |

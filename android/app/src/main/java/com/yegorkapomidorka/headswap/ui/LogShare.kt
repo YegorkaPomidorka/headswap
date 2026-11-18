@@ -244,7 +244,7 @@ object LogShare {
             appendLine("  сертификат: ${aa.certSet}")
             appendLine("  микрофон: ${aa.micMode.label}, MODULE_STATUS VR: ${aa.micVrStatus}")
             appendLine("  проверка обновлений: ${upd.enabled}, на GitHub: ${upd.release()?.version ?: "не проверялось"}")
-            appendLine("  метаданные: музыка ${aa.metaMusic}, навигация ${aa.metaNavi}, поле 6 NAVI_NEXT_TURN_INFO: ${aa.naviField6}, прогресс в ${if (aa.progressSeconds) "с" else "мс"}")
+            appendLine("  метаданные: музыка ${aa.metaMusic}, обложка ≤16 КБ ${aa.metaArt16k}, навигация ${aa.metaNavi}, поле 6 NAVI_NEXT_TURN_INFO: ${aa.naviField6}, прогресс в ${if (aa.progressSeconds) "с" else "мс"}")
             appendLine()
             appendLine("Данные ГУ и состояние")
             appendLine(CarLifeState.summary())

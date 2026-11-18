@@ -9,6 +9,37 @@
     <string name="desk_recovering">Восстанавливаю рабочий стол (%1$d/2)…</string>
     <string name="desk_recovery_stopped">Восстановление остановлено. Проверьте USB, доступ к рабочему столу и разблокировку телефона</string>
     <string name="desk_recovery_screen_busy">Предыдущий экран ещё не освобождён; автоматический запуск отменён</string>
+    <!-- заглушка моста на ГУ (DelegatedDexConnector, AaBridgeCore в режиме AA) -->
+    <string name="desk_ph_starting">Запускаю рабочий стол…</string>
+    <string name="desk_ph_ready">Рабочий стол %1$d×%2$d готов, ожидаю видео…</string>
+    <string name="desk_ph_wait_usb">Ожидаю повторного подключения USB CarLife…</string>
+    <string name="desk_ph_stopped">Рабочий стол остановлен</string>
+    <string name="aa_ph_connecting">Подключаю Android Auto…</string>
+    <string name="aa_ph_start_server">Запустите сервер ГУ в Android Auto</string>
+    <string name="aa_ph_wait_frame">Android Auto: жду кадр…</string>
+    <string name="aa_ph_lost">Android Auto отключился, переподключаю…</string>
+    <!-- ошибки рабочего стола: на заглушке ГУ и в статусе на телефоне (DelegatedDexConnector) -->
+    <string name="desk_err_open_service">Не удалось открыть службу рабочего стола: %1$s</string>
+    <string name="desk_err_service_null">Служба рабочего стола недоступна. Активируйте доступ с компьютера</string>
+    <string name="desk_err_prepare">Не удалось подготовить рабочий стол</string>
+    <string name="desk_err_bind">Android не запустил службу рабочего стола</string>
+    <string name="desk_err_access">Доступ с компьютера недоступен</string>
+    <string name="desk_err_access_ended">Доступ завершён. Подключите телефон к компьютеру для повторной активации</string>
+    <string name="desk_err_no_first_frame">Рабочий стол не передал первый кадр за 30 секунд</string>
+    <string name="desk_err_generic">Ошибка рабочего стола</string>
+    <string name="desk_err_service_timeout">Служба рабочего стола не ответила за 12 секунд</string>
+    <string name="desk_err_stopped">Подключение остановлено</string>
+    <string name="desk_err_service_unavailable">Служба рабочего стола недоступна</string>
+    <string name="desk_err_need_android_desktop">Для доступа с компьютера нужен режим Android Desktop</string>
+    <string name="desk_err_version">Версия службы рабочего стола не совпадает с приложением</string>
+    <string name="desk_err_display">Не удалось создать отдельный экран</string>
+    <string name="desk_err_session_ended">Сеанс завершён</string>
+    <string name="desk_err_screen">Ошибка создания экрана</string>
+    <string name="desk_err_close_unconfirmed">Служба не подтвердила закрытие экрана. Завершите HeadSwap перед повторным подключением</string>
+    <string name="desk_err_input">Не удалось передать управление рабочему столу: %1$s</string>
+    <string name="desk_err_input_queue">Очередь управления переполнена. Подключитесь снова</string>
+    <string name="desk_err_service_died">Служба рабочего стола завершилась; доступ с компьютера сохранён</string>
+    <string name="desk_err_activate">Активируйте доступ с компьютера</string>
 
     <!-- Активация с самого телефона (беспроводная отладка), Настройки - Режим -->
     <string name="pa_title">Активируйте Headswap</string>

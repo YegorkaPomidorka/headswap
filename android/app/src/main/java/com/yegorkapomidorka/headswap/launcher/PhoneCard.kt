@@ -40,7 +40,8 @@ private fun typeLabel(type: CallType): String = stringResource(when (type) {
 
 @Composable
 private fun whenText(timeMs: Long): String =
-    PhoneLogic.whenLabel(System.currentTimeMillis(), timeMs, yesterday = stringResource(R.string.l_yesterday))
+    PhoneLogic.whenLabel(System.currentTimeMillis(), timeMs, yesterday = stringResource(R.string.l_yesterday),
+        twelveHour = LauncherModel.clock12h)
 
 /** Кнопки карточки «Телефон» (PhoneStates.dc.html): все размером T. */
 private enum class PhoneBtn { CALL, RECALL, ACCEPT, DECLINE, END, CANCEL, CONTACTS, MUTE, ALLOW }
@@ -255,7 +256,8 @@ fun CallsScreen() {
     val yesterday = stringResource(R.string.l_yesterday)
     // тип вызова не пишем: пропущенные - имя цветом пропущенного, справа только время
     val rows: List<CallsRow> = if (tab == 0) PhoneController.calls.map {
-        CallsRow(it.title, PhoneLogic.whenLabel(System.currentTimeMillis(), it.timeMs, yesterday = yesterday),
+        CallsRow(it.title, PhoneLogic.whenLabel(System.currentTimeMillis(), it.timeMs, yesterday = yesterday,
+            twelveHour = LauncherModel.clock12h),
             if (it.type == CallType.MISSED) Pal.MISSED else Pal.TEXT, it.number)
     } else (if (tab == 2) PhoneController.favorites else PhoneController.contacts)
         .map { CallsRow(it.name.ifEmpty { it.number }, "", Pal.TEXT, it.number) }
