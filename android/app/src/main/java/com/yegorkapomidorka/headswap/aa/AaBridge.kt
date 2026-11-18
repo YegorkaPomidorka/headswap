@@ -3021,9 +3021,7 @@ class AaBridgeCore(
             if (huVw20082138 || huMobisNx4c) link.onEncodedKeyFrame(payload.size)
             return
         }
-        // CN7 после камеры заднего хода сбрасывает декодер без START и ждёт SPS/PPS: голый IDR даёт зелёный экран (h1254)
-        val out = if (idr && huHyundaiCn7 && !(AnnexB.startsWithSps(data) && 8 in types)) encCsd?.let { AnnexB.glue(it, data) } ?: data else data
-        if (!link.sendVideo(out)) {
+        if (!link.sendVideo(data)) {
             // кадр не принят (очередь CarLife переполнена): дальше P нельзя, до следующего IDR всё выбрасывается выше
             outGotIdr = false
             encDropped++
@@ -3033,19 +3031,22 @@ class AaBridgeCore(
         sent++
         if (idr) idrSent++
         AaState.bridgeSent = sent
-        if (idr && (huVw20082138 || huMobisNx4c)) link.onEncodedKeyFrame(out.size)
+        if (idr && (huVw20082138 || huMobisNx4c)) link.onEncodedKeyFrame(data.size)
     }
 
     /**
-     * FRAME_RATE_CHANGE от ГУ. На Hyundai CN7 он приходит вокруг камеры заднего хода, START после него бывает не всегда (h1254):
-     * сразу просим у энкодера ключевой кадр, SPS/PPS к нему приклеит [onEncoderFrame].
+     * FRAME_RATE_CHANGE от ГУ. Hyundai CN7 после камеры заднего хода сбрасывает декодер и шлёт только его, без START (h1254):
+     * голые IDR декодер не берёт, зелёный до 22 с. Разово, как на START: следующий IDR энкодера уйдёт с SPS/PPS
+     * ([onEncoderFrame], ветка !outGotIdr), P до него выбрасываются. SPS на каждом IDR CN7 не переносит — постоянный
+     * чёрный (h1254test1), поэтому только по событию.
      */
     @Synchronized
     fun onCarlifeFrameRateChange() {
-        if (!huHyundaiCn7) return
+        if (!huHyundaiCn7 || !carlifeStarted) return
         val t = transcoder ?: return
+        outGotIdr = false
         t.requestSyncFrame()
-        log("BRIDGE ГУ Hyundai CN7: FRAME_RATE_CHANGE, прошу у энкодера IDR с SPS/PPS", true)
+        log("BRIDGE ГУ Hyundai CN7: FRAME_RATE_CHANGE, следующий IDR энкодера с SPS/PPS", true)
     }
 
     /**

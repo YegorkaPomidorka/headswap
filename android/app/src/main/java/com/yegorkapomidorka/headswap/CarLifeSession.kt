@@ -533,8 +533,10 @@ class CarLifeSession(
                     else Handshake.frameRateChangeAllowed(fps)
                 if (allowed) {
                     onFrameRateChange(fps)
-                    bridge.onCarlifeFrameRateChange()
                     sendCmd(Msg.VIDEO_ENCODER_FRAME_RATE_CHANGE_DONE, Msgs.frameRate(fps))
+                    // h1254: CN7 после камеры ждёт SPS/PPS; второй раз через 2 с, если первый IDR съела очередь
+                    bridge.onCarlifeFrameRateChange()
+                    sched.schedule({ bridge.onCarlifeFrameRateChange() }, FRC_IDR_REPEAT_MS, TimeUnit.MILLISECONDS)
                 } else {
                     AppLog.i("видео: FRAME_RATE_CHANGE fps=$fps вне 3..${if (cfg.desktopVideo != null) 60 else 30}, игнор")
                 }
@@ -791,7 +793,8 @@ class CarLifeSession(
                 val (x, y) = bridge.spsCropOrigin
                 VideoSource(mode.aaW, mode.aaH, pendingFps, stubBps, this, Rect(x, y, x + mode.outW, y + mode.outH))
             } else {
-                VideoSource(pendingW, pendingH, pendingFps, if (air) bitratePolicy.current else stubBps, this)
+                VideoSource(pendingW, pendingH, pendingFps, if (air) bitratePolicy.current else stubBps, this,
+                    matchDesktopSps = cfg.desktopVideo != null)
             }
             s.banner = text
             try {
@@ -1620,6 +1623,8 @@ class CarLifeSession(
         /** moduleID телефона в MODULE_STATUS (ModuleStatusManage: 1 = PHONE; 0 idle, 1 входящий, 2 исходящий/разговор). */
         private const val MODULE_PHONE = 1
         private const val VR_ECHO_MS = 1500L
+        /** h1254: повтор SPS-IDR после FRAME_RATE_CHANGE на CN7; не чаще IdrThrottle (1,5 с), чтобы не забить канал. */
+        private const val FRC_IDR_REPEAT_MS = 2000L
 
         /** moduleID микрофона ГУ в MODULE_STATUS (ModuleStatusManage.setCarlifeModuleStatus(6, VOICE_MIC)). */
         private const val MODULE_MIC = 6
