@@ -4,6 +4,7 @@
     <string name="wl_state_waiting">بانتظار السيارة عبر Wi-Fi (%1$s)</string>
     <string name="wl_state_no_hotspot">لا توجد نقطة اتصال: فعّل نقطة اتصال Wi-Fi في الهاتف</string>
     <string name="wl_state_p2p_busy">Wi-Fi Direct مشغول: أوقف نقطة الاتصال في الهاتف</string>
+    <string name="wl_state_p2p_no_tcp">لم يتصل Wi-Fi Direct بالسيارة: صِل الهاتف بشبكة Wi-Fi الخاصة بالسيارة أو فعّل نقطة الاتصال</string>
     <string name="wl_state_connected">السيارة متصلة عبر Wi-Fi</string>
     <string name="wl_state_lost">انقطع الاتصال، بانتظار السيارة من جديد</string>
     <string name="wl_state_auto">السيارة قريبة عبر Bluetooth، بانتظارها عبر Wi-Fi (%1$s)</string>

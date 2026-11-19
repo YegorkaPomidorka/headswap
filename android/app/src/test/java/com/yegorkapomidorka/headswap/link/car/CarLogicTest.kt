@@ -6,6 +6,24 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class CarLogicTest {
+    /** #111: TARGET_INFO не делает машину Wi-Fi Direct навсегда; режим пишут 6/6, неудача P2P снимает запрет на сеть машины. */
+    @Test
+    fun carModeByWhatWorked() {
+        assertTrue(CarModePolicy.wifiDirect(CarConnMode.UNKNOWN, targetInfoThisWait = true, p2pFailed = false))
+        assertFalse(CarModePolicy.wifiDirect(CarConnMode.UNKNOWN, targetInfoThisWait = false, p2pFailed = false))
+        assertTrue(CarModePolicy.wifiDirect(CarConnMode.BT_CARLIFE, targetInfoThisWait = false, p2pFailed = false))
+        assertFalse(CarModePolicy.wifiDirect(CarConnMode.BT_CARLIFE, targetInfoThisWait = true, p2pFailed = true))
+        assertFalse(CarModePolicy.wifiDirect(CarConnMode.HOTSPOT, targetInfoThisWait = true, p2pFailed = false))
+
+        assertEquals(CarConnMode.BT_CARLIFE, CarModePolicy.onTargetInfo(CarConnMode.UNKNOWN))
+        assertEquals(null, CarModePolicy.onTargetInfo(CarConnMode.HOTSPOT))
+        assertEquals(null, CarModePolicy.onTargetInfo(CarConnMode.BT_CARLIFE))
+
+        assertEquals(CarConnMode.BT_CARLIFE, CarModePolicy.onSixReady(viaP2p = true, viaBeacon = false))
+        assertEquals(CarConnMode.HOTSPOT, CarModePolicy.onSixReady(viaP2p = false, viaBeacon = true))
+        assertEquals(null, CarModePolicy.onSixReady(viaP2p = false, viaBeacon = false))
+    }
+
     @Test
     fun macComparisonIgnoresCase() {
         assertTrue(CarMac.same("AA:BB:CC:DD:EE:FF", "aa:bb:cc:dd:ee:ff"))
