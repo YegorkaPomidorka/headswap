@@ -6,13 +6,13 @@ import android.net.LinkProperties
 import android.net.Network
 import android.net.NetworkCapabilities
 import android.net.NetworkRequest
-import android.net.wifi.WifiInfo
 import android.net.wifi.WifiManager
 import android.net.wifi.WifiNetworkSpecifier
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import com.yegorkapomidorka.headswap.link.diag.WLog
+import java.net.Inet4Address
 
 /** Состояние запроса сети машины (в отчёте как [label]). */
 enum class CarNetState(val label: String) {
@@ -27,8 +27,9 @@ enum class CarNetState(val label: String) {
  * сети (bindProcessToNetwork не используем). Колбэки приходят на главной нити. Запрос держится, пока не вызван [release]
  * (или сеть не пропала: тогда [state] сбрасывается в IDLE и вызывающий решает, просить ли заново).
  * Первая попытка WPA2, при отказе с паролем - одна повторная WPA3; без пароля сеть открытая.
- * Если телефон уже в этой сети, запрос не шлём: specifier поднимает второе подключение с новой MAC, и ГУ
- * заводит ещё один CarLife-девайс (ADR 0049). SSID и пароль в WL не попадают, из исключений в лог идёт только имя класса.
+ * Если телефон уже в подсети прошлой сессии с ГУ, сеть держим через requestNetwork без specifier: specifier поднимает
+ * второе подключение с новой MAC, и ГУ заводит ещё один CarLife-девайс (ADR 0049). Имя сети на Android 13+ из снимка
+ * не видно, поэтому сравниваем адреса. SSID и пароль в WL не попадают, из исключений в лог идёт только имя класса.
  *
  * [onState] - зеркало состояния для отчёта: пишет только экземпляр сервиса, проверка из настроек его не передаёт.
  */
@@ -51,7 +52,7 @@ class CarNetwork(ctx: Context, private val onState: (CarNetState) -> Unit = {}) 
     @Volatile var ifaceName: String? = null
         private set
 
-    private var cb: Cb? = null
+    private var watch: Watch? = null
 
     private enum class Sec(val label: String) { OPEN("open"), WPA2("wpa2"), WPA3("wpa3") }
 
@@ -79,13 +80,12 @@ class CarNetwork(ctx: Context, private val onState: (CarNetState) -> Unit = {}) 
         if (state == CarNetState.REQUESTING || state == CarNetState.AVAILABLE) return
         logStaConcurrency()
         val p = Params(ssid, pass, timeoutMs, onAvailable, onUnavailable, onLost)
-        val saved = savedCar(ssid)
-        if (saved != null) {
-            adopt(p, saved.first, saved.second)
+        val lan = rememberedLan(ssid)
+        if (lan != null && classify(lan) != Seen.OTHER) {
+            hold(p, lan)
             return
         }
-        val first = CarSecPolicy.first(rememberedSec(ssid), pass.isNotEmpty())
-        start(p, Sec.entries.first { it.label == first })
+        specifier(p)
     }
 
     /** Удачная защита из [CarWifi], если просим именно сохранённую сеть машины. */
@@ -93,8 +93,8 @@ class CarNetwork(ctx: Context, private val onState: (CarNetState) -> Unit = {}) 
 
     /** Снять запрос (и сеть, если её держал только он). Можно звать сколько угодно раз. */
     fun release(why: String) {
-        val c = cb
-        cb = null
+        val c = watch
+        watch = null
         if (c != null) {
             c.unregister()
             WLog.ev(NET, "car-release", "why" to why)
@@ -104,49 +104,83 @@ class CarNetwork(ctx: Context, private val onState: (CarNetState) -> Unit = {}) 
         if (state != CarNetState.IDLE) state = CarNetState.IDLE
     }
 
+    /** Подсеть и шлюз прошлой сессии в этой сети машины. Имя сети не читаем: на Android 13+ оно скрыто. */
+    private fun rememberedLan(ssid: String): Lan? {
+        val w = CarWifi(app)
+        if (w.ssid != ssid) return null
+        val addr = CarNetPolicy.ipv4(w.lanAddr) ?: return null
+        if (w.lanPrefix !in 16..30) return null
+        return Lan(addr, w.lanPrefix, CarNetPolicy.ipv4(w.lanGw))
+    }
+
     /**
-     * Уже ассоциированы с SSID машины и есть IPv4: эту сеть и держим. Имя сети видно с NEARBY_WIFI_DEVICES;
-     * не видно — null, и вызывающий идёт в specifier как раньше.
+     * Есть ли уже Wi-Fi машины. MATCH — адрес в запомненной подсети (или шлюз без интернета совпал).
+     * PENDING — Wi-Fi без интернета ещё без IPv4: подождём DHCP, specifier пока не шлём.
      */
-    @Suppress("DEPRECATION") // снимок сетей на момент запроса; колбэк здесь ещё не за что держать
-    private fun savedCar(ssid: String): Pair<Network, LinkProperties>? {
-        if (Build.VERSION.SDK_INT < 31) return null
-        return try {
-            cm.allNetworks.firstNotNullOfOrNull { n ->
-                val caps = cm.getNetworkCapabilities(n) ?: return@firstNotNullOfOrNull null
-                if (!caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)) return@firstNotNullOfOrNull null
-                val info = caps.transportInfo as? WifiInfo ?: return@firstNotNullOfOrNull null
-                if (!CarNetPolicy.sameWifiSsid(info.ssid, ssid)) return@firstNotNullOfOrNull null
-                val lp = cm.getLinkProperties(n) ?: return@firstNotNullOfOrNull null
-                if (lp.interfaceName.isNullOrEmpty()) return@firstNotNullOfOrNull null
-                if (lp.linkAddresses.none { it.address is java.net.Inet4Address }) return@firstNotNullOfOrNull null
-                n to lp
+    @Suppress("DEPRECATION") // снимок на момент запроса; колбэк здесь ещё не за что держать
+    private fun classify(lan: Lan): Seen = try {
+        var pending = false
+        for (n in cm.allNetworks) {
+            val caps = cm.getNetworkCapabilities(n) ?: continue
+            if (!caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)) continue
+            val lp = cm.getLinkProperties(n) ?: continue
+            if (onLan(caps, lp, lan)) return Seen.MATCH
+            if (lp.linkAddresses.none { it.address is Inet4Address } &&
+                !caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+            ) pending = true
+        }
+        if (pending) Seen.PENDING else Seen.OTHER
+    } catch (e: Exception) {
+        WLog.ev(NET, "car-lan-fail", "err" to e.javaClass.simpleName)
+        Seen.OTHER
+    }
+
+    private fun onLan(caps: NetworkCapabilities, lp: LinkProperties, lan: Lan): Boolean {
+        if (lp.linkAddresses.any { a ->
+                val ip = (a.address as? Inet4Address)?.hostAddress?.let(CarNetPolicy::ipv4) ?: return@any false
+                CarNetPolicy.sameCarLan(ip, a.prefixLength, lan.addr, lan.prefix)
             }
+        ) return true
+        if (caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)) return false
+        val gw = CarNetPolicy.ipv4(gateway(lp))
+        return lan.gw != null && gw == lan.gw
+    }
+
+    /** Держим уже ассоциированную сеть: без specifier и без требования интернета. */
+    private fun hold(p: Params, lan: Lan) {
+        val req = NetworkRequest.Builder()
+            .addTransportType(NetworkCapabilities.TRANSPORT_WIFI)
+            .removeCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+            .build()
+        val h = Hold(p, lan)
+        watch = h
+        state = CarNetState.REQUESTING
+        WLog.ev(NET, "car-hold", "prefix" to lan.prefix, "timeoutMs" to HOLD_MS)
+        try {
+            cm.requestNetwork(req, h, handler, HOLD_MS)
+            h.registered = true
         } catch (e: Exception) {
-            WLog.ev(NET, "car-saved-fail", "err" to e.javaClass.simpleName)
-            null
+            watch = null
+            WLog.ev(NET, "car-hold-fail", "err" to e.javaClass.simpleName)
+            specifier(p)
         }
     }
 
-    /** Следим за уже поднятой сетью, без WifiNetworkSpecifier. */
-    private fun adopt(p: Params, network: Network, lp: LinkProperties) {
-        val c = Cb(p, Sec.WPA2, adopted = true)
-        cb = c
-        c.net = network
-        c.ready = true
-        current = network
-        ifaceName = lp.interfaceName
-        state = CarNetState.AVAILABLE
-        val req = NetworkRequest.Builder().addTransportType(NetworkCapabilities.TRANSPORT_WIFI).build()
-        try {
-            cm.registerNetworkCallback(req, c, handler)
-            c.registered = true
-        } catch (e: Exception) {
-            WLog.ev(NET, "car-watch-fail", "err" to e.javaClass.simpleName)
-        }
-        val addr = lp.linkAddresses.firstOrNull { it.address is java.net.Inet4Address }?.address?.hostAddress
-        WLog.ev(NET, "car-available", "iface" to lp.interfaceName, "sec" to "saved", "addr" to addr, "held" to "saved")
-        p.onAvailable(network)
+    /** Сеть из запроса не та или DHCP не успел: обычный specifier. */
+    private fun missHold(h: Hold) {
+        if (watch !== h || h.handed) return
+        h.handed = true
+        h.unregister()
+        if (watch === h) watch = null
+        current = null
+        ifaceName = null
+        WLog.ev(NET, "car-hold-miss")
+        specifier(h.p)
+    }
+
+    private fun specifier(p: Params) {
+        val first = CarSecPolicy.first(rememberedSec(p.ssid), p.pass.isNotEmpty())
+        start(p, Sec.entries.first { it.label == first })
     }
 
     private fun start(p: Params, sec: Sec) {
@@ -164,19 +198,19 @@ class CarNetwork(ctx: Context, private val onState: (CarNetState) -> Unit = {}) 
                 .setNetworkSpecifier(spec)
                 .build()
         } catch (e: Exception) {      // длина SSID, короткий пароль: message может содержать SSID, в лог только класс
-            cb = null
+            watch = null
             fail(p, sec, e.javaClass.simpleName)
             return
         }
         val c = Cb(p, sec)
-        cb = c
+        watch = c
         state = CarNetState.REQUESTING
         WLog.ev(NET, "car-request", "sec" to sec.label, "timeoutMs" to p.timeoutMs)
         try {
             cm.requestNetwork(req, c, handler, p.timeoutMs.toInt())
             c.registered = true
         } catch (e: Exception) {
-            cb = null
+            watch = null
             fail(p, sec, e.javaClass.simpleName)
         }
     }
@@ -187,15 +221,19 @@ class CarNetwork(ctx: Context, private val onState: (CarNetState) -> Unit = {}) 
         p.onUnavailable("error:$err")
     }
 
-    private inner class Cb(val p: Params, val sec: Sec, private val adopted: Boolean = false) : ConnectivityManager.NetworkCallback() {
+    private interface Watch {
+        fun unregister()
+    }
+
+    private inner class Cb(val p: Params, val sec: Sec) : ConnectivityManager.NetworkCallback(), Watch {
         var registered = false
         var net: Network? = null
         var ready = false
 
         /** Колбэк прошлой попытки или уже снятый запрос. */
-        private fun stale() = cb !== this
+        private fun stale() = watch !== this
 
-        fun unregister() {
+        override fun unregister() {
             if (!registered) return
             registered = false
             try {
@@ -205,7 +243,7 @@ class CarNetwork(ctx: Context, private val onState: (CarNetState) -> Unit = {}) 
         }
 
         override fun onAvailable(network: Network) {
-            if (adopted || stale()) return
+            if (stale()) return
             net = network
         }
 
@@ -218,8 +256,8 @@ class CarNetwork(ctx: Context, private val onState: (CarNetState) -> Unit = {}) 
             ifaceName = name
             state = CarNetState.AVAILABLE
             CarWifi(app).let { if (it.ssid == p.ssid) it.rememberSec(sec.label) }
-            WLog.ev(NET, "car-available", "iface" to name, "sec" to sec.label,
-                "addr" to linkProperties.linkAddresses.firstOrNull { it.address is java.net.Inet4Address }?.address?.hostAddress)
+            rememberLan(linkProperties)
+            WLog.ev(NET, "car-available", "iface" to name, "sec" to sec.label, "addr" to v4(linkProperties))
             p.onAvailable(network)
         }
 
@@ -231,7 +269,7 @@ class CarNetwork(ctx: Context, private val onState: (CarNetState) -> Unit = {}) 
                 start(p, Sec.WPA3)      // сеть могла быть WPA3: одна повторная попытка
                 return
             }
-            cb = null
+            watch = null
             state = CarNetState.UNAVAILABLE
             p.onUnavailable("no-network")
         }
@@ -239,13 +277,110 @@ class CarNetwork(ctx: Context, private val onState: (CarNetState) -> Unit = {}) 
         override fun onLost(network: Network) {
             if (stale() || network != net) return
             unregister()
-            cb = null
+            watch = null
             current = null
             ifaceName = null
             state = CarNetState.IDLE
             WLog.ev(NET, "car-lost")
             p.onLost()
         }
+    }
+
+    /**
+     * Удержание сети без specifier. Колбэк системы может прийти прямо из requestNetwork, поэтому [Params.onAvailable]
+     * уходит через [handler]: иначе BridgeService.restartForCarNet зайдёт в request повторно.
+     */
+    private inner class Hold(val p: Params, val lan: Lan) : ConnectivityManager.NetworkCallback(), Watch {
+        var registered = false
+        var handed = false
+        private var net: Network? = null
+        private var ready = false
+
+        private fun stale() = watch !== this || handed
+
+        override fun unregister() {
+            if (!registered) return
+            registered = false
+            try {
+                cm.unregisterNetworkCallback(this)
+            } catch (_: IllegalArgumentException) {
+            }
+        }
+
+        override fun onAvailable(network: Network) {
+            if (stale()) return
+            net = network
+        }
+
+        override fun onCapabilitiesChanged(network: Network, caps: NetworkCapabilities) {
+            if (stale()) return
+            net = network
+            val lp = cm.getLinkProperties(network) ?: return
+            accept(network, caps, lp)
+        }
+
+        override fun onLinkPropertiesChanged(network: Network, linkProperties: LinkProperties) {
+            if (stale()) return
+            net = network
+            val caps = cm.getNetworkCapabilities(network) ?: return
+            accept(network, caps, linkProperties)
+        }
+
+        private fun accept(network: Network, caps: NetworkCapabilities, lp: LinkProperties) {
+            if (ready || network != net) return
+            val name = lp.interfaceName ?: return
+            if (lp.linkAddresses.none { it.address is Inet4Address }) return
+            if (!onLan(caps, lp, lan)) {
+                missHold(this)
+                return
+            }
+            ready = true
+            current = network
+            ifaceName = name
+            state = CarNetState.AVAILABLE
+            rememberLan(lp)
+            val addr = v4(lp)
+            WLog.ev(NET, "car-available", "iface" to name, "sec" to "saved", "addr" to addr, "held" to "lan")
+            val held = network
+            handler.post { if (watch === this && current == held) p.onAvailable(held) }
+        }
+
+        override fun onUnavailable() {
+            if (stale()) return
+            missHold(this)
+        }
+
+        override fun onLost(network: Network) {
+            if (stale() || network != net) return
+            if (!ready) {
+                missHold(this)
+                return
+            }
+            unregister()
+            watch = null
+            current = null
+            ifaceName = null
+            state = CarNetState.IDLE
+            WLog.ev(NET, "car-lost")
+            p.onLost()
+        }
+    }
+
+    private fun rememberLan(lp: LinkProperties) {
+        val addr = v4(lp) ?: return
+        val prefix = lp.linkAddresses.firstOrNull { it.address is Inet4Address }?.prefixLength ?: return
+        CarWifi(app).rememberLan(addr, prefix, gateway(lp))
+    }
+
+    private fun v4(lp: LinkProperties): String? =
+        lp.linkAddresses.firstOrNull { it.address is Inet4Address }?.address?.hostAddress
+
+    private fun gateway(lp: LinkProperties): String? {
+        if (Build.VERSION.SDK_INT >= 30) {
+            val dhcp = lp.dhcpServerAddress
+            if (dhcp is Inet4Address) return dhcp.hostAddress
+        }
+        return lp.routes.firstOrNull { it.isDefaultRoute && it.gateway is Inet4Address }?.gateway?.hostAddress
     }
 
     private fun logStaConcurrency() {
@@ -261,8 +396,13 @@ class CarNetwork(ctx: Context, private val onState: (CarNetState) -> Unit = {}) 
         WLog.ev(NET, "sta-concurrency", "local" to v)
     }
 
+    private class Lan(val addr: Int, val prefix: Int, val gw: Int?)
+
+    private enum class Seen { MATCH, PENDING, OTHER }
+
     private companion object {
         const val NET = "net"
+        const val HOLD_MS = 4_000
         @Volatile var staLogged = false
     }
 }

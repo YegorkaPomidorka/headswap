@@ -36,8 +36,25 @@ class CarWifi(ctx: Context) {
 
     fun save(ssid: String, pass: String) {
         val ed = sp.edit().putString("ssid", ssid).putString("pass", pass)
-        if (ssid != this.ssid) ed.remove("proven")
+        if (ssid != this.ssid) {
+            ed.remove("proven")
+            ed.remove("lanAddr").remove("lanPrefix").remove("lanGw")
+        }
         if (ssid != this.ssid || pass != this.pass) ed.remove("sec")
+        ed.apply()
+    }
+
+    /** Адрес телефона в сети ГУ после удачного входа, например `10.173.189.58` и префикс 24. Шлюз может быть null. */
+    val lanAddr: String? get() = sp.getString("lanAddr", null)
+
+    val lanPrefix: Int get() = sp.getInt("lanPrefix", -1)
+
+    val lanGw: String? get() = sp.getString("lanGw", null)
+
+    fun rememberLan(addr: String, prefix: Int, gw: String?) {
+        if (prefix !in 16..30 || addr.isEmpty()) return
+        val ed = sp.edit().putString("lanAddr", addr).putInt("lanPrefix", prefix)
+        if (!gw.isNullOrEmpty()) ed.putString("lanGw", gw)
         ed.apply()
     }
 

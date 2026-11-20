@@ -123,19 +123,30 @@ object CarNetPolicy {
         CarNetEvent.SESSION_START, CarNetEvent.SESSION_END -> false
     }
 
-    /**
-     * Телефон уже в Wi-Fi машины ([reported] — SSID из WifiInfo, в кавычках или как есть).
-     * WifiNetworkSpecifier в этом случае поднимает второе подключение и другую MAC: ГУ заводит новый CarLife-девайс.
-     * `<unknown ssid>` — не видим имя, запрос нужен как раньше.
-     */
-    fun sameWifiSsid(reported: String?, wanted: String): Boolean {
-        if (reported.isNullOrEmpty() || reported == UNKNOWN_WIFI_SSID || wanted.isEmpty()) return false
-        val bare = if (reported.length >= 2 && reported.startsWith("\"") && reported.endsWith("\""))
-            reported.substring(1, reported.length - 1) else reported
-        return bare == wanted
+    /** IPv4 из строки `a.b.c.d`. Неадрес — null. */
+    fun ipv4(text: String?): Int? {
+        if (text.isNullOrEmpty()) return null
+        val p = text.split('.')
+        if (p.size != 4) return null
+        var v = 0
+        for (s in p) {
+            val n = s.toIntOrNull() ?: return null
+            if (n !in 0..255) return null
+            v = (v shl 8) or n
+        }
+        return v
     }
 
-    private const val UNKNOWN_WIFI_SSID = "<unknown ssid>"
+    /**
+     * Та же подсеть, что у прошлой сессии с ГУ. Префикс короче /16 не сравниваем: иначе весь 10.0.0.0/8
+     * сойдёт за машину. SSID на Android 13+ из снимка сети не виден.
+     */
+    fun sameCarLan(local: Int, localPrefix: Int, remembered: Int, rememberedPrefix: Int): Boolean {
+        val n = minOf(localPrefix, rememberedPrefix)
+        if (n !in 16..32) return false
+        val shift = 32 - n
+        return (local ushr shift) == (remembered ushr shift)
+    }
 }
 
 /** Чистая логика подсказки «переподключи Bluetooth»: без android.*, проверяется JVM-тестами. */
