@@ -497,6 +497,7 @@ fun StatusBar(title: String? = null, showNet: Boolean = true) {
         return
     }
     DisposableEffect(Unit) { onDispose { model.statusBottom = null; model.statusBusyX = emptyList() } }
+    val glassStatus = homeGlassStyle
     // где на строке текст: полоска уведомлений встаёт над стыком плиток и наезжала на дату (Vezel, 08.11)
     var timeX by remember { mutableStateOf<ClosedFloatingPointRange<Float>?>(null) }
     var iconsX by remember { mutableStateOf<ClosedFloatingPointRange<Float>?>(null) }
@@ -513,10 +514,13 @@ fun StatusBar(title: String? = null, showNet: Boolean = true) {
                 val rtl = layoutDirection == LayoutDirection.Rtl
                 val left = if (rtl) s.padEnd else s.g
                 val right = if (rtl) s.g else s.padEnd
-                drawRect(bar, Offset(-left.toFloat(), -s.g8.toFloat()), Size(size.width + left + right, s.statusBandH.toFloat()))
+                if (!glassStatus) drawRect(bar, Offset(-left.toFloat(), -s.g8.toFloat()), Size(size.width + left + right, s.statusBandH.toFloat()))
+                // в стекле сплошной полосы нет: строка лежит прямо на фоне (Егор 20.11); вид в стекле решаем в макете
             }
             // строка по центру полосы: родитель опускает её на g8, полоса ниже строки на 3/4 g8
-            .offset(y = -m.dp(s.g8 / 4)),
+            .offset(y = -m.dp(s.g8 / 4))
+            // стекло, вариант Г (макет 20.11): полосы нет, текст и значки приглушены до 70%, чтобы не спорили с плитками
+            .then(if (glassStatus) Modifier.graphicsLayer { alpha = 0.7f } else Modifier),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(m.dp(s.g), Alignment.End),
     ) {

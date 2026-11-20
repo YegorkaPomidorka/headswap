@@ -31,7 +31,7 @@ enum class RailSize {
     }
 }
 
-/** Стиль боковой рейки: сплошная панель с золотым блоком навигации или стеклянная колонка на всю высоту (только альбом). */
+/** Общий «Стиль»: боковая рейка (сплошная с золотым блоком навигации или стеклянная колонка на всю высоту, только альбом) и нижний ряд главного (карточка «Телефон», быстрые приложения). */
 enum class RailStyle {
     SOLID, GLASS;
 
@@ -65,7 +65,7 @@ class LauncherPrefs(private val context: Context) {
         get() = RailSize.restore(prefs.getString("rail_size", null))
         set(value) { prefs.edit().putString("rail_size", value.name).apply() }
 
-    /** «Стиль панели» ([RailStyle]); стекло действует только на боковой рейке, в портрете игнорируется. */
+    /** «Стиль» ([RailStyle]): рейка (в портрете игнорируется) и нижний ряд главного. */
     var railStyle: RailStyle
         get() = RailStyle.restore(prefs.getString("rail_style", null))
         set(value) { prefs.edit().putString("rail_style", value.name).apply() }
