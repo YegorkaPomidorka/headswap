@@ -66,7 +66,7 @@
 ГУ подключается клиентом. Как телефон и ГУ оказываются в одной сети:
 (a) BT RFCOMM `carlife` + вход в P2P-группу ГУ (Mazda G6S); (b) хотспот телефона + маяк `HotspotBeacon`;
 (c) «Wi-Fi машины» — телефон входит в сеть ГУ (`CarNetwork`, VW). Если он уже в подсети прошлой сессии,
-сеть держим без specifier: второе подключение меняет MAC и ГУ заводит новый девайс (ADR 0049). ADR 0014.
+сеть держим без specifier: второе подключение меняет MAC и ГУ заводит новый девайс (ADR 0051). ADR 0014.
 
 **3. Сессия CarLife** (`CarLifeSession.onCmd`):
 HU_PROTOCOL_VERSION → стартовая пачка (`Handshake.startBatch`) → HU_INFO и STATISTIC_INFO (тут определяется ГУ, см. ниже) →
@@ -206,6 +206,7 @@ CONTROL0, SENSOR1, VIDEO2, INPUT3, SPEECH4, SYSTEM5, MEDIA6, MIC7, BT8, MEDIA_PL
 | Нет подсказок на приборке | подписка ГУ, `MetaRelay.sendNaviTurn`, `HondaClusterRoad` |
 | Текст на ГУ не на языке интерфейса | заглушка: `DelegatedDexConnector.text()` (`desk_ph_*`, `desk_err_*`), режим AA — тексты `AaBridgeCore` из `BridgeService` (`aa_ph_*`); язык — `AppLocale` |
 | Автотест стенда падает | `out/autotest-*/<язык>/`: `steps/`, `fail/*-diff.png`, `actions.log`; «обрезан многоточием» — баг вёрстки; README `pc-headunit/autotest` |
+| Главный: стекло/сплошной не там, карточка «Телефон» не так рисует звонок | `LauncherModel.railStyle` (настройка «Стиль») → `homeGlassStyle`; `PhoneCard.kt` (`phoneSurface`, `homeGlass`, `homeGlassEdge`, `homeGlassPanel`), `HomeScreen.QuickAppsCard`, шторка `NotificationsUi`, строка статуса `LauncherRoot`; ADR 0049 |
 | Клавиатура на ГУ разделена пополам | плотность рабочего стола `DesktopGeometryPolicy.density` (короткая сторона < 600 dp), ADR 0023 |
 | Главный: не та раскладка, плашка не листается «Слоями», ⇄ не там | prefs `home_layout`/`card_view`/`small_view` → `LauncherModel.tiles`, что листают «Слои» - prefs `layer_list` (`Layer`/`LayerList` в `HomeTilesLogic.kt`, настройки «Экран» → `LayersCard` и выбор по «+» `LayerPickerScreen` в `LayersUi.kt`; приложение плашки - prefs `tile_app`, окно по `appCardRect`, ADR 0030), правила в `HomeTilesLogic`, окна плашек в `EmbedUi.EmbedLayers` (плашка-приложение - слот app по `appCardRect`), ⇄ и «Слои» ленты - `HomeTileButtons`, ADR 0027 |
 | Рейка: стекло/сплошная, линза навигации не там, повторный тап навигатора, «Вид», формат даты | prefs `rail_style` (`RailStyle`) → `LauncherModel.railStyle`, `Rail(glass)`/`NavLens`/`glassRail` в `LauncherRoot.kt`, геометрия линзы и черты - `LauncherSpec.lensCenterY`/`dividerY`; стекла в портрете нет; повторный тап навигатора - `LauncherActions.openNavigator` (на весь экран → домой); «Вид» - `SettingsPage.LOOK` (`LookRow`/`Segmented`), в нём же 12 ч (`clock_12h`) и дата `date_mdy` → `StatusReader.formatDate`, ADR 0043 |
@@ -215,6 +216,7 @@ CONTROL0, SENSOR1, VIDEO2, INPUT3, SPEECH4, SYSTEM5, MEDIA6, MIC7, BT8, MEDIA_PL
 | Рабочий стол: громкость двумя пальцами не работает | `VolumeSwipe` (зона 30% справа, шаг 1/12 высоты) в `AaBridgeCore.onCarlifeTouch`, тумблер `AaPrefs.volumeSwipe` / `huHondaVezel`, `DesktopMediaControl.adjustVolume`; в логе `жест громкости`, `BRIDGE громкость`; ADR 0038 |
 | 2ГИС на рабочем столе: нет лимита/камер, заставка висит, «Перезапустите 2ГИС» | `carapp/CarAppSession` (области, порядок stop), кнопка «Перезапустить навигатор»; ADR 0021 |
 | Навигатор окном вместо хоста, в логе `handshake: отказ ... Unknown host` | TEMPLATE_RENDERER в манифесте; ADR 0022 |
+| Огромная жёлтая стрелка и значки, мало подписей у Я.Навигатора/Я.Карт в окне | буфер дочернего дисплея крупнее окна: `launcher/EmbedRenderPolicy.geometry` (400 / DPI, пакеты `MAP_PACKAGES`) в `EmbedHost.reconcileInternal`; в логе `EMBED ... крупнее для карты`; ADR 0050 |
 | Я.Карты/Навигатор просят Плюс, или навигатор окном без подсказок | настройка «Подсказки на приборке» (prefs `nav_hints:<pkg>`, по умолчанию выкл у всех) → `CarAppHost.allowFor` в `EmbedHost.carTargetFor`; теневая AA - `NavigatorPick.shadowWanted`; ADR 0028 |
 | Android 17: экран ГУ гаснет с телефоном, в логе `группа=0`, `VDM хост завершился` | отладка по USB (`adb_enabled=0`), `VdmHostLink`/`VdmHostRestart`, строки `VDM` и `VDMHOST`; ADR 0033 |
 | Навигатор в хосте: голая карта, нет кнопок/списка | шаблон не разобран (`CarUi.Unknown`): `carapp/CarUiMapper.map`, `cmd car_dump` |

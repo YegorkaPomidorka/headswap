@@ -27,6 +27,10 @@ import androidx.compose.runtime.produceState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.ImageBitmap
@@ -98,7 +102,7 @@ fun HomeScreen() {
             val topOnly = RoundedCornerShape(topStart = r, topEnd = r)
             Row(Modifier.height(m.dp(s.bottomH)).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(m.dp(s.g))) {
                 val bottom = listOf<@Composable RowScope.() -> Unit>(
-                    { CardBox(Modifier.weight(1f).fillMaxHeight(), shape = topOnly) { QuickAppsRow() } },
+                    { QuickAppsCard(Modifier.weight(1f).fillMaxHeight(), topOnly) },
                     { PhoneCard(Modifier.width(m.dp(s.phone)).fillMaxHeight(), topOnly) },
                 )
                 for (cell in if (mirror) bottom.asReversed() else bottom) cell(this)
@@ -130,7 +134,7 @@ private fun PortraitHome() {
                 // звонок: полоса вместо всего нижнего ряда
                 PortraitCallBar(Modifier.fillMaxWidth().height(m.dp(s.bottomRowH)))
             } else Row(Modifier.fillMaxWidth().height(m.dp(s.bottomRowH)), horizontalArrangement = Arrangement.spacedBy(m.dp(s.g))) {
-                CardBox(Modifier.weight(1f).fillMaxHeight(), shape = full) { QuickAppsRow() }
+                QuickAppsCard(Modifier.weight(1f).fillMaxHeight(), full)
                 PhoneCard(Modifier.width(m.dp(s.phone)).fillMaxHeight(), full)
             }
         }
@@ -158,14 +162,24 @@ fun quickSlots(apps: List<AppRef>, n: Int): List<QuickSlot> {
     }
 }
 
+/** Панель быстрых приложений нижнего ряда: в стиле карточки «Телефон» ([homeGlassStyle]), форма и высота те же. */
 @Composable
-private fun QuickAppsRow() {
+private fun QuickAppsCard(modifier: Modifier, shape: Shape) {
+    val s = LocalMetrics.current.spec
+    val glass = homeGlassStyle
+    CardBox(modifier, background = homeCardBg(), shape = shape) {
+        QuickAppsRow(Modifier.fillMaxSize().then(if (glass) Modifier.homeGlass(shape, s.t / 96f) else Modifier), glass)
+    }
+}
+
+@Composable
+private fun QuickAppsRow(modifier: Modifier, glass: Boolean) {
     val m = LocalMetrics.current
     val s = m.spec
     val slots = quickSlots(LauncherModel.visibleApps, s.quickApps)
     Row(
         // в портрете ряд ниже (T + G): иконка с полями почти во всю высоту, без вертикальных отступов
-        Modifier.fillMaxSize().padding(horizontal = m.dp(s.g), vertical = m.dp(if (s.portrait) 0 else s.g8)),
+        modifier.padding(horizontal = m.dp(s.g), vertical = m.dp(if (s.portrait) 0 else s.g8)),
         horizontalArrangement = Arrangement.spacedBy(m.dp(s.g4)), verticalAlignment = Alignment.CenterVertically,
     ) {
         for (slot in slots) {
@@ -173,7 +187,7 @@ private fun QuickAppsRow() {
                 when (slot) {
                     // без подписей: в быстром ряду иконок достаточно, подписи только обрезались («Доба…»)
                     is QuickSlot.App -> AppTile(slot.ref, labelled = false, onLong = { LauncherModel.confirmRemove = slot.ref })
-                    QuickSlot.Plus -> PlusTile(labelled = false)
+                    QuickSlot.Plus -> PlusTile(labelled = false, style = if (glass) RailStyle.GLASS else RailStyle.SOLID)
                     QuickSlot.Empty -> Unit
                 }
             }
@@ -250,9 +264,12 @@ fun AppCircle(ref: AppRef, sizePx: Int) {
     }
 }
 
-/** Закреплённый «+»: открывает выбор приложения для нижнего ряда. */
+/**
+ * Закреплённый «+»: открывает выбор приложения для нижнего ряда. [style] - стиль быстрого ряда: GLASS - стеклянный круг
+ * (градиент 170°, обводка и верхний блик), SOLID - круг [Pal.SURFACE_HI], белый плюс; null - контурный круг (лента).
+ */
 @Composable
-fun PlusTile(labelled: Boolean, iconPx: Int? = null, onTap: () -> Unit = { LauncherActions.openPicker() }) {
+fun PlusTile(labelled: Boolean, iconPx: Int? = null, style: RailStyle? = null, onTap: () -> Unit = { LauncherActions.openPicker() }) {
     val m = LocalMetrics.current
     val s = m.spec
     val size = iconPx ?: s.appIc
@@ -260,10 +277,26 @@ fun PlusTile(labelled: Boolean, iconPx: Int? = null, onTap: () -> Unit = { Launc
         if (pressed) Box(Modifier.matchParentSize().background(Pal.SURFACE_PRESSED))
         Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(m.dp(s.g4)),
             modifier = Modifier.padding(m.dp(s.g4))) {
-            Box(Modifier.size(m.dp(size)).border(m.dp(s.b4), Color(0xFF5F6C99), CircleShape), contentAlignment = Alignment.Center) {
-                SvgIcon(Ico.PLUS, s.appSvg, Pal.SEC2, stroke = 2.4f)
+            val circle = Modifier.size(m.dp(size))
+            when (style) {
+                RailStyle.GLASS -> Box(circle.glassPlus(s.t / 96f), contentAlignment = Alignment.Center) {
+                    SvgIcon(Ico.PLUS, s.appSvg, Pal.WHITE, stroke = 2.4f)
+                }
+                RailStyle.SOLID -> Box(circle.clip(CircleShape).background(Pal.SURFACE_HI), contentAlignment = Alignment.Center) {
+                    SvgIcon(Ico.PLUS, s.appSvg, Pal.WHITE, stroke = 2.4f)
+                }
+                null -> Box(circle.border(m.dp(s.b4), Color(0xFF5F6C99), CircleShape), contentAlignment = Alignment.Center) {
+                    SvgIcon(Ico.PLUS, s.appSvg, Pal.SEC2, stroke = 2.4f)
+                }
             }
             if (labelled) Txt(stringResource(R.string.l_add), s.appLbl, color = Pal.SEC2, weight = FontWeight.Medium)
         }
     }
+}
+
+/** Стеклянный круг «+»: градиент 170° белый .22 -> .06 (60%) -> .12, обводка 1,5 px макета белым .35, верхний блик 1,5 px белым .6. */
+private fun Modifier.glassPlus(k: Float): Modifier = clip(CircleShape).drawBehind {
+    drawRect(brush170(0f to Color.White.copy(alpha = 0.22f), 0.6f to Color.White.copy(alpha = 0.06f), 1f to Color.White.copy(alpha = 0.12f)))
+    drawCircle(Color.White.copy(alpha = 0.35f), style = Stroke(width = 2f * 1.5f * k))
+    drawRect(Color.White.copy(alpha = 0.6f), Offset.Zero, Size(size.width, 1.5f * k))
 }

@@ -139,7 +139,7 @@
     <string name="l_s_battery">Заряд телефона</string>
     <string name="l_s_clock12">12-часовой формат</string>
     <string name="l_s_rail_size">Размер панели</string>
-    <string name="l_s_rail_style">Стиль панели</string>
+    <string name="l_s_rail_style">Стиль</string>
     <string name="l_s_style_solid">Сплошная</string>
     <string name="l_s_style_glass">Стекло</string>
     <string name="l_s_date">Дата</string>
