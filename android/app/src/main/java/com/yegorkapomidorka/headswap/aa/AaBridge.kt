@@ -361,6 +361,7 @@ class AaBridgeCore(
     private var vrReply = false                // поток ответа ассистента открыт в канале VR (VR_INIT ушёл)
     private var navVr = false                  // h1318: поток подсказок навигации открыт в канале VR (VR_INIT ушёл), без NAVI=1
     private var navVrPackets = 0
+    private var desktopVoiceOn = false             // h1318: панель Алисы лаунчера открыта (MODULE_STATUS VR=1): подсказка не снимает VR=0
     @Volatile var huVw20082120 = false        // VW (STATISTIC_INFO channel 20082120 h93, 20082122 h222): без heartbeat рвёт USB через 3,7-5,6 с PAUSE
         private set
     @Volatile var huVw20082138 = false         // VW ID (channel 20082138 кроме "VW BT 1420"; ID.6 Crozz: 20082128 + "VW BT 9491"; пресет ID. UNYX): IDR > ~600 КиБ рвёт USB EIO
@@ -1485,6 +1486,7 @@ class AaBridgeCore(
      */
     @Synchronized
     fun desktopVoiceStatus(on: Boolean) {
+        desktopVoiceOn = on
         val s = if (on) 1 else 0
         if (link.sendModuleStatus(CarlifeAudio.MODULE_VR, s)) log("BRIDGE CarLife MODULE_STATUS VR=$s (панель Алисы)", true)
     }
@@ -1788,7 +1790,9 @@ class AaBridgeCore(
         navVr = false
         link.sendAudio(CarlifeAudio.CH_VR, CarlifeAudio.VR_STOP, ByteArray(0))
         log("BRIDGE h1318: подсказка VR STOP" + (why?.let { " ($it)" } ?: ""), true)
-        if (moduleOff && link.sendModuleStatus(CarlifeAudio.MODULE_VR, 0)) {
+        if (moduleOff && desktopVoiceOn) {
+            log("BRIDGE h1318: VR=0 после подсказки не шлю: панель Алисы открыта", true)   // закроется панель - уйдёт её VR=0
+        } else if (moduleOff && link.sendModuleStatus(CarlifeAudio.MODULE_VR, 0)) {
             log("BRIDGE h1318: CarLife MODULE_STATUS VR=0 (после подсказки)", true)
         }
     }

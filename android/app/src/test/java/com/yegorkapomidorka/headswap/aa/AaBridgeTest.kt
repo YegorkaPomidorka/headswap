@@ -1465,6 +1465,47 @@ class AaBridgeAudioTest {
     }
 
     @Test
+    fun navChannelVrDoesNotSendVrOffWhileLauncherVoicePanelIsOpen() {
+        core.navChannelProvider = { NavChannel.VR }
+        core.onCarlifeStart()
+        core.desktopVoiceStatus(true)                                    // панель Алисы открыта: VR=1
+        core.onAudioStart(SPEECH)
+        core.onAudioData(SPEECH, pcm(640), 1)                            // подсказка при открытой панели: данные идут в VR как обычно
+        core.onAudioStop(SPEECH)
+        timers.advance(1500)
+        assertEquals(listOf("M4=1", "A5:0x50002", "A5:0x50003", "A5:0x50004"), link.events.toList())   // VR_STOP есть, VR=0 нет
+        assertTrue(logs.any { it.contains("VR=0 после подсказки не шлю: панель Алисы открыта") })
+        core.desktopVoiceStatus(false)                                   // VR=0 отправит закрытие панели
+        assertEquals(listOf(4 to 1, 4 to 0), link.modules.toList())
+        // панель закрыта - следующая подсказка снова снимает VR=0 сама
+        core.onAudioStart(SPEECH)
+        core.onAudioData(SPEECH, pcm(640), 2)
+        core.onAudioStop(SPEECH)
+        timers.advance(1500)
+        assertEquals(listOf(4 to 1, 4 to 0, 4 to 0), link.modules.toList())
+    }
+
+    @Test
+    fun desktopCoreSpeechViaNavChannelVrGoesToVrNotTts() {
+        core.micModeProvider = { MicMode.CAR }                           // как у desktop-core в BridgeService.createDesktopHost
+        core.phoneMic = null
+        core.desktopInputEnabled = true
+        core.navChannelProvider = { NavChannel.VR }
+        core.voiceChunkProvider = { VoiceChunk.DEFAULT }
+        core.onCarlifeStart()
+        val s = pcm(640, 5)                                              // 20 мс моно 16 кГц, как отдаёт NavPcmDownmix
+        core.onAudioStart(SPEECH)
+        core.onAudioData(SPEECH, s, 1)
+        core.onAudioData(SPEECH, s, 2)
+        core.onAudioStop(SPEECH)
+        timers.advance(1500)
+        assertEquals(listOf("A5:0x50002", "A5:0x50003", "A5:0x50003", "A5:0x50004", "M4=0"), link.events.toList())
+        assertTrue(link.audio.none { it.chan == 4 })                     // TTS не трогали
+        assertTrue(link.modules.none { it.first == 2 })                  // и NAVI тоже
+        assertArrayEquals(s, link.audio[1].payload)
+    }
+
+    @Test
     fun vwCns2DelphiDelaysFirstTtsInitAfterNaviAndKeepsSpeech() {
         val l = FakeLink()
         val c = AaBridgeCore({ m, _ -> logs.add(m) }, clockMs = { timers.now }, audioSchedule = timers::schedule).also { it.attach(l) }

@@ -36,6 +36,20 @@ class DesktopSilenceGateTest {
         assertEquals(Step.START, gate.step(true, 8_000))
     }
 
+    @Test fun shortHoldClosesQuicklyAndKeepsPhraseGaps() {   // h1318: навигация держит 400 мс
+        val gate = DesktopSilenceGate(400)
+        assertEquals(Step.START, gate.step(true, 0))
+        assertEquals(Step.SEND, gate.step(false, 380))
+        assertEquals(Step.STOP, gate.step(false, 400))
+        assertEquals(Step.DROP, gate.step(false, 420))
+        assertEquals(Step.START, gate.step(true, 500))
+        assertEquals(DesktopSilenceGate.HOLD_MS, 5_000L)         // основной гейт по умолчанию не изменился
+        val main = DesktopSilenceGate()
+        main.step(true, 0)
+        assertEquals(Step.SEND, main.step(false, 4_999))
+        assertEquals(Step.STOP, main.step(false, 5_000))
+    }
+
     @Test fun audibleIgnoresZerosAndDither() {
         assertFalse(DesktopSilenceGate.audible(ByteArray(3840)))
         val dither = ByteArray(3840) { i -> if (i % 2 == 0) 3 else 0 } // +3
