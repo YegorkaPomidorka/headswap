@@ -290,6 +290,12 @@ class Speakers:
         self.voice_open: set[int] = set()
         self.voice_at = 0.0
         self.on_volume = None                   # колбэк окна: текст громкости в заголовок
+        try:
+            import sounddevice
+            self.sd = sounddevice
+        except Exception as e:  # noqa: BLE001 - любой сбой импорта = без звука
+            self.sd = None
+            log(f"speakers: no sound ({e}); pip install sounddevice")
 
     def active_knob(self) -> str:
         return "Голос" if self.voice_open or time.monotonic() - self.voice_at < 1.5 else "Музыка"
@@ -301,12 +307,6 @@ class Speakers:
         self.log(f"view: громкость {text} (Музыка {self.vol['Музыка']}, Голос {self.vol['Голос']})")
         if self.on_volume:
             self.on_volume(text)
-        try:
-            import sounddevice
-            self.sd = sounddevice
-        except Exception as e:  # noqa: BLE001 - любой сбой импорта = без звука
-            self.sd = None
-            log(f"speakers: no sound ({e}); pip install sounddevice")
 
     def on(self, chan: int, mtype: int, body: bytes):
         if chan in (CH_TTS, CH_VR):
