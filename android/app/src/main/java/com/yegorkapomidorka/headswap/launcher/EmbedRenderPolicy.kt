@@ -18,9 +18,23 @@ object EmbedRenderPolicy {
     /** Половина общего бюджета пикселей хоста: два окна-карты помещаются вместе. */
     const val TILE_PIXELS = EmbeddedDisplayPolicy.MAX_TOTAL_PIXELS / 2
 
+    /** Android 17 (VANILLA_ICE_CREAM + 1): дисплеи создаёт shell-хост VirtualDevice, режим окна на них не меняется. */
+    const val WIDE_SDK = 37
+    /** Короткая сторона окна в dp, от которой Android 16+ сам игнорирует жёсткую ориентацию приложения. */
+    const val WIDE_MIN_DP = 600
+
     data class Geometry(val width: Int, val height: Int, val density: Int)
 
-    fun geometry(pkg: String?, width: Int, height: Int, dpi: Int): Geometry {
+    /**
+     * Плотность окна портретного приложения (ADR 0051): 0,64 от плотности стола, как у HSD (720p: 200 -> 128 DPI,
+     * 900 dp по высоте). Одна на плитку и на развёрнутое окно, чтобы приложение не пересоздавалось при развороте.
+     * Плитка высотой 501 px при 128 DPI - 626 dp, выше порога [WIDE_MIN_DP]. Цена: интерфейс мельче, Gboard делится.
+     */
+    fun wideDensity(dpi: Int): Int = max(96, (dpi * 0.64).roundToInt())
+
+    /** [portrait] - портретное по манифесту ([EmbeddedDisplayPolicy.portraitApp]) на Android 17+. */
+    fun geometry(pkg: String?, width: Int, height: Int, dpi: Int, portrait: Boolean = false): Geometry {
+        if (portrait && pkg !in MAP_PACKAGES && dpi > 0) return Geometry(width, height, min(dpi, wideDensity(dpi)))
         val plain = Geometry(width, height, dpi)
         if (pkg !in MAP_PACKAGES || width <= 0 || height <= 0 || dpi <= 0) return plain
         val scale = minOf(

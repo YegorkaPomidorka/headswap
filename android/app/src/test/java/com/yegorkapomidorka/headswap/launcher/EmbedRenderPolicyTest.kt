@@ -35,6 +35,23 @@ class EmbedRenderPolicyTest {
         assertEquals(r.width / 1920.0, r.density / 160.0, 0.01)
     }
 
+    @Test fun portraitAppGetsWideDensity() {
+        // h1264: 720p при 200 DPI - столбик, при 128 - на всю плитку; плитка 501 px остаётся выше 600 dp
+        assertEquals(EmbedRenderPolicy.Geometry(761, 501, 128), g2("ru.yandex.taximeter", 761, 501, 200))
+        assertEquals(EmbedRenderPolicy.Geometry(1210, 720, 128), g2("ru.yandex.taximeter", 1210, 720, 200))
+        assertTrue(501 * 160 / EmbedRenderPolicy.wideDensity(200) >= EmbedRenderPolicy.WIDE_MIN_DP)
+        // плотность только вниз и не ниже предела дочернего дисплея
+        assertEquals(96, EmbedRenderPolicy.wideDensity(120))
+        assertEquals(EmbedRenderPolicy.Geometry(800, 600, 96), g2("x.y", 800, 600, 96))
+        EmbeddedDisplayPolicy.requireSize(800, 600, EmbedRenderPolicy.wideDensity(96))
+    }
+
+    @Test fun mapsStaySupersampledEvenIfPortrait() {
+        assertEquals(g("ru.yandex.yandexnavi", 800, 600, 200), g2("ru.yandex.yandexnavi", 800, 600, 200))
+    }
+
+    private fun g2(pkg: String?, w: Int, h: Int, dpi: Int) = EmbedRenderPolicy.geometry(pkg, w, h, dpi, portrait = true)
+
     @Test fun lowDpiCappedByBufferLimits() {
         val r = g("ru.yandex.yandexnavi", 1280, 1080, 96)
         assertTrue(r.width <= EmbeddedDisplayPolicy.MAX_WIDTH && r.height <= EmbeddedDisplayPolicy.MAX_HEIGHT)

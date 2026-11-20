@@ -77,7 +77,15 @@ internal object EmbeddedDisplayPolicy {
      * Остальным не включаем: YouTube в многооконном режиме не уходит на весь экран.
      */
     fun multiWindowLaunch(packageName: String, screenOrientation: Int = -1, packageOrientations: List<Int> = emptyList()): Boolean =
-        packageName in multiWindowPackages || screenOrientation in portraitOrientations ||
+        packageName in multiWindowPackages || portraitApp(screenOrientation, packageOrientations)
+
+    /**
+     * Портретное по манифесту: у запускаемого экрана или, если он без ориентации, у большинства экранов пакета.
+     * На Android 17 дисплей shell-хоста режим окна не меняет, там таким приложениям снижают плотность окна
+     * (launcher/EmbedRenderPolicy, ADR 0051).
+     */
+    fun portraitApp(screenOrientation: Int, packageOrientations: List<Int>): Boolean =
+        screenOrientation in portraitOrientations ||
             screenOrientation == -1 && packageOrientations.count { it in portraitOrientations } * 2 > packageOrientations.size
 
     /** Ориентации всех activity пакета для [multiWindowLaunch]; пусто, если пакет не виден. */

@@ -144,6 +144,11 @@ class EmbeddedDisplayPolicyTest {
         // Портретных половина или меньше - как раньше, на весь экран
         assertEquals(false, EmbeddedDisplayPolicy.multiWindowLaunch("com.google.android.youtube", -1, listOf(-1, -1, 1, 4)))
         assertEquals(false, EmbeddedDisplayPolicy.multiWindowLaunch("com.example", -1, emptyList()))
+        // портретность отдельно от списка Telegram: по ней на Android 17 снижают плотность окна (ADR 0051)
+        assertEquals(true, EmbeddedDisplayPolicy.portraitApp(1, emptyList()))
+        assertEquals(true, EmbeddedDisplayPolicy.portraitApp(-1, listOf(-1, 1, 1, 1, 7)))
+        assertEquals(false, EmbeddedDisplayPolicy.portraitApp(-1, listOf(-1, -1, 1, 4)))
+        assertEquals(false, EmbeddedDisplayPolicy.portraitApp(-1, emptyList()))
         // Явная ландшафтная заставка пакетом не перебивается
         assertEquals(false, EmbeddedDisplayPolicy.multiWindowLaunch("com.example", 0, listOf(1, 1, 1)))
     }
