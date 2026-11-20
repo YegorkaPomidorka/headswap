@@ -54,7 +54,7 @@ internal object LauncherModel {
     var area by mutableStateOf<Area>(Area.Home)
     var theme by mutableStateOf(ThemeChoice.DARK)
     var railSize by mutableStateOf(RailSize.NORMAL)
-    /** Стиль боковой рейки ([LauncherPrefs.railStyle]); в портрете не действует, см. [glassRail]. */
+    /** Общий «Стиль» ([LauncherPrefs.railStyle]): рейка (в портрете не действует, см. [glassRail]) и нижний ряд главного. */
     var railStyle by mutableStateOf(RailStyle.SOLID)
     var mapLeft by mutableStateOf(false)
     var animations by mutableStateOf(true)

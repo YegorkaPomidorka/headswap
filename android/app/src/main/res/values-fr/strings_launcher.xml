@@ -139,7 +139,7 @@
     <string name="l_s_battery">Batterie du téléphone</string>
     <string name="l_s_clock12">Horloge 12 h</string>
     <string name="l_s_rail_size">Taille du panneau</string>
-    <string name="l_s_rail_style">Style du panneau</string>
+    <string name="l_s_rail_style">Style</string>
     <string name="l_s_style_solid">Plein</string>
     <string name="l_s_style_glass">Verre</string>
     <string name="l_s_date">Date</string>
