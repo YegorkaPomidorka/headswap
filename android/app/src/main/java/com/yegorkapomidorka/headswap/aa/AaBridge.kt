@@ -638,6 +638,7 @@ class AaBridgeCore(
         vrReply = false
         navVr = false
         navStopTimer.cancel()
+        desktopVoiceOn = false                 // новая CarLife-сессия: панель лаунчера закрыта
         touchDecimator.reset()
         touchDecimationLogged = 1
         touchPacer.reset()
