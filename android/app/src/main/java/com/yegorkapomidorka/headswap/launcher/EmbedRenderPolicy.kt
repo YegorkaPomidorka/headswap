@@ -10,11 +10,11 @@ import kotlin.math.sqrt
 /**
  * Геометрия дочернего дисплея окна (ADR 0049). На низкой плотности рабочего стола ГУ (160–200 DPI) карта Яндекса
  * в окне огрублённая: огромная жёлтая стрелка и значки, мало подписей, мелкий охват. Для карт буфер и плотность
- * растут в одно число раз до 320 DPI: кнопки в dp того же размера, карта как на телефоне; TextureView ужимает буфер в окно.
+ * растут в одно число раз до 400 DPI: кнопки в dp того же размера, карта как на телефоне; TextureView ужимает буфер в окно.
  */
 object EmbedRenderPolicy {
     val MAP_PACKAGES = setOf("ru.yandex.yandexnavi", "ru.yandex.yandexmaps")
-    const val MAP_DPI = 320
+    const val MAP_DPI = 400
     /** Половина общего бюджета пикселей хоста: два окна-карты помещаются вместе. */
     const val TILE_PIXELS = EmbeddedDisplayPolicy.MAX_TOTAL_PIXELS / 2
 

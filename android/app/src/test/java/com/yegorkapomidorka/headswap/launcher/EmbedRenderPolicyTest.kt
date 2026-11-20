@@ -13,18 +13,18 @@ class EmbedRenderPolicyTest {
         assertEquals(EmbedRenderPolicy.Geometry(800, 600, 160), g(null, 800, 600, 160))
     }
 
-    @Test fun navigatorDoubledAt160() {
-        assertEquals(EmbedRenderPolicy.Geometry(1600, 1200, 320), g("ru.yandex.yandexnavi", 800, 600, 160))
+    @Test fun navigatorScaledAt160() {
+        assertEquals(EmbedRenderPolicy.Geometry(2000, 1500, 400), g("ru.yandex.yandexnavi", 800, 600, 160))
     }
 
     @Test fun mapsScaledByDpiRatio() {
-        // 200 DPI (высота 720): 320 / 200 = 1,6
-        assertEquals(EmbedRenderPolicy.Geometry(1280, 960, 320), g("ru.yandex.yandexmaps", 800, 600, 200))
+        // 200 DPI (высота 720): 400 / 200 = 2
+        assertEquals(EmbedRenderPolicy.Geometry(1600, 1200, 400), g("ru.yandex.yandexmaps", 800, 600, 200))
     }
 
     @Test fun noScaleAtHighDpi() {
-        assertEquals(EmbedRenderPolicy.Geometry(800, 600, 320), g("ru.yandex.yandexnavi", 800, 600, 320))
         assertEquals(EmbedRenderPolicy.Geometry(800, 600, 400), g("ru.yandex.yandexnavi", 800, 600, 400))
+        assertEquals(EmbedRenderPolicy.Geometry(800, 600, 480), g("ru.yandex.yandexnavi", 800, 600, 480))
     }
 
     @Test fun bigWindowCappedByTileBudget() {
