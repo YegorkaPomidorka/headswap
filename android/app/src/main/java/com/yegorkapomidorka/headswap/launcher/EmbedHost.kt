@@ -66,6 +66,8 @@ internal class EmbedSlot(val name: String) {
     var leaseDisplay = -1
     @Volatile var geomW = 0
     @Volatile var geomH = 0
+    /** Плотность дочернего дисплея; geomW x geomH - его буфер, у карт больше окна (EmbedRenderPolicy). */
+    var geomDpi = 0
     var launchedKey: String? = null
     var launchedAt = 0L
     var createdAt = 0L
@@ -594,29 +596,35 @@ internal object EmbedHost {
             }
             if (projSurface != null) { unproject(); dropSurface(slot) } // назад к окну реестра на свежей поверхности
         }
-        val w = slot.wantW
-        val h = slot.wantH
-        if (w < 128 || h < 128) return
+        if (slot.wantW < 128 || slot.wantH < 128) return
+        // буфер карт Яндекса больше окна, TextureView ужимает его; касания пересчитываются по geomW/geomH
+        val g = EmbedRenderPolicy.geometry(slot.pkg, slot.wantW, slot.wantH, densityDpi)
+        val w = g.width
+        val h = g.height
+        val dpi = g.density
+        val scaled = if (w != slot.wantW) " (окно ${slot.wantW}x${slot.wantH}, крупнее для карты)" else ""
         if (slot.handle <= 0) {
             slot.status = EmbedStatus.CONNECTING
             val surface = slot.surface ?: Surface(texture).also { slot.surface = it }
             texture.setDefaultBufferSize(w, h)
             val token = Binder()
-            slot.handle = timed(slot, "create") { EmbeddedSessionRegistry.create(uid, surface, token, display, w, h, densityDpi) }
-            AppLog.i("EMBED ${slot.name}: окно создано handle=${slot.handle} display=$display ${w}x$h dpi=$densityDpi", false)
+            slot.handle = timed(slot, "create") { EmbeddedSessionRegistry.create(uid, surface, token, display, w, h, dpi) }
+            AppLog.i("EMBED ${slot.name}: окно создано handle=${slot.handle} display=$display ${w}x$h dpi=$dpi$scaled", false)
             slot.token = token
             slot.leaseDisplay = display
             slot.geomW = w
             slot.geomH = h
+            slot.geomDpi = dpi
             slot.launchedKey = null
-        } else if (slot.geomW != w || slot.geomH != h) {
+        } else if (slot.geomW != w || slot.geomH != h || slot.geomDpi != dpi) {
             cancelTouch(slot)
-            AppLog.i("EMBED ${slot.name}: размер ${slot.geomW}x${slot.geomH} -> ${w}x$h", false)
+            AppLog.i("EMBED ${slot.name}: размер ${slot.geomW}x${slot.geomH} dpi=${slot.geomDpi} -> ${w}x$h dpi=$dpi$scaled", false)
             slot.fullscreenTracker.resized(SystemClock.uptimeMillis())
-            timed(slot, "resize") { EmbeddedSessionRegistry.resize(uid, slot.handle, w, h, densityDpi) }
+            timed(slot, "resize") { EmbeddedSessionRegistry.resize(uid, slot.handle, w, h, dpi) }
             texture.setDefaultBufferSize(w, h)
             slot.geomW = w
             slot.geomH = h
+            slot.geomDpi = dpi
         }
         var launch = slot.launchedKey != key
         if (!launch && slot.recheck) {
@@ -735,6 +743,7 @@ internal object EmbedHost {
         slot.lastPacket = null
         slot.geomW = 0
         slot.geomH = 0
+        slot.geomDpi = 0
         resetFullscreen(slot)
     }
 
