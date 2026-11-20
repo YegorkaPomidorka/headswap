@@ -359,6 +359,8 @@ class AaBridgeCore(
     val huReportsCalls: Boolean get() = huVwCns2Delphi || huVwCns3_20082122
     @Volatile var huIdleVideoHeartbeat = false // 20082114 (h425), Skoda CNS3 21290002 (h625): без видео 5-6 с рвёт USB и вне PAUSE
     private var vrReply = false                // поток ответа ассистента открыт в канале VR (VR_INIT ушёл)
+    private var navVr = false                  // h1318: поток подсказок навигации открыт в канале VR (VR_INIT ушёл), без NAVI=1
+    private var navVrPackets = 0
     @Volatile var huVw20082120 = false        // VW (STATISTIC_INFO channel 20082120 h93, 20082122 h222): без heartbeat рвёт USB через 3,7-5,6 с PAUSE
         private set
     @Volatile var huVw20082138 = false         // VW ID (channel 20082138 кроме "VW BT 1420"; ID.6 Crozz: 20082128 + "VW BT 9491"; пресет ID. UNYX): IDR > ~600 КиБ рвёт USB EIO
@@ -385,6 +387,8 @@ class AaBridgeCore(
     @Volatile var voiceChunkProvider: () -> VoiceChunk = { VoiceChunk.DEFAULT }
     private var voiceChunkLogged = CarlifeAudio.MAX_CHUNK
     @Volatile var ttsPrerollProvider: () -> TtsPreroll = { TtsPreroll.DEFAULT }
+    /** h1318: канал подсказок навигации. Без провайдера (тесты, пока нет настроек) - прежний TTS; в приложении ставит BridgeService. */
+    @Volatile var navChannelProvider: () -> NavChannel = { NavChannel.TTS }
     private val audioInited = HashMap<Int, Boolean>()
     private val audioLogged = HashMap<Int, Long>()
 
@@ -435,6 +439,9 @@ class AaBridgeCore(
     }
 
     private val ttsStopTimer = AudioTimer()
+
+    /** h1318: отложенный VR_STOP подсказок навигации (тот же дебаунс, что у TTS: AA дёргает START/STOP между кусками фразы). */
+    private val navStopTimer = AudioTimer()
 
     /** h425: Delphi глотает TTS_INIT в одну миллисекунду с NAVI=1; речь копится, INIT уходит через [TTS_INIT_AFTER_NAVI_MS]. */
     private val ttsInitTimer = AudioTimer()
@@ -628,6 +635,8 @@ class AaBridgeCore(
         huVwCns3_20082122 = false              // STATISTIC_INFO придёт заново в этой сессии
         huIdleVideoHeartbeat = false           // STATISTIC_INFO придёт заново в этой сессии
         vrReply = false
+        navVr = false
+        navStopTimer.cancel()
         touchDecimator.reset()
         touchDecimationLogged = 1
         touchPacer.reset()
@@ -662,6 +671,10 @@ class AaBridgeCore(
         if (carlifeStarted && carlifePaused && ttsStopTimer.pending) {
             log("BRIDGE CarLife START после PAUSE: отложенный TTS STOP шлю сразу", true)
             stopAudio(CarlifeAudio.CH_TTS)
+        }
+        if (carlifeStarted && carlifePaused && navStopTimer.pending) {
+            log("BRIDGE CarLife START после PAUSE: отложенный VR STOP подсказки шлю сразу", true)
+            navStopNow()
         }
         carlifeStarted = true
         carlifePaused = false
@@ -1535,6 +1548,9 @@ class AaBridgeCore(
         if (carlifeChannel(chan) == CarlifeAudio.CH_TTS && ttsStopTimer.cancel()) {
             log("BRIDGE TTS STOP отменён: SPEECH START до истечения ${TTS_STOP_DELAY_MS} мс, INIT не повторяю", true)
         }
+        if (carlifeChannel(chan) == CarlifeAudio.CH_TTS && navStopTimer.cancel()) {
+            log("BRIDGE h1318: подсказка VR STOP отменён: SPEECH START до истечения ${TTS_STOP_DELAY_MS} мс, INIT не повторяю", true)
+        }
     }
 
     @Synchronized
@@ -1553,7 +1569,12 @@ class AaBridgeCore(
             return
         }
         if (ch == CarlifeAudio.CH_TTS && (vrReply || (huVwCns2Delphi && voice && micModeProvider() != MicMode.PHONE))) {
+            if (navVr) closeNavVr("голосовая сессия ассистента", moduleOff = false)
             sendVrReply(chan, pcm)
+            return
+        }
+        if (ch == CarlifeAudio.CH_TTS && (navVr || navChannelProvider() == NavChannel.VR)) {
+            sendNavViaVr(chan, pcm)
             return
         }
         if (ch == CarlifeAudio.CH_TTS) {
@@ -1680,6 +1701,13 @@ class AaBridgeCore(
             vrModuleOff("последний VR STOP после голосовой сессии")
             return
         }
+        if (navVr && ch == CarlifeAudio.CH_TTS) {
+            if (!navStopTimer.pending) {
+                log("BRIDGE h1318: подсказка VR STOP отложен на ${TTS_STOP_DELAY_MS} мс", true)
+                navStopTimer.start(TTS_STOP_DELAY_MS) { navStopNow() }
+            }
+            return
+        }
         if (ch == CarlifeAudio.CH_MEDIA) {
             requestMediaPause("AA STOP ch$chan")
         } else if (TTS_DEBOUNCE_ENABLED) {
@@ -1720,12 +1748,58 @@ class AaBridgeCore(
     }
 
     /**
+     * h1318: подсказки навигатора (SPEECH) -> канал VR вместо TTS: VR_INIT 16 кГц моно, VR_DATA. Без MODULE_STATUS NAVI=1 и VR=1,
+     * без пре-ролла и задержки h425: ГУ видит обычный голосовой поток и может отдать кнопкам громкости «голос».
+     * Свой флаг [navVr], не [vrReply]: голосовая сессия Delphi идёт по прежней ветке.
+     */
+    private fun sendNavViaVr(chan: Int, pcm: ByteArray) {
+        if (navStopTimer.cancel()) log("BRIDGE h1318: подсказка VR STOP отменён: данные ch$chan до истечения ${TTS_STOP_DELAY_MS} мс, INIT не повторяю", true)
+        if (!navVr) {
+            if (audioInited[CarlifeAudio.CH_TTS] == true) stopAudio(CarlifeAudio.CH_TTS)
+            if (!link.sendAudio(CarlifeAudio.CH_VR, CarlifeAudio.VR_INIT, CarlifeAudio.initBody(16000, 1, 16))) {
+                audioDropped++
+                return
+            }
+            navVr = true
+            navVrPackets = 0
+            log("BRIDGE h1318: подсказка ch$chan -> CarLife VR INIT 16000Гц 1к 16бит", true)
+        }
+        val chunkMax = voiceChunkMax()
+        var off = 0
+        while (off < pcm.size) {
+            val n = minOf(chunkMax, pcm.size - off)
+            val chunk = if (off == 0 && n == pcm.size) pcm else pcm.copyOfRange(off, off + n)
+            if (!link.sendAudio(CarlifeAudio.CH_VR, CarlifeAudio.VR_DATA, chunk)) audioDropped++ else audioBytes += n
+            off += n
+        }
+        AaState.audioBytes = audioBytes
+        if (++navVrPackets <= TTS_DIAG_PACKETS) {
+            val (peak, rms) = CarlifeAudio.pcm16Stats(pcm)
+            log("BRIDGE h1318: подсказка VR пакет #$navVrPackets: ${pcm.size} Б, peak=$peak rms=%.1f${if (peak == 0) " (ВСЕ НУЛИ)" else ""}".format(rms), false)
+        }
+    }
+
+    /** h1318: отложенный VR_STOP подсказки сработал: закрыть поток и всегда отпустить VR (страховка от залипания громкости на голосе). */
+    private fun navStopNow() = closeNavVr(null, moduleOff = true)
+
+    private fun closeNavVr(why: String?, moduleOff: Boolean) {
+        navStopTimer.cancel()
+        if (!navVr) return
+        navVr = false
+        link.sendAudio(CarlifeAudio.CH_VR, CarlifeAudio.VR_STOP, ByteArray(0))
+        log("BRIDGE h1318: подсказка VR STOP" + (why?.let { " ($it)" } ?: ""), true)
+        if (moduleOff && link.sendModuleStatus(CarlifeAudio.MODULE_VR, 0)) {
+            log("BRIDGE h1318: CarLife MODULE_STATUS VR=0 (после подсказки)", true)
+        }
+    }
+
+    /**
      * h425: VW CNS2 Delphi после ответа в канале VR оставляет кнопки громкости на голосовом канале, пока не переткнуть
      * кабель. MODULE_STATUS VR=0 уходит при закрытии микрофона, но ответ в VR идёт уже после него: повторяем VR=0,
      * когда и голосовая сессия AA кончилась, и поток VR закрыт.
      */
     private fun vrModuleOff(why: String) {
-        if (!huVwCns2Delphi || voice || vrReply) return
+        if (!huVwCns2Delphi || voice || vrReply || navVr) return
         if (link.sendModuleStatus(CarlifeAudio.MODULE_VR, 0)) log("BRIDGE CarLife MODULE_STATUS VR=0 ($why)", true)
     }
 
@@ -1740,6 +1814,7 @@ class AaBridgeCore(
                     voice = true
                     log("BRIDGE голосовая сессия: старт, MEDIA на паузу, данные MEDIA не пересылаю", true)
                     requestMediaPause("голосовая сессия")
+                    closeNavVr("старт голосовой сессии", moduleOff = false)   // h1318: Delphi стартует VR_INIT чисто
                 } else if (cancelled) {
                     log("BRIDGE голосовая сессия: выход отменён (снова status=1)", true)
                 }
@@ -2034,6 +2109,8 @@ class AaBridgeCore(
     private fun resetAudio() {
         audioInited.clear()
         ttsStopTimer.cancel()
+        navStopTimer.cancel()
+        navVr = false
         dropTtsPending()
         mediaReleaseTimer.cancel()
         naviSent = false
@@ -2047,6 +2124,7 @@ class AaBridgeCore(
 
     private fun stopAllAudio(why: String) {
         ttsStopTimer.cancel()
+        closeNavVr(why, moduleOff = true)       // h1318: открытый поток подсказок закрываем сразу
         mediaReleaseTimer.cancel()
         voiceExitTimer.cancel()
         voice = false

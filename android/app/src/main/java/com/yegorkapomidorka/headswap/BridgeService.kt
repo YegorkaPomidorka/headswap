@@ -1376,6 +1376,7 @@ class BridgeService : Service() {
             core.mediaChunkProvider = { aaPrefs.mediaChunk }
             core.voiceChunkProvider = { aaPrefs.voiceChunk }
             core.ttsPrerollProvider = { aaPrefs.ttsPreroll }
+            core.navChannelProvider = { aaPrefs.navChannel }
             core.touchDecimationProvider = { aaPrefs.touchDecimation }
             core.dupDownFilterProvider = { aaPrefs.dupDownFilter }
             core.phoneMic = PhoneMicCapture(applicationContext)

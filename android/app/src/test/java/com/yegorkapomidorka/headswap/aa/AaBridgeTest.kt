@@ -1362,6 +1362,109 @@ class AaBridgeAudioTest {
     }
 
     @Test
+    fun navChannelVrSendsSpeechToVrWithoutNaviAndTtsInit() {
+        core.navChannelProvider = { NavChannel.VR }
+        core.onCarlifeStart()
+        val s = pcm(2048, 3)
+        core.onAudioStart(SPEECH)
+        core.onAudioData(SPEECH, s, 1)
+        core.onAudioData(SPEECH, s, 2)
+        assertEquals(listOf("A5:0x50002", "A5:0x50003", "A5:0x50003"), link.events.toList())   // ни NAVI=1, ни VR=1, ни TTS INIT
+        assertEquals("08807d10011810", hexs(link.audio[0].payload))      // {16000, 1, 16}
+        assertArrayEquals(s, link.audio[1].payload)                      // не-Delphi: пакет AA целиком
+        assertEquals(1, logs.count { it.contains("BRIDGE h1318: подсказка ch${SPEECH} -> CarLife VR INIT 16000Гц 1к 16бит") })
+    }
+
+    @Test
+    fun navChannelVrStopIsDebouncedThenVrStopAndVrOff() {
+        core.navChannelProvider = { NavChannel.VR }
+        core.onCarlifeStart()
+        core.onAudioStart(SPEECH)
+        core.onAudioData(SPEECH, pcm(640), 1)
+        core.onAudioStop(SPEECH)
+        timers.advance(1499)
+        assertTrue(link.audio.none { it.type == 0x50004 })
+        timers.advance(1)
+        assertEquals(listOf("A5:0x50002", "A5:0x50003", "A5:0x50004", "M4=0"), link.events.toList())
+        assertEquals(1, logs.count { it == "BRIDGE h1318: подсказка VR STOP" })
+        timers.advance(5000)
+        assertEquals(1, link.audio.count { it.type == 0x50004 })
+        // следующая подсказка открывает поток заново
+        core.onAudioData(SPEECH, pcm(640), 2)
+        assertEquals(2, link.audio.count { it.type == 0x50002 })
+    }
+
+    @Test
+    fun navChannelVrStartAndDataInsideDelayCancelStopWithoutSecondInit() {
+        core.navChannelProvider = { NavChannel.VR }
+        core.onCarlifeStart()
+        core.onAudioStart(SPEECH)
+        core.onAudioData(SPEECH, pcm(640), 1)
+        core.onAudioStop(SPEECH)
+        timers.advance(1000)
+        core.onAudioStart(SPEECH)                                        // SPEECH START отменяет отложенный STOP
+        core.onAudioData(SPEECH, pcm(640), 2)
+        timers.advance(5000)
+        assertEquals(listOf(0x50002, 0x50003, 0x50003), link.audio.map { it.type })
+        // данные тоже отменяют таймер
+        core.onAudioStop(SPEECH)
+        timers.advance(1400)
+        core.onAudioData(SPEECH, pcm(640), 3)
+        timers.advance(5000)
+        assertEquals(0, link.audio.count { it.type == 0x50004 })
+        assertEquals(1, link.audio.count { it.type == 0x50002 })
+        assertTrue("M4=0" !in link.events)
+        // а настоящий STOP наступает ровно через 1500 мс
+        core.onAudioStop(SPEECH)
+        timers.advance(1500)
+        assertEquals(1, link.audio.count { it.type == 0x50004 })
+        assertTrue("M4=0" in link.events)
+    }
+
+    @Test
+    fun navChannelVrSendsVrOffOnAnyHuAndNeverTouchesNaviOrTtsChannel() {
+        core.navChannelProvider = { NavChannel.VR }
+        core.onHuStatistic("20622116")                                   // не Delphi
+        core.onCarlifeStart()
+        core.onAudioData(SPEECH, pcm(640), 1)
+        core.onAudioStop(SPEECH)
+        timers.advance(1500)
+        assertTrue(link.audio.none { it.chan == 4 })
+        assertTrue(link.modules.none { it.first == 2 })                  // ни NAVI=1, ни NAVI=0
+        assertEquals(listOf(4 to 0), link.modules.toList())              // только VR=0 после подсказки
+    }
+
+    @Test
+    fun navChannelTtsKeepsOldBehaviour() {
+        core.navChannelProvider = { NavChannel.TTS }
+        core.onCarlifeStart()
+        core.onAudioStart(SPEECH)
+        core.onAudioData(SPEECH, pcm(640), 1)
+        core.onAudioStop(SPEECH)
+        timers.advance(1500)
+        assertEquals(listOf("M2=1", "A4:0x40001", "A4:0x40003", "A4:0x40002"), link.events.toList())
+    }
+
+    @Test
+    fun navChannelVrYieldsToDelphiVoiceSessionAndClosesOpenNavStream() {
+        core.navChannelProvider = { NavChannel.VR }
+        core.onHuStatistic("20082114")
+        core.micModeProvider = { MicMode.CAR }
+        core.onCarlifeStart()
+        core.onAudioData(SPEECH, pcm(640), 1)                            // подсказка уже открыла VR
+        core.onVoiceSession(1)
+        assertEquals(listOf("A5:0x50002", "A5:0x50003", "A5:0x50004"), link.events.toList())   // VR_STOP без VR=0
+        core.onAudioStart(SPEECH)
+        core.onAudioData(SPEECH, pcm(2048), 2)                           // ответ ассистента: прежняя ветка vrReply, свой INIT
+        assertEquals(2, link.audio.count { it.type == 0x50002 })
+        assertEquals(1, logs.count { it.contains("речь AA ch$SPEECH в голосовой сессии") })
+        core.onAudioStop(SPEECH)                                         // vrReply: STOP сразу, без дебаунса
+        assertEquals(2, link.audio.count { it.type == 0x50004 })
+        timers.advance(5000)
+        assertEquals(2, link.audio.count { it.type == 0x50004 })         // таймер подсказки не сработал
+    }
+
+    @Test
     fun vwCns2DelphiDelaysFirstTtsInitAfterNaviAndKeepsSpeech() {
         val l = FakeLink()
         val c = AaBridgeCore({ m, _ -> logs.add(m) }, clockMs = { timers.now }, audioSchedule = timers::schedule).also { it.attach(l) }
