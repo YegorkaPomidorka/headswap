@@ -98,7 +98,7 @@ NAMES = {
     0x00018078: "CHANGE_MD_THEME", 0x00018079: "REQUEST_MD_THEME_STATE", 0x00010080: "RESPONSE_MD_THEME_STATE",
     VIDEO_DATA: "VIDEO_DATA", VIDEO_HEARTBEAT: "VIDEO_HEARTBEAT",
     0x00030001: "MEDIA_INIT", 0x00030006: "MEDIA_DATA", 0x00040001: "TTS_INIT", 0x00040003: "TTS_DATA",
-    0x00050002: "VR_INIT", 0x00050003: "VR_DATA",
+    0x00050002: "VR_INIT", 0x00050003: "VR_DATA", 0x00050004: "VR_STOP",
     HU_PROTOCOL_VERSION: "HU_PROTOCOL_VERSION", HU_INFO: "HU_INFO", VIDEO_ENCODER_INIT: "VIDEO_ENCODER_INIT",
     VIDEO_ENCODER_START: "VIDEO_ENCODER_START", VIDEO_ENCODER_PAUSE: "VIDEO_ENCODER_PAUSE", HU_AUTHEN_REQUEST: "HU_AUTHEN_REQUEST",
     HU_AUTHEN_RESULT: "HU_AUTHEN_RESULT", HU_UNKNOWN_1804C: "HU_1804C",
@@ -224,6 +224,7 @@ def pb_render(body: bytes, limit: int = 200) -> str:
 # ---- звук в динамики ПК (--view) ----
 
 MEDIA_INIT, MEDIA_DATA, TTS_INIT, TTS_DATA = 0x00030001, 0x00030006, 0x00040001, 0x00040003
+VR_INIT_A, VR_DATA_A = 0x00050002, 0x00050003   # речь MD в канале VR (ответ помощника, h1318 - подсказки)
 
 
 class _PcmOut:
@@ -273,7 +274,7 @@ class Speakers:
     def on(self, chan: int, mtype: int, body: bytes):
         if self.sd is None:
             return
-        if mtype in (MEDIA_INIT, TTS_INIT):
+        if mtype in (MEDIA_INIT, TTS_INIT, VR_INIT_A):
             f = pb_parse(body)
             rate, ch = pb_get_int(f, 1) or 48000, pb_get_int(f, 2) or 2
             old = self.outs.pop(chan, None)
@@ -291,7 +292,7 @@ class Speakers:
                 self.log(f"speakers: {CH_NAMES[chan]} {rate} Hz {ch} ch -> {self.sd.query_devices(kind='output')['name']}")
             except Exception as e:  # noqa: BLE001
                 self.log(f"speakers: {CH_NAMES[chan]} open failed: {e}")
-        elif mtype in (MEDIA_DATA, TTS_DATA):
+        elif mtype in (MEDIA_DATA, TTS_DATA, VR_DATA_A):
             out = self.outs.get(chan)
             if out:
                 out.write(body)
@@ -649,7 +650,7 @@ class HeadUnit:
         if chan == CH_VIDEO and mtype == VIDEO_DATA:
             self.on_video(body)
             return
-        if self.speakers and chan in (CH_MEDIA, CH_TTS):
+        if self.speakers and chan in (CH_MEDIA, CH_TTS, CH_VR):
             self.speakers.on(chan, mtype, body)
         self.counts[(chan, mtype)] += 1
         extra = " TRUNCATED" if trunc else ""
