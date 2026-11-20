@@ -109,7 +109,8 @@ fun MusicCard(modifier: Modifier) {
         if (st.playing && pkg != null && pkg != model.selectedPlayer && pkg in chip) LauncherActions.adoptPlayer(pkg)
     }
     val colors = MusicColors.of(LocalAccent.current)
-    CardBox(modifier, background = Color.Transparent) {
+    // «Стекло»: только кромка поверх обложки, сама обложка и затемнение не меняются
+    CardBox(modifier.homeGlassEdge(RoundedCornerShape(m.dp(s.radius)), s.t / 96f), background = Color.Transparent) {
         Box(Modifier.fillMaxSize().musicBackground(colors))
         if (s.portrait) {
             MusicBodyPortrait(st, player, colors)

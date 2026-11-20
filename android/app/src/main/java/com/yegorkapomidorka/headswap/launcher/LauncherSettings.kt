@@ -669,7 +669,7 @@ private fun RailSizeCard(d: SettingsDims, modifier: Modifier) {
     }
 }
 
-/** «Стиль панели»: «Сплошная» или «Стекло» (только боковая рейка, в портрете строки нет). */
+/** «Стиль»: «Сплошная» или «Стекло» - рейка (только альбом) и нижний ряд главного (карточка «Телефон», быстрые приложения). */
 @Composable
 private fun RailStyleCard(d: SettingsDims, modifier: Modifier) {
     val model = LauncherModel
