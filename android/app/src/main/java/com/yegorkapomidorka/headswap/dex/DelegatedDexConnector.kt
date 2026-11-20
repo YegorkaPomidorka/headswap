@@ -247,14 +247,29 @@ class DelegatedDexConnector(context: Context, private val core: AaBridgeCore,
             val xs = points.map { it.x.coerceIn(0, width - 1).toFloat() }.toFloatArray()
             val ys = points.map { it.y.coerceIn(0, height - 1).toFloat() }.toFloatArray()
             if (runCatching { DesktopTouchState.validate(action, actionIndex, ids, xs, ys) }.isFailure) return
-            enqueue { it.injectTouchPoints(action, actionIndex, ids, xs, ys) }
+            enqueueTouch(action == MotionEvent.ACTION_MOVE) { it.injectTouchPoints(action, actionIndex, ids, xs, ys) }
         } else {
             // Samsung window captions and resize edges require mouse input.
             val p = points.first()
             if (action !in setOf(MotionEvent.ACTION_DOWN, MotionEvent.ACTION_UP, MotionEvent.ACTION_MOVE, MotionEvent.ACTION_CANCEL)) return
             val buttons = if (action == MotionEvent.ACTION_UP || action == MotionEvent.ACTION_CANCEL) 0 else MotionEvent.BUTTON_PRIMARY
-            enqueue { it.injectPointer(action, p.x.coerceIn(0, width - 1), p.y.coerceIn(0, height - 1), buttons) }
+            enqueueTouch(action == MotionEvent.ACTION_MOVE) {
+                it.injectPointer(action, p.x.coerceIn(0, width - 1), p.y.coerceIn(0, height - 1), buttons)
+            }
         }
+    }
+
+    private val touchMoves = TouchMoveCoalescer<(IDexUserService) -> Unit>()
+
+    /** MOVE схлопываются в один ждущий ([TouchMoveCoalescer]), остальное идёт в очередь как есть и служит барьером. */
+    private fun enqueueTouch(move: Boolean, block: (IDexUserService) -> Unit) {
+        if (!move) {
+            touchMoves.barrier()
+            enqueue(block)
+            return
+        }
+        val slot = touchMoves.offerMove(generation, block) ?: return
+        if (!enqueue { service -> touchMoves.take(slot)?.invoke(service) }) touchMoves.barrier()
     }
 
     /** Кнопка ГУ: сначала свой лаунчер (DesktopKeys), иначе нажатие в дисплей рабочего стола. */
@@ -294,10 +309,11 @@ class DelegatedDexConnector(context: Context, private val core: AaBridgeCore,
         return true
     }
 
-    private fun enqueue(block: (IDexUserService) -> Unit) {
+    /** true, если команда встала в очередь. */
+    private fun enqueue(block: (IDexUserService) -> Unit): Boolean {
         val token = generation
-        if (stopping.get() || token == 0L || retiringGeneration == token || !firstFrame) return
-        try { input.execute {
+        if (stopping.get() || token == 0L || retiringGeneration == token || !firstFrame) return false
+        return try { input.execute {
             if (!stopping.get() && generation == token && retiringGeneration != token && firstFrame) try { service?.let(block) }
             catch (e: Exception) {
                 // An already dequeued input can overlap normal USB-detach cleanup.
@@ -306,8 +322,9 @@ class DelegatedDexConnector(context: Context, private val core: AaBridgeCore,
                     fail(text(R.string.desk_err_input, e.message.toString()), failureKind(e))
                 }
             }
-        } } catch (_: java.util.concurrent.RejectedExecutionException) {
+        }; true } catch (_: java.util.concurrent.RejectedExecutionException) {
             if (!stopping.get()) fail(text(R.string.desk_err_input_queue))
+            false
         }
     }
 
