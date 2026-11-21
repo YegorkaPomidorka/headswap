@@ -188,7 +188,7 @@
     <string name="l_favorites">المفضّلة</string>
     <string name="l_favorites_empty">لا توجد جهات اتصال مفضّلة. ضع عليها نجمة في دفتر الهاتف</string>
     <string name="l_s_colors">الألوان</string>
-    <string name="l_s_colors_sub">لون التمييز والخلفية، لليل والنهار كلٌّ على حدة</string>
+    <string name="l_s_colors_sub">لون التمييز والخلفية والخلفية الجدارية</string>
     <string name="l_s_colors_night">الليل</string>
     <string name="l_s_colors_day">النهار</string>
     <string name="l_s_colors_reset">إعادة الضبط</string>
@@ -198,7 +198,7 @@
     <string name="l_s_colors_hint">ما دامت هذه الشاشة مفتوحة، يعرض سطح المكتب الألوان التي تعدّلها. تظهر ألوان الليل في السمة الداكنة، وألوان النهار في الفاتحة.</string>
     <string name="l_s_wallpaper">خلفية الشاشة</string>
     <string name="l_s_wallpaper_sub_glass">تحت الزجاج على سطح المكتب كله</string>
-    <string name="l_s_wallpaper_sub_solid">بنمط الزجاج فقط</string>
+    <string name="l_s_wallpaper_sub_solid">تعمل بنمط الزجاج فقط</string>
     <string name="l_s_wallpaper_none">بدون خلفية</string>
     <string name="l_s_wallpaper_headswap">Headswap</string>
     <string name="l_s_wallpaper_mountains">جبال</string>

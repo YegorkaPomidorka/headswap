@@ -36,7 +36,7 @@ object EmbedRenderPolicy {
         min(dpi, max(MIN_DPI, floor(160.0 * min(width, height) / WIDE_DP).toInt()))
 
     /**
-     * Навигаторы (ADR 0054): не портретные, правило 600 dp им не нужно - с ним Google Карты в плитке падали до 96 DPI
+     * Навигаторы (ADR 0055): не портретные, правило 600 dp им не нужно - с ним Google Карты в плитке падали до 96 DPI
      * и всё на карте было мелким. Им плотность стола × ступень «Масштаба карты» ([WINDOW_STEPS]).
      */
     val NAV_PACKAGES = (NavigatorPick.KNOWN + NavigatorPick.KNOWN_ZH).toSet()

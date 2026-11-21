@@ -22,8 +22,8 @@ object WallpaperLogic {
 
     fun clamp(v: Int): Int = v.coerceIn(0, 100)
 
-    /** Размытие 0..100 в пиксели экрана: 100 - 4,5% высоты (на 720p около 32 px). */
-    fun blurPx(blur: Int, heightPx: Int): Float = clamp(blur) / 100f * 0.045f * heightPx
+    /** Размытие 0..100 в пиксели экрана: 100 - 4,5% короткой стороны (на 720p около 32 px). */
+    fun blurPx(blur: Int, minSidePx: Int): Float = clamp(blur) / 100f * 0.045f * minSidePx
 
     /** Крупнее на столько, чтобы края размытой картинки не светились (по 2 радиуса на сторону). */
     fun overscan(blurPx: Float, minSidePx: Int): Float = 1f + blurPx * 2f / minSidePx.coerceAtLeast(1)

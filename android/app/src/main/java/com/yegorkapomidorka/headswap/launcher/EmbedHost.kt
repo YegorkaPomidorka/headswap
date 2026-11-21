@@ -602,7 +602,7 @@ internal object EmbedHost {
         if (slot.wantW < 128 || slot.wantH < 128) return
         // буфер карт Яндекса больше окна, TextureView ужимает его; касания пересчитываются по geomW/geomH
         // остальным окнам плотность ниже стола: короткая сторона от 600 dp, иначе портретное приложение идёт столбиком
-        // навигаторам - плотность стола × «Масштаб карты» (ADR 0054)
+        // навигаторам - плотность стола × «Масштаб карты» (ADR 0055)
         val g = EmbedRenderPolicy.geometry(slot.pkg, slot.wantW, slot.wantH, densityDpi, wide = slot !== alice,
             step = slot.pkg?.let { mapScaleFor(it) } ?: EmbedRenderPolicy.AUTO_STEP)
         val w = g.width

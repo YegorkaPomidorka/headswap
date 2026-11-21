@@ -33,7 +33,7 @@ class EmbedRenderPolicyTest {
     }
 
     @Test fun navigatorWindowGetsDesktopDensityTimesStep() {
-        // ADR 0054: Google Карты в плитке 356×596 на столе 200 DPI раньше шли на 96 DPI (правило 600 dp)
+        // ADR 0055: Google Карты в плитке 356×596 на столе 200 DPI раньше шли на 96 DPI (правило 600 dp)
         val gm = NavigatorPick.GOOGLE_MAPS
         assertEquals(EmbedRenderPolicy.Geometry(356, 596, 150), g(gm, 356, 596, 200))
         val steps = (0..3).map { EmbedRenderPolicy.geometry(gm, 356, 596, 200, step = it).density }

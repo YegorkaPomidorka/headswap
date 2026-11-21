@@ -54,7 +54,7 @@ internal object LauncherModel {
     var area by mutableStateOf<Area>(Area.Home)
     var theme by mutableStateOf(ThemeChoice.DARK)
     var railSize by mutableStateOf(RailSize.NORMAL)
-    /** Общий «Стиль» ([LauncherPrefs.railStyle]): рейка (в портрете не действует, см. [glassRail]) и нижний ряд главного. */
+    /** Общий «Стиль» ([LauncherPrefs.railStyle]): боковая рейка (в портрете нижняя), плитки главного и обои. */
     var railStyle by mutableStateOf(RailStyle.SOLID)
     /** Обои стола ([LauncherPrefs.wallpaper]): рисуются только в стиле «Стекло» ([WallpaperLayer]). */
     var wallpaper by mutableStateOf(WallpaperId.NONE)
@@ -88,9 +88,9 @@ internal object LauncherModel {
     var dayColors by mutableStateOf(ColorSet.DAY)
     /** На экране «Цвета» настраиваются дневные (иначе ночные); пока он открыт, весь стол показывает этот набор. */
     var colorsEditDay by mutableStateOf(false)
-    /** Страница «Цвета» открыта; в портрете «Цвета» - блок «Вида», он правит набор, пока открыт сам «Вид» (h921). */
+    /** Страница «Цвета» открыта (в альбоме и в портрете - отдельная страница «Вида», ADR 0054). */
     private val colorsOpen: Boolean
-        get() = area == Area.Settings && (settingsPage == SettingsPage.COLORS || (portrait && settingsPage == SettingsPage.LOOK))
+        get() = area == Area.Settings && settingsPage == SettingsPage.COLORS
     /** Светлая ли палитра на экране: на «Цветах» - редактируемый набор, иначе [lightTheme]. */
     val shownLight: Boolean get() = if (colorsOpen) colorsEditDay else lightTheme
     val palette: LauncherPalette
@@ -284,7 +284,15 @@ internal object LauncherModel {
     /** Слайдер «Цвета» двигается: только состояние, без записи; запись - [saveColors] по отпусканию. */
     fun editColors(set: ColorSet) { if (colorsEditDay) dayColors = set else nightColors = set }
     fun saveColors() { prefs.nightColors = nightColors; prefs.dayColors = dayColors }
-    fun resetColors() { editColors(if (colorsEditDay) ColorSet.DAY else ColorSet.NIGHT); saveColors() }
+    /**
+     * «Сбросить» на «Цветах и обоях»: правимый набор цветов - к золоту, обои - «Без обоев», размытие и затемнение - по
+     * умолчанию (Егор 21.11). Своё фото в filesDir остаётся, его можно выбрать снова.
+     */
+    fun resetColors() {
+        editColors(if (colorsEditDay) ColorSet.DAY else ColorSet.NIGHT); saveColors()
+        chooseWallpaper(WallpaperId.NONE)
+        editWallpaper(blur = WallpaperLogic.BLUR_DEFAULT, dim = WallpaperLogic.DIM_DEFAULT); saveWallpaper()
+    }
     /** Открыть «Цвета»: сначала настраивается тот набор, что сейчас на экране. */
     fun openColors() { colorsEditDay = lightTheme; settingsPage = SettingsPage.COLORS }
     fun chooseRailSize(value: RailSize) { railSize = value; prefs.railSize = value }
@@ -366,7 +374,7 @@ internal object LauncherModel {
     fun mapScale(pkg: String): Int { mapScaleRev; return prefs.mapScale(pkg) }
     fun chooseMapScale(pkg: String, step: Int) {
         prefs.setMapScale(pkg, step); mapScaleRev++
-        // окно навигатора: новая плотность дочернего дисплея на лету, без перезапуска (ADR 0054)
+        // окно навигатора: новая плотность дочернего дисплея на лету, без перезапуска (ADR 0055)
         if (CarAppHost.pkg != pkg) { EmbedHost.refresh(EmbedHost.nav); EmbedHost.refresh(EmbedHost.app); return }
         CarAppHost.setScale(CarConfigMath.step(step)) // 2ГИС меняет сразу
         // Яндекс берёт dpi только при старте сессии (стенд 04.11: новые dpi на той же сессии не меняют карту)
