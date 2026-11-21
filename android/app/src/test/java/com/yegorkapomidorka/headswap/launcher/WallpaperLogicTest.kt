@@ -19,7 +19,7 @@ class WallpaperLogicTest {
         assertEquals(100, WallpaperLogic.clamp(250))
     }
 
-    @Test fun blurPxScalesWithHeight() {
+    @Test fun blurPxScalesWithShortSide() {
         assertEquals(0f, WallpaperLogic.blurPx(0, 720), 0f)
         assertEquals(32.4f, WallpaperLogic.blurPx(100, 720), 0.01f)
         assertEquals(WallpaperLogic.blurPx(100, 720), WallpaperLogic.blurPx(900, 720), 0f)
