@@ -125,7 +125,10 @@ class AaTranscoder(
         var configured = false
         var lastErr: Exception? = null
         // Baidu-формат: сначала с level 256, при отказе без него (с записью в лог), дальше обычная лесенка
-        val levels = if (baidu) listOf(BAIDU_WITH_LEVEL, BAIDU_NO_LEVEL, 0, 1, 2) else listOf(0, 1, 2)
+        // BASELINE_*: только профиль (без режима битрейта и B-кадров). OMX.qcom на Xiaomi 220333QNY отвергает 0 и 1,
+        // а «минимальный формат» у него — High level 1.0, который Desay DS03H не декодирует (замёрзшая заставка с кашей).
+        val ladder = listOf(0, 1, BASELINE_WITH_LEVEL, BASELINE_NO_LEVEL, 2)
+        val levels = if (baidu) listOf(BAIDU_WITH_LEVEL, BAIDU_NO_LEVEL) + ladder else ladder
         for ((attempt, level) in levels.withIndex()) {
             try {
                 if (attempt > 0) c.reset()
@@ -139,6 +142,8 @@ class AaTranscoder(
                         "baseline+VBR+noB+repeat100ms+realtime"
                     }
                     1 -> if (tuning.contains("cbr")) "baseline+CBR+noB+repeat100ms" else "baseline+VBR+noB+repeat100ms"
+                    BASELINE_WITH_LEVEL -> "baseline+level${baselineLevelName()}+repeat100ms"
+                    BASELINE_NO_LEVEL -> "baseline+repeat100ms, без level"
                     else -> "минимальный формат+repeat100ms"
                 }
                 configured = true
@@ -279,6 +284,11 @@ class AaTranscoder(
         }
     }
 
+    /** Наименьший уровень H.264, в который влезает кадр [width]x[height] при [fps] (таблица A-1 стандарта). */
+    private fun baselineLevel(): Int = avcLevelFor(width, height, fps).first
+
+    private fun baselineLevelName(): String = avcLevelFor(width, height, fps).second
+
     private fun format(level: Int): MediaFormat {
         val f = MediaFormat.createVideoFormat(MIME, width, height)
         f.setInteger(MediaFormat.KEY_COLOR_FORMAT, MediaCodecInfo.CodecCapabilities.COLOR_FormatSurface)
@@ -305,6 +315,12 @@ class AaTranscoder(
             f.setInteger(MediaFormat.KEY_MAX_B_FRAMES, 0)
             f.setInteger(MediaFormat.KEY_PRIORITY, 0)
             if (Build.VERSION.SDK_INT >= 30) f.setInteger(MediaFormat.KEY_LOW_LATENCY, 1)
+            return f
+        }
+        if (level == BASELINE_WITH_LEVEL || level == BASELINE_NO_LEVEL) {
+            if (tuning.contains("nobase")) throw IllegalArgumentException("nobase: шаг Baseline пропущен")
+            f.setInteger(MediaFormat.KEY_PROFILE, MediaCodecInfo.CodecProfileLevel.AVCProfileBaseline)
+            if (level == BASELINE_WITH_LEVEL) f.setInteger(MediaFormat.KEY_LEVEL, baselineLevel())
             return f
         }
         if (level <= 1 && !tuning.contains("nobase")) {
@@ -710,6 +726,23 @@ class AaTranscoder(
         /** Попытки configure в Baidu-формате: с KEY_LEVEL=AVCLevel3 (256) и без него. */
         private const val BAIDU_WITH_LEVEL = -2
         private const val BAIDU_NO_LEVEL = -1
+        /** Запасные шаги перед «минимальным форматом»: только Baseline, с уровнем по размеру кадра и без уровня. */
+        private const val BASELINE_WITH_LEVEL = 3
+        private const val BASELINE_NO_LEVEL = 4
+
+        /** Уровень H.264 (константа MediaCodec, имя) по макроблокам на кадр и в секунду. */
+        internal fun avcLevelFor(width: Int, height: Int, fps: Int): Pair<Int, String> {
+            val mbs = ((width + 15) / 16) * ((height + 15) / 16)
+            val rate = mbs.toLong() * maxOf(fps, 1)
+            return when {
+                mbs <= 1620 && rate <= 40_500 -> MediaCodecInfo.CodecProfileLevel.AVCLevel3 to "3.0"
+                mbs <= 3600 && rate <= 108_000 -> MediaCodecInfo.CodecProfileLevel.AVCLevel31 to "3.1"
+                mbs <= 5120 && rate <= 216_000 -> MediaCodecInfo.CodecProfileLevel.AVCLevel32 to "3.2"
+                mbs <= 8192 && rate <= 245_760 -> MediaCodecInfo.CodecProfileLevel.AVCLevel4 to "4.0"
+                mbs <= 8704 && rate <= 522_240 -> MediaCodecInfo.CodecProfileLevel.AVCLevel42 to "4.2"
+                else -> MediaCodecInfo.CodecProfileLevel.AVCLevel51 to "5.1"
+            }
+        }
 
         /** Реле перерисовывает последний кадр, если новых нет столько мс (как repeat-previous-frame-after у Baidu). */
         const val REDRAW_IDLE_MS = 100L
