@@ -1576,7 +1576,9 @@ class AaBridgeCore(
             sendVrReply(chan, pcm)
             return
         }
-        if (ch == CarlifeAudio.CH_TTS && (navVr || navChannelProvider() == NavChannel.VR)) {
+        // h1318 лог CNS3 21.11: в голосовой сессии AA (микрофон ГУ открыт, VR=1) по ch4 идёт сигнал «слушаю», не подсказка -
+        // в VR-путь подсказок его не пускаем: VR_STOP + VR=0 гасили бы открытую сессию, а канал VR занят микрофоном ГУ.
+        if (ch == CarlifeAudio.CH_TTS && !voice && (navVr || navChannelProvider() == NavChannel.VR)) {
             sendNavViaVr(chan, pcm)
             return
         }
@@ -1791,8 +1793,9 @@ class AaBridgeCore(
         navVr = false
         link.sendAudio(CarlifeAudio.CH_VR, CarlifeAudio.VR_STOP, ByteArray(0))
         log("BRIDGE h1318: подсказка VR STOP" + (why?.let { " ($it)" } ?: ""), true)
-        if (moduleOff && desktopVoiceOn) {
-            log("BRIDGE h1318: VR=0 после подсказки не шлю: панель Алисы открыта", true)   // закроется панель - уйдёт её VR=0
+        if (moduleOff && (desktopVoiceOn || voice)) {
+            // закроется панель / голосовая сессия - уйдёт их VR=0
+            log("BRIDGE h1318: VR=0 после подсказки не шлю: ${if (voice) "голосовая сессия AA" else "панель Алисы открыта"}", true)
         } else if (moduleOff && link.sendModuleStatus(CarlifeAudio.MODULE_VR, 0)) {
             log("BRIDGE h1318: CarLife MODULE_STATUS VR=0 (после подсказки)", true)
         }

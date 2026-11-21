@@ -1465,6 +1465,22 @@ class AaBridgeAudioTest {
     }
 
     @Test
+    fun navChannelVrSkipsAaVoiceSessionOnNonDelphiHu() {
+        // лог CNS3 20082141, 21.11: сигнал «слушаю» в голосовой сессии ушёл в VR-путь, VR=0 погасил открытый микрофон
+        core.navChannelProvider = { NavChannel.VR }
+        core.onHuStatistic("20082141")
+        core.onCarlifeStart()
+        core.onVoiceSession(1)
+        core.onAudioStart(SPEECH)
+        core.onAudioData(SPEECH, pcm(640), 1)
+        core.onAudioStop(SPEECH)
+        timers.advance(5000)
+        assertTrue("в голосовой сессии VR-путь подсказок не открывается", link.audio.none { it.chan == 5 })
+        assertTrue("VR=0 подсказка не шлёт", (4 to 0) !in link.modules)
+        assertTrue(logs.none { it.contains("BRIDGE h1318: подсказка") })
+    }
+
+    @Test
     fun navChannelVrDoesNotSendVrOffWhileLauncherVoicePanelIsOpen() {
         core.navChannelProvider = { NavChannel.VR }
         core.onCarlifeStart()
