@@ -120,7 +120,7 @@
     <string name="l_s_theme_auto">Auto</string>
     <string name="l_s_theme_sub">Auto follows the headlights</string>
     <string name="l_s_colors">Colors</string>
-    <string name="l_s_colors_sub">Accent and background, night and day apart</string>
+    <string name="l_s_colors_sub">Accent, background and wallpaper</string>
     <string name="l_s_colors_night">Night</string>
     <string name="l_s_colors_day">Day</string>
     <string name="l_s_colors_reset">Reset</string>
@@ -128,7 +128,18 @@
     <string name="l_s_colors_bg_hue">Background hue</string>
     <string name="l_s_colors_bg_sat">Background saturation</string>
     <string name="l_s_colors_hint">While this screen is open, the desktop shows the colors you are editing. Night colors show in the dark theme, day colors in the light one.</string>
-    <string name="l_s_rail">Side panel</string>
+    <string name="l_s_wallpaper">Wallpaper</string>
+    <string name="l_s_wallpaper_sub_glass">Behind the glass on the whole desktop</string>
+    <string name="l_s_wallpaper_sub_solid">Works only with the Glass style</string>
+    <string name="l_s_wallpaper_none">None</string>
+    <string name="l_s_wallpaper_headswap">Headswap</string>
+    <string name="l_s_wallpaper_mountains">Mountains</string>
+    <string name="l_s_wallpaper_custom">My photo</string>
+    <string name="l_s_wallpaper_gallery">Gallery</string>
+    <string name="l_s_wallpaper_blur">Blur</string>
+    <string name="l_s_wallpaper_dim">Dim</string>
+    <string name="l_wallpaper_set">Wallpaper set</string>
+    <string name="l_wallpaper_failed">Could not set the wallpaper</string>
     <string name="l_s_rail_bottom">Bottom panel</string>
     <string name="l_s_layout_tile_top">Tile on top</string>
     <string name="l_s_layout_music_top">Music on top</string>
@@ -138,6 +149,14 @@
     <string name="l_s_rail_cut">Compact</string>
     <string name="l_s_anim">Button animations</string>
     <string name="l_s_battery">Phone battery</string>
+    <string name="l_s_clock12">12-hour clock</string>
+    <string name="l_s_rail_size">Panel size</string>
+    <string name="l_s_rail_style">Style</string>
+    <string name="l_s_style_solid">Solid</string>
+    <string name="l_s_style_glass">Glass</string>
+    <string name="l_s_date">Date</string>
+    <string name="l_s_date_dmy">DD.MM</string>
+    <string name="l_s_date_mdy">MM.DD</string>
     <string name="l_s_map_scale">Map scale</string>
     <string name="l_s_map_scale_sub">Only for %1$s · applies immediately</string>
     <string name="l_s_scale_smaller">Smaller</string>
@@ -163,11 +182,13 @@
     <string name="l_s_video">Video</string>
     <string name="l_s_version">Version</string>
     <string name="l_s_hu_channel">Channel %1$s</string>
-    <string name="l_s_fps">%1$s · %2$d fps</string>
+    <string name="l_s_fps">%1$s · %2$s fps</string>
     <string name="l_nav_yandex_navi">Ya.Navigator</string>
     <string name="l_nav_2gis">2GIS</string>
     <string name="l_nav_yandex_maps">Yandex Maps</string>
     <string name="l_nav_google_maps">Google Maps</string>
+    <string name="l_nav_amap">Amap</string>
+    <string name="l_nav_amap_auto">Amap Auto</string>
     <string name="l_nav_waze" translatable="false">Waze</string>
     <!-- навигатор на своём хосте Car App -->
     <string name="l_u_m">m</string>
@@ -180,6 +201,7 @@
     <string name="l_nh_arrival">arrival</string>
     <string name="l_nh_end">End route</string>
     <string name="l_nh_search">Search</string>
+    <string name="l_nh_voice">Voice assistant</string>
     <string name="l_nh_loading">Loading…</string>
     <string name="l_s_notifications">Notifications</string>
     <string name="l_s_alice_voice">Alice by voice only</string>

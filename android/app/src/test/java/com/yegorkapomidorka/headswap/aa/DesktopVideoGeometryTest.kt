@@ -16,7 +16,7 @@ class DesktopVideoGeometryTest {
         assertSame(mode, mode.effective(true))
         assertSame(mode, mode.effective(false))
         assertTrue(DesktopVideoGeometry.matchesNative(mode))
-        assertEquals(8_000_000, mode.bitrate)
+        assertEquals(6_000_000, mode.bitrate)
     }
 
     @Test fun anAaCanvasOrOld720PresetIsNotANative900Surface() {

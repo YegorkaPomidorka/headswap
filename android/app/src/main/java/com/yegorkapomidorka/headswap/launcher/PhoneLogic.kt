@@ -80,11 +80,12 @@ object PhoneLogic {
     }
 
     /** «14:02» сегодня, «вчера», иначе «31.10». */
-    fun whenLabel(nowMs: Long, thenMs: Long, zone: ZoneId = ZoneId.systemDefault(), yesterday: String = "вчера"): String {
+    fun whenLabel(nowMs: Long, thenMs: Long, zone: ZoneId = ZoneId.systemDefault(), yesterday: String = "вчера",
+                  twelveHour: Boolean = false): String {
         val now = Instant.ofEpochMilli(nowMs).atZone(zone).toLocalDate()
         val then = Instant.ofEpochMilli(thenMs).atZone(zone)
         return when (then.toLocalDate()) {
-            now -> then.format(DateTimeFormatter.ofPattern("HH:mm", Locale.ROOT))
+            now -> ClockFormat.format(then, twelveHour)
             now.minusDays(1) -> yesterday
             else -> then.format(DateTimeFormatter.ofPattern("dd.MM", Locale.ROOT))
         }
@@ -116,8 +117,19 @@ object MusicLogic {
         return UNLIKE.any { it in s }
     }
 
-    /** Подбор сессии: играющая (выбранный плеер среди играющих первым), иначе выбранный плеер, иначе первая. */
-    fun <T> pickSession(sessions: List<T>, pkgOf: (T) -> String, playing: (T) -> Boolean, preferred: String?): T? {
+    /**
+     * Подбор сессии: играющая (выбранный плеер среди играющих первым), иначе выбранный плеер, иначе первая.
+     * [chosenOnly] (карточка музыки с выбранным на чипе плеером): только сессия выбранного, чужие (даже играющие) карточку
+     * не занимают - нет его сессии, null, и Play запускает выбранный. Иначе после голосового в Telegram или звонка
+     * в Teams Play и обложка вели туда (поездки 16-17.11, Егор: «Play всегда вызывает выбранный»).
+     */
+    fun <T> pickSession(sessions: List<T>, pkgOf: (T) -> String, playing: (T) -> Boolean, preferred: String?,
+                        chosenOnly: Boolean = false, chip: Set<String> = emptySet()): T? {
+        if (chosenOnly) {
+            // заиграл другой плеер с чипа (Я.Музыку включили на телефоне) - карточка его, выбор переключит карточка
+            val own = sessions.filter { pkgOf(it) == preferred }
+            return own.firstOrNull(playing) ?: sessions.firstOrNull { playing(it) && pkgOf(it) in chip } ?: own.firstOrNull()
+        }
         val live = sessions.filter(playing)
         return live.firstOrNull { pkgOf(it) == preferred } ?: live.firstOrNull()
             ?: sessions.firstOrNull { pkgOf(it) == preferred }

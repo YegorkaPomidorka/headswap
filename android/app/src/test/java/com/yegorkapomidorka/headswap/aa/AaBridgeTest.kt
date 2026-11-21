@@ -123,6 +123,13 @@ class AaBridgeCoreTest {
     private fun types(b: ByteArray) = AnnexB.nalTypes(b)
 
     @Test
+    fun ownIdrIsBlockedByQueueBacklogOrFrameCount() {
+        assertFalse(AaBridgeCore.ownIdrBlocked(LinkVideoStats(0.0, 200, 10, 0)))
+        assertTrue(AaBridgeCore.ownIdrBlocked(LinkVideoStats(0.0, 201, 0, 0)))
+        assertTrue(AaBridgeCore.ownIdrBlocked(LinkVideoStats(0.0, 0, 11, 0)))
+    }
+
+    @Test
     fun hyundaiCn7ForcesTranscode() {
         // h638: на CN7 прямой проброс моргает и гаснет
         core.transcodeEnabled = false
@@ -881,6 +888,23 @@ class AaBridgeAudioTest {
         core.onMediaStatus(AaMediaStatus(2, "YandexMusic", 10, null, null, null))   // пользователь снова запустил
         core.onAudioData(AapMessages.CH_AUDIO_MEDIA, pcm(100), 3)
         assertEquals(listOf(0x30001, 0x30006, 0x30003, 0x30001, 0x30006), link.audio.map { it.type })
+    }
+
+    @Test
+    fun telephonyRingingPausesMediaOnVwCns3_20082122() {
+        // h1239: VW CNS3 20082122 (Tharu XR) - звонок по флажку глушит MEDIA, как на Delphi
+        core.peer = FakePeer()
+        core.onHuStatistic("20082122")
+        assertTrue(core.huReportsCalls)
+        core.onCarlifeStart()
+        core.onMediaStatus(AaMediaStatus(2, "YandexMusic", 10, null, null, null))
+        core.onAudioData(AapMessages.CH_AUDIO_MEDIA, pcm(100), 1)
+        core.onPhoneCallState(1)
+        core.onAudioData(AapMessages.CH_AUDIO_MEDIA, pcm(100), 2)                   // хвост буфера AA
+        core.onPhoneCallState(0)                                                    // плеер играет - пауза снята
+        core.onAudioData(AapMessages.CH_AUDIO_MEDIA, pcm(100), 3)
+        assertEquals(listOf(0x30001, 0x30006, 0x30003, 0x30001, 0x30006), link.audio.map { it.type })
+        assertEquals(1, link.mediaDrops)
     }
 
     @Test

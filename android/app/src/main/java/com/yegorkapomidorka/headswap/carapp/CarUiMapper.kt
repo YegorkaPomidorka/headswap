@@ -149,7 +149,8 @@ internal class CarUiMapper(private val app: Context, private val units: CarUnits
         e ?: return null
         val at = e.arrivalTimeAtDestination
         return CarEta(
-            arrival = at?.let { CarFormat.clock(it.timeSinceEpochMillis, it.zoneOffsetSeconds) }.orEmpty(),
+            arrival = at?.let { CarFormat.clock(it.timeSinceEpochMillis, it.zoneOffsetSeconds,
+                com.yegorkapomidorka.headswap.launcher.LauncherModel.clock12h) }.orEmpty(),
             time = CarFormat.duration(e.remainingTimeSeconds, units),
             distance = e.remainingDistance?.let { CarFormat.distance(it.displayDistance, it.displayUnit, units) }.orEmpty(),
             timeColor = tint(e.remainingTimeColor),

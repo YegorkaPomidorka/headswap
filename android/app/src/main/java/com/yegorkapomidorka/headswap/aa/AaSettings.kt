@@ -185,6 +185,11 @@ class AaPrefs(ctx: Context) {
         get() = sp.getBoolean("metaMusic", true)
         set(v) = sp.edit().putBoolean("metaMusic", v).apply()
 
+    /** Обложка трека в MEDIA_INFO не больше 16 КБ вместо 30 КБ (приборка Honda CR-V 2026, SEMIDRIVE X9, h219/h606). По умолчанию выкл. Читается на подключение. */
+    var metaArt16k: Boolean
+        get() = sp.getBoolean("metaArt16k", false)
+        set(v) = sp.edit().putBoolean("metaArt16k", v).apply()
+
     /** Подсказки поворотов из AA -> NAVI_NEXT_TURN_INFO (если ГУ подписалась). Читается на подключение. */
     var metaNavi: Boolean
         get() = sp.getBoolean("metaNavi", true)
@@ -206,6 +211,11 @@ class AaPrefs(ctx: Context) {
     var progressSeconds: Boolean
         get() = sp.getBoolean("progressSeconds", false)
         set(v) = sp.edit().putBoolean("progressSeconds", v).apply()
+
+    /** Время видеопакета CarLife в мс вместо секунд (раздел для разработчиков, по умолчанию выкл). Читается на подключение. */
+    var videoTimeMs: Boolean
+        get() = sp.getBoolean("videoTimeMs", false)
+        set(v) = sp.edit().putBoolean("videoTimeMs", v).apply()
 
     /** Хоть раз установилась настоящая AA-сессия: сервер ГУ у пользователя работал (для «Сервер ГУ не отвечает», а не «Запустите сервер ГУ»). */
     var serverWorked: Boolean

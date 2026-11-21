@@ -72,10 +72,12 @@ def find_ffmpeg() -> str | None:
     return shutil.which("ffmpeg")
 
 
-def ffmpeg_command(ffmpeg: str, out_w: int, out_h: int) -> list[str]:
-    """H.264 Annex-B с stdin -> rgb24 кадры out_w x out_h в stdout, минимальная задержка."""
+def ffmpeg_command(ffmpeg: str, out_w: int, out_h: int, decoder_args: tuple[str, ...] = ()) -> list[str]:
+    """H.264 Annex-B с stdin -> rgb24 кадры out_w x out_h в stdout, минимальная задержка.
+    decoder_args - опции входа перед -i (автотесты: "-threads 1", чтобы декодер не держал кадры)."""
     return [ffmpeg, "-hide_banner", "-loglevel", "error",
             "-flags", "low_delay", "-probesize", "32", "-analyzeduration", "0",     # -fflags nobuffer с -f h264 даёт 0 кадров
+            *decoder_args,
             "-f", "h264", "-i", "pipe:0",
             "-vf", f"scale={out_w}:{out_h}:flags=fast_bilinear",
             "-f", "rawvideo", "-pix_fmt", "rgb24", "pipe:1"]
@@ -123,13 +125,13 @@ class FfmpegDecoder:
     """Один процесс ffmpeg на размер кадра. feed() не блокирует; готовые кадры приходят в on_frame(bytes) с нити чтения."""
 
     def __init__(self, ffmpeg: str, out_w: int, out_h: int, on_frame: Callable[[bytes], None],
-                 log: Callable[[str], None] = lambda s: None):
+                 log: Callable[[str], None] = lambda s: None, decoder_args: tuple[str, ...] = ()):
         self.out_w, self.out_h = out_w, out_h
         self.on_frame = on_frame
         self.log = log
         self.frames = 0
         self.proc = subprocess.Popen(
-            ffmpeg_command(ffmpeg, out_w, out_h), stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+            ffmpeg_command(ffmpeg, out_w, out_h, decoder_args), stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
             bufsize=0, creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
         self.q: queue.Queue = queue.Queue(WRITE_QUEUE)
         self.wait_idr = False               # очередь переполнилась и сброшена: ждём кадр с IDR/SPS, иначе картинка поплывёт
@@ -222,8 +224,9 @@ class ViewPipeline:
     перезапускается. Размер на экране = размер видео * scale (scale None = по экрану ПК)."""
 
     def __init__(self, ffmpeg: str, scale: float | None, screen: tuple[int, int],
-                 log: Callable[[str], None] = lambda s: None):
+                 log: Callable[[str], None] = lambda s: None, decoder_args: tuple[str, ...] = ()):
         self.ffmpeg, self.scale_opt, self.screen, self.log = ffmpeg, scale, screen, log
+        self.decoder_args = decoder_args
         self.lock = threading.Lock()
         self.video = (0, 0)
         self.disp = (0, 0)
@@ -242,7 +245,8 @@ class ViewPipeline:
                 old.close()
             disp = self.disp
             self.log(f"view: video {w}x{h} -> window {disp[0]}x{disp[1]} (scale {disp[0] / w:.3f})")
-            self.decoder = FfmpegDecoder(self.ffmpeg, disp[0], disp[1], lambda d, s=disp: self.latest.put(d, s), self.log)
+            self.decoder = FfmpegDecoder(self.ffmpeg, disp[0], disp[1], lambda d, s=disp: self.latest.put(d, s), self.log,
+                                         self.decoder_args)
 
     def on_video(self, body: bytes):
         """С сетевой нити эмулятора; без размера видео (INIT_DONE не было) кадр пропускается."""

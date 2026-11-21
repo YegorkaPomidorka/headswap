@@ -46,10 +46,11 @@ public final class ManualAccessLauncher {
         try {
             ManualAccessPolicy.Options options = ManualAccessPolicy.Options.parse(args);
             if (options.help) {
-                System.out.println("HeadSwap ADB activation: --package <id> --token <token> [--audio]\n"
+                System.out.println("HeadSwap ADB activation: --package <id> --token <token> [--audio] [--vdm]\n"
                     + "Готовую команду с пакетом и токеном показывает приложение HeadSwap.\n"
                     + "Основной доступ включает управление текущей музыкой: пауза при отключении USB и продолжение той же сессии после готовности CarLife.\n"
                     + "Для USB-звука передайте --audio.\n"
+                    + "Для хоста VirtualDevice на Samsung с Android 16 передайте --vdm.\n"
                     + "Служебные API доступны только в активированном процессе HeadSwap.");
                 return 0;
             }
@@ -138,6 +139,7 @@ public final class ManualAccessLauncher {
                 check(same, "Процесс HeadSwap завершился после выхода из ADB-запуска. Доступ не сохранился.");
             }
             startVdmHost(options, app.pid);
+            startUinputHost(options, app.pid);
         } finally {
             if (!launcherStopped && output.pid != null && launcher.isAlive()) {
                 try { stopOwnedLauncher(output.pid, options); }
@@ -154,8 +156,22 @@ public final class ManualAccessLauncher {
      * Этап B (Android 17): отдельный shell-процесс держит VirtualDevice для дисплея рабочего стола. Отвязан от этого
      * запуска (setsid/nohup), живёт, пока жив проверенный выше процесс приложения. Не вышло - рабочий стол на обычном дисплее.
      */
+    /** h1007: Android 13–15, тач на ГУ при погашенном экране телефона через shell-тачскрин uinput. */
+    private static void startUinputHost(ManualAccessPolicy.Options options, int appPid) {
+        if (!VdmHostPolicy.uinputSdk(Build.VERSION.SDK_INT)) return;
+        try {
+            String apk = System.getProperty("java.class.path");
+            String command = VdmHostPolicy.uinputStartCommand(apk, options.packageName, appPid);
+            java.lang.Process process = new ProcessBuilder("/system/bin/sh", "-c", command).redirectErrorStream(true).start();
+            process.getOutputStream().close();
+            if (!process.waitFor(5, TimeUnit.SECONDS)) process.destroyForcibly();
+        } catch (Exception error) {
+            System.out.println("Хост тачскрина не запущен: " + safe(error.getMessage()));
+        }
+    }
+
     private static void startVdmHost(ManualAccessPolicy.Options options, int appPid) {
-        if (Build.VERSION.SDK_INT < VdmHostPolicy.MIN_SDK) return;
+        if (!VdmHostPolicy.supported(Build.VERSION.SDK_INT, Build.MANUFACTURER, options.vdm)) return;
         try {
             String apk = System.getProperty("java.class.path");
             String command = VdmHostPolicy.startCommand(apk, options.packageName, appPid);

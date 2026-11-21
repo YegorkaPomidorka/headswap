@@ -2,8 +2,12 @@
 package com.yegorkapomidorka.headswap.dex
 
 import android.content.Context
+import com.yegorkapomidorka.headswap.aa.CarPreset
 import com.yegorkapomidorka.headswap.aa.DesktopGeometryPolicy
 import com.yegorkapomidorka.headswap.aa.FpsSetting
+
+/** AUTO = по пресету машины; LIMITED/FULL - ручной выбор, работает на любой машине. */
+enum class VideoRangeMode { AUTO, LIMITED, FULL }
 
 /** Desktop preferences are separate from the AA / bridge settings. */
 class DexPrefs(context: Context) {
@@ -35,10 +39,31 @@ class DexPrefs(context: Context) {
     var desktopComponent: String?
         get() = prefs.getString("desktop_component", null)?.takeIf(DesktopPick::isComponent)
         set(value) { prefs.edit().putString("desktop_component", value?.takeIf(DesktopPick::isComponent)).apply() }
+    /** «Хост VirtualDevice на Android 16» (Для разработчиков, h1091): только Samsung на 16, по умолчанию выключен. */
+    var vdmHostOnAndroid16: Boolean
+        get() = prefs.getBoolean("vdm_host_android16", false)
+        set(value) { prefs.edit().putBoolean("vdm_host_android16", value).apply() }
     /** Direct desktop has an independent 30 fps default; the AA preferences are unchanged. */
     var desktopFps: FpsSetting
         get() = prefs.getString("desktop_fps", null).let { name -> FpsSetting.entries.firstOrNull { it.name == name } ?: FpsSetting.FPS30 }
         set(value) { prefs.edit().putString("desktop_fps", value.name).apply() }
+
+    /**
+     * Final H.264 color range. AUTO follows the selected car preset: the CR-V 2026 head unit
+     * alternates between two composition paths that treat full-range streams differently
+     * (~1.7 Hz brightness pulsing), so only those presets switch to limited range.
+     * A manual LIMITED/FULL choice still applies to any car.
+     */
+    var videoRangeMode: VideoRangeMode
+        get() = VideoRangeMode.entries.firstOrNull { it.name == prefs.getString("video_range_mode", null) }
+            ?: VideoRangeMode.AUTO
+        set(value) { prefs.edit().putString("video_range_mode", value.name).apply() }
+
+    fun effectiveLimitedRange(car: CarPreset?): Boolean = when (videoRangeMode) {
+        VideoRangeMode.AUTO -> car?.settings?.limitedRange == true
+        VideoRangeMode.LIMITED -> true
+        VideoRangeMode.FULL -> false
+    }
 }
 
 object DexState {

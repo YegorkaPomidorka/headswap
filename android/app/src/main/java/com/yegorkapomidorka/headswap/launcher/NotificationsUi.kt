@@ -110,7 +110,7 @@ fun NotificationsOverlay() {
     val spec = if (nt >= bs.t) bs else {
         val q = nt.toFloat() / bs.t
         fun sc(v: Int) = max(1, Math.round(v * q))
-        LauncherSpec(bs.w, bs.h, nt, sc(bs.g), sc(bs.m), sc(bs.f1), sc(bs.f2), sc(bs.f3), bs.railSize)
+        LauncherSpec(bs.w, bs.h, nt, sc(bs.g), sc(bs.m), sc(bs.f1), sc(bs.f2), sc(bs.f3), bs.railSize, bs.twelveHour)
     }
     val density = LocalDensity.current
     val metrics = remember(spec, density) { if (spec === bs) base else LauncherMetrics(spec, density) }
@@ -153,7 +153,9 @@ private fun NotificationsOverlayBody(barBandH: Int, home: LauncherSpec) {
         repo.endHeadsUp(h.seq)
     }
 
-    val topY = model.statusBottom ?: area.top
+    // стекло: панель выезжает с самого верха экрана, поверх строки статуса (макет Г, 20.11); полоска и зона тапа - как были
+    val glassPanel = homeGlassStyle
+    val topY = if (glassPanel) area.top else model.statusBottom ?: area.top
     val ear = px(32f)
     val barCy = (model.statusBottom ?: area.top) - barBandH / 2f // полоса строки статуса - в масштабе лаунчера
     // Полоска и язычок прибиты к пикселю своего разрешения (Егор 08.11 «зафиксируй по пикселям», 09.11): над стыком музыки
@@ -222,25 +224,38 @@ private fun NotificationsOverlayBody(barBandH: Int, home: LauncherSpec) {
                     Modifier.absoluteOffset { IntOffset(Math.round(area.left), Math.round(topY)) }
                         .size(m.dp(Math.round(area.width)), m.dp(Math.round(panelAreaH))).clipToBounds(),
                 ) {
-                    val shape = remember(earNow, bottomNow) { NotchShape(earNow.toFloat(), bottomNow.toFloat()) }
+                    // стекло: без «ушек» - стеклянная пластина так не изгибается (Егор 20.11), просто скругление снизу
+                    val glass = homeGlassStyle
+                    val shape = remember(earNow, bottomNow, glass) {
+                        if (glass) RoundedCornerShape(bottomStart = bottomNow.toFloat(), bottomEnd = bottomNow.toFloat())
+                        else NotchShape(earNow.toFloat(), bottomNow.toFloat())
+                    }
                     val (minW, maxW) = NotifGeom.tongueWidth(s.t, Math.round(area.width), ear, s.g)
                     val inShade = grown && (open || (shown.shade && !show))
                     Column(
                         // по центру над полоской (стыком), не вылезая за область: широкая шторка упирается в рейку
                         Modifier.layout { measurable, constraints ->
                             val pl = measurable.measure(constraints.copy(minWidth = 0))
-                            val x = Math.round(centerX - area.left - pl.width / 2f).coerceIn(0, max(0, constraints.maxWidth - pl.width))
+                            // стекло: от рейки и края экрана отступ G, не прилипать к рейке
+                            val inset = if (glassPanel) s.g else 0
+                            val x = Math.round(centerX - area.left - pl.width / 2f)
+                                .coerceIn(inset, max(inset, constraints.maxWidth - pl.width - inset))
                             shown.panelCx = area.left + x + pl.width / 2f
                             shown.panelBottom = topY + pl.height
                             layout(constraints.maxWidth, pl.height) { pl.place(x, 0) }
                         }
                             .graphicsLayer { translationY = if (idle) 0f else -size.height * (1f - p.value) }
-                            .shadow(m.dp(px(12f)), shape, clip = false)
-                            .clip(shape).background(pal.bar, shape)
+                            // стекло в покое (только полоска): ни подложки, ни тени - полоска лежит прямо на фоне строки статуса (макет Г, 20.11)
+                            .then(if (homeGlassStyle && idle) Modifier else Modifier.shadow(m.dp(px(12f)), shape, clip = false))
+                            .clip(shape).then(when {
+                                homeGlassStyle && idle -> Modifier
+                                homeGlassStyle -> Modifier.homeGlassPanel(shape, k)
+                                else -> Modifier.background(pal.bar, shape)
+                            })
                             .animateContentSize(tween(if (notchMode) 420 else 260, easing = EASE_OUT))
                             // тап по пустому месту самой шторки не должен падать на подложку и сворачивать её (кнопки забирают свои касания раньше)
                             .then(if (inShade) Modifier.pointerInput(Unit) { detectTapGestures { } } else Modifier)
-                            .padding(horizontal = m.dp(earNow)),
+                            .padding(horizontal = m.dp(if (glass) 0 else earNow)),
                     ) {
                         // в режиме чёлки содержимое проявляется, пока панель растёт
                         val fade = Modifier.graphicsLayer { alpha = if (notchMode) p.value else 1f }
@@ -407,7 +422,7 @@ private fun NotifRow(item: NotifItem, expanded: Boolean) {
                         Txt(e.who, s.f2, color = Pal.TEXT, weight = FontWeight.Bold)
                         Txt(e.text, s.f2, color = Pal.SEC2, maxLines = if (expanded) 40 else 2)
                     }
-                    Txt(NotificationsLogic.time(e.postTime), max(14, Math.round(s.f2 * 0.8f)), color = Pal.SEC2, weight = FontWeight.SemiBold, mono = true)
+                    Txt(NotificationsLogic.time(e.postTime, twelveHour = LauncherModel.clock12h), max(14, Math.round(s.f2 * 0.8f)), color = Pal.SEC2, weight = FontWeight.SemiBold, mono = true)
                 }
             }
             val dismiss = stringResource(R.string.l_notif_dismiss)
@@ -420,7 +435,7 @@ private fun NotifRow(item: NotifItem, expanded: Boolean) {
                 PillButton(stringResource(R.string.l_notif_open_in, item.appLabel), { repo.open(item) }, filled = false)
             }
         }
-        Box(Modifier.fillMaxWidth().height(m.dp(1)).background(LocalPalette.current.sep))
+        Box(Modifier.fillMaxWidth().height(m.dp(1)).background(if (homeGlassStyle) Color.White.copy(alpha = 0.10f) else LocalPalette.current.sep))
     }
 }
 

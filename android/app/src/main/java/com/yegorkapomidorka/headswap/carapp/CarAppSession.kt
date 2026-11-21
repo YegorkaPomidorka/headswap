@@ -147,12 +147,13 @@ internal class CarAppSession(
         deliverSurface()
     }
 
-    fun touch(action: Int, x: Float, y: Float) {
+    fun touch(action: Int, index: Int, xs: FloatArray, ys: FloatArray) {
         val cb = surfaceCb ?: return
         try {
-            when (val o = touch.feed(action, x, y)) {
+            when (val o = touch.feed(action, index, xs, ys)) {
                 is CarTouch.Click -> cb.onClick(o.x, o.y)
                 is CarTouch.Scroll -> cb.onScroll(o.dx, o.dy)
+                is CarTouch.Scale -> cb.onScale(o.x, o.y, o.factor)
                 null -> {}
             }
         } catch (e: Exception) { log("касание не ушло: ${e.javaClass.simpleName}") }

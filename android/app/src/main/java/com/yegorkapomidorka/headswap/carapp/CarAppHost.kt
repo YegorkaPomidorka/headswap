@@ -130,8 +130,8 @@ object CarAppHost {
     /** Сохранённый «Масштаб карты» навигатора (пакет -> множитель); берётся при старте сессии. */
     @Volatile var scaleFor: ((String) -> Float)? = null
 
-    /** Касание окна навигатора, координаты уже в поверхности. */
-    fun touch(action: Int, x: Float, y: Float) { h.post { session?.touch(action, x, y) } }
+    /** Касание окна навигатора: все пальцы, координаты уже в поверхности; [index] - палец POINTER_DOWN/UP. */
+    fun touch(action: Int, index: Int, xs: FloatArray, ys: FloatArray) { h.post { session?.touch(action, index, xs, ys) } }
 
     /** «Назад» хоста: приложение само решает, что закрыть. */
     fun back() { h.post { session?.back() } }

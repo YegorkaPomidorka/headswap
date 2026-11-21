@@ -3,6 +3,18 @@ package com.yegorkapomidorka.headswap.dex;
 /** Чистые правила запуска shell-хоста VirtualDevice (этап B): команда и разбор аргументов, без shell-ввода извне. */
 public final class VdmHostPolicy {
     public static final int MIN_SDK = 37;
+    /** Samsung One UI на Android 16 тоже кладёт дисплей с OWN_DISPLAY_GROUP в группу 0 (h1091, SM-A536E). */
+    public static final int SAMSUNG_MIN_SDK = 36;
+
+    /** Можно ли включить хост вручную («Для разработчиков»): Samsung на Android 16. */
+    public static boolean optInAvailable(int sdk, String manufacturer) {
+        return sdk == SAMSUNG_MIN_SDK && "samsung".equalsIgnoreCase(manufacturer);
+    }
+
+    /** Нужен ли shell-хост VirtualDevice: Android 17 везде, Samsung на Android 16 только по ручному тумблеру. */
+    public static boolean supported(int sdk, String manufacturer, boolean enabled) {
+        return sdk >= MIN_SDK || (enabled && optInAvailable(sdk, manufacturer));
+    }
     public static final String ENTRY = ManualAccessPolicy.DEX_CLASS_PACKAGE + ".VdmHostMain";
     public static final String LOG = "/data/local/tmp/headswap-vdm-host.log";
 
@@ -14,6 +26,27 @@ public final class VdmHostPolicy {
         if (appPid <= 1) throw new IllegalArgumentException("Некорректный PID приложения");
         return "rm -f " + LOG + "; CLASSPATH='" + apkPath + "' /system/bin/setsid /system/bin/nohup /system/bin/app_process / " + ENTRY
             + " --package " + packageName + " --pid " + appPid + " </dev/null >" + LOG + " 2>&1 &";
+    }
+
+    /**
+     * h1007: на Android 13–15 программный ввод (injectInputEvent) режется, пока экран телефона погашен; ввод от
+     * настоящего устройства на включённый дисплей ГУ проходит. Хост-тачскрин через /dev/uinput, он доступен только uid 2000.
+     */
+    public static final int UINPUT_MIN_SDK = 33;
+    public static final int UINPUT_MAX_SDK = 35;
+    public static final String UINPUT_ENTRY = ManualAccessPolicy.DEX_CLASS_PACKAGE + ".UinputHostMain";
+    public static final String UINPUT_LOG = "/data/local/tmp/headswap-uinput-host.log";
+    /** Системная команда uinput: её класс Device открывает /dev/uinput с любым bus (JSON разрешает только usb/bluetooth). */
+    public static final String UINPUT_JAR = "/system/framework/uinput.jar";
+
+    public static boolean uinputSdk(int sdk) { return sdk >= UINPUT_MIN_SDK && sdk <= UINPUT_MAX_SDK; }
+
+    public static String uinputStartCommand(String apkPath, String packageName, int appPid) {
+        ManualAccessPolicy.requireApkPath(apkPath);
+        ManualAccessPolicy.requirePackage(packageName);
+        if (appPid <= 1) throw new IllegalArgumentException("Некорректный PID приложения");
+        return "rm -f " + UINPUT_LOG + "; CLASSPATH='" + apkPath + "' /system/bin/setsid /system/bin/nohup /system/bin/app_process / "
+            + UINPUT_ENTRY + " --package " + packageName + " --pid " + appPid + " </dev/null >" + UINPUT_LOG + " 2>&1 &";
     }
 
     public static final class Args {

@@ -45,7 +45,10 @@
     <string name="set_direct_desc">Android Auto 的视频原样传给车机。宽屏画面由车机自行裁切。</string>
     <string name="set_direct_plus">+ 延迟更低，发热和耗电更少</string>
     <string name="set_direct_minus">− 无法调整帧率</string>
-    <string name="set_direct_desktop_desc">在“自带桌面”模式下，手机只对自己的屏幕编码一次，并将现成的 H.264 码流交给车机，无需转码。</string>
+    <string name="set_direct_desktop_desc">在“自带桌面”模式下，手机只捕获并编码一次桌面；这不是 Android Auto 转码。</string>
+    <string name="set_desktop_single_encode_title">单次屏幕编码</string>
+    <string name="set_desktop_fps_title">桌面帧率</string>
+    <string name="set_desktop_fps_note">下次连接时生效。“自动”会选择 30 fps，除非车机要求更低。</string>
 
     <string name="set_resolution">视频分辨率</string>
     <string name="set_res_pick">选择分辨率</string>
@@ -292,4 +295,12 @@
     <string name="about_author_ildar">Ildar Sadykov</string>
     <string name="about_open_project">项目主页</string>
     <string name="about_license_unavailable">许可证文本不可用。请查看项目主页。</string>
+    <string name="set_video_range_title">色彩范围</string>
+    <string name="set_video_range_auto">自动</string>
+    <string name="set_video_range_limited">有限（16–235）</string>
+    <string name="set_video_range_full">全范围（0–255）</string>
+    <string name="set_video_range_note">“自动”对本田 CR-V 2026 / CR-V 2026 混动预设使用有限范围（16–235），其他车型沿用原视频流；手动选择对所有车型生效。下次连接时生效。</string>
+    <string name="dongle_start">等待 USB 转 Wi-Fi 适配器</string>
+    <string name="dongle_stop">停止等待适配器</string>
+    <string name="dongle_note">将适配器插入车机 USB 口，手机开启 2.4 GHz 热点</string>
 </resources>

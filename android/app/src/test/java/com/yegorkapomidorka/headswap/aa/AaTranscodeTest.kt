@@ -691,7 +691,7 @@ class NoKeepaliveTest {
             File("app/src/main/java/com/yegorkapomidorka/headswap/CarLifeSession.kt"),
         ).first { it.isFile }
         val text = f.readText()
-        assertFalse("пустой VIDEO_DATA (keepalive) не должен отправляться", text.contains("Wire.dataInner(Msg.VIDEO_DATA, unixSeconds(), null)"))
+        assertFalse("пустой VIDEO_DATA (keepalive) не должен отправляться", text.contains("Wire.dataInner(Msg.VIDEO_DATA, videoTimeMs(), null)"))
         assertFalse(text.contains("KEEPALIVE_IDLE_MS"))
     }
 }

@@ -17,4 +17,7 @@
     <string name="wl_usb_to_air_title">Кабель отключён</string>
     <string name="wl_usb_to_air_text">Машина рядом по Bluetooth, подключаюсь по воздуху.</string>
     <string name="wl_state_gave_up">машина не подключилась за %1$d мин</string>
+    <string name="dongle_state_waiting">жду свисток на :%1$d</string>
+    <string name="dongle_state_connected">свисток подключён (%1$s)</string>
+    <string name="dongle_state_bind_failed">порт %1$d занят, свисток не подключится</string>
 </resources>

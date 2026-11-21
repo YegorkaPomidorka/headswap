@@ -9,8 +9,10 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
@@ -40,6 +42,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -66,17 +71,15 @@ import kotlinx.coroutines.withContext
 /** Разделы настроек; [COLORS] и [ABOUT] - вложенные страницы «Вида» и «Системы», своей кнопки слева у них нет. */
 enum class SettingsPage { LOOK, NAVIGATOR, MUSIC, HOME, SYSTEM, ABOUT, COLORS }
 
-/** Навигаторы раздела «Навигатор», плитки по две в ряд в порядке макета. */
-private val NAV_TILES = listOf(
+/** Подписи плиток раздела «Навигатор»; какие плитки и в каком порядке - [NavigatorPick.tiles]. */
+private val NAV_LABELS = mapOf(
     NavigatorPick.YANDEX_NAVI to R.string.l_nav_yandex_navi,
     NavigatorPick.DGIS to R.string.l_nav_2gis,
     NavigatorPick.YANDEX_MAPS to R.string.l_nav_yandex_maps,
     NavigatorPick.GOOGLE_MAPS to R.string.l_nav_google_maps,
-)
-/** Арабский интерфейс (h1003): Google Карты и Waze, один ряд. */
-private val NAV_TILES_AR = listOf(
-    NavigatorPick.GOOGLE_MAPS to R.string.l_nav_google_maps,
     NavigatorPick.WAZE to R.string.l_nav_waze,
+    NavigatorPick.AMAP to R.string.l_nav_amap,
+    NavigatorPick.AMAP_AUTO to R.string.l_nav_amap_auto,
 )
 
 /**
@@ -142,8 +145,8 @@ fun LauncherSettingsScreen() {
             fun isSelected(page: SettingsPage) = model.settingsPage == page || (page == SettingsPage.SYSTEM && model.settingsPage == SettingsPage.ABOUT) ||
                 (page == SettingsPage.LOOK && model.settingsPage == SettingsPage.COLORS)
             val pages = SettingsPage.entries.filter { it != SettingsPage.ABOUT && it != SettingsPage.COLORS }
-            // портрет: «Цвета» - блок прямо в «Виде», отдельной страницы нет
-            val shownPage = if (s.portrait && model.settingsPage == SettingsPage.COLORS) SettingsPage.LOOK else model.settingsPage
+            // «Цвета и обои» - отдельная страница «Вида» и в портрете (ADR 0054)
+            val shownPage = model.settingsPage
             SettingsFrame(
                 portrait = s.portrait,
                 tabs = {
@@ -159,44 +162,103 @@ fun LauncherSettingsScreen() {
             ) {
                     when (shownPage) {
                         SettingsPage.LOOK -> if (s.portrait) {
+                            // шесть рядов из семи: тема, стиль панели, вход в «Цвета и обои», размер панели, два тумблера, часы и дата
                             ThemeCard(d, cell(0).fillMaxWidth())
-                            ColorsBlock(d, cell(1, 3).fillMaxWidth())
-                            RailSizeCard(d, cell(4, 2).fillMaxWidth())
-                            Row(cell(6).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(m.dp(d.gap))) {
-                                SwitchCard(stringResource(R.string.l_s_anim), model.animations, d, Modifier.weight(1f).fillMaxHeight()) {
-                                    model.chooseAnimations(it)
-                                }
-                                SwitchCard(stringResource(R.string.l_s_battery), model.showBattery, d, Modifier.weight(1f).fillMaxHeight()) {
-                                    model.chooseShowBattery(it)
-                                }
+                            RailStyleCard(d, cell(1).fillMaxWidth())
+                            Placed(2) { ColorsLinkCard(d, Modifier) } // кнопка - через обёртку, рамка шайбы (h737)
+                            RailSizeCard(d, cell(3).fillMaxWidth())
+                            Row(cell(4).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(m.dp(d.gap))) {
+                                AnimBatteryCards(d, Modifier.weight(1f).fillMaxHeight())
+                            }
+                            Row(cell(5).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(m.dp(d.gap))) {
+                                ClockDateCards(d, Modifier.weight(1f).fillMaxHeight())
                             }
                         } else {
-                            ThemeCard(d, cell(0).fillMaxWidth())
-                            Placed(1) { ColorsLinkCard(d, Modifier) }
-                            RailSizeCard(d, cell(2, 2).fillMaxWidth())
-                            // ряд 4 пополам: анимации | заряд телефона в строке статуса (свободных рядов нет)
-                            Row(cell(4).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(m.dp(d.gap))) {
-                                SwitchCard(stringResource(R.string.l_s_anim), model.animations, d, Modifier.weight(1f).fillMaxHeight()) {
-                                    model.chooseAnimations(it)
+                            // шесть рядов одной высоты на всю область (общая сетка из пяти рядов у «Вида» не годится)
+                            val rows6 = 6
+                            val rowH6 = (h - (rows6 - 1) * gap) / rows6
+                            val d6 = SettingsDims(s, rowH6)
+                            // подпись под названием, пока влезает по высоте ряда
+                            val subFits = rowH6 >= ((s.f2 + d6.sub) * 1.25).roundToInt() + 4 + 2 * d6.padV
+                            Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(m.dp(gap))) {
+                                val row = Modifier.fillMaxWidth().weight(1f)
+                                ThemeCard(d6, row, subFits)
+                                ColorsLinkCard(d6, row, subFits)
+                                RailSizeCard(d6, row)
+                                RailStyleCard(d6, row)
+                                Row(row, horizontalArrangement = Arrangement.spacedBy(m.dp(gap))) {
+                                    AnimBatteryCards(d6, Modifier.weight(1f).fillMaxHeight())
                                 }
-                                SwitchCard(stringResource(R.string.l_s_battery), model.showBattery, d, Modifier.weight(1f).fillMaxHeight()) {
-                                    model.chooseShowBattery(it)
+                                Row(row, horizontalArrangement = Arrangement.spacedBy(m.dp(gap))) {
+                                    ClockDateCards(d6, Modifier.weight(1f).fillMaxHeight())
                                 }
                             }
                         }
-                        SettingsPage.COLORS -> {
-                            ColorsModeCard(d, cell(0).fillMaxWidth())
+                        SettingsPage.COLORS -> if (s.portrait) {
+                            // портрет: режим, три слайдера одной карточкой, обои (миниатюры в пропорции экрана), размытие
+                            // с затемнением, подсказка; доли высоты 1 : 3 : 4 : 2 : 1
+                            val unitH = (h - 4 * gap) / 11
+                            val dc = SettingsDims(s, unitH)
                             val set = if (model.colorsEditDay) model.dayColors else model.nightColors
                             val light = model.colorsEditDay
-                            ColorSliderCard(stringResource(R.string.l_s_colors_accent), set.accentHue, ColorSet.HUE_NEUTRAL, d, cell(1).fillMaxWidth(),
-                                hueTrack(light, accent = true)) { model.editColors(set.copy(accentHue = it)) }
-                            ColorSliderCard(stringResource(R.string.l_s_colors_bg_hue), set.bgHue, ColorSet.HUE_NEUTRAL, d, cell(2).fillMaxWidth(),
-                                hueTrack(light, accent = false)) { model.editColors(set.copy(bgHue = it)) }
-                            ColorSliderCard(stringResource(R.string.l_s_colors_bg_sat), set.bgSat, 100, d, cell(3).fillMaxWidth(),
-                                satTrack(light, set.bgHue)) { model.editColors(set.copy(bgSat = it)) }
-                            Card(cell(4).fillMaxWidth()) {
-                                Box(Modifier.fillMaxSize().padding(start = m.dp(d.padStart), end = m.dp(d.padEnd)), contentAlignment = Alignment.CenterStart) {
-                                    Txt(stringResource(R.string.l_s_colors_hint), d.sub, color = Pal.SEC, maxLines = 2, ellipsis = false)
+                            val glass = model.railStyle == RailStyle.GLASS
+                            Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(m.dp(gap))) {
+                                val row = Modifier.fillMaxWidth()
+                                ColorsModeCard(dc, row.weight(1f))
+                                SlidersCard(dc, row.weight(3f)) {
+                                    ColorSliderRow(stringResource(R.string.l_s_colors_accent), set.accentHue, ColorSet.HUE_NEUTRAL, dc, it,
+                                        hueTrack(light, accent = true)) { v -> model.editColors(set.copy(accentHue = v)) }
+                                    ColorSliderRow(stringResource(R.string.l_s_colors_bg_hue), set.bgHue, ColorSet.HUE_NEUTRAL, dc, it,
+                                        hueTrack(light, accent = false)) { v -> model.editColors(set.copy(bgHue = v)) }
+                                    ColorSliderRow(stringResource(R.string.l_s_colors_bg_sat), set.bgSat, 100, dc, it,
+                                        satTrack(light, set.bgHue)) { v -> model.editColors(set.copy(bgSat = v)) }
+                                }
+                                WallpaperCard(dc, glass, row.weight(4f), portrait = true)
+                                SlidersCard(dc, row.weight(2f).alpha(if (glass) 1f else WALLPAPER_OFF_ALPHA)) {
+                                    ColorSliderRow(stringResource(R.string.l_s_wallpaper_blur), model.wallpaperBlur, 100, dc, it, WALLPAPER_BLUR_TRACK,
+                                        enabled = glass, onRelease = { model.saveWallpaper() }) { v -> model.editWallpaper(blur = v) }
+                                    ColorSliderRow(stringResource(R.string.l_s_wallpaper_dim), model.wallpaperDim, 100, dc, it, WALLPAPER_DIM_TRACK,
+                                        enabled = glass, onRelease = { model.saveWallpaper() }) { v -> model.editWallpaper(dim = v) }
+                                }
+                                Card(row.weight(1f)) {
+                                    Box(Modifier.fillMaxSize().padding(start = m.dp(dc.padStart), end = m.dp(dc.padEnd)), contentAlignment = Alignment.CenterStart) {
+                                        Txt(stringResource(R.string.l_s_colors_hint), dc.sub, color = Pal.SEC, maxLines = 2, ellipsis = false)
+                                    }
+                                }
+                            }
+                        } else {
+                            // шесть долей высоты: режим, три цвета рядом, обои (две доли), размытие с затемнением, подсказка
+                            val unitH = (h - 4 * gap) / 6
+                            val dc = SettingsDims(s, unitH)
+                            val set = if (model.colorsEditDay) model.dayColors else model.nightColors
+                            val light = model.colorsEditDay
+                            val glass = model.railStyle == RailStyle.GLASS
+                            val wpAlpha = if (glass) 1f else WALLPAPER_OFF_ALPHA
+                            Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(m.dp(gap))) {
+                                val row = Modifier.fillMaxWidth()
+                                ColorsModeCard(dc, row.weight(1f))
+                                Row(row.weight(1f), horizontalArrangement = Arrangement.spacedBy(m.dp(gap))) {
+                                    val cardM = Modifier.weight(1f).fillMaxHeight()
+                                    CompactSliderCard(stringResource(R.string.l_s_colors_accent), set.accentHue, ColorSet.HUE_NEUTRAL, dc, cardM,
+                                        hueTrack(light, accent = true)) { model.editColors(set.copy(accentHue = it)) }
+                                    CompactSliderCard(stringResource(R.string.l_s_colors_bg_hue), set.bgHue, ColorSet.HUE_NEUTRAL, dc, cardM,
+                                        hueTrack(light, accent = false)) { model.editColors(set.copy(bgHue = it)) }
+                                    CompactSliderCard(stringResource(R.string.l_s_colors_bg_sat), set.bgSat, 100, dc, cardM,
+                                        satTrack(light, set.bgHue)) { model.editColors(set.copy(bgSat = it)) }
+                                }
+                                // подпись «Только в стиле «Стекло»» не приглушаем: приглушает миниатюры сама карточка
+                                WallpaperCard(dc, glass, row.weight(2f))
+                                Row(row.weight(1f).alpha(wpAlpha), horizontalArrangement = Arrangement.spacedBy(m.dp(gap))) {
+                                    val cardM = Modifier.weight(1f).fillMaxHeight()
+                                    CompactSliderCard(stringResource(R.string.l_s_wallpaper_blur), model.wallpaperBlur, 100, dc, cardM, WALLPAPER_BLUR_TRACK,
+                                        enabled = glass, onRelease = { model.saveWallpaper() }) { model.editWallpaper(blur = it) }
+                                    CompactSliderCard(stringResource(R.string.l_s_wallpaper_dim), model.wallpaperDim, 100, dc, cardM, WALLPAPER_DIM_TRACK,
+                                        enabled = glass, onRelease = { model.saveWallpaper() }) { model.editWallpaper(dim = it) }
+                                }
+                                Card(row.weight(1f)) {
+                                    Box(Modifier.fillMaxSize().padding(start = m.dp(dc.padStart), end = m.dp(dc.padEnd)), contentAlignment = Alignment.CenterStart) {
+                                        Txt(stringResource(R.string.l_s_colors_hint), dc.sub, color = Pal.SEC, maxLines = 2, ellipsis = false)
+                                    }
                                 }
                             }
                         }
@@ -228,9 +290,10 @@ fun LauncherSettingsScreen() {
                                 // заняты (подсказки, масштаб, перезапуск), поэтому, пока разрешения нет, подсказка стоит на месте масштаба
                                 val carHost = EmbedHost.nav.carHost
                                 val noBgLocation = carHost && hints && !google && !noHints && !hasBackgroundLocation(navPkg)
-                                // масштаб - dpi своего хоста Car App; навигатору окном и через AA он не нужен
+                                // масштаб - dpi своего хоста Car App или окна навигатора (ADR 0055); через теневую AA карту
+                                // рисует Android Auto, там он не нужен
                                 if (noBgLocation) Placed(row++) { LocationHintCard(navPkg, d, Modifier) }
-                                else if (carHost) MapScaleCard(navPkg, d, cell(row++).fillMaxWidth())
+                                else if (carHost || !(hints && google)) MapScaleCard(navPkg, d, cell(row++).fillMaxWidth())
                                 Placed(row++) { RestartNavCard(d, Modifier) } // кнопка - через обёртку, рамка шайбы (h737)
                                 // Google через AA: сервер ГУ живёт в Android Auto, перезапуск - в её настройках на телефоне
                                 if (hints && google) AaServerHintCard(d, cell(row).fillMaxWidth())
@@ -255,10 +318,10 @@ fun LauncherSettingsScreen() {
                             }
                         }
                         SettingsPage.HOME -> if (s.portrait) {
-                            // «Раскладка» четыре ряда, «Слои» два; без прокрутки (семь рядов)
+                            // «Раскладка» четыре ряда, «Слои» три; без прокрутки (семь рядов)
                             Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(m.dp(gap))) {
                                 PortraitLayoutCard(d, Modifier.fillMaxWidth().height(m.dp(cellH(0, 4))))
-                                LayersCard(cellH(4, 2), Modifier.fillMaxWidth().height(m.dp(cellH(4, 2))))
+                                LayersCard(cellH(4, 3), Modifier.fillMaxWidth().height(m.dp(cellH(4, 3))))
                             }
                         } else {
                             // «Раскладка» ужата до 0,87 высоты, чтобы снизу выглядывала шапка «Слои» - видно, что есть
@@ -391,29 +454,44 @@ private fun Card(modifier: Modifier, content: @Composable () -> Unit) {
     Box(modifier.clip(RoundedCornerShape(m.dp(m.spec.radius))).background(Pal.SURFACE)) { content() }
 }
 
-/** «Тема»: название с подписью слева, три пилюли справа. 1 ряд (второй отдан «Цветам»). */
+/** Строка «Вида»: карточка на ряд, название (и серая подпись) слева, управление справа. */
 @Composable
-private fun ThemeCard(d: SettingsDims, modifier: Modifier) {
+private fun LookRow(label: String, sub: String?, d: SettingsDims, modifier: Modifier, control: @Composable RowScope.() -> Unit) {
     val m = LocalMetrics.current
     val s = m.spec
-    val model = LauncherModel
     Card(modifier) {
         Row(Modifier.fillMaxSize().padding(start = m.dp(d.padStart), end = m.dp(d.padEnd)), verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(m.dp(s.g))) {
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(m.dp(4))) {
-                Txt(stringResource(R.string.l_s_theme), s.f2, ellipsis = false)
-                Txt(stringResource(R.string.l_s_theme_sub), d.sub, color = Pal.SEC)
+                Txt(label, s.f2, ellipsis = false)
+                if (sub != null) Txt(sub, d.sub, color = Pal.SEC)
             }
-            for ((choice, res) in listOf(ThemeChoice.DARK to R.string.l_s_theme_dark, ThemeChoice.LIGHT to R.string.l_s_theme_light,
-                ThemeChoice.AUTO to R.string.l_s_theme_auto)) {
-                val label = stringResource(res)
-                Pill(label, model.theme == choice, d) { model.chooseTheme(choice) }
+            control()
+        }
+    }
+}
+
+/**
+ * Сегментированный переключатель: капсула высотой с контрол ряда, внутри варианты; выбранный - золото .32 с обводкой 2px
+ * ([OptionBox]). Один на все строки «Вида»; [fs] - кегль подписей (в узких местах мельче обычного).
+ */
+@Composable
+private fun <T> Segmented(options: List<Pair<T, String>>, selected: T, d: SettingsDims, fs: Int, onSelect: (T) -> Unit) {
+    val m = LocalMetrics.current
+    val shape = RoundedCornerShape(m.dp(d.ctl / 2))
+    Row(Modifier.height(m.dp(d.ctl)).clip(shape).background(LocalPalette.current.btnSet)) {
+        for ((value, label) in options) {
+            OptionBox(selected == value, Modifier.fillMaxHeight(), shape, label, unselected = Color.Transparent,
+                onTap = { onSelect(value) }) {
+                Box(Modifier.fillMaxHeight().padding(horizontal = m.dp(d.pillPad * 3 / 4)), contentAlignment = Alignment.Center) {
+                    Txt(label, fs, weight = FontWeight.SemiBold, ellipsis = false)
+                }
             }
         }
     }
 }
 
-/** Пилюля-вариант высотой с контрол ряда. */
+/** Пилюля-вариант высотой с контрол ряда («Ночные» / «Дневные» в «Цветах»). */
 @Composable
 private fun Pill(label: String, selected: Boolean, d: SettingsDims, onTap: () -> Unit) {
     val m = LocalMetrics.current
@@ -425,9 +503,44 @@ private fun Pill(label: String, selected: Boolean, d: SettingsDims, onTap: () ->
     }
 }
 
+/** «Тема»: название с подписью слева, сегмент «Тёмная / Светлая / Авто» справа. */
+@Composable
+private fun ThemeCard(d: SettingsDims, modifier: Modifier, withSub: Boolean = true) {
+    val model = LauncherModel
+    LookRow(stringResource(R.string.l_s_theme), stringResource(R.string.l_s_theme_sub).takeIf { withSub }, d, modifier) {
+        Segmented(listOf(ThemeChoice.DARK to stringResource(R.string.l_s_theme_dark), ThemeChoice.LIGHT to stringResource(R.string.l_s_theme_light),
+            ThemeChoice.AUTO to stringResource(R.string.l_s_theme_auto)), model.theme, d, LocalMetrics.current.spec.f2) { model.chooseTheme(it) }
+    }
+}
+
+/** «Анимации кнопок» и «Заряд телефона»: два тумблера в одном ряду пополам (вызывать внутри Row). */
+@Composable
+private fun RowScope.AnimBatteryCards(d: SettingsDims, modifier: Modifier) {
+    val model = LauncherModel
+    SwitchCard(stringResource(R.string.l_s_anim), model.animations, d, modifier) { model.chooseAnimations(it) }
+    SwitchCard(stringResource(R.string.l_s_battery), model.showBattery, d, modifier) { model.chooseShowBattery(it) }
+}
+
+/** «12-часовой формат» (тумблер) и «Дата» (сегмент ДД.ММ / ММ.ДД): пополам в одном ряду (вызывать внутри Row). */
+@Composable
+private fun RowScope.ClockDateCards(d: SettingsDims, modifier: Modifier) {
+    val model = LauncherModel
+    SwitchCard(stringResource(R.string.l_s_clock12), model.clock12h, d, modifier) { model.chooseClock12h(it) }
+    Card(modifier) {
+        val m = LocalMetrics.current
+        val s = m.spec
+        Row(Modifier.fillMaxSize().padding(start = m.dp(d.padStart), end = m.dp(d.padEnd)), verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(m.dp(s.g))) {
+            Txt(stringResource(R.string.l_s_date), s.f2, Modifier.weight(1f), ellipsis = false)
+            Segmented(listOf(false to stringResource(R.string.l_s_date_dmy), true to stringResource(R.string.l_s_date_mdy)),
+                model.dateMdy, d, (s.f2 * 0.85f).roundToInt()) { model.chooseDateMdy(it) }
+        }
+    }
+}
+
 /** «Цвета» в «Виде»: подпись, миниатюры ночного и дневного набора, шеврон; тап открывает [SettingsPage.COLORS]. */
 @Composable
-private fun ColorsLinkCard(d: SettingsDims, modifier: Modifier) {
+private fun ColorsLinkCard(d: SettingsDims, modifier: Modifier, withSub: Boolean = true) {
     val m = LocalMetrics.current
     val s = m.spec
     val model = LauncherModel
@@ -439,7 +552,7 @@ private fun ColorsLinkCard(d: SettingsDims, modifier: Modifier) {
             horizontalArrangement = Arrangement.spacedBy(m.dp(s.g))) {
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(m.dp(4))) {
                 Txt(label, s.f2, ellipsis = false)
-                Txt(stringResource(R.string.l_s_colors_sub), d.sub, color = Pal.SEC)
+                if (withSub) Txt(stringResource(R.string.l_s_colors_sub), d.sub, color = Pal.SEC)
             }
             ColorsSwatch(LauncherColors.palette(false, model.nightColors), d)
             ColorsSwatch(LauncherColors.palette(true, model.dayColors), d)
@@ -491,30 +604,20 @@ private fun ColorsModeRow(d: SettingsDims, modifier: Modifier) {
 }
 
 /**
- * «Цвета» прямо в «Виде» портрета (Settings.dc.html): пилюли набора и три слайдера в одной карточке на три ряда.
- * Пока блок на экране, весь стол показывает редактируемый набор ([LauncherModel.colorsOpen]); набор по умолчанию - текущей темы.
+ * Карточка со слайдерами столбиком (портретные «Цвета и обои»): каждый ряд [content] получает модификатор доли высоты.
  */
 @Composable
-private fun ColorsBlock(d: SettingsDims, modifier: Modifier) {
+private fun SlidersCard(d: SettingsDims, modifier: Modifier, content: @Composable ColumnScope.(Modifier) -> Unit) {
     val m = LocalMetrics.current
-    val model = LauncherModel
-    // набор для правки следует теме (смена «Тёмная»/«Светлая» переключает и стол); «Ночные»/«Дневные» потом смотрят другой
-    LaunchedEffect(model.lightTheme) { model.colorsEditDay = model.lightTheme }
-    val set = if (model.colorsEditDay) model.dayColors else model.nightColors
-    val light = model.colorsEditDay
     Card(modifier) {
-        Column(Modifier.fillMaxSize().padding(start = m.dp(d.padStart), end = m.dp(d.padEnd), top = m.dp(d.padV), bottom = m.dp(d.padV)),
-            verticalArrangement = Arrangement.spacedBy(m.dp(m.spec.g4))) {
-            ColorsModeRow(d, Modifier.fillMaxWidth())
-            ColorSliderRow(stringResource(R.string.l_s_colors_accent), set.accentHue, ColorSet.HUE_NEUTRAL, d, Modifier.weight(1f).fillMaxWidth(),
-                hueTrack(light, accent = true)) { model.editColors(set.copy(accentHue = it)) }
-            ColorSliderRow(stringResource(R.string.l_s_colors_bg_hue), set.bgHue, ColorSet.HUE_NEUTRAL, d, Modifier.weight(1f).fillMaxWidth(),
-                hueTrack(light, accent = false)) { model.editColors(set.copy(bgHue = it)) }
-            ColorSliderRow(stringResource(R.string.l_s_colors_bg_sat), set.bgSat, 100, d, Modifier.weight(1f).fillMaxWidth(),
-                satTrack(light, set.bgHue)) { model.editColors(set.copy(bgSat = it)) }
+        Column(Modifier.fillMaxSize().padding(start = m.dp(d.padStart), end = m.dp(d.padEnd), top = m.dp(d.padV), bottom = m.dp(d.padV))) {
+            content(Modifier.weight(1f).fillMaxWidth())
         }
     }
 }
+
+/** Приглушение обоев и их слайдеров вне стиля «Стекло». */
+private const val WALLPAPER_OFF_ALPHA = 0.38f
 
 /**
  * Радуга оттенков для слайдера: акцент - как он будет на экране, фон - приглушённый. Хвост после 360° -
@@ -538,50 +641,187 @@ private fun satTrack(light: Boolean, hue: Int): Brush {
     return Brush.horizontalGradient(listOf(Color.hsl(hue.toFloat() % 360f, 0f, l), Color.hsl(hue.toFloat() % 360f, if (light) 0.6f else 0.45f, l)))
 }
 
+/** Дорожки слайдеров обоев: размытие - от чёткого к мутному, затемнение - от светлого к почти чёрному. */
+private val WALLPAPER_BLUR_TRACK = Brush.horizontalGradient(listOf(Color(0xFFF2F2F2), Color(0xFF5E636B)))
+private val WALLPAPER_DIM_TRACK = Brush.horizontalGradient(listOf(Color(0xFFDADADA), Color(0xFF0C0C0C)))
+
 /**
- * Карточка-слайдер «Цветов»: название слева, трек с градиентом и белая ручка справа. Тап ставит значение сразу,
- * перетаскивание двигает; в настройки пишется по отпусканию ([LauncherModel.saveColors]).
+ * Карточка-слайдер «Цветов» и обоев: название сверху одной строкой, трек с градиентом и белая ручка под ним. Тап ставит
+ * значение сразу, перетаскивание двигает. [enabled] = false - не двигается (обои вне стиля «Стекло»); [onRelease] - запись
+ * по отпусканию, для цветов [LauncherModel.saveColors].
  */
 @Composable
-private fun ColorSliderCard(label: String, value: Int, top: Int, d: SettingsDims, modifier: Modifier, track: Brush, onChange: (Int) -> Unit) {
+private fun CompactSliderCard(
+    label: String, value: Int, top: Int, d: SettingsDims, modifier: Modifier, track: Brush,
+    enabled: Boolean = true, onRelease: () -> Unit = { LauncherModel.saveColors() }, onChange: (Int) -> Unit,
+) {
     val m = LocalMetrics.current
     Card(modifier) {
-        ColorSliderRow(label, value, top, d, Modifier.fillMaxSize().padding(start = m.dp(d.padStart), end = m.dp(d.padEnd)), track, onChange)
+        Column(Modifier.fillMaxSize().padding(horizontal = m.dp(d.padEnd), vertical = m.dp(d.padV / 2)), verticalArrangement = Arrangement.Center) {
+            Txt(label, d.sub)
+            ColorSlider(value, top, d, track, Modifier.fillMaxWidth().weight(1f), onChange, enabled, onRelease)
+        }
     }
 }
 
-/** Название слева, трек справа: строка слайдера без подложки (карточка «Цветов» и блок «Вида» в портрете). */
+/**
+ * Выбор обоев стола: название и пояснение слева, справа миниатюры 16:9 с подписью («Без обоев», две встроенные, своё фото
+ * при наличии) и «Галерея» - выбор фото на телефоне ([LauncherActions.openWallpaperPicker]). Вне стиля «Стекло» ([glass] = false)
+ * миниатюры приглушены и не нажимаются, а подпись акцентом объясняет почему; [LauncherModel.wallpaper] при этом не меняется.
+ * [portrait]: название сверху, миниатюры под ним в пропорции экрана - видно, что останется от картинки после обрезки (ADR 0054).
+ */
 @Composable
-private fun ColorSliderRow(label: String, value: Int, top: Int, d: SettingsDims, modifier: Modifier, track: Brush, onChange: (Int) -> Unit) {
+private fun WallpaperCard(d: SettingsDims, glass: Boolean, modifier: Modifier, portrait: Boolean = false) {
+    val m = LocalMetrics.current
+    val s = m.spec
+    val model = LauncherModel
+    val ctx = LocalContext.current
+    val hasCustom = remember(model.wallpaperVer) { WallpaperImport.file(ctx).exists() }
+    val title = @Composable { w: Modifier ->
+        Column(w, verticalArrangement = Arrangement.spacedBy(m.dp(4))) {
+            Txt(stringResource(R.string.l_s_wallpaper), s.f2, ellipsis = false)
+            Txt(stringResource(if (glass) R.string.l_s_wallpaper_sub_glass else R.string.l_s_wallpaper_sub_solid), d.sub,
+                color = if (glass) Pal.SEC else LocalAccent.current, maxLines = 3, ellipsis = false)
+        }
+    }
+    Card(modifier) {
+        BoxWithConstraints(Modifier.fillMaxSize().padding(start = m.dp(d.padStart), end = m.dp(d.padEnd), top = m.dp(d.padV), bottom = m.dp(d.padV))) {
+            val g = s.g
+            val items = if (hasCustom) 5 else 4
+            val labelH = (d.sub * 1.3).roundToInt() + s.g4
+            val off = Modifier.alpha(if (glass) 1f else WALLPAPER_OFF_ALPHA)
+            if (portrait) {
+                val titleH = ((s.f2 + d.sub) * 1.3).roundToInt() + 4
+                val availH = constraints.maxHeight - titleH - g - labelH
+                val thumbW = min(availH * s.w / s.h, (constraints.maxWidth - (items - 1) * g) / items)
+                val thumbH = thumbW * s.h / s.w
+                Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(m.dp(g))) {
+                    title(Modifier.fillMaxWidth())
+                    Row(Modifier.fillMaxWidth().then(off), horizontalArrangement = Arrangement.SpaceBetween) {
+                        WallpaperThumbs(glass, hasCustom, thumbW, thumbH, d)
+                    }
+                }
+            } else {
+                val textW = constraints.maxWidth * 22 / 100
+                val availW = constraints.maxWidth - textW - g
+                val thumbW = min((constraints.maxHeight - labelH) * 16 / 9, (availW - (items - 1) * g) / items)
+                val thumbH = thumbW * 9 / 16
+                Row(Modifier.fillMaxSize(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(m.dp(g))) {
+                    title(Modifier.width(m.dp(textW)))
+                    Row(Modifier.weight(1f).then(off), horizontalArrangement = Arrangement.spacedBy(m.dp(g), Alignment.End)) {
+                        WallpaperThumbs(glass, hasCustom, thumbW, thumbH, d)
+                    }
+                }
+            }
+        }
+    }
+}
+
+/** Ряд миниатюр [WallpaperCard]: «Без обоев», встроенные, своё фото (если есть) и «Галерея». */
+@Composable
+private fun WallpaperThumbs(glass: Boolean, hasCustom: Boolean, thumbW: Int, thumbH: Int, d: SettingsDims) {
+    val m = LocalMetrics.current
+    val model = LauncherModel
+    val pal = LocalPalette.current
+    fun pick(id: WallpaperId) { model.chooseWallpaper(id) }
+    WallpaperThumb(stringResource(R.string.l_s_wallpaper_none), model.wallpaper == WallpaperId.NONE, glass, thumbW, thumbH, d, { pick(WallpaperId.NONE) }) {
+        Box(Modifier.fillMaxSize().background(Brush.linearGradient(pal.bgStops.map { it.second }))) {
+            Box(Modifier.align(Alignment.BottomStart).fillMaxWidth(0.25f).fillMaxHeight(0.4f).background(pal.accent))
+        }
+    }
+    WallpaperThumb(stringResource(R.string.l_s_wallpaper_headswap), model.wallpaper == WallpaperId.HEADSWAP, glass, thumbW, thumbH, d, { pick(WallpaperId.HEADSWAP) }) {
+        WallpaperPreview(WallpaperId.HEADSWAP, model.wallpaperVer, thumbW, thumbH)
+    }
+    WallpaperThumb(stringResource(R.string.l_s_wallpaper_mountains), model.wallpaper == WallpaperId.MOUNTAINS, glass, thumbW, thumbH, d, { pick(WallpaperId.MOUNTAINS) }) {
+        WallpaperPreview(WallpaperId.MOUNTAINS, model.wallpaperVer, thumbW, thumbH)
+    }
+    if (hasCustom) {
+        WallpaperThumb(stringResource(R.string.l_s_wallpaper_custom), model.wallpaper == WallpaperId.CUSTOM, glass, thumbW, thumbH, d, { pick(WallpaperId.CUSTOM) }) {
+            WallpaperPreview(WallpaperId.CUSTOM, model.wallpaperVer, thumbW, thumbH)
+        }
+    }
+    WallpaperThumb(stringResource(R.string.l_s_wallpaper_gallery), false, glass, thumbW, thumbH, d, { LauncherActions.openWallpaperPicker() }) {
+        Box(Modifier.fillMaxSize().border(m.dp(2), Pal.SEC, RoundedCornerShape(m.dp(max(2, min(thumbW, thumbH) / 10)))), contentAlignment = Alignment.Center) {
+            SvgIcon(Ico.IMAGE, min(thumbW, thumbH) * 4 / 10, Pal.SEC)
+        }
+    }
+}
+
+/** Миниатюра обоев: та же картинка, что на столе, но читается в малом размере [w]x[h]; пока читается - пустая плашка. */
+@Composable
+private fun WallpaperPreview(id: WallpaperId, ver: Int, w: Int, h: Int) {
+    val ctx = LocalContext.current
+    val image by produceState<ImageBitmap?>(null, id, ver, w, h) {
+        value = withContext(Dispatchers.IO) { WallpaperLoader.load(ctx, id, ver, max(1, w), max(1, h)) }
+    }
+    Box(Modifier.fillMaxSize().background(Pal.SURFACE_HI)) {
+        image?.let { Image(it, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop) }
+    }
+}
+
+/** Миниатюра (16:9 в альбоме, по экрану в портрете) со скруглением и подписью под ней; выбранная - в кольце акцента через зазор ([SettingsDims.ring]). */
+@Composable
+private fun WallpaperThumb(
+    label: String, selected: Boolean, enabled: Boolean, w: Int, h: Int, d: SettingsDims, onTap: () -> Unit,
+    content: @Composable BoxScope.() -> Unit,
+) {
+    val m = LocalMetrics.current
+    val accent = LocalAccent.current
+    // скругление от короткой стороны: в портрете миниатюры высокие
+    val shape = RoundedCornerShape(m.dp(max(3, min(w, h) / 8)))
+    val inner = RoundedCornerShape(m.dp(max(2, min(w, h) / 10)))
+    Column(Modifier.width(m.dp(w)), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(m.dp(m.spec.g4))) {
+        Pressable(Modifier.size(m.dp(w), m.dp(h)).clip(shape), enabled = enabled, description = label, onTap = onTap) { pressed ->
+            Box(Modifier.matchParentSize().then(if (selected) Modifier.border(m.dp(d.ring), accent, shape) else Modifier)
+                .padding(m.dp(d.ring * 2)).clip(inner)) {
+                content()
+                if (pressed) Box(Modifier.matchParentSize().background(Pal.SURFACE_PRESSED))
+            }
+        }
+        Txt(label, d.sub, Modifier.fillMaxWidth(), color = if (selected) Pal.TEXT else Pal.SEC, align = TextAlign.Center)
+    }
+}
+
+/** Название слева, трек справа: строка слайдера без подложки (портретные «Цвета и обои», [SlidersCard]). */
+@Composable
+private fun ColorSliderRow(
+    label: String, value: Int, top: Int, d: SettingsDims, modifier: Modifier, track: Brush,
+    enabled: Boolean = true, onRelease: () -> Unit = { LauncherModel.saveColors() }, onChange: (Int) -> Unit,
+) {
     val m = LocalMetrics.current
     val s = m.spec
     Row(modifier, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(m.dp(s.g))) {
         Txt(label, s.f2, Modifier.weight(0.34f), maxLines = 2, ellipsis = false)
-        ColorSlider(value, top, d, track, Modifier.weight(0.66f).fillMaxHeight(), onChange)
+        ColorSlider(value, top, d, track, Modifier.weight(0.66f).fillMaxHeight(), onChange, enabled, onRelease)
     }
 }
 
 @Composable
-private fun ColorSlider(value: Int, top: Int, d: SettingsDims, track: Brush, modifier: Modifier, onChange: (Int) -> Unit) {
+private fun ColorSlider(
+    value: Int, top: Int, d: SettingsDims, track: Brush, modifier: Modifier, onChange: (Int) -> Unit,
+    enabled: Boolean = true, onRelease: () -> Unit = { LauncherModel.saveColors() },
+) {
     val m = LocalMetrics.current
     val density = androidx.compose.ui.platform.LocalDensity.current
     val knobDp = m.dp(d.knob)
     val knobPx = with(density) { knobDp.toPx() }
     val change by androidx.compose.runtime.rememberUpdatedState(onChange)
+    val release by androidx.compose.runtime.rememberUpdatedState(onRelease)
     BoxWithConstraints(modifier) {
         val w = constraints.maxWidth.toFloat()
         val span = (w - knobPx).coerceAtLeast(1f)
         fun at(x: Float) = (((x - knobPx / 2) / span).coerceIn(0f, 1f) * top).roundToInt()
         Box(Modifier.fillMaxSize()
-            .pointerInput(top, span) {
-                detectTapGestures(onTap = { change(at(it.x)); LauncherModel.saveColors() })
-            }
-            .pointerInput(top, span) {
-                detectHorizontalDragGestures(
-                    onDragEnd = { LauncherModel.saveColors() },
-                    onDragCancel = { LauncherModel.saveColors() },
-                ) { c, _ -> c.consume(); change(at(c.position.x)) }
-            },
+            .then(if (!enabled) Modifier else Modifier
+                .pointerInput(top, span) {
+                    detectTapGestures(onTap = { change(at(it.x)); release() })
+                }
+                .pointerInput(top, span) {
+                    detectHorizontalDragGestures(
+                        onDragEnd = { release() },
+                        onDragCancel = { release() },
+                    ) { c, _ -> c.consume(); change(at(c.position.x)) }
+                }),
         ) {
             Box(Modifier.align(Alignment.CenterStart).padding(horizontal = knobDp / 2).fillMaxWidth().height(m.dp(d.trackH * 4 / 10))
                 .clip(RoundedCornerShape(m.dp(d.trackH / 5))).background(track))
@@ -592,118 +832,42 @@ private fun ColorSlider(value: Int, top: Int, d: SettingsDims, track: Brush, mod
     }
 }
 
-/** «Боковая панель»: размер рейки, миниатюры вариантов на равную ширину. «Обрезанная» - только на экранах высотой 480. 2 ряда. */
+/**
+ * «Размер панели»: сегмент вариантов рейки. «Обрезанная» - только на экранах высотой 480. В портрете панель нижняя
+ * (заголовок свой, «Обрезанной» нет).
+ */
 @Composable
 private fun RailSizeCard(d: SettingsDims, modifier: Modifier) {
     val m = LocalMetrics.current
     val s = m.spec
     val model = LauncherModel
-    Card(modifier) {
-        Column(
-            Modifier.fillMaxSize().padding(start = m.dp(d.padStart), end = m.dp(d.padEnd), top = m.dp(d.padV), bottom = m.dp(d.padV)),
-            verticalArrangement = Arrangement.spacedBy(m.dp(s.g4)),
-        ) {
-            // в портрете панель нижняя (h921): свой заголовок, миниатюра - полоска у низа, «Обрезанной» нет
-            Txt(stringResource(if (s.portrait) R.string.l_s_rail_bottom else R.string.l_s_rail), s.f2)
-            Row(Modifier.weight(1f).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(m.dp(s.g8))) {
-                val options = listOfNotNull(
-                    if (s.h480) RailSize.CUT to R.string.l_s_rail_cut else null,
-                    RailSize.SMALL to R.string.l_s_rail_small,
-                    RailSize.MEDIUM to R.string.l_s_rail_medium,
-                    RailSize.NORMAL to R.string.l_s_rail_normal,
-                )
-                // сохранённая «Обрезанная» в портрете работает как «Маленькая» ([LauncherSpec.rs])
-                val current = if (s.portrait) s.rs else model.railSize
-                for ((v, res) in options) {
-                    val label = stringResource(res)
-                    OptionBox(current == v, Modifier.weight(1f).fillMaxHeight(), RoundedCornerShape(m.dp(s.radius)), label,
-                        unselected = LocalPalette.current.btnSet, onTap = { model.chooseRailSize(v) }) {
-                        Column(Modifier.fillMaxSize().padding(m.dp(s.g4)), horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.spacedBy(m.dp(s.g4))) {
-                            if (s.portrait) BottomRailMiniature(v, current == v, Modifier.weight(1f).fillMaxWidth())
-                            else RailMiniature(v, Modifier.weight(1f).fillMaxWidth())
-                            Txt(label, (s.f2 * 0.85).roundToInt(), weight = FontWeight.SemiBold, ellipsis = false)
-                        }
-                    }
-                }
-            }
-        }
+    val options = listOfNotNull(
+        if (s.h480) RailSize.CUT to stringResource(R.string.l_s_rail_cut) else null,
+        RailSize.SMALL to stringResource(R.string.l_s_rail_small),
+        RailSize.MEDIUM to stringResource(R.string.l_s_rail_medium),
+        RailSize.NORMAL to stringResource(R.string.l_s_rail_normal),
+    )
+    // сохранённая «Обрезанная» в портрете работает как «Маленькая» ([LauncherSpec.rs])
+    val current = if (s.portrait) s.rs else model.railSize
+    LookRow(stringResource(if (s.portrait) R.string.l_s_rail_bottom else R.string.l_s_rail_size), null, d, modifier) {
+        Segmented(options, current, d, if (options.size > 3) (s.f2 * 0.8f).roundToInt() else (s.f2 * 0.9f).roundToInt()) { model.chooseRailSize(it) }
     }
 }
 
-/** Нижняя панель портрета (Settings.dc.html): полоска с закруглением сверху у низа миниатюры, высота по размеру панели; выбранная - акцентом. */
+/** «Стиль»: «Сплошная» или «Стекло» - рейка (в портрете нижняя), плитки главного и обои. */
 @Composable
-private fun BottomRailMiniature(size: RailSize, selected: Boolean, modifier: Modifier) {
-    val m = LocalMetrics.current
-    val k = m.spec.t / 96.0
-    val h = when (size) {
-        RailSize.NORMAL -> 38
-        RailSize.MEDIUM -> 28
-        RailSize.SMALL, RailSize.CUT -> 18
-    }
-    val corner = m.dp(max(1, (6 * k).roundToInt()))
-    Box(modifier, contentAlignment = Alignment.BottomCenter) {
-        Box(Modifier.fillMaxWidth(0.7f).height(m.dp(max(1, (h * k).roundToInt()))).clip(RoundedCornerShape(topStart = corner, topEnd = corner))
-            .background(if (selected) LocalAccent.current else LocalPalette.current.fg2.copy(alpha = 0.35f)))
+private fun RailStyleCard(d: SettingsDims, modifier: Modifier) {
+    val model = LauncherModel
+    LookRow(stringResource(R.string.l_s_rail_style), null, d, modifier) {
+        Segmented(listOf(RailStyle.SOLID to stringResource(R.string.l_s_style_solid), RailStyle.GLASS to stringResource(R.string.l_s_style_glass)),
+            model.railStyle, d, LocalMetrics.current.spec.f2) { model.chooseRailStyle(it) }
     }
 }
 
 /**
- * Миниатюра главного для варианта панели: у начала строки (слева, в RTL справа) рейка (кнопки точками, золотой блок
- * навигации внизу, часы чертами), за ней музыка с картой и нижний ряд. В «Маленькой» и «Обрезанной» время - чертой сверху слева в правой части.
+ * «Масштаб карты» навигатора, у каждого своя ступень. Свой хост Car App: dpi = «Авто» × ступень; окно: плотность стола ×
+ * 0,6 / 0,75 / 1 / 1,2 (ADR 0055).
  */
-@Composable
-private fun RailMiniature(size: RailSize, modifier: Modifier) {
-    val m = LocalMetrics.current
-    val k = m.spec.t / 96.0
-    fun r(v: Int) = max(1, (v * k).roundToInt())
-    val pal = LocalPalette.current
-    val accent = LocalAccent.current
-    val gap = m.dp(r(4))
-    val small = RoundedCornerShape(gap)
-    val frac = when (size) {
-        RailSize.NORMAL -> 0.15f
-        RailSize.MEDIUM -> 0.11f
-        RailSize.SMALL -> 0.07f
-        RailSize.CUT -> 0.08f
-    }
-    val inStatus = size == RailSize.SMALL || size == RailSize.CUT
-    val mark = pal.fg2
-    Row(modifier.clip(RoundedCornerShape(m.dp(r(6)))).background(pal.mini)) {
-        Column(Modifier.weight(frac).fillMaxHeight().background(pal.btn2), horizontalAlignment = Alignment.CenterHorizontally) {
-            Column(Modifier.weight(0.8f).fillMaxWidth().padding(vertical = gap), horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.SpaceEvenly) {
-                when (size) {
-                    RailSize.NORMAL -> Box(Modifier.fillMaxWidth(0.6f).height(m.dp(r(2))).background(mark))
-                    RailSize.MEDIUM -> {
-                        Box(Modifier.fillMaxWidth(0.5f).height(m.dp(r(2))).background(mark))
-                        Box(Modifier.fillMaxWidth(0.3f).height(m.dp(r(2))).background(accent))
-                        Box(Modifier.fillMaxWidth(0.5f).height(m.dp(r(2))).background(mark.copy(alpha = 0.6f)))
-                    }
-                    else -> Unit
-                }
-                repeat(4) { Box(Modifier.size(m.dp(r(4))).clip(CircleShape).background(mark.copy(alpha = 0.6f))) }
-            }
-            Box(Modifier.weight(0.2f).fillMaxWidth().background(accent))
-        }
-        Column(Modifier.weight(1f - frac).fillMaxHeight().padding(gap), verticalArrangement = Arrangement.spacedBy(gap)) {
-            if (inStatus) Box(Modifier.fillMaxWidth(0.25f).height(m.dp(r(2))).background(mark))
-            // рейка стоит у начала строки (в RTL справа), плашки за ней - физически, карта справа, как в главном по умолчанию
-            Ltr {
-                Row(Modifier.weight(2f).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(gap)) {
-                    Box(Modifier.weight(0.33f).fillMaxHeight().clip(small).background(Color(0xFF6B5520)))
-                    Box(Modifier.weight(0.67f).fillMaxHeight().clip(small).background(accent))
-                }
-                Row(Modifier.weight(1f).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(gap)) {
-                    Box(Modifier.weight(0.67f).fillMaxHeight().clip(small).background(pal.btn2))
-                    Box(Modifier.weight(0.33f).fillMaxHeight().clip(small).background(pal.btn2))
-                }
-            }
-        }
-    }
-}
-
-/** «Масштаб карты» навигатора на своём хосте: dpi для приложения = «Авто» × ступень, у каждого навигатора своя. */
 @Composable
 private fun MapScaleCard(pkg: String, d: SettingsDims, modifier: Modifier) {
     val m = LocalMetrics.current
@@ -820,11 +984,11 @@ private fun NavigatorTiles(d: SettingsDims, rowH: Int, modifier: Modifier) {
     val model = LauncherModel
     val installed = model.installedPackages
     Column(modifier, verticalArrangement = Arrangement.spacedBy(m.dp(d.gap))) {
-        for (row in (if (model.arabic) NAV_TILES_AR else NAV_TILES).chunked(2)) {
+        for (row in NavigatorPick.tiles(model.arabic, model.chinese).chunked(2)) {
             Row(Modifier.height(m.dp(rowH)).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(m.dp(d.gap))) {
-                for ((pkg, res) in row) {
+                for (pkg in row) {
                     val has = pkg in installed
-                    val label = stringResource(res)
+                    val label = stringResource(NAV_LABELS.getValue(pkg))
                     OptionBox(has && model.navigatorPkg == pkg, Modifier.weight(1f).fillMaxHeight().alpha(if (has) 1f else 0.4f),
                         RoundedCornerShape(m.dp(s.radius)), label, unselected = Pal.SURFACE, enabled = has,
                         onTap = { model.setNavigator(pkg) }) {
@@ -1116,7 +1280,8 @@ private fun systemInfo(): List<Pair<String, String>> {
     val version = CarLifeState.huCarlifeVersion ?: CarLifeState.huStatVersion
     val hu = name?.let { n -> version?.let { "$n · CarLife $it" } ?: n } ?: dash
     val link = if (!CarLifeState.running) dash else if (CarLifeState.wirelessSession) "Wi-Fi" else "USB"
-    val fps = DexPrefs(LauncherModel.context).desktopFps.fixed ?: 30
+    val desktopFps = DexPrefs(LauncherModel.context).desktopFps
+    val fps = desktopFps.fixed?.toString() ?: stringResource(R.string.fps_auto_title)
     val res = CarLifeState.videoMode?.let { stringResource(R.string.l_s_fps, "${it.outW}×${it.outH}", fps) }
     return listOf(
         stringResource(R.string.l_s_hu) to hu,

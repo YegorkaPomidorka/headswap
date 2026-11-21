@@ -17,4 +17,7 @@
     <string name="wl_usb_to_air_title">数据线已拔出</string>
     <string name="wl_usb_to_air_text">车机已通过蓝牙发现，正在无线连接。</string>
     <string name="wl_state_gave_up">车机在 %1$d 分钟内未连接</string>
+    <string name="dongle_state_waiting">正在端口 :%1$d 等待适配器</string>
+    <string name="dongle_state_connected">适配器已连接（%1$s）</string>
+    <string name="dongle_state_bind_failed">端口 %1$d 已被占用，适配器无法连接</string>
 </resources>

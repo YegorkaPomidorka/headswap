@@ -17,6 +17,8 @@
     <string name="dev_meta_time_sub">int32 time to the maneuver, s (like apollo-DuerOS)</string>
     <string name="dev_meta_progress_title">Progress in seconds</string>
     <string name="dev_meta_progress_sub">MEDIA_PROGRESS_BAR in s instead of ms (if the head unit shows 1000× too much)</string>
+    <string name="dev_meta_art16k_title">Track cover up to 16 KB</string>
+    <string name="dev_meta_art16k_sub">For clusters that don\'t show the cover (e.g. Honda CR-V 2026, SEMIDRIVE X9). Lower quality on the head unit</string>
 
     <string name="dev_section_music_chunk">Music packet size (experimental)</string>
     <string name="dev_music_chunk_note">Smaller means a smaller buffer on the head unit but more packets over USB. If the sound stutters, switch back to “As Android Auto sends it”</string>
@@ -35,11 +37,15 @@
     <string name="dev_section_video">Video (applies on reconnect)</string>
     <string name="dev_own_idr_title">Own keyframe in direct passthrough</string>
     <string name="dev_own_idr_sub">Every 2 s the phone sends the head unit its own keyframe: the picture comes back after the reverse camera and the car menu. Turn off if the head unit recovers on its own (e.g. VW): less traffic and phone load</string>
+    <string name="dev_video_time_ms_title">Video packet time in ms</string>
+    <string name="dev_video_time_ms_sub">Experiment: the time field of VIDEO_DATA in milliseconds (like music) instead of seconds. Turn on if the video on the head unit stutters or freezes; turn off if it got worse</string>
     <string name="dev_custom_res_title">Custom resolution</string>
     <string name="dev_custom_res_sub">Instead of the mode from video settings</string>
     <string name="dev_section_desktop">Head unit desktop</string>
     <string name="dev_hide_status_title">Hide status bar</string>
     <string name="dev_hide_status_sub">For head units that already show their own bar with clock and icons on top (some VW). Notifications hang as a notch with a gold line: pull down for the shade</string>
+    <string name="dev_vdm_host_title">VirtualDevice host on Android 16</string>
+    <string name="dev_vdm_host_sub">For Samsung on Android 16, if the car screen goes dark together with the phone screen. Needs USB debugging. After switching, activate the desktop again.</string>
     <string name="dev_custom_w">Width</string>
     <string name="dev_custom_h">Height</string>
     <string name="dev_custom_hint">Width 640–2240, height 640–1080 (portrait: the other way round), even numbers</string>

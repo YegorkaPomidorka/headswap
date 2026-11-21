@@ -29,7 +29,10 @@ param(
     [string[]]$HuArgs = @(),
     [string]$Out = '',
     [switch]$NoView,
-    [switch]$Audio      # activation with --audio: desktop sound capture over the CarLife MEDIA channel (ADR 0025)
+    [switch]$Audio,     # activation with --audio: desktop sound capture over the CarLife MEDIA channel (ADR 0025)
+    # autotests (autotest/stand.py): build/install/prefs/activation + adb reverse, then exit; the caller starts the
+    # emulator and BridgeService itself
+    [switch]$PrepareOnly
 )
 # Continue: in Windows PowerShell 5.1 any stderr line of a native command (adb progress) is an error record;
 # failures are checked by exit code below.
@@ -102,14 +105,28 @@ if ($Mode -ne 'keep') {
     AdbOk shell rm /data/local/tmp/hs_aa.xml
 }
 
+if ($PrepareOnly) {
+    # autotests: launcher prefs are reset to defaults (theme, colors, rail size/style, navigator, date/clock format),
+    # otherwise the screens and reference frames depend on what the phone was last set to; no music autostart on
+    # connect, otherwise the last player starts and the home screen and the music settings (player order) differ
+    Step 'autotest defaults: launcher prefs reset, autoplay=false'
+    $xml = "<?xml version='1.0' encoding='utf-8' standalone='yes' ?>`n<map>`n    <boolean name=`"autoplay`" value=`"false`" />`n</map>"
+    $tmp = Join-Path $Out 'headswap_launcher.xml'
+    [IO.File]::WriteAllText($tmp, $xml.Replace("`r", '') + "`n")
+    AdbOk push $tmp /data/local/tmp/hs_launcher.xml 2>$null | Out-Null
+    AdbOk shell "run-as $Pkg sh -c 'cat /data/local/tmp/hs_launcher.xml > shared_prefs/headswap_launcher.xml'"
+    AdbOk shell rm /data/local/tmp/hs_launcher.xml
+}
+
 Step 'activation (ManualAccessLauncher)'
 $apkPath = ((& adb shell pm path $Pkg) -replace 'package:', '').Trim()
 $act = & adb shell "CLASSPATH=$apkPath app_process / com.yegorkapomidorka.headswap.dex.ManualAccessLauncher --package $Pkg --token $token$(if ($Audio) { ' --audio' })" 2>&1
 if (($act -join "`n") -notmatch 'HEADSWAP_READY') { $act | Select-Object -Last 10 | Write-Host; throw 'Activation failed' }
 
 # 4. emulator + bridge + view
-Step "emulator for $Duration s, out: $Out"
 AdbOk reverse tcp:7240 tcp:7240 | Out-Null
+if ($PrepareOnly) { Step 'prepared: start the emulator, then BridgeService with debug_tcp 7240'; exit 0 }
+Step "emulator for $Duration s, out: $Out"
 $env:PYTHONIOENCODING = 'utf-8'
 if (-not $Size) { $Size = if ($Hu -eq 'mazda') { '1728x648' } else { '1280x720' } }
 $pyArgs = @('carlife_hu.py', '--duration', $Duration, '--out', "`"$Out`"", '--size', $Size, '--hu', $Hu)

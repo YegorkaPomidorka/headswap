@@ -193,7 +193,9 @@ internal fun EmbedLayer(
     val onePx = with(density) { 1.toDp() }
     Box(
         Modifier.absoluteOffset { when { shown -> IntOffset(rect.left.roundToInt(), rect.top.roundToInt()); hidden -> IntOffset.Zero; else -> OFFSCREEN } }
-            .size(if (hidden && !shown) onePx else w, if (hidden && !shown) onePx else h).clip(shape),
+            .size(if (hidden && !shown) onePx else w, if (hidden && !shown) onePx else h).clip(shape)
+            // «Стекло»: кромка плитки поверх живого окна (после AndroidView и подписи), только у плашек главного
+            .homeGlassEdge(shape, m.spec.t / 96f, enabled = rounded && shown && homeGlassStyle),
     ) {
         // textureGen: кнопка перезапуска просит новый TextureView (свежая текстура без старого продюсера)
         androidx.compose.runtime.key(slot.textureGen) { AndroidView(
@@ -261,7 +263,12 @@ fun TileCard(view: CardView, modifier: Modifier, small: Boolean = false) {
         CardView.NAVIGATOR -> NavCard(modifier)
         CardView.APP -> AppTileCard(modifier)
         CardView.MUSIC -> MusicCard(modifier)
-        CardView.CLOCK -> CardBox(modifier, background = LocalPalette.current.mapBg) { ClockFace(small) }
+        CardView.CLOCK -> {
+            val m = LocalMetrics.current
+            CardBox(modifier.homeGlassEdge(RoundedCornerShape(m.dp(m.spec.radius)), m.spec.t / 96f), background = LocalPalette.current.mapBg) {
+                ClockFace(small)
+            }
+        }
     }
 }
 
@@ -269,8 +276,10 @@ fun TileCard(view: CardView, modifier: Modifier, small: Boolean = false) {
 @Composable
 private fun AppTileCard(modifier: Modifier) {
     val model = LauncherModel
-    val s = LocalMetrics.current.spec
-    CardBox(modifier.onGloballyPositioned { model.appCardRect = it.boundsInRoot() }, background = LocalPalette.current.mapBg) {
+    val m = LocalMetrics.current
+    val s = m.spec
+    CardBox(modifier.onGloballyPositioned { model.appCardRect = it.boundsInRoot() }
+        .homeGlassEdge(RoundedCornerShape(m.dp(s.radius)), s.t / 96f), background = LocalPalette.current.mapBg) {
         if (model.catalogLoaded && model.tileAppKey == null) Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             Txt(stringResource(R.string.l_app_not_installed), s.f1, color = Pal.SEC2, weight = FontWeight.Medium, align = TextAlign.Center)
         }
@@ -283,7 +292,8 @@ fun NavCard(modifier: Modifier) {
     val model = LauncherModel
     val m = LocalMetrics.current
     val s = m.spec
-    CardBox(modifier.onGloballyPositioned { model.navCardRect = it.boundsInRoot() }, background = LocalPalette.current.mapBg) {
+    CardBox(modifier.onGloballyPositioned { model.navCardRect = it.boundsInRoot() }
+        .homeGlassEdge(RoundedCornerShape(m.dp(s.radius)), s.t / 96f), background = LocalPalette.current.mapBg) {
         when {
             model.navigatorPkg == null -> Pressable(Modifier.fillMaxSize(), onTap = { LauncherActions.openNavigatorChoice() }) { pressed ->
                 if (pressed) Box(Modifier.matchParentSize().background(Pal.SURFACE_PRESSED))

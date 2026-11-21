@@ -10,6 +10,37 @@
     <string name="desk_recovering">Restoring the desktop (%1$d/2)…</string>
     <string name="desk_recovery_stopped">Restore stopped. Check USB, desktop access and unlock the phone</string>
     <string name="desk_recovery_screen_busy">The previous screen is not released yet; automatic restore cancelled</string>
+    <!-- заглушка моста на ГУ (DelegatedDexConnector, AaBridgeCore в режиме AA) -->
+    <string name="desk_ph_starting">Starting the desktop…</string>
+    <string name="desk_ph_ready">Desktop %1$d×%2$d is ready, waiting for video…</string>
+    <string name="desk_ph_wait_usb">Waiting for USB CarLife to reconnect…</string>
+    <string name="desk_ph_stopped">Desktop stopped</string>
+    <string name="aa_ph_connecting">Connecting Android Auto…</string>
+    <string name="aa_ph_start_server">Start the head unit server in Android Auto</string>
+    <string name="aa_ph_wait_frame">Android Auto: waiting for a frame…</string>
+    <string name="aa_ph_lost">Android Auto disconnected, reconnecting…</string>
+    <!-- ошибки рабочего стола: на заглушке ГУ и в статусе на телефоне (DelegatedDexConnector) -->
+    <string name="desk_err_open_service">Could not open the desktop service: %1$s</string>
+    <string name="desk_err_service_null">The desktop service is unavailable. Activate access from a computer</string>
+    <string name="desk_err_prepare">Could not prepare the desktop</string>
+    <string name="desk_err_bind">Android did not start the desktop service</string>
+    <string name="desk_err_access">Access from a computer is unavailable</string>
+    <string name="desk_err_access_ended">Access ended. Connect the phone to a computer to activate again</string>
+    <string name="desk_err_no_first_frame">The desktop did not send the first frame in 30 seconds</string>
+    <string name="desk_err_generic">Desktop error</string>
+    <string name="desk_err_service_timeout">The desktop service did not respond in 12 seconds</string>
+    <string name="desk_err_stopped">Connection stopped</string>
+    <string name="desk_err_service_unavailable">The desktop service is unavailable</string>
+    <string name="desk_err_need_android_desktop">Access from a computer needs the Android Desktop mode</string>
+    <string name="desk_err_version">The desktop service version does not match the app</string>
+    <string name="desk_err_display">Could not create a separate screen</string>
+    <string name="desk_err_session_ended">Session ended</string>
+    <string name="desk_err_screen">Screen creation error</string>
+    <string name="desk_err_close_unconfirmed">The service did not confirm closing the screen. Quit HeadSwap before connecting again</string>
+    <string name="desk_err_input">Could not pass control to the desktop: %1$s</string>
+    <string name="desk_err_input_queue">The control queue is full. Connect again</string>
+    <string name="desk_err_service_died">The desktop service ended; access from a computer is kept</string>
+    <string name="desk_err_activate">Activate access from a computer</string>
 
     <!-- Activation from the phone itself (wireless debugging), Settings - Mode -->
     <string name="pa_title">Activate Headswap</string>
