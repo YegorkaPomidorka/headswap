@@ -9,6 +9,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -40,6 +41,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -190,18 +194,37 @@ fun LauncherSettingsScreen() {
                             }
                         }
                         SettingsPage.COLORS -> {
-                            ColorsModeCard(d, cell(0).fillMaxWidth())
+                            // шесть долей высоты: режим, три цвета рядом, обои (две доли), размытие с затемнением, подсказка
+                            val unitH = (h - 4 * gap) / 6
+                            val dc = SettingsDims(s, unitH)
                             val set = if (model.colorsEditDay) model.dayColors else model.nightColors
                             val light = model.colorsEditDay
-                            ColorSliderCard(stringResource(R.string.l_s_colors_accent), set.accentHue, ColorSet.HUE_NEUTRAL, d, cell(1).fillMaxWidth(),
-                                hueTrack(light, accent = true)) { model.editColors(set.copy(accentHue = it)) }
-                            ColorSliderCard(stringResource(R.string.l_s_colors_bg_hue), set.bgHue, ColorSet.HUE_NEUTRAL, d, cell(2).fillMaxWidth(),
-                                hueTrack(light, accent = false)) { model.editColors(set.copy(bgHue = it)) }
-                            ColorSliderCard(stringResource(R.string.l_s_colors_bg_sat), set.bgSat, 100, d, cell(3).fillMaxWidth(),
-                                satTrack(light, set.bgHue)) { model.editColors(set.copy(bgSat = it)) }
-                            Card(cell(4).fillMaxWidth()) {
-                                Box(Modifier.fillMaxSize().padding(start = m.dp(d.padStart), end = m.dp(d.padEnd)), contentAlignment = Alignment.CenterStart) {
-                                    Txt(stringResource(R.string.l_s_colors_hint), d.sub, color = Pal.SEC, maxLines = 2, ellipsis = false)
+                            val glass = model.railStyle == RailStyle.GLASS
+                            val wpAlpha = if (glass) 1f else 0.38f
+                            Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(m.dp(gap))) {
+                                val row = Modifier.fillMaxWidth()
+                                ColorsModeCard(dc, row.weight(1f))
+                                Row(row.weight(1f), horizontalArrangement = Arrangement.spacedBy(m.dp(gap))) {
+                                    val cardM = Modifier.weight(1f).fillMaxHeight()
+                                    CompactSliderCard(stringResource(R.string.l_s_colors_accent), set.accentHue, ColorSet.HUE_NEUTRAL, dc, cardM,
+                                        hueTrack(light, accent = true)) { model.editColors(set.copy(accentHue = it)) }
+                                    CompactSliderCard(stringResource(R.string.l_s_colors_bg_hue), set.bgHue, ColorSet.HUE_NEUTRAL, dc, cardM,
+                                        hueTrack(light, accent = false)) { model.editColors(set.copy(bgHue = it)) }
+                                    CompactSliderCard(stringResource(R.string.l_s_colors_bg_sat), set.bgSat, 100, dc, cardM,
+                                        satTrack(light, set.bgHue)) { model.editColors(set.copy(bgSat = it)) }
+                                }
+                                WallpaperCard(dc, glass, row.weight(2f).alpha(wpAlpha))
+                                Row(row.weight(1f).alpha(wpAlpha), horizontalArrangement = Arrangement.spacedBy(m.dp(gap))) {
+                                    val cardM = Modifier.weight(1f).fillMaxHeight()
+                                    CompactSliderCard(stringResource(R.string.l_s_wallpaper_blur), model.wallpaperBlur, 100, dc, cardM, WALLPAPER_BLUR_TRACK,
+                                        enabled = glass, onRelease = { model.saveWallpaper() }) { model.editWallpaper(blur = it) }
+                                    CompactSliderCard(stringResource(R.string.l_s_wallpaper_dim), model.wallpaperDim, 100, dc, cardM, WALLPAPER_DIM_TRACK,
+                                        enabled = glass, onRelease = { model.saveWallpaper() }) { model.editWallpaper(dim = it) }
+                                }
+                                Card(row.weight(1f)) {
+                                    Box(Modifier.fillMaxSize().padding(start = m.dp(dc.padStart), end = m.dp(dc.padEnd)), contentAlignment = Alignment.CenterStart) {
+                                        Txt(stringResource(R.string.l_s_colors_hint), dc.sub, color = Pal.SEC, maxLines = 2, ellipsis = false)
+                                    }
                                 }
                             }
                         }
@@ -593,15 +616,117 @@ private fun satTrack(light: Boolean, hue: Int): Brush {
     return Brush.horizontalGradient(listOf(Color.hsl(hue.toFloat() % 360f, 0f, l), Color.hsl(hue.toFloat() % 360f, if (light) 0.6f else 0.45f, l)))
 }
 
+/** Дорожки слайдеров обоев: размытие - от чёткого к мутному, затемнение - от светлого к почти чёрному. */
+private val WALLPAPER_BLUR_TRACK = Brush.horizontalGradient(listOf(Color(0xFFF2F2F2), Color(0xFF5E636B)))
+private val WALLPAPER_DIM_TRACK = Brush.horizontalGradient(listOf(Color(0xFFDADADA), Color(0xFF0C0C0C)))
+
 /**
- * Карточка-слайдер «Цветов»: название слева, трек с градиентом и белая ручка справа. Тап ставит значение сразу,
- * перетаскивание двигает; в настройки пишется по отпусканию ([LauncherModel.saveColors]).
+ * Карточка-слайдер «Цветов» и обоев: название сверху одной строкой, трек с градиентом и белая ручка под ним. Тап ставит
+ * значение сразу, перетаскивание двигает. [enabled] = false - не двигается (обои вне стиля «Стекло»); [onRelease] - запись
+ * по отпусканию, для цветов [LauncherModel.saveColors].
  */
 @Composable
-private fun ColorSliderCard(label: String, value: Int, top: Int, d: SettingsDims, modifier: Modifier, track: Brush, onChange: (Int) -> Unit) {
+private fun CompactSliderCard(
+    label: String, value: Int, top: Int, d: SettingsDims, modifier: Modifier, track: Brush,
+    enabled: Boolean = true, onRelease: () -> Unit = { LauncherModel.saveColors() }, onChange: (Int) -> Unit,
+) {
     val m = LocalMetrics.current
     Card(modifier) {
-        ColorSliderRow(label, value, top, d, Modifier.fillMaxSize().padding(start = m.dp(d.padStart), end = m.dp(d.padEnd)), track, onChange)
+        Column(Modifier.fillMaxSize().padding(horizontal = m.dp(d.padEnd), vertical = m.dp(d.padV / 2)), verticalArrangement = Arrangement.Center) {
+            Txt(label, d.sub)
+            ColorSlider(value, top, d, track, Modifier.fillMaxWidth().weight(1f), onChange, enabled, onRelease)
+        }
+    }
+}
+
+/**
+ * Выбор обоев стола: название и пояснение слева, справа миниатюры 16:9 с подписью («Без обоев», две встроенные, своё фото
+ * при наличии) и «Галерея» - выбор фото на телефоне ([LauncherActions.openWallpaperPicker]). Вне стиля «Стекло» ([glass] = false)
+ * карточку приглушает и отключает вызывающий; [LauncherModel.wallpaper] при этом не меняется.
+ */
+@Composable
+private fun WallpaperCard(d: SettingsDims, glass: Boolean, modifier: Modifier) {
+    val m = LocalMetrics.current
+    val s = m.spec
+    val model = LauncherModel
+    val ctx = LocalContext.current
+    val hasCustom = remember(model.wallpaperVer) { WallpaperImport.file(ctx).exists() }
+    Card(modifier) {
+        BoxWithConstraints(Modifier.fillMaxSize().padding(start = m.dp(d.padStart), end = m.dp(d.padEnd), top = m.dp(d.padV), bottom = m.dp(d.padV))) {
+            val g = s.g
+            val items = if (hasCustom) 5 else 4
+            val textW = constraints.maxWidth * 22 / 100
+            val labelH = (d.sub * 1.3).roundToInt() + s.g4
+            val availW = constraints.maxWidth - textW - g
+            val thumbW = min((constraints.maxHeight - labelH) * 16 / 9, (availW - (items - 1) * g) / items)
+            val thumbH = thumbW * 9 / 16
+            Row(Modifier.fillMaxSize(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(m.dp(g))) {
+                Column(Modifier.width(m.dp(textW)), verticalArrangement = Arrangement.spacedBy(m.dp(4))) {
+                    Txt(stringResource(R.string.l_s_wallpaper), s.f2, ellipsis = false)
+                    Txt(stringResource(if (glass) R.string.l_s_wallpaper_sub_glass else R.string.l_s_wallpaper_sub_solid), d.sub,
+                        color = Pal.SEC, maxLines = 3, ellipsis = false)
+                }
+                Row(Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(m.dp(g), Alignment.End)) {
+                    val pal = LocalPalette.current
+                    fun pick(id: WallpaperId) { model.chooseWallpaper(id) }
+                    WallpaperThumb(stringResource(R.string.l_s_wallpaper_none), model.wallpaper == WallpaperId.NONE, glass, thumbW, thumbH, d, { pick(WallpaperId.NONE) }) {
+                        Box(Modifier.fillMaxSize().background(Brush.linearGradient(pal.bgStops.map { it.second }))) {
+                            Box(Modifier.align(Alignment.BottomStart).fillMaxWidth(0.25f).fillMaxHeight(0.4f).background(pal.accent))
+                        }
+                    }
+                    WallpaperThumb(stringResource(R.string.l_s_wallpaper_headswap), model.wallpaper == WallpaperId.HEADSWAP, glass, thumbW, thumbH, d, { pick(WallpaperId.HEADSWAP) }) {
+                        WallpaperPreview(WallpaperId.HEADSWAP, model.wallpaperVer)
+                    }
+                    WallpaperThumb(stringResource(R.string.l_s_wallpaper_mountains), model.wallpaper == WallpaperId.MOUNTAINS, glass, thumbW, thumbH, d, { pick(WallpaperId.MOUNTAINS) }) {
+                        WallpaperPreview(WallpaperId.MOUNTAINS, model.wallpaperVer)
+                    }
+                    if (hasCustom) {
+                        WallpaperThumb(stringResource(R.string.l_s_wallpaper_custom), model.wallpaper == WallpaperId.CUSTOM, glass, thumbW, thumbH, d, { pick(WallpaperId.CUSTOM) }) {
+                            WallpaperPreview(WallpaperId.CUSTOM, model.wallpaperVer)
+                        }
+                    }
+                    WallpaperThumb(stringResource(R.string.l_s_wallpaper_gallery), false, glass, thumbW, thumbH, d, { LauncherActions.openWallpaperPicker() }) {
+                        Box(Modifier.fillMaxSize().border(m.dp(2), Pal.SEC, RoundedCornerShape(m.dp(max(2, thumbH / 10)))), contentAlignment = Alignment.Center) {
+                            SvgIcon(Ico.IMAGE, thumbH * 4 / 10, Pal.SEC)
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+/** Миниатюра обоев: та же картинка, что на столе, но читается в малом размере; пока читается - пустая плашка. */
+@Composable
+private fun WallpaperPreview(id: WallpaperId, ver: Int) {
+    val ctx = LocalContext.current
+    val image by produceState<ImageBitmap?>(null, id, ver) {
+        value = withContext(Dispatchers.IO) { WallpaperLoader.load(ctx, id, ver, 320, 180) }
+    }
+    Box(Modifier.fillMaxSize().background(Pal.SURFACE_HI)) {
+        image?.let { Image(it, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop) }
+    }
+}
+
+/** Миниатюра 16:9 со скруглением и подписью под ней; выбранная - в кольце акцента через зазор ([SettingsDims.ring]). */
+@Composable
+private fun WallpaperThumb(
+    label: String, selected: Boolean, enabled: Boolean, w: Int, h: Int, d: SettingsDims, onTap: () -> Unit,
+    content: @Composable BoxScope.() -> Unit,
+) {
+    val m = LocalMetrics.current
+    val accent = LocalAccent.current
+    val shape = RoundedCornerShape(m.dp(max(3, h / 8)))
+    val inner = RoundedCornerShape(m.dp(max(2, h / 10)))
+    Column(Modifier.width(m.dp(w)), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(m.dp(m.spec.g4))) {
+        Pressable(Modifier.size(m.dp(w), m.dp(h)).clip(shape), enabled = enabled, description = label, onTap = onTap) { pressed ->
+            Box(Modifier.matchParentSize().then(if (selected) Modifier.border(m.dp(d.ring), accent, shape) else Modifier)
+                .padding(m.dp(d.ring * 2)).clip(inner)) {
+                content()
+                if (pressed) Box(Modifier.matchParentSize().background(Pal.SURFACE_PRESSED))
+            }
+        }
+        Txt(label, d.sub, Modifier.fillMaxWidth(), color = if (selected) Pal.TEXT else Pal.SEC, align = TextAlign.Center)
     }
 }
 
@@ -617,26 +742,31 @@ private fun ColorSliderRow(label: String, value: Int, top: Int, d: SettingsDims,
 }
 
 @Composable
-private fun ColorSlider(value: Int, top: Int, d: SettingsDims, track: Brush, modifier: Modifier, onChange: (Int) -> Unit) {
+private fun ColorSlider(
+    value: Int, top: Int, d: SettingsDims, track: Brush, modifier: Modifier, onChange: (Int) -> Unit,
+    enabled: Boolean = true, onRelease: () -> Unit = { LauncherModel.saveColors() },
+) {
     val m = LocalMetrics.current
     val density = androidx.compose.ui.platform.LocalDensity.current
     val knobDp = m.dp(d.knob)
     val knobPx = with(density) { knobDp.toPx() }
     val change by androidx.compose.runtime.rememberUpdatedState(onChange)
+    val release by androidx.compose.runtime.rememberUpdatedState(onRelease)
     BoxWithConstraints(modifier) {
         val w = constraints.maxWidth.toFloat()
         val span = (w - knobPx).coerceAtLeast(1f)
         fun at(x: Float) = (((x - knobPx / 2) / span).coerceIn(0f, 1f) * top).roundToInt()
         Box(Modifier.fillMaxSize()
-            .pointerInput(top, span) {
-                detectTapGestures(onTap = { change(at(it.x)); LauncherModel.saveColors() })
-            }
-            .pointerInput(top, span) {
-                detectHorizontalDragGestures(
-                    onDragEnd = { LauncherModel.saveColors() },
-                    onDragCancel = { LauncherModel.saveColors() },
-                ) { c, _ -> c.consume(); change(at(c.position.x)) }
-            },
+            .then(if (!enabled) Modifier else Modifier
+                .pointerInput(top, span) {
+                    detectTapGestures(onTap = { change(at(it.x)); release() })
+                }
+                .pointerInput(top, span) {
+                    detectHorizontalDragGestures(
+                        onDragEnd = { release() },
+                        onDragCancel = { release() },
+                    ) { c, _ -> c.consume(); change(at(c.position.x)) }
+                }),
         ) {
             Box(Modifier.align(Alignment.CenterStart).padding(horizontal = knobDp / 2).fillMaxWidth().height(m.dp(d.trackH * 4 / 10))
                 .clip(RoundedCornerShape(m.dp(d.trackH / 5))).background(track))

@@ -70,6 +70,23 @@ class LauncherPrefs(private val context: Context) {
         get() = RailStyle.restore(prefs.getString("rail_style", null))
         set(value) { prefs.edit().putString("rail_style", value.name).apply() }
 
+    /** Обои стола в стиле «Стекло» ([WallpaperId.key]), размытие и затемнение 0..100; ver растёт при смене своего фото (сброс кэша). */
+    var wallpaper: WallpaperId
+        get() = WallpaperId.restore(prefs.getString("wallpaper", null))
+        set(value) { prefs.edit().putString("wallpaper", value.key).apply() }
+
+    var wallpaperBlur: Int
+        get() = WallpaperLogic.clamp(prefs.getInt("wallpaper_blur", WallpaperLogic.BLUR_DEFAULT))
+        set(value) { prefs.edit().putInt("wallpaper_blur", WallpaperLogic.clamp(value)).apply() }
+
+    var wallpaperDim: Int
+        get() = WallpaperLogic.clamp(prefs.getInt("wallpaper_dim", WallpaperLogic.DIM_DEFAULT))
+        set(value) { prefs.edit().putInt("wallpaper_dim", WallpaperLogic.clamp(value)).apply() }
+
+    var wallpaperVer: Int
+        get() = prefs.getInt("wallpaper_ver", 0)
+        set(value) { prefs.edit().putInt("wallpaper_ver", value).apply() }
+
     /**
      * «Карта на главном» слева, физически. Новый ключ: старый right_hand двигал рейку.
      * По умолчанию на арабском (RTL) карта слева: весь главный - зеркало LTR, рейка справа, как в макете.
