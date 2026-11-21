@@ -256,9 +256,10 @@ fun LauncherSettingsScreen() {
                                 // заняты (подсказки, масштаб, перезапуск), поэтому, пока разрешения нет, подсказка стоит на месте масштаба
                                 val carHost = EmbedHost.nav.carHost
                                 val noBgLocation = carHost && hints && !google && !noHints && !hasBackgroundLocation(navPkg)
-                                // масштаб - dpi своего хоста Car App; навигатору окном и через AA он не нужен
+                                // масштаб - dpi своего хоста Car App или окна навигатора (ADR 0054); через теневую AA карту
+                                // рисует Android Auto, там он не нужен
                                 if (noBgLocation) Placed(row++) { LocationHintCard(navPkg, d, Modifier) }
-                                else if (carHost) MapScaleCard(navPkg, d, cell(row++).fillMaxWidth())
+                                else if (carHost || !(hints && google)) MapScaleCard(navPkg, d, cell(row++).fillMaxWidth())
                                 Placed(row++) { RestartNavCard(d, Modifier) } // кнопка - через обёртку, рамка шайбы (h737)
                                 // Google через AA: сервер ГУ живёт в Android Auto, перезапуск - в её настройках на телефоне
                                 if (hints && google) AaServerHintCard(d, cell(row).fillMaxWidth())
@@ -809,7 +810,10 @@ private fun RailStyleCard(d: SettingsDims, modifier: Modifier) {
     }
 }
 
-/** «Масштаб карты» навигатора на своём хосте: dpi для приложения = «Авто» × ступень, у каждого навигатора своя. */
+/**
+ * «Масштаб карты» навигатора, у каждого своя ступень. Свой хост Car App: dpi = «Авто» × ступень; окно: плотность стола ×
+ * 0,6 / 0,75 / 1 / 1,2 (ADR 0054).
+ */
 @Composable
 private fun MapScaleCard(pkg: String, d: SettingsDims, modifier: Modifier) {
     val m = LocalMetrics.current

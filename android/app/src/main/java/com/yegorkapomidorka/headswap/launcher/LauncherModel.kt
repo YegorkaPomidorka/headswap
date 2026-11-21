@@ -227,6 +227,7 @@ internal object LauncherModel {
         EmbedHost.onGone = { LauncherActions.embedGone(it) }
         EmbedHost.onAssistantOpened = { LauncherActions.assistantOpened(it) }
         CarAppHost.scaleFor = { pkg -> CarConfigMath.step(prefs.mapScale(pkg)) }
+        EmbedHost.mapScaleFor = { pkg -> prefs.mapScale(pkg) }
         CarAppHost.allowFor = { pkg -> prefs.navHints(pkg) && !NavigatorPick.noHints(pkg) }
         LauncherActions.startRouteCatcher(context.applicationContext)
         ready = true
@@ -365,7 +366,8 @@ internal object LauncherModel {
     fun mapScale(pkg: String): Int { mapScaleRev; return prefs.mapScale(pkg) }
     fun chooseMapScale(pkg: String, step: Int) {
         prefs.setMapScale(pkg, step); mapScaleRev++
-        if (CarAppHost.pkg != pkg) return
+        // окно навигатора: новая плотность дочернего дисплея на лету, без перезапуска (ADR 0054)
+        if (CarAppHost.pkg != pkg) { EmbedHost.refresh(EmbedHost.nav); EmbedHost.refresh(EmbedHost.app); return }
         CarAppHost.setScale(CarConfigMath.step(step)) // 2ГИС меняет сразу
         // Яндекс берёт dpi только при старте сессии (стенд 04.11: новые dpi на той же сессии не меняют карту)
         if (com.yegorkapomidorka.headswap.carapp.CarScaleRestart.needed(pkg)) EmbedHost.restartCar()

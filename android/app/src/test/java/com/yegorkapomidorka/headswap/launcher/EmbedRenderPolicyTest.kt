@@ -32,6 +32,27 @@ class EmbedRenderPolicyTest {
         assertEquals(EmbedRenderPolicy.Geometry(761, 501, 200), EmbedRenderPolicy.geometry("ru.yandex.searchplugin", 761, 501, 200, wide = false))
     }
 
+    @Test fun navigatorWindowGetsDesktopDensityTimesStep() {
+        // ADR 0054: Google Карты в плитке 356×596 на столе 200 DPI раньше шли на 96 DPI (правило 600 dp)
+        val gm = NavigatorPick.GOOGLE_MAPS
+        assertEquals(EmbedRenderPolicy.Geometry(356, 596, 150), g(gm, 356, 596, 200))
+        val steps = (0..3).map { EmbedRenderPolicy.geometry(gm, 356, 596, 200, step = it).density }
+        assertEquals(listOf(120, 150, 200, 240), steps)
+        assertEquals(240, EmbedRenderPolicy.geometry(NavigatorPick.DGIS, 1210, 720, 200, step = 9).density)
+        assertEquals(EmbedRenderPolicy.MIN_DPI, EmbedRenderPolicy.geometry(NavigatorPick.WAZE, 356, 596, 120, step = 0).density)
+        // ступень не трогает остальные окна
+        assertEquals(EmbedRenderPolicy.Geometry(761, 501, 131), EmbedRenderPolicy.geometry("ru.yandex.taximeter", 761, 501, 200, step = 3))
+    }
+
+    @Test fun yandexStepScalesDensityNotBuffer() {
+        val auto = g("ru.yandex.yandexmaps", 800, 600, 200)
+        val big = EmbedRenderPolicy.geometry("ru.yandex.yandexmaps", 800, 600, 200, step = 3)
+        assertEquals(auto.width, big.width)
+        assertEquals(auto.height, big.height)
+        assertEquals(640, big.density) // 400 × 1,2 / 0,75
+        EmbeddedDisplayPolicy.requireSize(big.width, big.height, big.density)
+    }
+
     @Test fun navigatorScaledAt160() {
         assertEquals(EmbedRenderPolicy.Geometry(2000, 1500, 400), g("ru.yandex.yandexnavi", 800, 600, 160))
     }
