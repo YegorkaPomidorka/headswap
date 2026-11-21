@@ -104,9 +104,12 @@ fun LauncherRoot(connected: Boolean) {
         // раскладка плашек в портрете своя ([LauncherModel.layout]): флаг ведёт модель, спека у каждого экрана своя
         SideEffect { model.portrait = spec.portrait }
         val pal = model.palette
+        // обои - только в «Стекле»; null (нет обоев, файла, картинка ещё читается) = всё как без них: градиент и bgSolid справа от рейки
+        val wallpaper = rememberWallpaper(model.railStyle == RailStyle.GLASS, model.wallpaper, model.wallpaperVer, w, h, model.context)
         CompositionLocalProvider(LocalMetrics provides metrics, LocalAccent provides pal.accent, LocalPalette provides pal,
             LocalLocaleDirection provides localeDir) {
             Box(Modifier.fillMaxSize().launcherBackground(pal)) {
+                if (wallpaper != null && model.foreign == null) WallpaperLayer(wallpaper, model.wallpaperBlur, model.wallpaperDim, h, minOf(w, h))
                 if (!connected) {
                     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         Txt(stringResource(R.string.l_connecting), spec.f1, color = Pal.SEC)
@@ -127,10 +130,11 @@ fun LauncherRoot(connected: Boolean) {
                             if (!fullscreen) BottomRail()
                         }
                     } else Row(Modifier.fillMaxSize()) {
-                        // «Стекло»: рейка прозрачная поверх общего фона, а область справа от неё - сплошной bgSolid без градиента
+                        // «Стекло»: рейка прозрачная поверх общего фона, а область справа от неё - сплошной bgSolid без градиента;
+                        // с обоями bgSolid не рисуем, иначе они закрыты
                         val glass = model.railStyle == RailStyle.GLASS
                         if (!fullscreen) Rail(glass)
-                        Box(Modifier.weight(1f).fillMaxHeight().then(if (glass && !fullscreen) Modifier.background(pal.bgSolid) else Modifier)
+                        Box(Modifier.weight(1f).fillMaxHeight().then(if (glass && !fullscreen && wallpaper == null) Modifier.background(pal.bgSolid) else Modifier)
                             .onGloballyPositioned { model.areaRect = it.boundsInRoot() }) {
                             AreaContent()
                         }

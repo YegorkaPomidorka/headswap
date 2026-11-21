@@ -72,6 +72,18 @@ object LauncherActions {
             .onFailure { AppLog.i("LAUNCHER запрос разрешений на телефоне: ${it.javaClass.simpleName}: ${it.message}", false) }
     }
 
+    /** «Галерея» в обоях: выбор фото на экране телефона (на виртуальном дисплее ГУ системный выбор не открывается), файл копируется в filesDir. */
+    fun openWallpaperPicker() {
+        if (!model.launchDebounce.allow(model.now())) return
+        val ctx = model.context
+        val intent = Intent(ctx, MainActivity::class.java).putExtra(MainActivity.EXTRA_CMD, "wallpaper_pick")
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        val opts = ActivityOptions.makeBasic().setLaunchDisplayId(Display.DEFAULT_DISPLAY)
+        runCatching { ctx.startActivity(intent, opts.toBundle()) }
+            .onSuccess { AppLog.i("LAUNCHER выбор обоев открыт на телефоне", false) }
+            .onFailure { AppLog.i("LAUNCHER выбор обоев на телефоне: ${it.javaClass.simpleName}: ${it.message}", false) }
+    }
+
     /** Настройки приложения [pkg] на телефоне (h1029: геолокация навигатора «в любом режиме»); лаунчер на экране ГУ. */
     fun openAppSettings(pkg: String) {
         if (!model.launchDebounce.allow(model.now())) return

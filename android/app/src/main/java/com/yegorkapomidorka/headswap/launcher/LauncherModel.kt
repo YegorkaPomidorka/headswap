@@ -56,6 +56,12 @@ internal object LauncherModel {
     var railSize by mutableStateOf(RailSize.NORMAL)
     /** Общий «Стиль» ([LauncherPrefs.railStyle]): рейка (в портрете не действует, см. [glassRail]) и нижний ряд главного. */
     var railStyle by mutableStateOf(RailStyle.SOLID)
+    /** Обои стола ([LauncherPrefs.wallpaper]): рисуются только в стиле «Стекло» ([WallpaperLayer]). */
+    var wallpaper by mutableStateOf(WallpaperId.NONE)
+    var wallpaperBlur by mutableIntStateOf(WallpaperLogic.BLUR_DEFAULT)
+    var wallpaperDim by mutableIntStateOf(WallpaperLogic.DIM_DEFAULT)
+    /** Номер версии своего фото: меняется, когда телефон записал новый файл. */
+    var wallpaperVer by mutableIntStateOf(0)
     var mapLeft by mutableStateOf(false)
     var animations by mutableStateOf(true)
     /** Заряд телефона в строке статуса ([LauncherPrefs.showBattery]). */
@@ -191,6 +197,10 @@ internal object LauncherModel {
         dayColors = prefs.dayColors
         railSize = prefs.railSize
         railStyle = prefs.railStyle
+        wallpaper = prefs.wallpaper
+        wallpaperBlur = prefs.wallpaperBlur
+        wallpaperDim = prefs.wallpaperDim
+        wallpaperVer = prefs.wallpaperVer
         mapLeft = prefs.mapLeft
         animations = prefs.animations
         showBattery = prefs.showBattery
@@ -278,6 +288,20 @@ internal object LauncherModel {
     fun openColors() { colorsEditDay = lightTheme; settingsPage = SettingsPage.COLORS }
     fun chooseRailSize(value: RailSize) { railSize = value; prefs.railSize = value }
     fun chooseRailStyle(value: RailStyle) { railStyle = value; prefs.railStyle = value }
+    fun chooseWallpaper(id: WallpaperId) { wallpaper = id; prefs.wallpaper = id }
+    /** Слайдеры обоев двигаются: только состояние (стол перерисовывается сразу); запись - [saveWallpaper] по отпусканию. */
+    fun editWallpaper(blur: Int? = null, dim: Int? = null) {
+        if (blur != null) wallpaperBlur = WallpaperLogic.clamp(blur)
+        if (dim != null) wallpaperDim = WallpaperLogic.clamp(dim)
+    }
+    fun saveWallpaper() { prefs.wallpaperBlur = wallpaperBlur; prefs.wallpaperDim = wallpaperDim }
+    /** С телефона ([com.yegorkapomidorka.headswap.MainActivity]) после записи файла: лаунчер мог ещё не стартовать, префы - своим экземпляром. */
+    fun setCustomWallpaper(ctx: Context) {
+        val p = LauncherPrefs(ctx.applicationContext)
+        val ver = p.wallpaperVer + 1
+        p.wallpaperVer = ver; p.wallpaper = WallpaperId.CUSTOM
+        wallpaperVer = ver; wallpaper = WallpaperId.CUSTOM
+    }
     fun chooseMapLeft(left: Boolean) { mapLeft = left; prefs.mapLeft = left }
     fun chooseAnimations(on: Boolean) { animations = on; prefs.animations = on }
     fun chooseShowBattery(on: Boolean) { showBattery = on; prefs.showBattery = on }
