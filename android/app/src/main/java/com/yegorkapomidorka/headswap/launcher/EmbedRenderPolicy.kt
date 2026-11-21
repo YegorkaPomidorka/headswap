@@ -18,11 +18,28 @@ object EmbedRenderPolicy {
     /** Половина общего бюджета пикселей хоста: два окна-карты помещаются вместе. */
     const val TILE_PIXELS = EmbeddedDisplayPolicy.MAX_TOTAL_PIXELS / 2
 
+    /**
+     * Короткая сторона окна приложения в dp (ADR 0051). От 600 dp Android 16+ игнорирует жёсткий портрет приложения,
+     * а приложения включают планшетную вёрстку; запас 10 dp на округление.
+     */
+    const val WIDE_DP = 610
+    const val MIN_DPI = 96
+
     data class Geometry(val width: Int, val height: Int, val density: Int)
 
-    fun geometry(pkg: String?, width: Int, height: Int, dpi: Int): Geometry {
-        val plain = Geometry(width, height, dpi)
-        if (pkg !in MAP_PACKAGES || width <= 0 || height <= 0 || dpi <= 0) return plain
+    /**
+     * Плотность окна, при которой его короткая сторона не уже [WIDE_DP]; только вниз от плотности стола [dpi].
+     * Считается от размера окна, а не стола: плитка 761×501 одна и та же на столе 720p и 1080p (h1264).
+     * Окно ниже 366 px и при [MIN_DPI] уже порога - там портретное приложение останется столбиком.
+     */
+    fun wideDensity(width: Int, height: Int, dpi: Int): Int =
+        min(dpi, max(MIN_DPI, floor(160.0 * min(width, height) / WIDE_DP).toInt()))
+
+    /** [wide] = false - окно помощника: плашка поверх экрана, ей плотность стола. */
+    fun geometry(pkg: String?, width: Int, height: Int, dpi: Int, wide: Boolean = true): Geometry {
+        if (width <= 0 || height <= 0 || dpi <= 0) return Geometry(width, height, dpi)
+        if (pkg !in MAP_PACKAGES) return Geometry(width, height, if (wide) wideDensity(width, height, dpi) else dpi)
+        val plain = Geometry(width, height, dpi) // карты не портретные, им плотность только вверх
         val scale = minOf(
             MAP_DPI.toDouble() / dpi,
             EmbeddedDisplayPolicy.MAX_WIDTH.toDouble() / width,

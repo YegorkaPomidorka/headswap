@@ -8,9 +8,28 @@ import org.junit.Test
 class EmbedRenderPolicyTest {
     private fun g(pkg: String?, w: Int, h: Int, dpi: Int) = EmbedRenderPolicy.geometry(pkg, w, h, dpi)
 
-    @Test fun otherAppsUnchanged() {
-        assertEquals(EmbedRenderPolicy.Geometry(800, 600, 160), g("com.spotify.music", 800, 600, 160))
-        assertEquals(EmbedRenderPolicy.Geometry(800, 600, 160), g(null, 800, 600, 160))
+    @Test fun otherAppsKeepSizeAndGetWideDensity() {
+        // h1264: плитка 761×501 одна и та же на столе 720p (200 DPI) и 1080p (300 DPI); при них Яндекс Про шёл столбиком
+        assertEquals(EmbedRenderPolicy.Geometry(761, 501, 131), g("ru.yandex.taximeter", 761, 501, 200))
+        assertEquals(EmbedRenderPolicy.Geometry(761, 501, 131), g("ru.yandex.taximeter", 761, 501, 300))
+        assertEquals(EmbedRenderPolicy.Geometry(1210, 720, 188), g("ru.yandex.taximeter", 1210, 720, 200))
+        assertEquals(EmbedRenderPolicy.Geometry(1846, 1080, 283), g(null, 1846, 1080, 300))
+        // короткая сторона окна не уже 600 dp, пока плотность выше нижнего предела
+        for (short in 366..1080) for (dpi in listOf(160, 200, 300)) {
+            val d = EmbedRenderPolicy.wideDensity(short * 2, short, dpi)
+            assertTrue("$short при $dpi", short * 160 / d >= 600 && d <= dpi)
+            EmbeddedDisplayPolicy.requireSize(maxOf(128, short * 2).coerceAtMost(EmbeddedDisplayPolicy.MAX_WIDTH), short, d)
+        }
+    }
+
+    @Test fun wideDensityOnlyLowers() {
+        // стол уже шире порога (HSD: 128 DPI) - окно не трогаем; мелкое окно упирается в 96
+        assertEquals(EmbedRenderPolicy.Geometry(1210, 720, 128), g("com.spotify.music", 1210, 720, 128))
+        assertEquals(EmbedRenderPolicy.Geometry(400, 300, 96), g("com.spotify.music", 400, 300, 200))
+    }
+
+    @Test fun assistantKeepsDesktopDensity() {
+        assertEquals(EmbedRenderPolicy.Geometry(761, 501, 200), EmbedRenderPolicy.geometry("ru.yandex.searchplugin", 761, 501, 200, wide = false))
     }
 
     @Test fun navigatorScaledAt160() {
