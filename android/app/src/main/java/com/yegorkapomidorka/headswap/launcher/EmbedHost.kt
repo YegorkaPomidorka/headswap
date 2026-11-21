@@ -68,9 +68,6 @@ internal class EmbedSlot(val name: String) {
     @Volatile var geomH = 0
     /** Плотность дочернего дисплея; geomW x geomH - его буфер, у карт больше окна (EmbedRenderPolicy). */
     var geomDpi = 0
-    /** Для какого wantKey посчитан [portrait] (портретное по манифесту, ADR 0051). */
-    var portraitKey: String? = null
-    var portrait = false
     var launchedKey: String? = null
     var launchedAt = 0L
     var createdAt = 0L
@@ -555,27 +552,6 @@ internal object EmbedHost {
         schedule(slot, RETRY_MS)
     }
 
-    /**
-     * Портретное по манифесту приложение на Android 17: дисплей shell-хоста режим окна не меняет, и система рисует его
-     * столбиком. Такому окну снижаем плотность (EmbedRenderPolicy.wideDensity, ADR 0051). Помощника не трогаем.
-     */
-    private fun portraitApp(slot: EmbedSlot, key: String): Boolean {
-        if (android.os.Build.VERSION.SDK_INT < EmbedRenderPolicy.WIDE_SDK || slot === alice) return false
-        if (slot.portraitKey != key) {
-            val pkg = key.substringBefore('/')
-            val cls = key.substringAfter('/')
-            slot.portrait = appContext?.packageManager?.let { pm ->
-                val orientation = runCatching {
-                    pm.getActivityInfo(android.content.ComponentName(pkg, if (cls.startsWith('.')) pkg + cls else cls), 0).screenOrientation
-                }.getOrDefault(-1)
-                com.yegorkapomidorka.headswap.dex.EmbeddedDisplayPolicy.portraitApp(orientation,
-                    com.yegorkapomidorka.headswap.dex.EmbeddedDisplayPolicy.packageOrientations(pm, pkg))
-            } ?: false
-            slot.portraitKey = key
-        }
-        return slot.portrait
-    }
-
     private fun reconcileInternal(slot: EmbedSlot) {
         val key = slot.wantKey
         if (key == null) { if (slot === nav) unproject(); releaseLease(slot); slot.status = EmbedStatus.IDLE; return }
@@ -622,12 +598,11 @@ internal object EmbedHost {
         }
         if (slot.wantW < 128 || slot.wantH < 128) return
         // буфер карт Яндекса больше окна, TextureView ужимает его; касания пересчитываются по geomW/geomH
-        val g = EmbedRenderPolicy.geometry(slot.pkg, slot.wantW, slot.wantH, densityDpi, portraitApp(slot, key))
+        val g = EmbedRenderPolicy.geometry(slot.pkg, slot.wantW, slot.wantH, densityDpi)
         val w = g.width
         val h = g.height
         val dpi = g.density
-        val scaled = if (w != slot.wantW) " (окно ${slot.wantW}x${slot.wantH}, крупнее для карты)"
-            else if (dpi != densityDpi) " (портретное приложение, плотность ниже стола $densityDpi)" else ""
+        val scaled = if (w != slot.wantW) " (окно ${slot.wantW}x${slot.wantH}, крупнее для карты)" else ""
         if (slot.handle <= 0) {
             slot.status = EmbedStatus.CONNECTING
             val surface = slot.surface ?: Surface(texture).also { slot.surface = it }
