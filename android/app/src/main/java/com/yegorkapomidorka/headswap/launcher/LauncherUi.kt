@@ -247,6 +247,8 @@ object Ico {
     val NAV_BACK = listOf("M17 4 6 12l11 8z")
     val NAV_HOME = listOf(circle(12, 12, 8))
     val NAV_RECENTS = listOf(roundRectPath(5f, 5f, 14f, 14f, 3f))
+    /** «Галерея» в выборе обоев: рамка с солнцем и горкой. */
+    val IMAGE = listOf(roundRectPath(3f, 3f, 18f, 18f, 2f), "M7 8.5a1.5 1.5 0 1 0 3 0 1.5 1.5 0 1 0-3 0", "m21 15-5-5L5 21")
     /** «Последний» во втором слоте плеера. */
     val REPEAT = listOf("M20 11a8 8 0 0 0-14.5-4.5L4 8", "M4 3v5h5", "M4 13a8 8 0 0 0 14.5 4.5L20 16", "M20 21v-5h-5")
 }
