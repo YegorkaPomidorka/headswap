@@ -114,8 +114,8 @@ class CarNetwork(ctx: Context, private val onState: (CarNetState) -> Unit = {}) 
     }
 
     /**
-     * Есть ли уже Wi-Fi машины. MATCH — адрес в запомненной подсети (или шлюз без интернета совпал).
-     * PENDING — Wi-Fi без интернета ещё без IPv4: подождём DHCP, specifier пока не шлём.
+     * Есть ли уже Wi-Fi машины. MATCH — непроверенный Wi-Fi в запомненной подсети или с тем же шлюзом.
+     * PENDING — непроверенный Wi-Fi ещё без IPv4: подождём DHCP до [HOLD_MS], specifier пока не шлём.
      */
     @Suppress("DEPRECATION") // снимок на момент запроса; колбэк здесь ещё не за что держать
     private fun classify(lan: Lan): Seen = try {
@@ -126,7 +126,7 @@ class CarNetwork(ctx: Context, private val onState: (CarNetState) -> Unit = {}) 
             val lp = cm.getLinkProperties(n) ?: continue
             if (onLan(caps, lp, lan)) return Seen.MATCH
             if (lp.linkAddresses.none { it.address is Inet4Address } &&
-                !caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+                !caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
             ) pending = true
         }
         if (pending) Seen.PENDING else Seen.OTHER
@@ -135,13 +135,17 @@ class CarNetwork(ctx: Context, private val onState: (CarNetState) -> Unit = {}) 
         Seen.OTHER
     }
 
+    /**
+     * Сеть машины узнаём только среди Wi-Fi без проверенного интернета: домашний роутер часто в той же
+     * 192.168.1.0/24, что и ГУ. Сохранённая системой сеть ГУ несёт INTERNET и без интернета, поэтому смотрим VALIDATED.
+     */
     private fun onLan(caps: NetworkCapabilities, lp: LinkProperties, lan: Lan): Boolean {
+        if (caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)) return false
         if (lp.linkAddresses.any { a ->
                 val ip = (a.address as? Inet4Address)?.hostAddress?.let(CarNetPolicy::ipv4) ?: return@any false
                 CarNetPolicy.sameCarLan(ip, a.prefixLength, lan.addr, lan.prefix)
             }
         ) return true
-        if (caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)) return false
         val gw = CarNetPolicy.ipv4(gateway(lp))
         return lan.gw != null && gw == lan.gw
     }
@@ -163,7 +167,10 @@ class CarNetwork(ctx: Context, private val onState: (CarNetState) -> Unit = {}) 
             watch = null
             WLog.ev(NET, "car-hold-fail", "err" to e.javaClass.simpleName)
             specifier(p)
+            return
         }
+        // Таймаут requestNetwork не сработает, если сеть уже подошла под запрос, а DHCP так и не дал IPv4.
+        handler.postDelayed({ if (!h.ready) missHold(h) }, HOLD_MS.toLong())
     }
 
     /** Сеть из запроса не та или DHCP не успел: обычный specifier. */
@@ -294,7 +301,8 @@ class CarNetwork(ctx: Context, private val onState: (CarNetState) -> Unit = {}) 
         var registered = false
         var handed = false
         private var net: Network? = null
-        private var ready = false
+        var ready = false
+            private set
 
         private fun stale() = watch !== this || handed
 
