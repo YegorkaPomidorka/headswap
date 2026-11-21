@@ -74,12 +74,13 @@ internal fun rememberWallpaper(active: Boolean, id: WallpaperId, ver: Int, w: In
 
 /**
  * Обои на весь стол, первый слой корня: картинка по Crop, размытие по слою картинки (не фон под стеклом, ADR 0052) и
- * чёрное затемнение. Картинка чуть крупнее экрана, чтобы края размытия не светились.
+ * чёрное затемнение. Картинка чуть крупнее экрана, чтобы края размытия не светились. Размытие - от короткой стороны
+ * [minSidePx]: в альбоме это высота, в портрете ширина, и ползунок мажет одинаково (ADR 0054).
  */
 @Composable
-internal fun WallpaperLayer(image: ImageBitmap, blur: Int, dim: Int, heightPx: Int, minSidePx: Int, modifier: Modifier = Modifier) {
+internal fun WallpaperLayer(image: ImageBitmap, blur: Int, dim: Int, minSidePx: Int, modifier: Modifier = Modifier) {
     val density = LocalDensity.current
-    val blurPx = WallpaperLogic.blurPx(blur, heightPx)
+    val blurPx = WallpaperLogic.blurPx(blur, minSidePx)
     val scale = WallpaperLogic.overscan(blurPx, minSidePx)
     Box(modifier.fillMaxSize()) {
         Image(image, null, Modifier.fillMaxSize().graphicsLayer { scaleX = scale; scaleY = scale }
