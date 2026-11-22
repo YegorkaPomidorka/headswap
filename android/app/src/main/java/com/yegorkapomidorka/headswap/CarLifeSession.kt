@@ -92,6 +92,7 @@ class CarLifeSession(
     // only when the direct Surface encoder is requested, never from an early source flag.
     private val bitratePolicy: BitratePolicy get() = if (encodingSurface) surfaceBitratePolicy else legacyBitratePolicy
     @Volatile private var vwIdrCutMs = NEVER_MS
+    @Volatile private var hondaIdrCutMs = NEVER_MS
     private val thermalThrottle = ThermalThrottle()
     private var thermalStatus = 0                       // только нить cl-sched
     private var thermalHeadroom = Float.NaN
@@ -782,6 +783,7 @@ class CarLifeSession(
                 bridge.huPioneerRm56 -> minOf(mode.bitrate, AaBridgeCore.PIONEER_RM56_CEILING_BPS)
                 bridge.huMazda20622111 -> minOf(mode.bitrate, AaBridgeCore.MAZDA_20622111_CEILING_BPS)
                 bridge.huBonAuto20362105 -> minOf(mode.bitrate, AaBridgeCore.BONAUTO_20362105_CEILING_BPS)
+                bridge.huHonda20772122 -> minOf(mode.bitrate, AaBridgeCore.HONDA_20772122_CEILING_BPS)
                 else -> mode.bitrate
             }
             // h529: в passthrough с SPS-кропом заглушка в кадре AA с теми же полями, ГУ не видит смены размера на AA.
@@ -990,6 +992,33 @@ class CarLifeSession(
         applyPioneerCeiling()
         applyMazda20622111Ceiling()
         applyBonAuto20362105Ceiling()
+        applyHonda20772122Ceiling()
+    }
+
+    /**
+     * Honda XR-V 2022 (channel 20772122, h1235): ГУ сбрасывает USB (EIO, VBUS пропадает) в 4 с после IDR ≥ ~605 КиБ,
+     * IDR ≤ 597 КиБ живут. Навигатор на весь экран при 8 Мбит/с VBR даёт 600-700 КиБ, на 6 Мбит/с ~440. Стартуем с 6.
+     */
+    private fun applyHonda20772122Ceiling() {
+        if (!bridge.huHonda20772122) return
+        val old = bitratePolicy.current
+        if (!bitratePolicy.lowerCeiling(AaBridgeCore.HONDA_20772122_CEILING_BPS)) return
+        AppLog.i("Honda 20772122: потолок битрейта ${bitratePolicy.ceilingBps / 1000} кбит/с (лимит размера IDR)")
+        if (bitratePolicy.current != old) bridge.setEncoderBitrate(bitratePolicy.current)
+    }
+
+    /** Honda 20772122: IDR > 450 КБ - потолок = min(потолок, текущий) ×0,75 (не ниже 3 Мбит/с), не чаще раза в секунду. */
+    private fun honda20772122KeyFrame(size: Int) {
+        if (size <= AaBridgeCore.HONDA_20772122_IDR_LIMIT) return
+        val now = SystemClock.elapsedRealtime()
+        if (hondaIdrCutMs != NEVER_MS && now - hondaIdrCutMs < VW_20082138_CUT_INTERVAL_MS) return
+        applyHonda20772122Ceiling()
+        val old = bitratePolicy.current
+        val target = maxOf(AaBridgeCore.HONDA_20772122_MIN_BPS, (minOf(bitratePolicy.ceilingBps, old) * 0.75).toInt())
+        if (!bitratePolicy.lowerCeiling(target)) return
+        hondaIdrCutMs = now
+        AppLog.i("Honda 20772122: IDR $size Б > ${AaBridgeCore.HONDA_20772122_IDR_LIMIT}, потолок битрейта -> ${bitratePolicy.ceilingBps}")
+        if (bitratePolicy.current != old) bridge.setEncoderBitrate(bitratePolicy.current)
     }
 
     /** Потолок fps под ГУ (Pioneer RM56E8B: 15), null = без ограничения. */
@@ -1025,6 +1054,10 @@ class CarLifeSession(
     override fun onEncodedKeyFrame(size: Int) {
         if (bridge.huMobisNx4c) {
             mobisKeyFrame(size, mobisAaCeiling, "энкодера") { bridge.setEncoderBitrate(it) }
+            return
+        }
+        if (bridge.huHonda20772122) {
+            honda20772122KeyFrame(size)
             return
         }
         if (size <= VW_20082138_IDR_LIMIT) return
