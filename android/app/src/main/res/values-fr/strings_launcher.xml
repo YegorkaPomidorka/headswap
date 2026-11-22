@@ -120,7 +120,7 @@
     <string name="l_s_theme_auto">Auto</string>
     <string name="l_s_theme_sub">Auto suit les phares</string>
     <string name="l_s_colors">Couleurs</string>
-    <string name="l_s_colors_sub">Accent et fond, nuit et jour séparément</string>
+    <string name="l_s_colors_sub">Accent, fond et fond d\'écran</string>
     <string name="l_s_colors_night">Nuit</string>
     <string name="l_s_colors_day">Jour</string>
     <string name="l_s_colors_reset">Réinitialiser</string>
@@ -128,6 +128,18 @@
     <string name="l_s_colors_bg_hue">Teinte du fond</string>
     <string name="l_s_colors_bg_sat">Saturation du fond</string>
     <string name="l_s_colors_hint">Tant que cet écran est ouvert, le bureau affiche les couleurs que vous modifiez. Les couleurs de nuit s\'affichent avec le thème sombre, celles de jour avec le thème clair.</string>
+    <string name="l_s_wallpaper">Fond d\'écran</string>
+    <string name="l_s_wallpaper_sub_glass">Sous le verre, sur tout le bureau</string>
+    <string name="l_s_wallpaper_sub_solid">Uniquement avec le style Verre</string>
+    <string name="l_s_wallpaper_none">Aucun</string>
+    <string name="l_s_wallpaper_headswap">Headswap</string>
+    <string name="l_s_wallpaper_mountains">Montagnes</string>
+    <string name="l_s_wallpaper_custom">Ma photo</string>
+    <string name="l_s_wallpaper_gallery">Galerie</string>
+    <string name="l_s_wallpaper_blur">Flou</string>
+    <string name="l_s_wallpaper_dim">Assombrir</string>
+    <string name="l_wallpaper_set">Fond d\'écran défini</string>
+    <string name="l_wallpaper_failed">Impossible de définir le fond d\'écran</string>
     <string name="l_s_rail_bottom">Panneau du bas</string>
     <string name="l_s_layout_tile_top">Tuile en haut</string>
     <string name="l_s_layout_music_top">Musique en haut</string>
@@ -139,7 +151,7 @@
     <string name="l_s_battery">Batterie du téléphone</string>
     <string name="l_s_clock12">Horloge 12 h</string>
     <string name="l_s_rail_size">Taille du panneau</string>
-    <string name="l_s_rail_style">Style du panneau</string>
+    <string name="l_s_rail_style">Style</string>
     <string name="l_s_style_solid">Plein</string>
     <string name="l_s_style_glass">Verre</string>
     <string name="l_s_date">Date</string>

@@ -120,7 +120,7 @@
     <string name="l_s_theme_auto">Auto</string>
     <string name="l_s_theme_sub">Auto follows the headlights</string>
     <string name="l_s_colors">Colors</string>
-    <string name="l_s_colors_sub">Accent and background, night and day apart</string>
+    <string name="l_s_colors_sub">Accent, background and wallpaper</string>
     <string name="l_s_colors_night">Night</string>
     <string name="l_s_colors_day">Day</string>
     <string name="l_s_colors_reset">Reset</string>
@@ -128,6 +128,18 @@
     <string name="l_s_colors_bg_hue">Background hue</string>
     <string name="l_s_colors_bg_sat">Background saturation</string>
     <string name="l_s_colors_hint">While this screen is open, the desktop shows the colors you are editing. Night colors show in the dark theme, day colors in the light one.</string>
+    <string name="l_s_wallpaper">Wallpaper</string>
+    <string name="l_s_wallpaper_sub_glass">Behind the glass on the whole desktop</string>
+    <string name="l_s_wallpaper_sub_solid">Works only with the Glass style</string>
+    <string name="l_s_wallpaper_none">None</string>
+    <string name="l_s_wallpaper_headswap">Headswap</string>
+    <string name="l_s_wallpaper_mountains">Mountains</string>
+    <string name="l_s_wallpaper_custom">My photo</string>
+    <string name="l_s_wallpaper_gallery">Gallery</string>
+    <string name="l_s_wallpaper_blur">Blur</string>
+    <string name="l_s_wallpaper_dim">Dim</string>
+    <string name="l_wallpaper_set">Wallpaper set</string>
+    <string name="l_wallpaper_failed">Could not set the wallpaper</string>
     <string name="l_s_rail_bottom">Bottom panel</string>
     <string name="l_s_layout_tile_top">Tile on top</string>
     <string name="l_s_layout_music_top">Music on top</string>
@@ -139,7 +151,7 @@
     <string name="l_s_battery">Phone battery</string>
     <string name="l_s_clock12">12-hour clock</string>
     <string name="l_s_rail_size">Panel size</string>
-    <string name="l_s_rail_style">Panel style</string>
+    <string name="l_s_rail_style">Style</string>
     <string name="l_s_style_solid">Solid</string>
     <string name="l_s_style_glass">Glass</string>
     <string name="l_s_date">Date</string>
