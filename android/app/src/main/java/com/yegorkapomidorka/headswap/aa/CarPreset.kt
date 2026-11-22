@@ -71,6 +71,8 @@ enum class CarPreset(val titleRes: Int, val settings: CarSettings = CarSettings(
     SKODA_KAMIQ_GT_2021(R.string.car_skoda_kamiq_gt_2021),
     /** CNS3 просит 2:1, 1280×640 (h292); на 1080p виснет (h305). */
     SKODA_OCTAVIA_PRO(R.string.car_skoda_octavia_pro, CarSettings(videoMode = VideoMode.WIDE_2_1)),
+    /** Экран 1280×720: всё по умолчанию (Егор, 22.11). */
+    TOYOTA_BZ4X(R.string.car_toyota_bz4x),
     /** HSAE 21070007, 1920×720 (h420): энкодер Xiaomi на 1920×720 падает, ГУ игнорирует кроп SPS и берёт верхние 720 строк - прямой проброс с полями снизу. */
     TOYOTA_COROLLA_CROSS_2024(R.string.car_toyota_corolla_cross_2024, CarSettings(videoMode = VideoMode.WIDE_HD)),
     TOYOTA_LEVIN(R.string.car_toyota_levin),
