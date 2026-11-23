@@ -1465,6 +1465,24 @@ class AaBridgeAudioTest {
     }
 
     @Test
+    fun navChannelVrReinitsMediaAfterPromptSoHuMusicComesBack() {
+        // VW CNS3 23.11: на VR-подсказку ГУ гасит музыку и сама не поднимает - после подсказки MEDIA заново через INIT
+        core.navChannelProvider = { NavChannel.VR }
+        core.onCarlifeStart()
+        core.onAudioData(MEDIA, pcm(4096), 1)
+        core.onAudioData(SPEECH, pcm(640), 2)
+        core.onAudioData(MEDIA, pcm(4096), 3)                            // музыка во время подсказки - тем же потоком
+        assertEquals(1, link.audio.count { it.type == 0x30001 })
+        core.onAudioStop(SPEECH)
+        timers.advance(1500)
+        core.onAudioData(MEDIA, pcm(4096), 4)
+        assertEquals(2, link.audio.count { it.type == 0x30001 })
+        val afterStop = link.events.toList().dropWhile { it != "A5:0x50004" }
+        assertEquals(listOf("A5:0x50004", "M4=0", "A3:0x30001"), afterStop.take(3))
+        assertTrue("MUSIC=1 заново", afterStop.drop(3).any { it.endsWith("=1") && it.startsWith("M") })
+    }
+
+    @Test
     fun navChannelVrSkipsAaVoiceSessionOnNonDelphiHu() {
         // лог CNS3 20082141, 21.11: сигнал «слушаю» в голосовой сессии ушёл в VR-путь, VR=0 погасил открытый микрофон
         core.navChannelProvider = { NavChannel.VR }

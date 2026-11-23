@@ -1799,6 +1799,13 @@ class AaBridgeCore(
         } else if (moduleOff && link.sendModuleStatus(CarlifeAudio.MODULE_VR, 0)) {
             log("BRIDGE h1318: CarLife MODULE_STATUS VR=0 (после подсказки)", true)
         }
+        // h1318 (VW CNS3 20082141, 23.11): на VR-поток ГУ гасит свой музыкальный источник целиком и сама его не
+        // поднимает - музыка молчит, пока не уйти в меню «Музыка» ГУ и обратно. Как после голосовой сессии: MEDIA
+        // заново через INIT + MUSIC=1 на первых данных.
+        if (moduleOff && audioInited[CarlifeAudio.CH_MEDIA] == true) {
+            audioInited[CarlifeAudio.CH_MEDIA] = false
+            log("BRIDGE h1318: после подсказки MEDIA поднимется через INIT на первых данных", true)
+        }
     }
 
     /**
