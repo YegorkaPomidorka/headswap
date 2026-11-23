@@ -172,6 +172,17 @@ class CarLogicTest {
         assertFalse(CarNetPolicy.shouldRelease(CarNetEvent.SESSION_END))
     }
 
+    @Test
+    fun carLanMatchesAnotherAddressInTheSameSubnet() {
+        val remembered = CarNetPolicy.ipv4("10.173.189.58")!!
+        val now = CarNetPolicy.ipv4("10.173.189.63")!!
+        assertTrue(CarNetPolicy.sameCarLan(now, 24, remembered, 24))
+        assertTrue(CarNetPolicy.sameCarLan(now, 32, remembered, 24))
+        assertFalse(CarNetPolicy.sameCarLan(CarNetPolicy.ipv4("192.168.1.5")!!, 24, remembered, 24))
+        assertFalse(CarNetPolicy.sameCarLan(CarNetPolicy.ipv4("10.1.2.3")!!, 8, remembered, 8))
+        assertEquals(null, CarNetPolicy.ipv4("10.173.189"))
+    }
+
     /** Все условия выполнены; тесты по одному ломают по условию. */
     private fun btHint(
         waiting: Boolean = true,

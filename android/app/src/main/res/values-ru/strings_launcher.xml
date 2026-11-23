@@ -120,7 +120,7 @@
     <string name="l_s_theme_auto">Авто</string>
     <string name="l_s_theme_sub">Авто — по фарам</string>
     <string name="l_s_colors">Цвета</string>
-    <string name="l_s_colors_sub">Акцент и фон, отдельно ночью и днём</string>
+    <string name="l_s_colors_sub">Акцент, фон и обои</string>
     <string name="l_s_colors_night">Ночные</string>
     <string name="l_s_colors_day">Дневные</string>
     <string name="l_s_colors_reset">Сбросить</string>
@@ -130,7 +130,7 @@
     <string name="l_s_colors_hint">Пока открыт этот экран, стол показывает настраиваемые цвета. Ночные видны в тёмной теме, дневные — в светлой.</string>
     <string name="l_s_wallpaper">Обои</string>
     <string name="l_s_wallpaper_sub_glass">Под стеклом на всём столе</string>
-    <string name="l_s_wallpaper_sub_solid">Только в стиле «Стекло»</string>
+    <string name="l_s_wallpaper_sub_solid">Работают только в стиле «Стекло»</string>
     <string name="l_s_wallpaper_none">Без обоев</string>
     <string name="l_s_wallpaper_headswap">Headswap</string>
     <string name="l_s_wallpaper_mountains">Горы</string>
