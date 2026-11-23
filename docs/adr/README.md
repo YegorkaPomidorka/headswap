@@ -79,3 +79,4 @@
 | 0054 | [Стекло и обои в портрете: нижняя стеклянная полоса, «Цвета и обои» отдельной страницей](0054-portrait-glass-wallpaper.md) | принято |
 | 0055 | [Окну навигатора — плотность стола и «Масштаб карты»](0055-nav-window-map-scale.md) | принято |
 | 0057 | [Toyota Desay G6SA: после звонка play по MUSIC=1 от ГУ](0057-toyota-desay-resume-on-music1.md) | принято |
+| 0059 | [Hyundai CN7: SPS/PPS по FRAME_RATE_CHANGE, заглушка рабочего стола с SPS энкодера](0059-hyundai-cn7-sps-on-frame-rate-change.md) | принято |
