@@ -188,7 +188,7 @@
     <string name="l_favorites">المفضّلة</string>
     <string name="l_favorites_empty">لا توجد جهات اتصال مفضّلة. ضع عليها نجمة في دفتر الهاتف</string>
     <string name="l_s_colors">الألوان</string>
-    <string name="l_s_colors_sub">لون التمييز والخلفية، لليل والنهار كلٌّ على حدة</string>
+    <string name="l_s_colors_sub">لون التمييز والخلفية والخلفية الجدارية</string>
     <string name="l_s_colors_night">الليل</string>
     <string name="l_s_colors_day">النهار</string>
     <string name="l_s_colors_reset">إعادة الضبط</string>
@@ -196,6 +196,18 @@
     <string name="l_s_colors_bg_hue">درجة لون الخلفية</string>
     <string name="l_s_colors_bg_sat">تشبّع الخلفية</string>
     <string name="l_s_colors_hint">ما دامت هذه الشاشة مفتوحة، يعرض سطح المكتب الألوان التي تعدّلها. تظهر ألوان الليل في السمة الداكنة، وألوان النهار في الفاتحة.</string>
+    <string name="l_s_wallpaper">خلفية الشاشة</string>
+    <string name="l_s_wallpaper_sub_glass">تحت الزجاج على سطح المكتب كله</string>
+    <string name="l_s_wallpaper_sub_solid">تعمل بنمط الزجاج فقط</string>
+    <string name="l_s_wallpaper_none">بدون خلفية</string>
+    <string name="l_s_wallpaper_headswap">Headswap</string>
+    <string name="l_s_wallpaper_mountains">جبال</string>
+    <string name="l_s_wallpaper_custom">صورتي</string>
+    <string name="l_s_wallpaper_gallery">المعرض</string>
+    <string name="l_s_wallpaper_blur">تمويه</string>
+    <string name="l_s_wallpaper_dim">تعتيم</string>
+    <string name="l_wallpaper_set">تم تعيين الخلفية</string>
+    <string name="l_wallpaper_failed">تعذّر تعيين الخلفية</string>
     <string name="l_s_alice_voice">Alice بالصوت فقط</string>
     <string name="l_s_alice_voice_on">بلا نافذة، شريط صغير في الأسفل؛ يعمل حتى والهاتف مقفل</string>
     <string name="l_s_alice_voice_off">Alice في لوحة بجانب الشريط الجانبي</string>

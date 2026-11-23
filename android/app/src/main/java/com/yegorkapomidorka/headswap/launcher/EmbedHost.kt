@@ -140,6 +140,9 @@ internal object EmbedHost {
     /** Плотность родительского дисплея: дочерние окна живут с ней же. */
     @Volatile var densityDpi = 160
 
+    /** Ступень «Масштаба карты» навигатора по пакету (LauncherPrefs.mapScale); ставит LauncherModel. */
+    @Volatile var mapScaleFor: (String) -> Int = { EmbedRenderPolicy.AUTO_STEP }
+
     /** Задача приложения на дочернем дисплее исчезла (Back из корня, процесс убит). Вызывается на главном потоке. */
     @Volatile var onGone: ((EmbedSlot) -> Unit)? = null
     /** В панели Алисы открылась задача другого приложения. Главный поток. */
@@ -598,11 +601,15 @@ internal object EmbedHost {
         }
         if (slot.wantW < 128 || slot.wantH < 128) return
         // буфер карт Яндекса больше окна, TextureView ужимает его; касания пересчитываются по geomW/geomH
-        val g = EmbedRenderPolicy.geometry(slot.pkg, slot.wantW, slot.wantH, densityDpi)
+        // остальным окнам плотность ниже стола: короткая сторона от 600 dp, иначе портретное приложение идёт столбиком
+        // навигаторам - плотность стола × «Масштаб карты» (ADR 0055)
+        val g = EmbedRenderPolicy.geometry(slot.pkg, slot.wantW, slot.wantH, densityDpi, wide = slot !== alice,
+            step = slot.pkg?.let { mapScaleFor(it) } ?: EmbedRenderPolicy.AUTO_STEP)
         val w = g.width
         val h = g.height
         val dpi = g.density
-        val scaled = if (w != slot.wantW) " (окно ${slot.wantW}x${slot.wantH}, крупнее для карты)" else ""
+        val scaled = if (w != slot.wantW) " (окно ${slot.wantW}x${slot.wantH}, крупнее для карты)"
+            else if (dpi != densityDpi) " (стол $densityDpi, окну ниже: ${minOf(w, h) * 160 / dpi} dp)" else ""
         if (slot.handle <= 0) {
             slot.status = EmbedStatus.CONNECTING
             val surface = slot.surface ?: Surface(texture).also { slot.surface = it }

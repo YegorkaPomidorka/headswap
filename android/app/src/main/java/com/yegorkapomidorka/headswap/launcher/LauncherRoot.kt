@@ -104,9 +104,12 @@ fun LauncherRoot(connected: Boolean) {
         // раскладка плашек в портрете своя ([LauncherModel.layout]): флаг ведёт модель, спека у каждого экрана своя
         SideEffect { model.portrait = spec.portrait }
         val pal = model.palette
+        // обои - только в «Стекле»; null (нет обоев, файла, картинка ещё читается) = всё как без них: градиент и bgSolid справа от рейки
+        val wallpaper = rememberWallpaper(model.railStyle == RailStyle.GLASS, model.wallpaper, model.wallpaperVer, w, h, model.context)
         CompositionLocalProvider(LocalMetrics provides metrics, LocalAccent provides pal.accent, LocalPalette provides pal,
             LocalLocaleDirection provides localeDir) {
             Box(Modifier.fillMaxSize().launcherBackground(pal)) {
+                if (wallpaper != null && model.foreign == null) WallpaperLayer(wallpaper, model.wallpaperBlur, model.wallpaperDim, minOf(w, h))
                 if (!connected) {
                     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         Txt(stringResource(R.string.l_connecting), spec.f1, color = Pal.SEC)
@@ -119,18 +122,19 @@ fun LauncherRoot(connected: Boolean) {
                     // Полноэкранный YouTube забирает и её место: выход - кнопкой самого YouTube (FullscreenApp)
                     val fullscreen = model.area is Area.App && EmbedHost.app.fullscreen
                     if (spec.portrait) {
-                        // вертикальный экран: область на всю ширину, рейка снизу (h921)
+                        // вертикальный экран: область на всю ширину, рейка снизу (h921); в «Стекле» - стеклянная полоса (ADR 0054)
                         Column(Modifier.fillMaxSize()) {
                             Box(Modifier.weight(1f).fillMaxWidth().onGloballyPositioned { model.areaRect = it.boundsInRoot() }) {
                                 AreaContent()
                             }
-                            if (!fullscreen) BottomRail()
+                            if (!fullscreen) BottomRail(model.railStyle == RailStyle.GLASS)
                         }
                     } else Row(Modifier.fillMaxSize()) {
-                        // «Стекло»: рейка прозрачная поверх общего фона, а область справа от неё - сплошной bgSolid без градиента
+                        // «Стекло»: рейка прозрачная поверх общего фона, а область справа от неё - сплошной bgSolid без градиента;
+                        // с обоями bgSolid не рисуем, иначе они закрыты
                         val glass = model.railStyle == RailStyle.GLASS
                         if (!fullscreen) Rail(glass)
-                        Box(Modifier.weight(1f).fillMaxHeight().then(if (glass && !fullscreen) Modifier.background(pal.bgSolid) else Modifier)
+                        Box(Modifier.weight(1f).fillMaxHeight().then(if (glass && !fullscreen && wallpaper == null) Modifier.background(pal.bgSolid) else Modifier)
                             .onGloballyPositioned { model.areaRect = it.boundsInRoot() }) {
                             AreaContent()
                         }
@@ -195,7 +199,7 @@ private fun AreaContent() {
 
 /**
  * Рейка на всю высоту (S-образно распределена) и под ней отдельный золотой блок навигации. Макет v2.
- * [glass] ([RailStyle.GLASS], только альбом): одна стеклянная колонка на весь экран, вместо блока - круглая золотая линза.
+ * [glass] ([RailStyle.GLASS]; в портрете - [BottomRail]): одна стеклянная колонка на весь экран, вместо блока - круглая золотая линза.
  */
 @Composable
 private fun Rail(glass: Boolean) {
@@ -316,6 +320,21 @@ private fun Modifier.glassRail(k: Float): Modifier = drawBehind {
     drawRect(Color.White.copy(alpha = 0.5f), Offset(if (rtl) 0f else w - line, 0f), Size(line, h))
 }
 
+/**
+ * Стекло нижней рейки портрета: то же, что [glassRail], повёрнутое к верхнему краю - белый градиент сверху вниз,
+ * светлая линия по верхней кромке и свечение под ней.
+ */
+private fun Modifier.glassBottom(k: Float): Modifier = drawBehind {
+    val w = size.width
+    drawRect(Brush.verticalGradient(
+        0f to Color.White.copy(alpha = 0.18f), 0.3f to Color.White.copy(alpha = 0.06f),
+        0.7f to Color.White.copy(alpha = 0.03f), 1f to Color.White.copy(alpha = 0.10f)))
+    val glow = 8f * k
+    drawRect(Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.18f), Color.White.copy(alpha = 0f)), startY = 0f, endY = glow),
+        size = Size(w, glow))
+    drawRect(Color.White.copy(alpha = 0.5f), Offset.Zero, Size(w, 1.5f * k))
+}
+
 /** Доля размера иконки, на которую центр масс стрелки Ico.NAV смещён от центра: 1.67 / 24. */
 private const val NAV_MASS_SHIFT = 1.67f / 24f
 
@@ -428,11 +447,27 @@ private fun NavBlock(modifier: Modifier, shape: Shape) {
 /**
  * Нижняя рейка портрета (h921): слева панель цвета карточек с «Назад», лого, настройками, «Видом карточки» и громкостью
  * «−»/«+» (капсула), справа блок навигации шириной рейки. Скругление сверху, прибита к низу экрана.
+ * [glass] ([RailStyle.GLASS]): одна стеклянная полоса на всю ширину, навигация - золотая линза у правого края (ADR 0054).
  */
 @Composable
-private fun BottomRail() {
+private fun BottomRail(glass: Boolean) {
     val m = LocalMetrics.current
     val s = m.spec
+    if (glass) {
+        Row(Modifier.fillMaxWidth().height(m.dp(s.bottomRailH)).glassBottom(s.t / 96f).padding(horizontal = m.dp(s.g)),
+            verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+            RailBackButton()
+            RailLogoButton(glass = true)
+            RailGearButton()
+            CardViewButton(s.rb, s.ric, Color.Transparent, Pal.SEC2)
+            VolumeGroup()
+            // разделитель перед линзой, как в боковой стеклянной рейке
+            Box(Modifier.width(m.dp(maxOf(1, s.t / 96))).height(m.dp(s.rb * 3 / 4))
+                .background(Brush.verticalGradient(listOf(Color.Transparent, Color.White.copy(alpha = 0.4f), Color.Transparent))))
+            NavLens(Modifier)
+        }
+        return
+    }
     val r = m.dp(s.radius)
     val top = RoundedCornerShape(topStart = r, topEnd = r)
     Row(Modifier.fillMaxWidth().height(m.dp(s.bottomRailH)).padding(horizontal = m.dp(s.g)),

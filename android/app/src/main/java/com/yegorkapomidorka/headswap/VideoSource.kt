@@ -29,6 +29,11 @@ class VideoSource(
     private val area: Rect? = null,
     /** Энкодер в формате Baidu (Mobis CCNC, h242): VBR, level 256, повтор кадра 100 мс. */
     private val baidu: Boolean = false,
+    /**
+     * Desktop: без Baseline-лесенки h1207. Рабочий стол кодируется минимальным форматом (High), и заглушка должна
+     * дать тот же SPS: смену профиля без START Hyundai CN7 не переваривает, зелёный 7–17 с на старте (h1254).
+     */
+    private val matchDesktopSps: Boolean = false,
 ) {
     interface Listener {
         fun onConfig(csd: ByteArray)
@@ -106,6 +111,11 @@ class VideoSource(
         } catch (e: Exception) {
             AppLog.e("configure с profile/CBR не прошёл, пробую Baseline без CBR", e)
             c.reset()
+        }
+        if (matchDesktopSps) {
+            AppLog.i("заглушка: Desktop, минимальный формат, как у энкодера рабочего стола (SPS без смены профиля)")
+            c.configure(format(withExtras = false), null, null, MediaCodec.CONFIGURE_FLAG_ENCODE)
+            return
         }
         // h1207: без профиля OMX.qcom (OPPO) отдаёт High + CABAC, level 1.0; ГУ Desay 20082133 цепляется за этот
         // первый SPS/PPS и потом разбирает Baseline AA по нему — каша на весь экран. Держим Baseline до последнего.
