@@ -45,6 +45,7 @@
 | Mitsubishi Outlander 4 2022 | — |
 | Skoda Kamiq GT 2021 | — |
 | Skoda Octavia Pro | 2.0 |
+| Toyota bZ4X | — |
 | Toyota Corolla Cross 2024–2025 | 2.0 |
 | Toyota Levin | — |
 | Volkswagen Golf 8, комплектация Pro, 2021 | — |

@@ -147,8 +147,8 @@ class LauncherSpec(
     val tp = r(t * 0.78)
     val tpIc = r(ic * 0.85)
     val titleB = t + g8 + g4
-    /** Сколько приложений в быстром ряду (без плюса): в ленте сетка 2x3. */
-    val quickApps = if (strip) 5 else 4
+    /** Сколько приложений в быстром ряду (без плюса): в ленте сетка 2x3, на широких экранах (от 1500) тоже 5. */
+    val quickApps = if (strip || wide) 5 else 4
     /** Узкая карточка «Телефон»: имя цветом состояния, ниже время и счётчик, одна кнопка. */
     val phoneCompact = portrait || phone - 2 * g - (if (wide) 2 * t + 2 * g else t + g) < 15 * f2 * 0.55
 

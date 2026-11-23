@@ -172,9 +172,9 @@ class LauncherSpecTest {
         assertEquals(92 * 5 - 21, LauncherSpecs.forSize(1280, 480).phone) // только для оверлея входящего
     }
 
-    @Test fun quickAppsFourPlusAddOrFiveInStrip() {
+    @Test fun quickAppsFourPlusAddOrFiveInStripAndWide() {
         assertEquals(4, LauncherSpecs.forSize(800, 480).quickApps)
-        assertEquals(4, LauncherSpecs.forSize(1920, 720).quickApps)
+        assertEquals(5, LauncherSpecs.forSize(1920, 720).quickApps)
         assertEquals(5, LauncherSpecs.forSize(1280, 480).quickApps)
     }
 

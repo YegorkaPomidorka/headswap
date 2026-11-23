@@ -346,6 +346,8 @@ class AaBridgeCore(
         private set
     @Volatile var huHondaVezel = false         // Honda Vezel (channel 20832125): кнопка звука на ГУ шлёт MUSIC=0/1, на MUSIC=1 возвращаем play
         private set
+    @Volatile var huToyotaDesay = false        // Toyota Desay G6SA (2105xxxx, h1334): после звонка ГУ сама шлёт MUSIC=1, на него возвращаем play
+        private set
     @Volatile var huHonda20772104 = false      // Honda Civic 2021 (channel 20772104, h629): после задней AA встаёт на паузу извне, ГУ тут же просит MUSIC=1
         private set
     @Volatile var huHonda = false              // Honda (STATISTIC_INFO channel 2077xxxx/2083xxxx, HU_INFO пустой): roadName на приборке режется по байтам и клеткам
@@ -372,6 +374,9 @@ class AaBridgeCore(
     @Volatile var huPioneerRm56 = false        // ГУ Pioneer RM56E8B (Dongfeng DF6, h277): 4-5 Мбит/с рвут USB EIO за 25-30 с, живёт на ~1 Мбит/с и fps ≤ 15
         private set
     @Volatile var huMazda20622111 = false      // Mazda Connect 2 из Китая (channel 20622111, h238/h359): VIDEO_DATA > ~16 КиБ вешает чтение USB
+        private set
+    @Volatile var huHonda20772122 = false      // Honda XR-V 2022 (channel 20772122, h1235): IDR ≥ ~600 КиБ - ГУ сбрасывает USB (EIO)
+    @Volatile var huBonAuto20362105 = false    // Bon-Auto (Mitsubishi Outlander, channel 20362105, h1063/h1111): низ кадра - каша при любом разрешении, EIO; пробуем потолок битрейта
         private set
     @Volatile var huMobisNx4c = false          // Hyundai Tucson NX4 (Mobis CCNC, channel 20022188, h242): всё как у Baidu (запись AOA, keepalive, MIC, энкодер 20 fps)
         private set
@@ -607,6 +612,7 @@ class AaBridgeCore(
         gotIdr = false
         huDesayG6S = false                    // HU_INFO / STATISTIC_INFO придут заново в этой сессии
         huHondaVezel = false                   // STATISTIC_INFO придёт заново в этой сессии
+        huToyotaDesay = false                  // STATISTIC_INFO придёт заново в этой сессии
         huHonda20772104 = false                // STATISTIC_INFO придёт заново в этой сессии
         huVw20082120 = false                   // HU_INFO / STATISTIC_INFO придут заново в этой сессии
         huHonda = false                        // STATISTIC_INFO придёт заново в этой сессии
@@ -620,6 +626,8 @@ class AaBridgeCore(
         huHyundaiCn7 = false                   // HU_INFO придёт заново в этой сессии
         huPioneerRm56 = false                  // HU_INFO придёт заново в этой сессии
         huMazda20622111 = false                // STATISTIC_INFO придёт заново в этой сессии
+        huBonAuto20362105 = false              // STATISTIC_INFO придёт заново в этой сессии
+        huHonda20772122 = false                // STATISTIC_INFO придёт заново в этой сессии
         huMobisNx4c = false                    // HU_INFO / STATISTIC_INFO придут заново в этой сессии
         huVwCns2Delphi = false                 // STATISTIC_INFO придёт заново в этой сессии
         huVwCns3_20082122 = false              // STATISTIC_INFO придёт заново в этой сессии
@@ -731,7 +739,9 @@ class AaBridgeCore(
             requestMediaPause("ГУ MODULE_CONTROL MUSIC=0")
             return false
         }
-        if (HU_MUSIC_RESUME_ENABLED && status == 1 && (huDesayG6S || huHondaVezel)) {
+        // Toyota Desay G6SA (h1334, bZ4X 21050016): на звонке MUSIC=0, после звонка на наш MUSIC=1 ещё раз MUSIC=0
+        // (ГУ не вышла из звонка), через ~1,4 с MUSIC=1 - тут и возвращаем play (лог 2026-11-21, три звонка).
+        if (HU_MUSIC_RESUME_ENABLED && status == 1 && (huDesayG6S || huHondaVezel || huToyotaDesay)) {
             val now = clockMs()
             val p = peer
             if (huPausedAa && resumeOnHuMusic && p != null) {
@@ -796,7 +806,7 @@ class AaBridgeCore(
             if (cn7CallEndMs != NEVER) log("BRIDGE CN7: ГУ вернула MUSIC=1 через ${clockMs() - cn7CallEndMs} мс после звонка", true)
             cn7CallActive = false
             cn7CallEndMs = NEVER
-            if (HU_MUSIC_RESUME_ENABLED && resumeOnHuMusic && (huDesayG6S || huHondaVezel)) {
+            if (HU_MUSIC_RESUME_ENABLED && resumeOnHuMusic && (huDesayG6S || huHondaVezel || huToyotaDesay)) {
                 resumeOnHuMusic = false
                 lastHuResumeMs = now
                 lastUserInputMs = now
@@ -1032,6 +1042,7 @@ class AaBridgeCore(
         if (channel == MOBIS_NX4C_CHANNEL) enableMobisNx4c()
         if (channel == DESAY_G6S_CHANNEL) huDesayG6S = true
         if (channel == HONDA_20832125_CHANNEL) huHondaVezel = true
+        if (channel in TOYOTA_DESAY_CHANNELS) huToyotaDesay = true
         if (channel == HONDA_20772104_CHANNEL) huHonda20772104 = true
         if (channel == KIA_20032131_CHANNEL && !huKia20032131) {
             huKia20032131 = true
@@ -1040,6 +1051,14 @@ class AaBridgeCore(
         if (channel == MAZDA_20622111_CHANNEL && !huMazda20622111) {
             huMazda20622111 = true
             log("BRIDGE ГУ Mazda 20622111: VIDEO_DATA режу на куски ≤ $MAZDA_20622111_MAX_VIDEO_PACKET Б, потолок ${MAZDA_20622111_CEILING_BPS / 1000} кбит/с", true)
+        }
+        if (channel == HONDA_20772122_CHANNEL && !huHonda20772122) {
+            huHonda20772122 = true
+            log("BRIDGE ГУ Honda 20772122: потолок битрейта ${HONDA_20772122_CEILING_BPS / 1000} кбит/с, срез по IDR > ${HONDA_20772122_IDR_LIMIT / 1000} КБ (h1235)", true)
+        }
+        if (channel == BONAUTO_20362105_CHANNEL && !huBonAuto20362105) {
+            huBonAuto20362105 = true
+            log("BRIDGE ГУ Bon-Auto 20362105: потолок битрейта ${BONAUTO_20362105_CEILING_BPS / 1000} кбит/с (h1111)", true)
         }
         if (channel == VW_20082120_CHANNEL || channel == VW_CNS3_20082122_CHANNEL || channel == VW_CNS3_20082134_CHANNEL ||
             channel == VW_CNS2_20082114_CHANNEL || channel == SKODA_CNS3_21290002_CHANNEL) huVw20082120 = true
@@ -3018,7 +3037,7 @@ class AaBridgeCore(
                     if (valid) listener?.onFirstFrame(generation)
                 }
             }
-            if (huVw20082138 || huMobisNx4c) link.onEncodedKeyFrame(payload.size)
+            if (huVw20082138 || huMobisNx4c || huHonda20772122) link.onEncodedKeyFrame(payload.size)
             return
         }
         if (!link.sendVideo(data)) {
@@ -3031,7 +3050,7 @@ class AaBridgeCore(
         sent++
         if (idr) idrSent++
         AaState.bridgeSent = sent
-        if (idr && (huVw20082138 || huMobisNx4c)) link.onEncodedKeyFrame(data.size)
+        if (idr && (huVw20082138 || huMobisNx4c || huHonda20772122)) link.onEncodedKeyFrame(data.size)
     }
 
     /**
@@ -3303,6 +3322,8 @@ class AaBridgeCore(
         const val TEXT_WAIT_FRAME = "Android Auto: жду кадр..."
         const val TEXT_AA_LOST = "Android Auto отключился, переподключаю..."
         const val DESAY_MANUFACTURER = "Desay SV Automotive"
+        /** STATISTIC_INFO.channel у Toyota с Desay G6SA: RAV4 XA50, bZ4X (h1334), Venza 2. */
+        val TOYOTA_DESAY_CHANNELS = setOf("21050015", "21050016", "21050023")
         const val DESAY_G6S_MODEL = "G6S"
         const val DESAY_G6S_CHANNEL = "20622116"          // STATISTIC_INFO.channel у Mazda CX-5; Vezel - 20832125, другая Mazda - 21520001
         /** Префиксы STATISTIC_INFO.channel у Honda (CarLife 1.1.0, HU_INFO пустой, BT «Honda HFT»): 2077xxxx (Civic 11, UR-V), 2083xxxx (Vezel и др.). */
@@ -3320,6 +3341,13 @@ class AaBridgeCore(
         const val MAZDA_20622111_MAX_VIDEO_PACKET = 15_000
         const val MAZDA_20622111_ART_BYTES = 12_000          // обложка в MEDIA_INFO: весь пакет должен остаться < 15000 Б
         const val MAZDA_20622111_CEILING_BPS = 1_500_000  // IDR поменьше на случай, если ГУ не склеивает куски
+        /** Bon-Auto (Mitsubishi Outlander, h1063/h1111): низ кадра - каша при любом разрешении, EIO; гипотеза - ГУ не переваривает большие кадры. */
+        const val HONDA_20772122_CHANNEL = "20772122"     // Honda XR-V 2022 (h383/h864/h1235): сброс USB на IDR ≥ ~600 КиБ
+        const val HONDA_20772122_CEILING_BPS = 6_000_000  // на 6 Мбит/с (тепловая ступень WARM) IDR ~440 КиБ, обрывов не было
+        const val HONDA_20772122_MIN_BPS = 3_000_000
+        const val HONDA_20772122_IDR_LIMIT = 450_000      // выжившие IDR ≤ 597 КиБ, обрывы после 605-699 КиБ
+        const val BONAUTO_20362105_CHANNEL = "20362105"
+        const val BONAUTO_20362105_CEILING_BPS = 1_000_000
         const val KIA_20032131_CHANNEL = "20032131"       // Kia Seltos 2026 Китай, QTI sm6150_au madison (h672)
         const val VW_20082120_CHANNEL = "20082120"        // VW, protocol 1.0, versionName="RADIO" (h93)
         const val VW_CNS3_20082122_CHANNEL = "20082122"   // VW CNS3 (Tharu и др.): рвёт USB через ~5,6 с PAUSE без heartbeat (h222)

@@ -15,6 +15,7 @@ import android.os.Looper
 import android.view.View
 import android.view.WindowInsets
 import android.widget.FrameLayout
+import android.widget.Toast
 import com.yegorkapomidorka.headswap.aa.AaCreds
 import com.yegorkapomidorka.headswap.aa.AaPrefs
 import com.yegorkapomidorka.headswap.aa.AaProbe
@@ -183,6 +184,21 @@ class MainActivity : Activity() {
             CarPairing.onResult(this, resultCode, data)
             current()?.onActivityResultDone()
         }
+        if (requestCode == REQ_WALLPAPER) {
+            val uri = data?.data
+            if (resultCode != RESULT_OK || uri == null) return
+            val app = applicationContext
+            // тексты - до потока: язык приложения только у activity, у applicationContext он системный
+            val done = getString(R.string.l_wallpaper_set)
+            val failed = getString(R.string.l_wallpaper_failed)
+            Thread({
+                val ok = com.yegorkapomidorka.headswap.launcher.WallpaperImport.run(app, uri)
+                handler.post {
+                    if (ok) com.yegorkapomidorka.headswap.launcher.LauncherModel.setCustomWallpaper(app)
+                    Toast.makeText(app, if (ok) done else failed, Toast.LENGTH_SHORT).show()
+                }
+            }, "headswap-wallpaper").start()
+        }
     }
 
     /** Отладка беспровода: системный запрос ACCESS_LOCAL_NETWORK (Android 17+). Онбординг с ним появится в Э4. */
@@ -274,6 +290,13 @@ class MainActivity : Activity() {
                     val ask = com.yegorkapomidorka.headswap.launcher.PhoneController.PERMISSIONS.filter { checkSelfPermission(it) != PackageManager.PERMISSION_GRANTED }
                     if (ask.isNotEmpty()) requestPermissions(ask.toTypedArray(), REQ_PHONE_CARD)
                 }
+                // «Галерея» в обоях стола лаунчера: системный выбор фото на экране телефона
+                "wallpaper_pick" -> try {
+                    startActivityForResult(Intent(Intent.ACTION_OPEN_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE).setType("image/*"), REQ_WALLPAPER)
+                } catch (e: Exception) {
+                    AppLog.i("обои: выбор фото не открылся: ${e.javaClass.simpleName}")
+                    Toast.makeText(this, R.string.l_wallpaper_failed, Toast.LENGTH_LONG).show()
+                }
                 "open_aa" -> Actions.openAaSettings(this)
                 // автостарт беспровода без Bluetooth машины: то же, что ACL_CONNECTED / ACL_DISCONNECTED выбранной машины
                 "car_auto" -> startForegroundService(Intent(this, BridgeService::class.java).setAction(BridgeService.ACTION_WIFI_B_AUTO))
@@ -351,6 +374,7 @@ class MainActivity : Activity() {
         private const val REQ_PHONE_STATE = 40      // 38 - диалог CDM (CarPairing), 39 - BLUETOOTH_CONNECT
 
         /** adb shell am start -n com.yegorkapomidorka.headswap/.MainActivity --es cmd aa_selftest */
+        private const val REQ_WALLPAPER = 43        // 42 - PhoneActivationBlock
         const val EXTRA_CMD = "cmd"
         /** Разрешения карточки «Телефон» лаунчера; тот же код, что SettingsScreen.REQ_PHONE_CARD. */
         const val REQ_PHONE_CARD = 41

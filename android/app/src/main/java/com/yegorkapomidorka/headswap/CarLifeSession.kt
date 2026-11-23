@@ -92,6 +92,7 @@ class CarLifeSession(
     // only when the direct Surface encoder is requested, never from an early source flag.
     private val bitratePolicy: BitratePolicy get() = if (encodingSurface) surfaceBitratePolicy else legacyBitratePolicy
     @Volatile private var vwIdrCutMs = NEVER_MS
+    @Volatile private var hondaIdrCutMs = NEVER_MS
     private val thermalThrottle = ThermalThrottle()
     private var thermalStatus = 0                       // только нить cl-sched
     private var thermalHeadroom = Float.NaN
@@ -181,6 +182,9 @@ class CarLifeSession(
     private var vFrames = 0L
     private var vBytes = 0L
     private var vKeys = 0L
+    @Volatile private var vMaxWin = 0        // макс. кадр за окно статистики, Б (h1111)
+    @Volatile private var vMaxKeyWin = 0     // макс. ключевой кадр за окно статистики, Б
+    @Volatile private var vSplitWin = 0      // кадров, порезанных на куски за окно статистики
     private var vBeats = 0L
     private var vDropped = 0L
     private var audioTx = 0L
@@ -781,6 +785,8 @@ class CarLifeSession(
             val stubBps = when {
                 bridge.huPioneerRm56 -> minOf(mode.bitrate, AaBridgeCore.PIONEER_RM56_CEILING_BPS)
                 bridge.huMazda20622111 -> minOf(mode.bitrate, AaBridgeCore.MAZDA_20622111_CEILING_BPS)
+                bridge.huBonAuto20362105 -> minOf(mode.bitrate, AaBridgeCore.BONAUTO_20362105_CEILING_BPS)
+                bridge.huHonda20772122 -> minOf(mode.bitrate, AaBridgeCore.HONDA_20772122_CEILING_BPS)
                 else -> mode.bitrate
             }
             // h529: в passthrough с SPS-кропом заглушка в кадре AA с теми же полями, ГУ не видит смены размера на AA.
@@ -838,15 +844,22 @@ class CarLifeSession(
      * по [AaBridgeCore.MAZDA_20622111_MAX_VIDEO_PACKET] байт, каждый отдельным VIDEO_DATA подряд (расчёт на то, что ГУ
      * склеивает поток перед декодером). Остальные ГУ получают кадр одним пакетом, как раньше.
      */
+    /** ГУ, которые режут/вешают USB на пакетах больше ~16 КиБ: Mazda 20622111 (h359), Bon-Auto 20362105 (h1111: IDR > ~18 КБ = каша, потом ГУ перестаёт читать). */
+    private val huSmallPackets get() = bridge.huMazda20622111 || bridge.huBonAuto20362105
+
     private fun sendVideoData(data: ByteArray) {
+        // размер кадра целиком, до нарезки: на TX видны только куски, там максимум всегда упирается в лимит (h1063)
+        if (data.size > vMaxWin) vMaxWin = data.size
+        if (data.size > vMaxKeyWin && AnnexB.nalTypes(data).contains(5)) vMaxKeyWin = data.size
         val max = AaBridgeCore.MAZDA_20622111_MAX_VIDEO_PACKET
-        if (!bridge.huMazda20622111 || data.size <= max) {
+        if (huSmallPackets && data.size > max) vSplitWin++
+        if (!huSmallPackets || data.size <= max) {
             send(Ch.VIDEO, Wire.dataInner(Msg.VIDEO_DATA, videoTimeMs(), data))
             return
         }
         if (!splitLogged) {
             splitLogged = true
-            AppLog.i("видео: Mazda 20622111, кадр ${data.size} Б режу на ${(data.size + max - 1) / max} VIDEO_DATA по ≤ $max Б")
+            AppLog.i("видео: ${if (bridge.huBonAuto20362105) "Bon-Auto 20362105" else "Mazda 20622111"}, кадр ${data.size} Б режу на ${(data.size + max - 1) / max} VIDEO_DATA по ≤ $max Б")
         }
         val ts = videoTimeMs()
         var off = 0
@@ -969,10 +982,47 @@ class CarLifeSession(
         if (bitratePolicy.current != old) bridge.setEncoderBitrate(bitratePolicy.current)
     }
 
+    /** Bon-Auto 20362105 (h1111): потолок 1 Мбит/с, чтобы кадры (особенно IDR) были поменьше. */
+    private fun applyBonAuto20362105Ceiling() {
+        if (!bridge.huBonAuto20362105) return
+        val old = bitratePolicy.current
+        if (!bitratePolicy.lowerCeiling(AaBridgeCore.BONAUTO_20362105_CEILING_BPS)) return
+        AppLog.i("Bon-Auto 20362105: потолок битрейта ${bitratePolicy.ceilingBps / 1000} кбит/с")
+        if (bitratePolicy.current != old) bridge.setEncoderBitrate(bitratePolicy.current)
+    }
+
     private fun applyHuCeilings() {
         applyVwCeiling()
         applyPioneerCeiling()
         applyMazda20622111Ceiling()
+        applyBonAuto20362105Ceiling()
+        applyHonda20772122Ceiling()
+    }
+
+    /**
+     * Honda XR-V 2022 (channel 20772122, h1235): ГУ сбрасывает USB (EIO, VBUS пропадает) в 4 с после IDR ≥ ~605 КиБ,
+     * IDR ≤ 597 КиБ живут. Навигатор на весь экран при 8 Мбит/с VBR даёт 600-700 КиБ, на 6 Мбит/с ~440. Стартуем с 6.
+     */
+    private fun applyHonda20772122Ceiling() {
+        if (!bridge.huHonda20772122) return
+        val old = bitratePolicy.current
+        if (!bitratePolicy.lowerCeiling(AaBridgeCore.HONDA_20772122_CEILING_BPS)) return
+        AppLog.i("Honda 20772122: потолок битрейта ${bitratePolicy.ceilingBps / 1000} кбит/с (лимит размера IDR)")
+        if (bitratePolicy.current != old) bridge.setEncoderBitrate(bitratePolicy.current)
+    }
+
+    /** Honda 20772122: IDR > 450 КБ - потолок = min(потолок, текущий) ×0,75 (не ниже 3 Мбит/с), не чаще раза в секунду. */
+    private fun honda20772122KeyFrame(size: Int) {
+        if (size <= AaBridgeCore.HONDA_20772122_IDR_LIMIT) return
+        val now = SystemClock.elapsedRealtime()
+        if (hondaIdrCutMs != NEVER_MS && now - hondaIdrCutMs < VW_20082138_CUT_INTERVAL_MS) return
+        applyHonda20772122Ceiling()
+        val old = bitratePolicy.current
+        val target = maxOf(AaBridgeCore.HONDA_20772122_MIN_BPS, (minOf(bitratePolicy.ceilingBps, old) * 0.75).toInt())
+        if (!bitratePolicy.lowerCeiling(target)) return
+        hondaIdrCutMs = now
+        AppLog.i("Honda 20772122: IDR $size Б > ${AaBridgeCore.HONDA_20772122_IDR_LIMIT}, потолок битрейта -> ${bitratePolicy.ceilingBps}")
+        if (bitratePolicy.current != old) bridge.setEncoderBitrate(bitratePolicy.current)
     }
 
     /** Потолок fps под ГУ (Pioneer RM56E8B: 15), null = без ограничения. */
@@ -1008,6 +1058,10 @@ class CarLifeSession(
     override fun onEncodedKeyFrame(size: Int) {
         if (bridge.huMobisNx4c) {
             mobisKeyFrame(size, mobisAaCeiling, "энкодера") { bridge.setEncoderBitrate(it) }
+            return
+        }
+        if (bridge.huHonda20772122) {
+            honda20772122KeyFrame(size)
             return
         }
         if (size <= VW_20082138_IDR_LIMIT) return
@@ -1107,8 +1161,9 @@ class CarLifeSession(
                 art.contentEquals(lastArtSrc) -> lastArtJpeg
                 else -> {
                     val t = SystemClock.elapsedRealtime()
-                    // Mazda 20622111 (h359): пакет > ~16 КиБ вешает USB, обложка 24 КБ убила сессию через 3 с после картинки
-                    val limit = MetaImages.artLimit(cfg.metaArt16k, bridge.huMazda20622111)
+                    // Mazda 20622111 (h359): пакет > ~16 КиБ вешает USB, обложка 24 КБ убила сессию через 3 с после картинки;
+                    // Bon-Auto 20362105 (h1063) под тем же лимитом
+                    val limit = MetaImages.artLimit(cfg.metaArt16k, huSmallPackets)
                     val j = MetaImages.albumJpeg(art, limit) ?: ByteArray(0)
                     AppLog.i("метаданные: обложка ${PbText.blob(art)} -> ${PbText.blob(j)} за ${SystemClock.elapsedRealtime() - t} мс", ui = false)
                     lastArtSrc = art
@@ -1288,7 +1343,7 @@ class CarLifeSession(
 
     private fun send(chan: Int, inner: ByteArray) {
         if (closed.get()) return
-        if (bridge.huMazda20622111 && inner.size > AaBridgeCore.MAZDA_20622111_MAX_VIDEO_PACKET + 12) {
+        if (huSmallPackets && inner.size > AaBridgeCore.MAZDA_20622111_MAX_VIDEO_PACKET + 12) {
             // страховка h359: VIDEO_DATA уже нарезан, всё прочее больше лимита ГУ не шлём - иначе ГУ перестаёт читать USB
             AppLog.i("Mazda 20622111: пакет ch$chan ${inner.size} Б больше лимита ГУ, не отправляю")
             return
@@ -1475,7 +1530,11 @@ class CarLifeSession(
             CarLifeState.status = "ГУ молчит, байт от него нет"
         }
         if (now - lastStatsAt >= 5000 && (vFrames > 0 || vBeats > 0)) {
-            AppLog.i("видео: отправлено кадров=$vFrames (ключевых=$vKeys) байт=$vBytes heartbeat=$vBeats сброшено=$vDropped очередь=${transport.queueSize(Ch.VIDEO)} (+${vFrames - lastStatsFrames} за ${(now - lastStatsAt) / 1000}с)")
+            AppLog.i("видео: отправлено кадров=$vFrames (ключевых=$vKeys) байт=$vBytes heartbeat=$vBeats сброшено=$vDropped очередь=${transport.queueSize(Ch.VIDEO)} (+${vFrames - lastStatsFrames} за ${(now - lastStatsAt) / 1000}с) макс кадр=$vMaxWin Б, макс ключевой=$vMaxKeyWin Б" +
+                if (huSmallPackets) ", порезано кадров=$vSplitWin" else "")
+            vMaxWin = 0
+            vMaxKeyWin = 0
+            vSplitWin = 0
             lastStatsAt = now
             lastStatsFrames = vFrames
             CarLifeState.video = "$chosen; кадров=$vFrames hb=$vBeats"

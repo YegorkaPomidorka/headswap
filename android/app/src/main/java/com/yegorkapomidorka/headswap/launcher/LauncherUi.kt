@@ -213,6 +213,9 @@ object Ico {
     val VOLUME_DOWN = listOf("M3 9h3l4-4v14l-4-4H3z", "M14 12h7")
     val VOLUME_UP = listOf("M3 9h3l4-4v14l-4-4H3z", "M14 12h7", "M17.5 8.5v7")
     val PHONE = listOf("M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2")
+    /** Material Icons call / call_end, Apache 2.0. Залитые (SvgIcon fill = true): кнопки карточки «Телефон». */
+    val CALL = listOf("M20.01 15.38c-1.23 0-2.42-.2-3.53-.56-.35-.12-.74-.03-1.01.24l-1.57 1.97c-2.83-1.35-5.48-3.9-6.89-6.83l1.95-1.66c.27-.28.35-.67.24-1.02-.37-1.11-.56-2.3-.56-3.53 0-.54-.45-.99-.99-.99H4.19C3.65 3 3 3.24 3 3.99 3 13.28 10.73 21 20.01 21c.71 0 .99-.63.99-1.18v-3.45c0-.54-.45-.99-.99-.99z")
+    val CALL_END = listOf("M12 9c-1.6 0-3.15.25-4.6.72v3.1c0 .39-.23.74-.56.9-.98.49-1.87 1.12-2.66 1.85-.18.18-.43.28-.7.28-.28 0-.53-.11-.71-.29L.29 13.08c-.18-.17-.29-.42-.29-.7 0-.28.11-.53.29-.71C3.34 8.78 7.46 7 12 7s8.66 1.78 11.71 4.67c.18.18.29.43.29.71 0 .28-.11.53-.29.71l-2.48 2.48c-.18.18-.43.29-.71.29-.27 0-.52-.11-.7-.28-.79-.74-1.69-1.36-2.67-1.85-.33-.16-.56-.5-.56-.9v-3.1C15.15 9.25 13.6 9 12 9z")
     val CONTACT = listOf(circle(12, 8, 4), "M4 21a8 8 0 0 1 16 0")
     /** Входящий в компактной карточке «Телефон»: трубка с волнами. */
     val PHONE_RING = PHONE + listOf("M15 3a6 6 0 0 1 6 6", "M15 7a2 2 0 0 1 2 2")
@@ -244,6 +247,8 @@ object Ico {
     val NAV_BACK = listOf("M17 4 6 12l11 8z")
     val NAV_HOME = listOf(circle(12, 12, 8))
     val NAV_RECENTS = listOf(roundRectPath(5f, 5f, 14f, 14f, 3f))
+    /** «Галерея» в выборе обоев: рамка с солнцем и горкой. */
+    val IMAGE = listOf(roundRectPath(3f, 3f, 18f, 18f, 2f), "M7 8.5a1.5 1.5 0 1 0 3 0 1.5 1.5 0 1 0-3 0", "m21 15-5-5L5 21")
     /** «Последний» во втором слоте плеера. */
     val REPEAT = listOf("M20 11a8 8 0 0 0-14.5-4.5L4 8", "M4 3v5h5", "M4 13a8 8 0 0 0 14.5 4.5L20 16", "M20 21v-5h-5")
 }
@@ -428,6 +433,8 @@ fun Txt(
     text: String, sizePx: Int, modifier: Modifier = Modifier, color: Color = Pal.TEXT,
     weight: FontWeight = FontWeight.Normal, mono: Boolean = false, maxLines: Int = 1, align: TextAlign = TextAlign.Start,
     ellipsis: Boolean = true,
+    /** Если задан: не влезает - шрифт уменьшается до этого размера (px макета), и только потом многоточие. */
+    minSizePx: Int? = null,
 ) {
     val m = LocalMetrics.current
     // Арабский (RTL): Start/End - по раскладке, а не по абзацу (латиница в RTL-интерфейсе тоже прижата вправо);
@@ -449,6 +456,9 @@ fun Txt(
             textDirection = if (rtl && !hasRtl) TextDirection.ContentOrLtr else TextDirection.Unspecified,
         ),
         maxLines = maxLines, softWrap = maxLines > 1, overflow = if (ellipsis) TextOverflow.Ellipsis else TextOverflow.Clip,
+        autoSize = minSizePx?.takeIf { it < sizePx }?.let {
+            androidx.compose.foundation.text.TextAutoSize.StepBased(minFontSize = m.sp(it), maxFontSize = m.sp(sizePx), stepSize = m.sp(1))
+        },
     )
 }
 
