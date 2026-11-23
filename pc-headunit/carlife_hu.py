@@ -98,7 +98,7 @@ NAMES = {
     0x00018078: "CHANGE_MD_THEME", 0x00018079: "REQUEST_MD_THEME_STATE", 0x00010080: "RESPONSE_MD_THEME_STATE",
     VIDEO_DATA: "VIDEO_DATA", VIDEO_HEARTBEAT: "VIDEO_HEARTBEAT",
     0x00030001: "MEDIA_INIT", 0x00030006: "MEDIA_DATA", 0x00040001: "TTS_INIT", 0x00040003: "TTS_DATA",
-    0x00050002: "VR_INIT", 0x00050003: "VR_DATA",
+    0x00050002: "VR_INIT", 0x00050003: "VR_DATA", 0x00050004: "VR_STOP",
     HU_PROTOCOL_VERSION: "HU_PROTOCOL_VERSION", HU_INFO: "HU_INFO", VIDEO_ENCODER_INIT: "VIDEO_ENCODER_INIT",
     VIDEO_ENCODER_START: "VIDEO_ENCODER_START", VIDEO_ENCODER_PAUSE: "VIDEO_ENCODER_PAUSE", HU_AUTHEN_REQUEST: "HU_AUTHEN_REQUEST",
     HU_AUTHEN_RESULT: "HU_AUTHEN_RESULT", HU_UNKNOWN_1804C: "HU_1804C",
@@ -224,6 +224,27 @@ def pb_render(body: bytes, limit: int = 200) -> str:
 # ---- звук в динамики ПК (--view) ----
 
 MEDIA_INIT, MEDIA_DATA, TTS_INIT, TTS_DATA = 0x00030001, 0x00030006, 0x00040001, 0x00040003
+VR_INIT_A, VR_DATA_A = 0x00050002, 0x00050003   # речь MD в канале VR (ответ помощника, h1318 - подсказки)
+TTS_STOP_A, VR_STOP_A = 0x00040002, 0x00050004
+VOL_MAX = 10
+
+
+def _scale_pcm16(pcm: bytes, gain: float) -> bytes:
+    """Громкость ГУ: PCM16 * gain. numpy, если есть; иначе array (медленнее, но без зависимостей)."""
+    if gain >= 0.999:
+        return pcm
+    if gain <= 0.0:
+        return b"\x00" * len(pcm)
+    try:
+        import numpy as np
+        a = np.frombuffer(pcm[:len(pcm) & ~1], dtype=np.int16).astype(np.float32) * gain
+        return a.astype(np.int16).tobytes()
+    except ImportError:
+        import array
+        a = array.array("h", pcm[:len(pcm) & ~1])
+        for i in range(len(a)):
+            a[i] = int(a[i] * gain)
+        return a.tobytes()
 
 
 class _PcmOut:
@@ -263,6 +284,12 @@ class Speakers:
     def __init__(self, log):
         self.log = log
         self.outs: dict[int, _PcmOut] = {}
+        # h1318: модель громкости ГУ - две крутилки, «Музыка» (MEDIA) и «Голос» (TTS/VR). Кнопки «Гр-/Гр+» крутят ту,
+        # чей поток звучит сейчас: голос, пока открыт TTS/VR или он говорил < 1.5 с назад, иначе музыку.
+        self.vol = {"Музыка": 6, "Голос": 6}
+        self.voice_open: set[int] = set()
+        self.voice_at = 0.0
+        self.on_volume = None                   # колбэк окна: текст громкости в заголовок
         try:
             import sounddevice
             self.sd = sounddevice
@@ -270,10 +297,28 @@ class Speakers:
             self.sd = None
             log(f"speakers: no sound ({e}); pip install sounddevice")
 
+    def active_knob(self) -> str:
+        return "Голос" if self.voice_open or time.monotonic() - self.voice_at < 1.5 else "Музыка"
+
+    def volume_step(self, d: int):
+        k = self.active_knob()
+        self.vol[k] = max(0, min(VOL_MAX, self.vol[k] + d))
+        text = f"{k} {self.vol[k]}/{VOL_MAX}"
+        self.log(f"view: громкость {text} (Музыка {self.vol['Музыка']}, Голос {self.vol['Голос']})")
+        if self.on_volume:
+            self.on_volume(text)
+
     def on(self, chan: int, mtype: int, body: bytes):
+        if chan in (CH_TTS, CH_VR):
+            if mtype in (TTS_INIT, VR_INIT_A):
+                self.voice_open.add(chan)
+            elif mtype in (TTS_STOP_A, VR_STOP_A):
+                self.voice_open.discard(chan)
+            elif mtype in (TTS_DATA, VR_DATA_A):
+                self.voice_at = time.monotonic()
         if self.sd is None:
             return
-        if mtype in (MEDIA_INIT, TTS_INIT):
+        if mtype in (MEDIA_INIT, TTS_INIT, VR_INIT_A):
             f = pb_parse(body)
             rate, ch = pb_get_int(f, 1) or 48000, pb_get_int(f, 2) or 2
             old = self.outs.pop(chan, None)
@@ -291,10 +336,11 @@ class Speakers:
                 self.log(f"speakers: {CH_NAMES[chan]} {rate} Hz {ch} ch -> {self.sd.query_devices(kind='output')['name']}")
             except Exception as e:  # noqa: BLE001
                 self.log(f"speakers: {CH_NAMES[chan]} open failed: {e}")
-        elif mtype in (MEDIA_DATA, TTS_DATA):
+        elif mtype in (MEDIA_DATA, TTS_DATA, VR_DATA_A):
             out = self.outs.get(chan)
             if out:
-                out.write(body)
+                knob = "Музыка" if chan == CH_MEDIA else "Голос"
+                out.write(_scale_pcm16(body, (self.vol[knob] / VOL_MAX) ** 2))
 
     def close(self):
         for out in self.outs.values():
@@ -649,7 +695,7 @@ class HeadUnit:
         if chan == CH_VIDEO and mtype == VIDEO_DATA:
             self.on_video(body)
             return
-        if self.speakers and chan in (CH_MEDIA, CH_TTS):
+        if self.speakers and chan in (CH_MEDIA, CH_TTS, CH_VR):
             self.speakers.on(chan, mtype, body)
         self.counts[(chan, mtype)] += 1
         extra = " TRUNCATED" if trunc else ""
@@ -1293,6 +1339,10 @@ def wheel_buttons(hu: HeadUnit) -> list[tuple[str, object]]:
     """Ряд кнопок руля под окном. Vezel по CarLife шлёт только голос (MODULE_CONTROL VR=1) и BACK (0x0E);
     треки и трубка у него идут по BT, здесь они hard key CarLife, как у других ГУ (HARD_KEY_TO_ANDROID моста)."""
     k = hu.send_hard_key
+
+    def vol(d: int):
+        return lambda: hu.speakers.volume_step(d) if hu.speakers else hu.log("view: громкость - звук выключен (--mute)")
+    volume = [("Гр−", vol(-1)), ("Гр+", vol(+1))]   # h1318: крутилка громкости ГУ (Музыка/Голос), только на ПК
     if hu.o.hu == "mazda":
         # Mazda Commander (лог h737/04.11): поворот 6/7, наклоны 0x15..0x18, нажатие OK 0x14, Домой = MAIN 0x1E,
         # NAVI 0x0B, MEDIA 0x09, BACK 0x0E. «Избранное» не берём: его код неизвестен.
@@ -1311,8 +1361,8 @@ def wheel_buttons(hu: HeadUnit) -> list[tuple[str, object]]:
             ("Голос", hu.send_voice_key),
             ("|<<", lambda: k(0x0F)),
             (">>|", lambda: k(0x10)),
-        ]
-    return [
+        ] + volume
+    return volume + [
         ("Голос", hu.send_voice_key),
         ("VR_START", lambda: k(0x21)),
         ("|<<", lambda: k(0x0F)),
@@ -1341,6 +1391,9 @@ def run_view(hu: HeadUnit, scale: float | None) -> int:
                       lambda: worker.is_alive(), hu.log, HARD_KEY_BACK, HARD_KEY_HOME, wheel=wheel_buttons(hu),
                       knob=MAZDA_KNOB_KEYS if hu.o.hu == "mazda" else None)
     hu.video_sink, hu.size_sink = viewer.pipe.on_video, viewer.pipe.set_video_size
+    if hu.speakers:
+        base = viewer.title
+        hu.speakers.on_volume = lambda text: setattr(viewer, "title", f"{base}  [{text}]")
 
     def work():
         try:

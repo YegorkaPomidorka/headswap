@@ -185,6 +185,10 @@
     <string name="tpreroll_200">200 毫秒</string>
     <string name="tpreroll_400">400 毫秒</string>
 
+    <!-- 导航提示通道（NavChannel） -->
+    <string name="navch_vr">VR（语音通道）</string>
+    <string name="navch_tts">TTS（导航通道）</string>
+
     <!-- 触摸抽样（TouchDecimation） -->
     <string name="tdec_off">关闭</string>
     <string name="tdec_x2">×2</string>
