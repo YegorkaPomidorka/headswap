@@ -131,7 +131,7 @@ CONTROL0, SENSOR1, VIDEO2, INPUT3, SPEECH4, SYSTEM5, MEDIA6, MIC7, BT8, MEDIA_PL
 | `huVwCns3_20082122` | 20082122 (Tharu XR) | вместе с Delphi (`huReportsCalls`): по флажку «Сообщать ГУ о звонках» MODULE_STATUS PHONE + TELE_STATE и пауза MEDIA (ADR 0045) |
 | `huVwBt1420` | «VW BT 1420» | воздух: heartbeat на PAUSE, тёплое возобновление |
 | `huVw20082138` | VW ID (20082138, 20082128+«VW BT 9491», пресет ID. UNYX) | потолок битрейта по IDR (ADR 0008) |
-| `huHyundaiCn7` | product `wp_cn7cpe_cn` | музыка 32 кГц; рабочий стол после HFP-звонка ждёт MUSIC=1 от ГУ до 5 с (`BT_HFP_INDICATION`, ADR 0044) |
+| `huHyundaiCn7` | product `wp_cn7cpe_cn` | музыка 32 кГц; рабочий стол после HFP-звонка ждёт MUSIC=1 от ГУ до 5 с (`BT_HFP_INDICATION`, ADR 0044); на FRAME_RATE_CHANGE (после камеры) следующий IDR с SPS/PPS, заглушка рабочего стола с SPS энкодера (ADR 0059) |
 | `huToyotaDesay` | Toyota Desay G6SA, ch 21050015/16/23 | после нашей паузы на MUSIC=0 (звонок) play по MUSIC=1 от ГУ, как Mazda G6S/Vezel (ADR 0057) |
 | `huPioneerRm56` | Pioneer RM56E8B | перекодирование, 800 кбит/с, ≤10 fps, музыка 22 кГц |
 | `huMazda20622111` | ch 20622111 | VIDEO_DATA ≤ 15000 Б, 1,5 Мбит/с, обложка ≤ 12 КБ (ADR 0009) |

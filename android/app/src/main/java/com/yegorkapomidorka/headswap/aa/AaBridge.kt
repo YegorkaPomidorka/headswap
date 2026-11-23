@@ -3054,6 +3054,21 @@ class AaBridgeCore(
     }
 
     /**
+     * FRAME_RATE_CHANGE от ГУ. Hyundai CN7 после камеры заднего хода сбрасывает декодер и шлёт только его, без START (h1254):
+     * голые IDR декодер не берёт, зелёный до 22 с. Разово, как на START: следующий IDR энкодера уйдёт с SPS/PPS
+     * ([onEncoderFrame], ветка !outGotIdr), P до него выбрасываются. SPS на каждом IDR CN7 не переносит — постоянный
+     * чёрный (h1254test1), поэтому только по событию.
+     */
+    @Synchronized
+    fun onCarlifeFrameRateChange() {
+        if (!huHyundaiCn7 || !carlifeStarted) return
+        val t = transcoder ?: return
+        outGotIdr = false
+        t.requestSyncFrame()
+        log("BRIDGE ГУ Hyundai CN7: FRAME_RATE_CHANGE, следующий IDR энкодера с SPS/PPS", true)
+    }
+
+    /**
      * IDR у энкодера после отказа очереди CarLife - не чаще раза в 1.5 с (IdrThrottle). Иначе большие IDR (30-160 КБ)
      * сами забивают медленный канал. Отказали - ждём уже запрошенный или ближайший естественный IDR (интервал 1 с).
      */
