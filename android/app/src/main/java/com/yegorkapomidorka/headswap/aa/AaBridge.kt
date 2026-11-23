@@ -346,6 +346,8 @@ class AaBridgeCore(
         private set
     @Volatile var huHondaVezel = false         // Honda Vezel (channel 20832125): кнопка звука на ГУ шлёт MUSIC=0/1, на MUSIC=1 возвращаем play
         private set
+    @Volatile var huToyotaDesay = false        // Toyota Desay G6SA (2105xxxx, h1334): после звонка ГУ сама шлёт MUSIC=1, на него возвращаем play
+        private set
     @Volatile var huHonda20772104 = false      // Honda Civic 2021 (channel 20772104, h629): после задней AA встаёт на паузу извне, ГУ тут же просит MUSIC=1
         private set
     @Volatile var huHonda = false              // Honda (STATISTIC_INFO channel 2077xxxx/2083xxxx, HU_INFO пустой): roadName на приборке режется по байтам и клеткам
@@ -610,6 +612,7 @@ class AaBridgeCore(
         gotIdr = false
         huDesayG6S = false                    // HU_INFO / STATISTIC_INFO придут заново в этой сессии
         huHondaVezel = false                   // STATISTIC_INFO придёт заново в этой сессии
+        huToyotaDesay = false                  // STATISTIC_INFO придёт заново в этой сессии
         huHonda20772104 = false                // STATISTIC_INFO придёт заново в этой сессии
         huVw20082120 = false                   // HU_INFO / STATISTIC_INFO придут заново в этой сессии
         huHonda = false                        // STATISTIC_INFO придёт заново в этой сессии
@@ -736,7 +739,9 @@ class AaBridgeCore(
             requestMediaPause("ГУ MODULE_CONTROL MUSIC=0")
             return false
         }
-        if (HU_MUSIC_RESUME_ENABLED && status == 1 && (huDesayG6S || huHondaVezel)) {
+        // Toyota Desay G6SA (h1334, bZ4X 21050016): на звонке MUSIC=0, после звонка на наш MUSIC=1 ещё раз MUSIC=0
+        // (ГУ не вышла из звонка), через ~1,4 с MUSIC=1 - тут и возвращаем play (лог 2026-11-21, три звонка).
+        if (HU_MUSIC_RESUME_ENABLED && status == 1 && (huDesayG6S || huHondaVezel || huToyotaDesay)) {
             val now = clockMs()
             val p = peer
             if (huPausedAa && resumeOnHuMusic && p != null) {
@@ -801,7 +806,7 @@ class AaBridgeCore(
             if (cn7CallEndMs != NEVER) log("BRIDGE CN7: ГУ вернула MUSIC=1 через ${clockMs() - cn7CallEndMs} мс после звонка", true)
             cn7CallActive = false
             cn7CallEndMs = NEVER
-            if (HU_MUSIC_RESUME_ENABLED && resumeOnHuMusic && (huDesayG6S || huHondaVezel)) {
+            if (HU_MUSIC_RESUME_ENABLED && resumeOnHuMusic && (huDesayG6S || huHondaVezel || huToyotaDesay)) {
                 resumeOnHuMusic = false
                 lastHuResumeMs = now
                 lastUserInputMs = now
@@ -1037,6 +1042,7 @@ class AaBridgeCore(
         if (channel == MOBIS_NX4C_CHANNEL) enableMobisNx4c()
         if (channel == DESAY_G6S_CHANNEL) huDesayG6S = true
         if (channel == HONDA_20832125_CHANNEL) huHondaVezel = true
+        if (channel in TOYOTA_DESAY_CHANNELS) huToyotaDesay = true
         if (channel == HONDA_20772104_CHANNEL) huHonda20772104 = true
         if (channel == KIA_20032131_CHANNEL && !huKia20032131) {
             huKia20032131 = true
@@ -3301,6 +3307,8 @@ class AaBridgeCore(
         const val TEXT_WAIT_FRAME = "Android Auto: жду кадр..."
         const val TEXT_AA_LOST = "Android Auto отключился, переподключаю..."
         const val DESAY_MANUFACTURER = "Desay SV Automotive"
+        /** STATISTIC_INFO.channel у Toyota с Desay G6SA: RAV4 XA50, bZ4X (h1334), Venza 2. */
+        val TOYOTA_DESAY_CHANNELS = setOf("21050015", "21050016", "21050023")
         const val DESAY_G6S_MODEL = "G6S"
         const val DESAY_G6S_CHANNEL = "20622116"          // STATISTIC_INFO.channel у Mazda CX-5; Vezel - 20832125, другая Mazda - 21520001
         /** Префиксы STATISTIC_INFO.channel у Honda (CarLife 1.1.0, HU_INFO пустой, BT «Honda HFT»): 2077xxxx (Civic 11, UR-V), 2083xxxx (Vezel и др.). */
