@@ -86,6 +86,12 @@ internal object LauncherModel {
     /** Свои цвета «Вид › Цвета» ([ColorSet]): ночные - для тёмной палитры, дневные - для светлой. */
     var nightColors by mutableStateOf(ColorSet.NIGHT)
     var dayColors by mutableStateOf(ColorSet.DAY)
+    /** Гирлянда по нижнему краю строки статуса ([LauncherPrefs.garland], [GarlandUi]). */
+    var garland by mutableStateOf(false)
+    /** Выбранный праздничный пресет ([LauncherPrefs.festivePreset]): подменяет плитку «Без обоев» в «Цвета › Обои». */
+    var festivePreset by mutableStateOf(ColorPreset.NONE_ID)
+    /** Праздничные обои для первой плитки; null - обычная «Без обоев». */
+    val festiveWallpaper: WallpaperId? get() = ColorPreset.ALL.firstOrNull { it.id == festivePreset }?.wallpaper
     /** На экране «Цвета» настраиваются дневные (иначе ночные); пока он открыт, весь стол показывает этот набор. */
     var colorsEditDay by mutableStateOf(false)
     /** Страница «Цвета» открыта (в альбоме и в портрете - отдельная страница «Вида», ADR 0054). */
@@ -197,6 +203,8 @@ internal object LauncherModel {
         theme = prefs.theme
         nightColors = prefs.nightColors
         dayColors = prefs.dayColors
+        garland = prefs.garland
+        festivePreset = prefs.festivePreset
         railSize = prefs.railSize
         railStyle = prefs.railStyle
         wallpaper = prefs.wallpaper
@@ -286,12 +294,24 @@ internal object LauncherModel {
     /** Слайдер «Цвета» двигается: только состояние, без записи; запись - [saveColors] по отпусканию. */
     fun editColors(set: ColorSet) { if (colorsEditDay) dayColors = set else nightColors = set }
     fun saveColors() { prefs.nightColors = nightColors; prefs.dayColors = dayColors }
+    /** Тап по «Готовому» набору: значения в правимый набор (ночной или дневной), запись, гирлянда по набору. */
+    fun applyPreset(p: ColorPreset) {
+        editColors(p.set(colorsEditDay)); saveColors()
+        garland = p.garland; prefs.garland = p.garland
+        val festive = if (p.garland) p.id else ColorPreset.NONE_ID
+        festivePreset = festive; prefs.festivePreset = festive
+        // праздничный набор ставит свои обои; «Как было» снимает праздничные, Headswap, «Горы» и своё фото не трогает
+        if (p.wallpaper != null) chooseWallpaper(p.wallpaper)
+        else if (wallpaper == WallpaperId.TREE || wallpaper == WallpaperId.WINTER_ROAD) chooseWallpaper(WallpaperId.NONE)
+    }
     /**
      * «Сбросить» на «Цветах и обоях»: правимый набор цветов - к золоту, обои - «Без обоев», размытие и затемнение - по
      * умолчанию (Егор 21.11). Своё фото в filesDir остаётся, его можно выбрать снова.
      */
     fun resetColors() {
         editColors(if (colorsEditDay) ColorSet.DAY else ColorSet.NIGHT); saveColors()
+        garland = false; prefs.garland = false
+        festivePreset = ColorPreset.NONE_ID; prefs.festivePreset = ColorPreset.NONE_ID
         chooseWallpaper(WallpaperId.NONE)
         editWallpaper(blur = WallpaperLogic.BLUR_DEFAULT, dim = WallpaperLogic.DIM_DEFAULT); saveWallpaper()
     }
