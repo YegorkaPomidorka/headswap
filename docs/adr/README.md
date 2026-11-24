@@ -81,3 +81,4 @@
 | 0057 | [Toyota Desay G6SA: после звонка play по MUSIC=1 от ГУ](0057-toyota-desay-resume-on-music1.md) | принято |
 | 0059 | [Hyundai CN7: SPS/PPS по FRAME_RATE_CHANGE, заглушка рабочего стола с SPS энкодера](0059-hyundai-cn7-sps-on-frame-rate-change.md) | принято |
 | 0060 | [Подсказки навигатора в CarLife-канал VR: отдельная громкость на ГУ](0060-nav-prompts-in-vr-channel.md) | принято |
+| 0062 | [Левая рейка прячется свайпом по экрану ГУ: ловим в мосту, не задерживая касание](0062-rail-swipe-hide.md) | принято |
