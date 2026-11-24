@@ -219,7 +219,9 @@ private fun Rail(glass: Boolean) {
             // разделитель посередине зазора между рядами плиток
             Box(Modifier.align(Alignment.TopCenter).offset(y = m.dp(s.dividerY)).width(m.dp(s.rb)).height(m.dp(maxOf(1, s.t / 96)))
                 .background(Brush.horizontalGradient(listOf(Color.Transparent, Color.White.copy(alpha = 0.4f), Color.Transparent))))
-            NavLens(Modifier.align(Alignment.TopCenter).offset(y = m.dp(s.lensTop)))
+            // смещение - на обёртке: рамку шайбы Pressable рисует до своего modifier, и offset внутри неё
+            // увёз бы линзу вниз, а белое кольцо оставил бы вверху рейки поверх «Назад» (h1413)
+            Box(Modifier.align(Alignment.TopCenter).offset(y = m.dp(s.lensTop))) { NavLens(Modifier) }
         }
         return
     }
