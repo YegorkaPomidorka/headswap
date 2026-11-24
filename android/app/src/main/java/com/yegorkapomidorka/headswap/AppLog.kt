@@ -85,6 +85,11 @@ object AppLog {
 
     /** Лог одного сообщения: заголовок + hexdump первых 256 байт inner и декодированный protobuf. */
     fun msg(dir: String, chan: Int, outerLen: Int, type: Int, len: Int, decoded: String?, inner: ByteArray, ui: Boolean = true, note: String = "") {
+        // в BT OOB-сообщениях passKey/hash/randomizer, а лог уходит пользователю в zip
+        if (type == Msg.HU_BT_OOB_INFO || type == Msg.MD_BT_OOB_INFO) {
+            i("$dir ${Ch.name(chan)} ${Msg.hex(type)} ${Msg.name(type)} len=$len <скрыто>", ui)
+            return
+        }
         val head = "$dir ${Ch.name(chan)} ${Msg.hex(type)} ${Msg.name(type)} len=$len" +
             (if (decoded != null) " $decoded" else "") + note
         i(head, ui)
