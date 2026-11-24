@@ -128,6 +128,12 @@
     <string name="l_s_colors_bg_hue">背景色相</string>
     <string name="l_s_colors_bg_sat">背景饱和度</string>
     <string name="l_s_colors_hint">此页面打开期间，桌面会显示您正在编辑的颜色。夜间颜色用于深色主题，白天颜色用于浅色主题。</string>
+    <string name="l_s_colors_presets">预设</string>
+    <string name="l_s_preset_default">默认</string>
+    <string name="l_s_preset_tree">圣诞树</string>
+    <string name="l_s_preset_new_year">新年</string>
+    <string name="l_ny_countdown">距离新年</string>
+    <string name="l_ny_greeting">%1$s 新年快乐！</string>
     <string name="l_s_wallpaper">壁纸</string>
     <string name="l_s_wallpaper_sub_glass">毛玻璃下方，铺满整个桌面</string>
     <string name="l_s_wallpaper_sub_solid">仅在“玻璃”样式下生效</string>

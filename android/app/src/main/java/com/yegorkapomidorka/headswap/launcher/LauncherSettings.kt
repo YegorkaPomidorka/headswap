@@ -2,6 +2,7 @@ package com.yegorkapomidorka.headswap.launcher
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -196,7 +197,7 @@ fun LauncherSettingsScreen() {
                         }
                         SettingsPage.COLORS -> if (s.portrait) {
                             // портрет: режим, три слайдера одной карточкой, обои (миниатюры в пропорции экрана), размытие
-                            // с затемнением, подсказка; доли высоты 1 : 3 : 4 : 2 : 1
+                            // с затемнением, «Готовые»; доли высоты 1 : 3 : 4 : 2 : 1
                             val unitH = (h - 4 * gap) / 11
                             val dc = SettingsDims(s, unitH)
                             val set = if (model.colorsEditDay) model.dayColors else model.nightColors
@@ -220,14 +221,10 @@ fun LauncherSettingsScreen() {
                                     ColorSliderRow(stringResource(R.string.l_s_wallpaper_dim), model.wallpaperDim, 100, dc, it, WALLPAPER_DIM_TRACK,
                                         enabled = glass, onRelease = { model.saveWallpaper() }) { v -> model.editWallpaper(dim = v) }
                                 }
-                                Card(row.weight(1f)) {
-                                    Box(Modifier.fillMaxSize().padding(start = m.dp(dc.padStart), end = m.dp(dc.padEnd)), contentAlignment = Alignment.CenterStart) {
-                                        Txt(stringResource(R.string.l_s_colors_hint), dc.sub, color = Pal.SEC, maxLines = 2, ellipsis = false)
-                                    }
-                                }
+                                PresetsCard(dc, row.weight(1f), withLabel = false)
                             }
                         } else {
-                            // шесть долей высоты: режим, три цвета рядом, обои (две доли), размытие с затемнением, подсказка
+                            // шесть долей высоты: режим, три цвета рядом, обои (две доли), размытие с затемнением, «Готовые»
                             val unitH = (h - 4 * gap) / 6
                             val dc = SettingsDims(s, unitH)
                             val set = if (model.colorsEditDay) model.dayColors else model.nightColors
@@ -255,11 +252,7 @@ fun LauncherSettingsScreen() {
                                     CompactSliderCard(stringResource(R.string.l_s_wallpaper_dim), model.wallpaperDim, 100, dc, cardM, WALLPAPER_DIM_TRACK,
                                         enabled = glass, onRelease = { model.saveWallpaper() }) { model.editWallpaper(dim = it) }
                                 }
-                                Card(row.weight(1f)) {
-                                    Box(Modifier.fillMaxSize().padding(start = m.dp(dc.padStart), end = m.dp(dc.padEnd)), contentAlignment = Alignment.CenterStart) {
-                                        Txt(stringResource(R.string.l_s_colors_hint), dc.sub, color = Pal.SEC, maxLines = 2, ellipsis = false)
-                                    }
-                                }
+                                PresetsCard(dc, row.weight(1f), withLabel = true)
                             }
                         }
                         SettingsPage.NAVIGATOR -> {
@@ -570,6 +563,64 @@ private fun ColorsSwatch(pal: LauncherPalette, d: SettingsDims) {
         .background(Brush.linearGradient(pal.bgStops.map { it.second }))
         .border(m.dp(1), pal.sep, RoundedCornerShape(m.dp(max(2, h / 6))))) {
         Box(Modifier.align(Alignment.BottomStart).width(m.dp(h * 16 / 9 / 4)).height(m.dp(h * 4 / 10)).background(pal.accent))
+    }
+}
+
+/**
+ * «Готовые» наборы цветов: три равные пилюли с миниатюрой и подписью (ADR 0063). Тап применяет набор к правимому
+ * (ночному или дневному), выбранный - тот, чьи значения совпали с текущими. [withLabel] - слева подпись ряда (в портрете места нет).
+ */
+@Composable
+private fun PresetsCard(d: SettingsDims, modifier: Modifier, withLabel: Boolean) {
+    val m = LocalMetrics.current
+    val s = m.spec
+    val model = LauncherModel
+    val light = model.colorsEditDay
+    val cur = if (light) model.dayColors else model.nightColors
+    Card(modifier) {
+        Row(Modifier.fillMaxSize().padding(start = m.dp(d.padStart), end = m.dp(d.padEnd)), verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(m.dp(s.g8))) {
+            if (withLabel) Txt(stringResource(R.string.l_s_colors_presets), d.sub, color = Pal.SEC, ellipsis = false)
+            for (p in ColorPreset.ALL) {
+                val label = stringResource(when (p.id) {
+                    "tree" -> R.string.l_s_preset_tree
+                    "new_year" -> R.string.l_s_preset_new_year
+                    else -> R.string.l_s_preset_default
+                })
+                val shape = RoundedCornerShape(m.dp(d.ctl / 2))
+                OptionBox(p.set(light) == cur, Modifier.weight(1f).height(m.dp(d.ctl)), shape, label,
+                    unselected = LocalPalette.current.btnSet, onTap = { model.applyPreset(p) }) {
+                    Row(Modifier.fillMaxSize().padding(horizontal = m.dp(d.pillPad / 2)), verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(m.dp(s.g8), Alignment.CenterHorizontally)) {
+                        PresetSwatch(p, light, d)
+                        Txt(label, (s.f2 * 0.7f).roundToInt(), Modifier.weight(1f, fill = false), weight = FontWeight.SemiBold,
+                            maxLines = 2, ellipsis = false)
+                    }
+                }
+            }
+        }
+    }
+}
+
+/** Миниатюра набора 16:9 (56x32 при T 96): фон палитры, уголок акцента слева снизу; у праздничных - огоньки гирлянды по верху. */
+@Composable
+private fun PresetSwatch(p: ColorPreset, light: Boolean, d: SettingsDims) {
+    val m = LocalMetrics.current
+    val set = p.set(light)
+    val pal = LauncherColors.palette(light, set)
+    val h = max(8, d.ctl / 3)
+    val w = h * 16 / 9
+    val corner = RoundedCornerShape(m.dp(max(2, h / 6)))
+    Box(Modifier.width(m.dp(w)).height(m.dp(h)).clip(corner).background(Brush.linearGradient(pal.bgStops.map { it.second }))
+        .border(m.dp(1), pal.sep, corner)) {
+        Box(Modifier.align(Alignment.BottomStart).width(m.dp(w / 4)).height(m.dp(h * 4 / 10)).background(pal.accent))
+        if (p.garland) {
+            val lights = remember(set.accentHue) { GarlandLogic.colors(set.accentHue) }
+            Canvas(Modifier.fillMaxSize()) {
+                val r = max(1f, size.height / 11f)
+                for (i in 0 until 5) drawCircle(lights[i % lights.size], r, androidx.compose.ui.geometry.Offset(size.width * (i + 0.5f) / 5f, size.height * 0.16f))
+            }
+        }
     }
 }
 

@@ -128,6 +128,12 @@
     <string name="l_s_colors_bg_hue">Оттенок фона</string>
     <string name="l_s_colors_bg_sat">Насыщенность фона</string>
     <string name="l_s_colors_hint">Пока открыт этот экран, стол показывает настраиваемые цвета. Ночные видны в тёмной теме, дневные — в светлой.</string>
+    <string name="l_s_colors_presets">Готовые</string>
+    <string name="l_s_preset_default">По умолчанию</string>
+    <string name="l_s_preset_tree">Ёлка</string>
+    <string name="l_s_preset_new_year">Новогодний</string>
+    <string name="l_ny_countdown">До Нового года</string>
+    <string name="l_ny_greeting">С Новым %1$s годом!</string>
     <string name="l_s_wallpaper">Обои</string>
     <string name="l_s_wallpaper_sub_glass">Под стеклом на всём столе</string>
     <string name="l_s_wallpaper_sub_solid">Работают только в стиле «Стекло»</string>

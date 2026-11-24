@@ -61,6 +61,11 @@ class LauncherPrefs(private val context: Context) {
         get() = ColorSet.decode(prefs.getString("colors_day", null), ColorSet.DAY)
         set(value) { prefs.edit().putString("colors_day", value.encode()).apply() }
 
+    /** Гирлянда на строке статуса: включается праздничным набором «Вид › Цвета › Готовые», «По умолчанию» и «Сбросить» её гасят. */
+    var garland: Boolean
+        get() = prefs.getBoolean("garland", false)
+        set(value) { prefs.edit().putBoolean("garland", value).apply() }
+
     var railSize: RailSize
         get() = RailSize.restore(prefs.getString("rail_size", null))
         set(value) { prefs.edit().putString("rail_size", value.name).apply() }

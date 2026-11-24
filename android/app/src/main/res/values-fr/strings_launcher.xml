@@ -128,6 +128,12 @@
     <string name="l_s_colors_bg_hue">Teinte du fond</string>
     <string name="l_s_colors_bg_sat">Saturation du fond</string>
     <string name="l_s_colors_hint">Tant que cet écran est ouvert, le bureau affiche les couleurs que vous modifiez. Les couleurs de nuit s\'affichent avec le thème sombre, celles de jour avec le thème clair.</string>
+    <string name="l_s_colors_presets">Prêts à l\'emploi</string>
+    <string name="l_s_preset_default">Par défaut</string>
+    <string name="l_s_preset_tree">Sapin</string>
+    <string name="l_s_preset_new_year">Nouvel An</string>
+    <string name="l_ny_countdown">Avant le Nouvel An</string>
+    <string name="l_ny_greeting">Bonne année %1$s !</string>
     <string name="l_s_wallpaper">Fond d\'écran</string>
     <string name="l_s_wallpaper_sub_glass">Sous le verre, sur tout le bureau</string>
     <string name="l_s_wallpaper_sub_solid">Uniquement avec le style Verre</string>
