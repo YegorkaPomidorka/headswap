@@ -80,6 +80,8 @@ fun NavPlayerPlateOverlay() {
     // как у Алисы и шаблонов навигатора: px макета 1280x720 по высоте, в портрете по T
     val k = if (m.spec.portrait) m.spec.t / 96f else m.spec.h / 720f
     fun px(v: Int) = (v * k).roundToInt()
+    // содержимое плашки крупнее макета в [NavPlayerPlate.SCALE] раз (Егор 24.11: мелко), W и H уже с ним
+    fun ps(v: Int) = (v * k * NavPlayerPlate.SCALE).roundToInt()
     val glass = homeGlassStyle
     val fg = if (glass) Pal.WHITE else Pal.TEXT
     val plateH = px(NavPlayerPlate.H)
@@ -97,7 +99,7 @@ fun NavPlayerPlateOverlay() {
     val (ox, oy) = NavPlayerPlate.origin(saved, areaW, areaH, fullW, plateH, k)
     val origin by rememberUpdatedState(Offset(ox.toFloat(), oy.toFloat()))
     val at = drag ?: origin
-    val shape: Shape = if (look == NavPlayerPlate.Look.COLLAPSED) CircleShape else RoundedCornerShape(m.dp(px(18)))
+    val shape: Shape = if (look == NavPlayerPlate.Look.COLLAPSED) CircleShape else RoundedCornerShape(m.dp(ps(18)))
     // непрозрачная, как сплошная шторка уведомлений: Pal.SURFACE - белый 7% поверх фона лаунчера, на светлой карте
     // текст и prev / next пропадали (стенд 24.11, Google Карты). bar сам светлый днём и тёмный ночью
     val surface = LocalPalette.current.bar
@@ -140,51 +142,51 @@ fun NavPlayerPlateOverlay() {
                     drag = null
                 }
             }
-            .then(if (glass) Modifier else Modifier.shadow(m.dp(px(12)), shape, clip = false))
+            .then(if (glass) Modifier else Modifier.shadow(m.dp(ps(12)), shape, clip = false))
             .clip(shape)
             .then(if (glass) Modifier.homeGlassPanel(shape, m.spec.t / 96f) else Modifier.background(surface, shape)),
     ) {
         if (look == NavPlayerPlate.Look.COLLAPSED) {
             RoundButton(plateH, stringResource(R.string.l_music_players), onTap = unlessDragged { pausedSince = SystemClock.uptimeMillis() }) {
-                SvgIcon(Ico.MUSIC, px(28), fg)
+                SvgIcon(Ico.MUSIC, ps(28), fg)
             }
             return@Box
         }
         // обложка и название открывают приложение плеера; prev / play / next всегда слева направо
         Ltr {
             Row(
-                Modifier.fillMaxSize().padding(start = m.dp(px(8)), end = m.dp(px(10))),
-                verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(m.dp(px(12))),
+                Modifier.fillMaxSize().padding(start = m.dp(ps(8)), end = m.dp(ps(10))),
+                verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(m.dp(ps(12))),
             ) {
                 Pressable(Modifier.weight(1f), description = stringResource(R.string.l_music_players),
                     onTap = unlessDragged { LauncherActions.openMusicApp() }) {
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(m.dp(px(12)))) {
-                        val cover = px(56)
-                        Box(Modifier.size(m.dp(cover)).clip(RoundedCornerShape(m.dp(px(12)))).background(Color(0x33FFFFFF)),
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(m.dp(ps(12)))) {
+                        val cover = ps(56)
+                        Box(Modifier.size(m.dp(cover)).clip(RoundedCornerShape(m.dp(ps(12)))).background(Color(0x33FFFFFF)),
                             contentAlignment = Alignment.Center) {
                             val art = st.art
                             if (art != null) Image(art, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
-                            else SvgIcon(Ico.MUSIC, px(28), fg.copy(alpha = 0.6f))
+                            else SvgIcon(Ico.MUSIC, ps(28), fg.copy(alpha = 0.6f))
                         }
                         LocaleDir {
-                            Column(verticalArrangement = Arrangement.spacedBy(m.dp(px(2)))) {
-                                Txt(st.title, px(16), color = fg, weight = FontWeight.SemiBold)
-                                if (st.artist.isNotEmpty()) Txt(st.artist, px(13), color = fg.copy(alpha = 0.7f))
+                            Column(verticalArrangement = Arrangement.spacedBy(m.dp(ps(2)))) {
+                                Txt(st.title, ps(16), color = fg, weight = FontWeight.SemiBold)
+                                if (st.artist.isNotEmpty()) Txt(st.artist, ps(13), color = fg.copy(alpha = 0.7f))
                             }
                         }
                     }
                 }
                 val player = st.pkg ?: model.selectedPlayer
-                RoundButton(px(44), stringResource(R.string.l_prev), onTap = unlessDragged { MusicController.previous() }) {
-                    SvgIcon(Ico.PREV, px(22), fg, fill = true)
+                RoundButton(ps(44), stringResource(R.string.l_prev), onTap = unlessDragged { MusicController.previous() }) {
+                    SvgIcon(Ico.PREV, ps(22), fg, fill = true)
                 }
-                RoundButton(px(48), stringResource(if (st.playing) R.string.l_pause else R.string.l_play),
+                RoundButton(ps(48), stringResource(if (st.playing) R.string.l_pause else R.string.l_play),
                     onTap = unlessDragged { MusicController.playPause(model.context, player) },
                     background = if (glass) Color(0x29FFFFFF) else LocalAccent.current) {
-                    SvgIcon(if (st.playing) Ico.PAUSE else Ico.PLAY, px(22), Pal.WHITE, fill = true)
+                    SvgIcon(if (st.playing) Ico.PAUSE else Ico.PLAY, ps(22), Pal.WHITE, fill = true)
                 }
-                RoundButton(px(44), stringResource(R.string.l_next), onTap = unlessDragged { MusicController.next() }) {
-                    SvgIcon(Ico.NEXT, px(22), fg, fill = true)
+                RoundButton(ps(44), stringResource(R.string.l_next), onTap = unlessDragged { MusicController.next() }) {
+                    SvgIcon(Ico.NEXT, ps(22), fg, fill = true)
                 }
             }
         }
