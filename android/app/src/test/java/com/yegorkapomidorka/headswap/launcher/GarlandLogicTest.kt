@@ -47,7 +47,7 @@ class GarlandLogicTest {
         assertEquals(ColorSet.DAY, ColorPreset.DEFAULT.day)
         assertTrue(!ColorPreset.DEFAULT.garland && ColorPreset.TREE.garland && ColorPreset.NEW_YEAR.garland)
         assertEquals(ColorSet(46, 152, 70), ColorPreset.TREE.night)
-        assertEquals(ColorSet(140, 350, 60), ColorPreset.NEW_YEAR.night)
+        assertEquals(ColorSet(0, 350, 85), ColorPreset.NEW_YEAR.night)
     }
 }
 
