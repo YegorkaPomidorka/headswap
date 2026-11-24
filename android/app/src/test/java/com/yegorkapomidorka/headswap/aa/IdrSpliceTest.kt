@@ -558,6 +558,23 @@ class IdrSpliceBridgeTest {
         assertTrue(dec.stopped)
     }
 
+    /** dispose() гасит нити сборки и пул слайсов; после него поздние кадры не собирают IDR и не падают на закрытых исполнителях. */
+    @Test
+    fun disposeShutsDownBuildThreads() {
+        val build = java.util.concurrent.Executors.newSingleThreadExecutor()
+        val pool = java.util.concurrent.Executors.newFixedThreadPool(2)
+        core.spliceExecutor = build
+        core.spliceSlicePool = pool
+        startWith(3)
+        core.dispose()
+        assertTrue(build.isShutdown)
+        assertTrue(pool.isShutdown)
+        decoded(3)
+        now = 2000; core.tick()                                 // сборка бы стартовала: после dispose её нет
+        core.dispose()                                          // повторный вызов безвреден
+        assertTrue(build.isTerminated || build.awaitTermination(1, java.util.concurrent.TimeUnit.SECONDS))
+    }
+
     companion object {
         const val MISSES = AaBridgeCore.SPLICE_MAX_MISSES
     }

@@ -6,6 +6,7 @@ import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executor
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
+import java.util.concurrent.RejectedExecutionException
 import java.util.concurrent.ScheduledExecutorService
 import java.util.concurrent.TimeUnit
 
@@ -406,12 +407,17 @@ class AaBridgeCore(
         private set
 
     // Серийность аудио, по MD Baidu: NAVI перед TTS, MEDIA отпускается PAUSE, TTS_STOP с задержкой.
-    private val audioTimer: ScheduledExecutorService by lazy {
+    private val audioTimerLazy = lazy {
         Executors.newSingleThreadScheduledExecutor { r -> Thread(r, "aa-audio-timer").also { it.isDaemon = true } }
     }
+    private val audioTimer: ScheduledExecutorService by audioTimerLazy
     private val audioSched: (Long, Runnable) -> MicTimerHandle = audioSchedule ?: { delayMs, task ->
-        val f = audioTimer.schedule(task, delayMs, TimeUnit.MILLISECONDS)
-        MicTimerHandle { f.cancel(false) }
+        try {
+            val f = audioTimer.schedule(task, delayMs, TimeUnit.MILLISECONDS)
+            MicTimerHandle { f.cancel(false) }
+        } catch (_: RejectedExecutionException) {      // ядро уже dispose()
+            MicTimerHandle { }
+        }
     }
 
     /** Одноразовый отменяемый таймер; задача идёт под блокировкой ядра, отменённая (даже уже вставшая в очередь) не выполняется. */
@@ -587,9 +593,10 @@ class AaBridgeCore(
     /** Микрофон телефона (AudioRecord); null = нет. Один экземпляр на всё время: router вызывает start/stop по очереди. */
     @Volatile var phoneMic: PhoneMic? = null
 
-    private val micTimer: ScheduledExecutorService by lazy {
+    private val micTimerLazy = lazy {
         Executors.newSingleThreadScheduledExecutor { r -> Thread(r, "aa-mic-timer").also { it.isDaemon = true } }
     }
+    private val micTimer: ScheduledExecutorService by micTimerLazy
 
     private val mic = AaMicRouter(
         log = log,
@@ -599,8 +606,12 @@ class AaBridgeCore(
         phone = { phoneMic },
         toAa = { pcm, ts -> peer?.sendMicPcm(pcm, ts) },
         schedule = micSchedule ?: { delayMs, task ->
-            val f = micTimer.schedule(task, delayMs, TimeUnit.MILLISECONDS)
-            MicTimerHandle { f.cancel(false) }
+            try {
+                val f = micTimer.schedule(task, delayMs, TimeUnit.MILLISECONDS)
+                MicTimerHandle { f.cancel(false) }
+            } catch (_: RejectedExecutionException) {      // ядро уже dispose()
+                MicTimerHandle { }
+            }
         },
         nowMs = clockMs,
         nowUs = clockUs,
@@ -2624,7 +2635,7 @@ class AaBridgeCore(
             val ready = refPicSeq == seq                // сначала номер, потом картинка: она не старше номера
             val pic = refPic
             val sp = splicer
-            if (seq == 0L || spliceBuilding || !ready || pic == null || sp == null) return
+            if (seq == 0L || spliceBuilding || !ready || pic == null || sp == null || disposed) return
             val job = sp.prepare()
             if (job == null || job.seq != seq) {
                 // в фоне: AA прислал кадр раньше, чем декодер отдал картинку
@@ -2643,16 +2654,36 @@ class AaBridgeCore(
         // копия: в фоне декодер может писать в тот же буфер следующую картинку (тогда этот IDR и так устареет)
         val pic = task.pic.copy()
         val exec = task.exec
-        exec.execute {
-            val t0 = clockMs()
-            val r = try {
-                b.build(job, pic)
-            } catch (e: RuntimeException) {
-                log("BRIDGE свой IDR: !!!!!! сборка упала: ${e.javaClass.simpleName}: ${e.message}", true)
-                null
+        try {
+            exec.execute {
+                val t0 = clockMs()
+                val r = try {
+                    b.build(job, pic)
+                } catch (e: RuntimeException) {
+                    log("BRIDGE свой IDR: !!!!!! сборка упала: ${e.javaClass.simpleName}: ${e.message}", true)
+                    null
+                }
+                spliceComplete(job, r, clockMs() - t0)
             }
-            spliceComplete(job, r, clockMs() - t0)
+        } catch (_: RejectedExecutionException) {      // dispose() успел между блокировкой и execute
+            spliceComplete(job, null, 0)
         }
+    }
+
+    @Volatile private var disposed = false
+
+    /**
+     * Ядро окончательно снесено (хост закрыт, переиспользовать не будем): гасим нити сборки IDR и таймеры.
+     * Поздние кадры после этого свой IDR не собирают и в закрытые исполнители не пишут.
+     */
+    @Synchronized
+    fun dispose() {
+        if (disposed) return
+        disposed = true
+        (spliceExecutor as? ExecutorService)?.shutdownNow()
+        spliceSlicePool?.shutdownNow()
+        if (audioTimerLazy.isInitialized()) audioTimer.shutdownNow()
+        if (micTimerLazy.isInitialized()) micTimer.shutdownNow()
     }
 
     private class BuildTask(val job: IdrSplicer.Job, val builder: IdrBuilder, val exec: Executor, val pic: IdrSplice.Picture)

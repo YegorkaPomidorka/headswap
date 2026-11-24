@@ -1299,7 +1299,9 @@ class BridgeService : Service() {
         DesktopNavHints.target = null
         com.yegorkapomidorka.headswap.dex.DesktopMediaMeta.stop()
         val recovery = pendingDesktopRecovery
-        if (recovery != null && recovery.owner === owner && desktopRecovery.isCurrent(recovery.attempt)) {
+        val recovering = recovery != null && recovery.owner === owner && desktopRecovery.isCurrent(recovery.attempt)
+        if (!recovering) owner.core.dispose()      // recoverDesktop переиспользует ядро этого хоста
+        if (recovery != null && recovering) {
             // колбэк подтверждает закрытие и привилегированного производителя, и энкодера с Surface
             DexState.error = null
             DexState.status = getString(R.string.desk_recovering, recovery.attempt.number)
@@ -1309,25 +1311,31 @@ class BridgeService : Service() {
     }
 
     private fun recoverDesktop(recovery: Recovery) {
-        if (pendingDesktopRecovery !== recovery || !desktopRecovery.consume(recovery.attempt)) return
+        // ядро хоста держали ради восстановления: не вышло - гасим его нити
+        if (!tryRecoverDesktop(recovery)) recovery.owner.core.dispose()
+    }
+
+    private fun tryRecoverDesktop(recovery: Recovery): Boolean {
+        if (pendingDesktopRecovery !== recovery || !desktopRecovery.consume(recovery.attempt)) return false
         pendingDesktopRecovery = null
-        if (host != null || session !== recovery.session || !recovery.owner.isTornDown) return
+        if (host != null || session !== recovery.session || !recovery.owner.isTornDown) return false
         // после паузы проверяем заново: Стоп, отключение, отозванный доступ, смерть сервера или блокировка отменяют восстановление
         if (!canRecoverDesktop(recovery.session)) {
             DexState.error = getString(R.string.desk_recovery_stopped)
             AppLog.i("DESKTOP recovery cancelled: current session/access no longer eligible", false)
-            return
+            return false
         }
         val core = recovery.owner.core
         if (!core.rearmDesktopSurfaceAfterStop()) {
             DexState.error = getString(R.string.desk_recovery_screen_busy)
-            return
+            return false
         }
         val replacement = createDesktopHost(AaPrefs(this), core.videoMode, core.densityOverride,
-            previous = recovery.owner, recoveredCore = core) ?: return
+            previous = recovery.owner, recoveredCore = core) ?: return false
         host = replacement
         AppLog.i("DESKTOP recovery bind attempt=${recovery.attempt.number}/2; fresh producer and encoder generation", false)
         replacement.onUsbSessionStarted()
+        return true
     }
 
     private fun cancelDesktopRecovery() {
@@ -1410,6 +1418,7 @@ class BridgeService : Service() {
             val ref = arrayOfNulls<BridgeHost>(1)
             val h = BridgeHost(core, conn, scheduler, log, previous = previous, onTornDown = {
                 main.post {
+                    core.dispose()      // режим AA ядро не переиспользует: новый хост = новое ядро
                     if (host === ref[0]) host = null
                     AppLog.i("BRIDGE: AA закрыта полностью")
                     if (session == null && host == null && !linkWaiting && !wifiBMode && !usbToAirPending && dongle == null) finish()
@@ -1564,6 +1573,7 @@ class BridgeService : Service() {
         }
         session?.close("сервис уничтожен")
         host?.shutdown("сервис уничтожен")
+        scheduler.shutdownNow()      // после stopRequested BridgeHost закрывается сразу (immediate), grace больше не планируется
         releaseSessionWakeLocks()
         super.onDestroy()
     }
