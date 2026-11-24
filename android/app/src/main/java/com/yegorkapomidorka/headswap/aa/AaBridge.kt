@@ -346,6 +346,8 @@ class AaBridgeCore(
         private set
     @Volatile var huHondaVezel = false         // Honda Vezel (channel 20832125): кнопка звука на ГУ шлёт MUSIC=0/1, на MUSIC=1 возвращаем play
         private set
+    @Volatile var huToyotaDesay = false        // Toyota Desay G6SA (2105xxxx, h1334): после звонка ГУ сама шлёт MUSIC=1, на него возвращаем play
+        private set
     @Volatile var huHonda20772104 = false      // Honda Civic 2021 (channel 20772104, h629): после задней AA встаёт на паузу извне, ГУ тут же просит MUSIC=1
         private set
     @Volatile var huHonda = false              // Honda (STATISTIC_INFO channel 2077xxxx/2083xxxx, HU_INFO пустой): roadName на приборке режется по байтам и клеткам
@@ -359,6 +361,9 @@ class AaBridgeCore(
     val huReportsCalls: Boolean get() = huVwCns2Delphi || huVwCns3_20082122
     @Volatile var huIdleVideoHeartbeat = false // 20082114 (h425), Skoda CNS3 21290002 (h625): без видео 5-6 с рвёт USB и вне PAUSE
     private var vrReply = false                // поток ответа ассистента открыт в канале VR (VR_INIT ушёл)
+    private var navVr = false                  // h1318: поток подсказок навигации открыт в канале VR (VR_INIT ушёл), без NAVI=1
+    private var navVrPackets = 0
+    private var desktopVoiceOn = false             // h1318: панель Алисы лаунчера открыта (MODULE_STATUS VR=1): подсказка не снимает VR=0
     @Volatile var huVw20082120 = false        // VW (STATISTIC_INFO channel 20082120 h93, 20082122 h222): без heartbeat рвёт USB через 3,7-5,6 с PAUSE
         private set
     @Volatile var huVw20082138 = false         // VW ID (channel 20082138 кроме "VW BT 1420"; ID.6 Crozz: 20082128 + "VW BT 9491"; пресет ID. UNYX): IDR > ~600 КиБ рвёт USB EIO
@@ -386,6 +391,8 @@ class AaBridgeCore(
     @Volatile var voiceChunkProvider: () -> VoiceChunk = { VoiceChunk.DEFAULT }
     private var voiceChunkLogged = CarlifeAudio.MAX_CHUNK
     @Volatile var ttsPrerollProvider: () -> TtsPreroll = { TtsPreroll.DEFAULT }
+    /** h1318: канал подсказок навигации. Без провайдера (тесты, пока нет настроек) - прежний TTS; в приложении ставит BridgeService. */
+    @Volatile var navChannelProvider: () -> NavChannel = { NavChannel.TTS }
     private val audioInited = HashMap<Int, Boolean>()
     private val audioLogged = HashMap<Int, Long>()
 
@@ -436,6 +443,9 @@ class AaBridgeCore(
     }
 
     private val ttsStopTimer = AudioTimer()
+
+    /** h1318: отложенный VR_STOP подсказок навигации (тот же дебаунс, что у TTS: AA дёргает START/STOP между кусками фразы). */
+    private val navStopTimer = AudioTimer()
 
     /** h425: Delphi глотает TTS_INIT в одну миллисекунду с NAVI=1; речь копится, INIT уходит через [TTS_INIT_AFTER_NAVI_MS]. */
     private val ttsInitTimer = AudioTimer()
@@ -627,6 +637,7 @@ class AaBridgeCore(
         gotIdr = false
         huDesayG6S = false                    // HU_INFO / STATISTIC_INFO придут заново в этой сессии
         huHondaVezel = false                   // STATISTIC_INFO придёт заново в этой сессии
+        huToyotaDesay = false                  // STATISTIC_INFO придёт заново в этой сессии
         huHonda20772104 = false                // STATISTIC_INFO придёт заново в этой сессии
         huVw20082120 = false                   // HU_INFO / STATISTIC_INFO придут заново в этой сессии
         huHonda = false                        // STATISTIC_INFO придёт заново в этой сессии
@@ -647,6 +658,9 @@ class AaBridgeCore(
         huVwCns3_20082122 = false              // STATISTIC_INFO придёт заново в этой сессии
         huIdleVideoHeartbeat = false           // STATISTIC_INFO придёт заново в этой сессии
         vrReply = false
+        navVr = false
+        navStopTimer.cancel()
+        desktopVoiceOn = false                 // новая CarLife-сессия: панель лаунчера закрыта
         touchDecimator.reset()
         touchDecimationLogged = 1
         touchPacer.reset()
@@ -681,6 +695,10 @@ class AaBridgeCore(
         if (carlifeStarted && carlifePaused && ttsStopTimer.pending) {
             log("BRIDGE CarLife START после PAUSE: отложенный TTS STOP шлю сразу", true)
             stopAudio(CarlifeAudio.CH_TTS)
+        }
+        if (carlifeStarted && carlifePaused && navStopTimer.pending) {
+            log("BRIDGE CarLife START после PAUSE: отложенный VR STOP подсказки шлю сразу", true)
+            navStopNow()
         }
         carlifeStarted = true
         carlifePaused = false
@@ -753,7 +771,9 @@ class AaBridgeCore(
             requestMediaPause("ГУ MODULE_CONTROL MUSIC=0")
             return false
         }
-        if (HU_MUSIC_RESUME_ENABLED && status == 1 && (huDesayG6S || huHondaVezel)) {
+        // Toyota Desay G6SA (h1334, bZ4X 21050016): на звонке MUSIC=0, после звонка на наш MUSIC=1 ещё раз MUSIC=0
+        // (ГУ не вышла из звонка), через ~1,4 с MUSIC=1 - тут и возвращаем play (лог 2026-11-21, три звонка).
+        if (HU_MUSIC_RESUME_ENABLED && status == 1 && (huDesayG6S || huHondaVezel || huToyotaDesay)) {
             val now = clockMs()
             val p = peer
             if (huPausedAa && resumeOnHuMusic && p != null) {
@@ -818,7 +838,7 @@ class AaBridgeCore(
             if (cn7CallEndMs != NEVER) log("BRIDGE CN7: ГУ вернула MUSIC=1 через ${clockMs() - cn7CallEndMs} мс после звонка", true)
             cn7CallActive = false
             cn7CallEndMs = NEVER
-            if (HU_MUSIC_RESUME_ENABLED && resumeOnHuMusic && (huDesayG6S || huHondaVezel)) {
+            if (HU_MUSIC_RESUME_ENABLED && resumeOnHuMusic && (huDesayG6S || huHondaVezel || huToyotaDesay)) {
                 resumeOnHuMusic = false
                 lastHuResumeMs = now
                 lastUserInputMs = now
@@ -1054,6 +1074,7 @@ class AaBridgeCore(
         if (channel == MOBIS_NX4C_CHANNEL) enableMobisNx4c()
         if (channel == DESAY_G6S_CHANNEL) huDesayG6S = true
         if (channel == HONDA_20832125_CHANNEL) huHondaVezel = true
+        if (channel in TOYOTA_DESAY_CHANNELS) huToyotaDesay = true
         if (channel == HONDA_20772104_CHANNEL) huHonda20772104 = true
         if (channel == KIA_20032131_CHANNEL && !huKia20032131) {
             huKia20032131 = true
@@ -1498,6 +1519,7 @@ class AaBridgeCore(
      */
     @Synchronized
     fun desktopVoiceStatus(on: Boolean) {
+        desktopVoiceOn = on
         val s = if (on) 1 else 0
         if (link.sendModuleStatus(CarlifeAudio.MODULE_VR, s)) log("BRIDGE CarLife MODULE_STATUS VR=$s (панель Алисы)", true)
     }
@@ -1561,6 +1583,9 @@ class AaBridgeCore(
         if (carlifeChannel(chan) == CarlifeAudio.CH_TTS && ttsStopTimer.cancel()) {
             log("BRIDGE TTS STOP отменён: SPEECH START до истечения ${TTS_STOP_DELAY_MS} мс, INIT не повторяю", true)
         }
+        if (carlifeChannel(chan) == CarlifeAudio.CH_TTS && navStopTimer.cancel()) {
+            log("BRIDGE h1318: подсказка VR STOP отменён: SPEECH START до истечения ${TTS_STOP_DELAY_MS} мс, INIT не повторяю", true)
+        }
     }
 
     @Synchronized
@@ -1579,7 +1604,14 @@ class AaBridgeCore(
             return
         }
         if (ch == CarlifeAudio.CH_TTS && (vrReply || (huVwCns2Delphi && voice && micModeProvider() != MicMode.PHONE))) {
+            if (navVr) closeNavVr("голосовая сессия ассистента", moduleOff = false)
             sendVrReply(chan, pcm)
+            return
+        }
+        // h1318 лог CNS3 21.11: в голосовой сессии AA (микрофон ГУ открыт, VR=1) по ch4 идёт сигнал «слушаю», не подсказка -
+        // в VR-путь подсказок его не пускаем: VR_STOP + VR=0 гасили бы открытую сессию, а канал VR занят микрофоном ГУ.
+        if (ch == CarlifeAudio.CH_TTS && !voice && (navVr || navChannelProvider() == NavChannel.VR)) {
+            sendNavViaVr(chan, pcm)
             return
         }
         if (ch == CarlifeAudio.CH_TTS) {
@@ -1706,6 +1738,13 @@ class AaBridgeCore(
             vrModuleOff("последний VR STOP после голосовой сессии")
             return
         }
+        if (navVr && ch == CarlifeAudio.CH_TTS) {
+            if (!navStopTimer.pending) {
+                log("BRIDGE h1318: подсказка VR STOP отложен на ${TTS_STOP_DELAY_MS} мс", true)
+                navStopTimer.start(TTS_STOP_DELAY_MS) { navStopNow() }
+            }
+            return
+        }
         if (ch == CarlifeAudio.CH_MEDIA) {
             requestMediaPause("AA STOP ch$chan")
         } else if (TTS_DEBOUNCE_ENABLED) {
@@ -1746,12 +1785,68 @@ class AaBridgeCore(
     }
 
     /**
+     * h1318: подсказки навигатора (SPEECH) -> канал VR вместо TTS: VR_INIT 16 кГц моно, VR_DATA. Без MODULE_STATUS NAVI=1 и VR=1,
+     * без пре-ролла и задержки h425: ГУ видит обычный голосовой поток и может отдать кнопкам громкости «голос».
+     * Свой флаг [navVr], не [vrReply]: голосовая сессия Delphi идёт по прежней ветке.
+     */
+    private fun sendNavViaVr(chan: Int, pcm: ByteArray) {
+        if (navStopTimer.cancel()) log("BRIDGE h1318: подсказка VR STOP отменён: данные ch$chan до истечения ${TTS_STOP_DELAY_MS} мс, INIT не повторяю", true)
+        if (!navVr) {
+            if (audioInited[CarlifeAudio.CH_TTS] == true) stopAudio(CarlifeAudio.CH_TTS)
+            if (!link.sendAudio(CarlifeAudio.CH_VR, CarlifeAudio.VR_INIT, CarlifeAudio.initBody(16000, 1, 16))) {
+                audioDropped++
+                return
+            }
+            navVr = true
+            navVrPackets = 0
+            log("BRIDGE h1318: подсказка ch$chan -> CarLife VR INIT 16000Гц 1к 16бит", true)
+        }
+        val chunkMax = voiceChunkMax()
+        var off = 0
+        while (off < pcm.size) {
+            val n = minOf(chunkMax, pcm.size - off)
+            val chunk = if (off == 0 && n == pcm.size) pcm else pcm.copyOfRange(off, off + n)
+            if (!link.sendAudio(CarlifeAudio.CH_VR, CarlifeAudio.VR_DATA, chunk)) audioDropped++ else audioBytes += n
+            off += n
+        }
+        AaState.audioBytes = audioBytes
+        if (++navVrPackets <= TTS_DIAG_PACKETS) {
+            val (peak, rms) = CarlifeAudio.pcm16Stats(pcm)
+            log("BRIDGE h1318: подсказка VR пакет #$navVrPackets: ${pcm.size} Б, peak=$peak rms=%.1f${if (peak == 0) " (ВСЕ НУЛИ)" else ""}".format(rms), false)
+        }
+    }
+
+    /** h1318: отложенный VR_STOP подсказки сработал: закрыть поток и всегда отпустить VR (страховка от залипания громкости на голосе). */
+    private fun navStopNow() = closeNavVr(null, moduleOff = true)
+
+    private fun closeNavVr(why: String?, moduleOff: Boolean) {
+        navStopTimer.cancel()
+        if (!navVr) return
+        navVr = false
+        link.sendAudio(CarlifeAudio.CH_VR, CarlifeAudio.VR_STOP, ByteArray(0))
+        log("BRIDGE h1318: подсказка VR STOP" + (why?.let { " ($it)" } ?: ""), true)
+        if (moduleOff && (desktopVoiceOn || voice)) {
+            // закроется панель / голосовая сессия - уйдёт их VR=0
+            log("BRIDGE h1318: VR=0 после подсказки не шлю: ${if (voice) "голосовая сессия AA" else "панель Алисы открыта"}", true)
+        } else if (moduleOff && link.sendModuleStatus(CarlifeAudio.MODULE_VR, 0)) {
+            log("BRIDGE h1318: CarLife MODULE_STATUS VR=0 (после подсказки)", true)
+        }
+        // h1318 (VW CNS3 20082141, 23.11): на VR-поток ГУ гасит свой музыкальный источник целиком и сама его не
+        // поднимает - музыка молчит, пока не уйти в меню «Музыка» ГУ и обратно. Как после голосовой сессии: MEDIA
+        // заново через INIT + MUSIC=1 на первых данных.
+        if (moduleOff && audioInited[CarlifeAudio.CH_MEDIA] == true) {
+            audioInited[CarlifeAudio.CH_MEDIA] = false
+            log("BRIDGE h1318: после подсказки MEDIA поднимется через INIT на первых данных", true)
+        }
+    }
+
+    /**
      * h425: VW CNS2 Delphi после ответа в канале VR оставляет кнопки громкости на голосовом канале, пока не переткнуть
      * кабель. MODULE_STATUS VR=0 уходит при закрытии микрофона, но ответ в VR идёт уже после него: повторяем VR=0,
      * когда и голосовая сессия AA кончилась, и поток VR закрыт.
      */
     private fun vrModuleOff(why: String) {
-        if (!huVwCns2Delphi || voice || vrReply) return
+        if (!huVwCns2Delphi || voice || vrReply || navVr) return
         if (link.sendModuleStatus(CarlifeAudio.MODULE_VR, 0)) log("BRIDGE CarLife MODULE_STATUS VR=0 ($why)", true)
     }
 
@@ -1766,6 +1861,7 @@ class AaBridgeCore(
                     voice = true
                     log("BRIDGE голосовая сессия: старт, MEDIA на паузу, данные MEDIA не пересылаю", true)
                     requestMediaPause("голосовая сессия")
+                    closeNavVr("старт голосовой сессии", moduleOff = false)   // h1318: Delphi стартует VR_INIT чисто
                 } else if (cancelled) {
                     log("BRIDGE голосовая сессия: выход отменён (снова status=1)", true)
                 }
@@ -2060,6 +2156,8 @@ class AaBridgeCore(
     private fun resetAudio() {
         audioInited.clear()
         ttsStopTimer.cancel()
+        navStopTimer.cancel()
+        navVr = false
         dropTtsPending()
         mediaReleaseTimer.cancel()
         naviSent = false
@@ -2073,6 +2171,7 @@ class AaBridgeCore(
 
     private fun stopAllAudio(why: String) {
         ttsStopTimer.cancel()
+        closeNavVr(why, moduleOff = true)       // h1318: открытый поток подсказок закрываем сразу
         mediaReleaseTimer.cancel()
         voiceExitTimer.cancel()
         voice = false
@@ -3068,6 +3167,21 @@ class AaBridgeCore(
     }
 
     /**
+     * FRAME_RATE_CHANGE от ГУ. Hyundai CN7 после камеры заднего хода сбрасывает декодер и шлёт только его, без START (h1254):
+     * голые IDR декодер не берёт, зелёный до 22 с. Разово, как на START: следующий IDR энкодера уйдёт с SPS/PPS
+     * ([onEncoderFrame], ветка !outGotIdr), P до него выбрасываются. SPS на каждом IDR CN7 не переносит — постоянный
+     * чёрный (h1254test1), поэтому только по событию.
+     */
+    @Synchronized
+    fun onCarlifeFrameRateChange() {
+        if (!huHyundaiCn7 || !carlifeStarted) return
+        val t = transcoder ?: return
+        outGotIdr = false
+        t.requestSyncFrame()
+        log("BRIDGE ГУ Hyundai CN7: FRAME_RATE_CHANGE, следующий IDR энкодера с SPS/PPS", true)
+    }
+
+    /**
      * IDR у энкодера после отказа очереди CarLife - не чаще раза в 1.5 с (IdrThrottle). Иначе большие IDR (30-160 КБ)
      * сами забивают медленный канал. Отказали - ждём уже запрошенный или ближайший естественный IDR (интервал 1 с).
      */
@@ -3321,6 +3435,8 @@ class AaBridgeCore(
         const val TEXT_WAIT_FRAME = "Android Auto: жду кадр..."
         const val TEXT_AA_LOST = "Android Auto отключился, переподключаю..."
         const val DESAY_MANUFACTURER = "Desay SV Automotive"
+        /** STATISTIC_INFO.channel у Toyota с Desay G6SA: RAV4 XA50, bZ4X (h1334), Venza 2. */
+        val TOYOTA_DESAY_CHANNELS = setOf("21050015", "21050016", "21050023")
         const val DESAY_G6S_MODEL = "G6S"
         const val DESAY_G6S_CHANNEL = "20622116"          // STATISTIC_INFO.channel у Mazda CX-5; Vezel - 20832125, другая Mazda - 21520001
         /** Префиксы STATISTIC_INFO.channel у Honda (CarLife 1.1.0, HU_INFO пустой, BT «Honda HFT»): 2077xxxx (Civic 11, UR-V), 2083xxxx (Vezel и др.). */

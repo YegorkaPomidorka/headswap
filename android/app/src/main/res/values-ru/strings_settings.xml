@@ -190,6 +190,10 @@
     <string name="tpreroll_200">200 мс</string>
     <string name="tpreroll_400">400 мс</string>
 
+    <!-- Канал подсказок навигации (NavChannel) -->
+    <string name="navch_vr">VR (голосовой канал)</string>
+    <string name="navch_tts">TTS (канал навигации)</string>
+
     <!-- Прореживание тача (TouchDecimation) -->
     <string name="tdec_off">Выкл</string>
     <string name="tdec_x2">×2</string>

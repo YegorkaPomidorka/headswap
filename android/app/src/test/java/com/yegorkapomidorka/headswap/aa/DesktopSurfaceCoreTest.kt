@@ -153,6 +153,32 @@ class DesktopSurfaceCoreTest {
         assertEquals(2, f.link.transport.sent.size)
     }
 
+    @Test fun hyundaiCn7FrameRateChangeSendsOneSpsIdrPeriodicIdrStaysBare() = Fixture().use { f ->
+        val generation = f.start()
+        val encoder = f.link.encoders.single()
+        f.core.desktopSurfaceReady(generation)
+        encoder.output.onEncoderConfig(cfg)
+        encoder.output.onEncoderFrame(idr, true)
+        f.event("first")
+        val before = encoder.fake.syncs.get()
+        f.core.onCarlifeFrameRateChange()
+        assertEquals("Other head units: FRAME_RATE_CHANGE does not touch the stream", before, encoder.fake.syncs.get())
+
+        f.core.onHuInfo("QTI", "sm6150_au for arm64", AaBridgeCore.HYUNDAI_CN7_PRODUCT)
+        encoder.output.onEncoderFrame(idr, true)
+        assertArrayEquals("CN7 periodic IDR stays bare (SPS on every IDR = black, h1254test1)", idr, f.link.transport.sent.last())
+
+        f.core.onCarlifeFrameRateChange()
+        assertEquals(before + 1, encoder.fake.syncs.get())
+        val sent = f.link.transport.sent.size
+        encoder.output.onEncoderFrame(p, false)
+        assertEquals("P before the requested IDR is dropped", sent, f.link.transport.sent.size)
+        encoder.output.onEncoderFrame(idr, true)
+        assertArrayEquals("First IDR after FRAME_RATE_CHANGE carries SPS/PPS", cfg + idr, f.link.transport.sent.last())
+        encoder.output.onEncoderFrame(idr, true)
+        assertArrayEquals("Only once", idr, f.link.transport.sent.last())
+    }
+
     @Test fun usbReconnectClosesProducerBeforeEncoderAndBeforeCreatingNextEncoder() = Fixture().use { f ->
         val oldGeneration = f.start()
         val old = f.link.encoders.single()
