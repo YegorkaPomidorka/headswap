@@ -739,8 +739,8 @@ private fun WallpaperCard(d: SettingsDims, glass: Boolean, modifier: Modifier, p
         BoxWithConstraints(Modifier.fillMaxSize().padding(start = m.dp(d.padStart), end = m.dp(d.padEnd), top = m.dp(d.padV), bottom = m.dp(d.padV))) {
             val g = s.g
             val items = if (hasCustom) 5 else 4
-            // подпись в две строки: «Зимняя дорога», «Christmas tree» в узкой плитке переносятся
-            val labelH = 2 * (d.sub * 1.3).roundToInt() + s.g4
+            // подпись в одну строку: две строки у одной плитки сдвигали ряд миниатюр (Егор)
+            val labelH = (d.sub * 1.3).roundToInt() + s.g4
             val off = Modifier.alpha(if (glass) 1f else WALLPAPER_OFF_ALPHA)
             if (portrait) {
                 val titleH = ((s.f2 + d.sub) * 1.3).roundToInt() + 4
@@ -776,7 +776,7 @@ private fun WallpaperThumbs(glass: Boolean, hasCustom: Boolean, thumbW: Int, thu
     val model = LauncherModel
     val pal = LocalPalette.current
     fun pick(id: WallpaperId) { model.chooseWallpaper(id) }
-    // первая плитка: «Без обоев» или, пока выбран праздничный пресет, его обои («Ёлка», «Зимняя дорога»)
+    // первая плитка: «Без обоев» или, пока выбран праздничный пресет, его обои («Ёлка», «Дорога»)
     val festive = model.festiveWallpaper
     if (festive == null) {
         WallpaperThumb(stringResource(R.string.l_s_wallpaper_none), model.wallpaper == WallpaperId.NONE, glass, thumbW, thumbH, d, { pick(WallpaperId.NONE) }) {
@@ -839,7 +839,7 @@ private fun WallpaperThumb(
                 if (pressed) Box(Modifier.matchParentSize().background(Pal.SURFACE_PRESSED))
             }
         }
-        Txt(label, d.sub, Modifier.fillMaxWidth(), color = if (selected) Pal.TEXT else Pal.SEC, align = TextAlign.Center, maxLines = 2, ellipsis = false)
+        Txt(label, d.sub, Modifier.fillMaxWidth(), color = if (selected) Pal.TEXT else Pal.SEC, align = TextAlign.Center)
     }
 }
 
