@@ -91,11 +91,12 @@ fun AliceVoicePill() {
             .border(m.dp(1), if (route) ROUTE_EDGE else PILL_EDGE, RoundedCornerShape(50)),
     ) {
         Pressable(
-            Modifier.height(m.dp(h)).padding(start = m.dp(px(16)), end = m.dp(px(28))),
+            // отступы внутри Row, не в modifier Pressable: рамка шайбы рисуется после modifier и сжалась бы внутрь них
+            Modifier.height(m.dp(h)),
             description = stringResource(if (gemini) R.string.l_gemini_close else R.string.l_alice_close),
             onTap = { LauncherActions.closeAssistant("тап по плашке помощника"); AliceVoice.stop() },
         ) {
-            Row(Modifier.height(m.dp(h)), verticalAlignment = Alignment.CenterVertically,
+            Row(Modifier.height(m.dp(h)).padding(start = m.dp(px(16)), end = m.dp(px(28))), verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(m.dp(px(16)))) {
                 if (route) {
                     Box(Modifier.size(m.dp(px(56))).clip(CircleShape).background(GOLD), contentAlignment = Alignment.Center) {
