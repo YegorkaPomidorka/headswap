@@ -251,11 +251,8 @@ object NavPlayerPlate {
     const val COLLAPSE_MS = 30_000L
     const val W = 340
     const val H = 72
-    /**
-     * По умолчанию плашка сверху: снизу Google Карты держат машину и «где я» по центру свободной части карты
-     * (стенд 24.11), а верх между манёвром и скоростью свободен у ЯН, 2ГИС и Google Карт.
-     */
-    const val TOP = 19
+    /** Отступ снизу места по умолчанию: справа от левой нижней панели навигатора (Егор 24.11), дальше тащит сам. */
+    const val BOTTOM = 19
 
     /**
      * Место, куда плашку перетащили (долгое нажатие и тащить): доли свободного хода по x и y, 0..1, чтобы место
@@ -271,11 +268,11 @@ object NavPlayerPlate {
         }
     }
 
-    /** Левый верхний угол плашки в области (px экрана): сохранённое место [pos] или по умолчанию сверху в промежутке. */
+    /** Левый верхний угол плашки в области (px экрана): сохранённое место [pos] или по умолчанию снизу в промежутке. */
     fun origin(pos: Pos?, areaW: Int, areaH: Int, plateW: Int, plateH: Int, k: Float): Pair<Int, Int> {
         val roomX = (areaW - plateW).coerceAtLeast(0)
         val roomY = (areaH - plateH).coerceAtLeast(0)
-        if (pos == null) return left(areaW, plateW, k).coerceAtMost(roomX) to (TOP * k).toInt().coerceAtMost(roomY)
+        if (pos == null) return left(areaW, plateW, k).coerceAtMost(roomX) to (roomY - (BOTTOM * k).toInt()).coerceAtLeast(0)
         return (pos.fx * roomX).toInt() to (pos.fy * roomY).toInt()
     }
 

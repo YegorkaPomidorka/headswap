@@ -45,10 +45,10 @@ class NavPlayerPlateTest {
         assertEquals(0, NavPlayerPlate.left(300, 340, 1f))
     }
 
-    @Test fun defaultPlaceIsTopInTheGap() {
-        assertEquals(583 to 19, NavPlayerPlate.origin(null, 1136, 720, 340, 72, 1f))
+    @Test fun defaultPlaceIsBottomInTheGap() {
+        assertEquals(583 to 720 - 72 - 19, NavPlayerPlate.origin(null, 1136, 720, 340, 72, 1f))
         // экран крупнее макета: отступы растут с k
-        assertEquals(NavPlayerPlate.left(1704, 510, 1.5f) to 28, NavPlayerPlate.origin(null, 1704, 1080, 510, 108, 1.5f))
+        assertEquals(NavPlayerPlate.left(1704, 510, 1.5f) to 1080 - 108 - 28, NavPlayerPlate.origin(null, 1704, 1080, 510, 108, 1.5f))
     }
 
     @Test fun draggedPlaceSurvivesOtherAreaSize() {
