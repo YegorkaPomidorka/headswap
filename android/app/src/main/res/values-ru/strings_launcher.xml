@@ -138,6 +138,7 @@
     <string name="l_s_wallpaper_sub_glass">Под стеклом на всём столе</string>
     <string name="l_s_wallpaper_sub_solid">Работают только в стиле «Стекло»</string>
     <string name="l_s_wallpaper_none">Без обоев</string>
+    <string name="l_s_wallpaper_lights">Огоньки</string>
     <string name="l_s_wallpaper_headswap">Headswap</string>
     <string name="l_s_wallpaper_mountains">Горы</string>
     <string name="l_s_wallpaper_custom">Своё фото</string>

@@ -138,6 +138,7 @@
     <string name="l_s_wallpaper_sub_glass">Behind the glass on the whole desktop</string>
     <string name="l_s_wallpaper_sub_solid">Works only with the Glass style</string>
     <string name="l_s_wallpaper_none">None</string>
+    <string name="l_s_wallpaper_lights">Lights</string>
     <string name="l_s_wallpaper_headswap">Headswap</string>
     <string name="l_s_wallpaper_mountains">Mountains</string>
     <string name="l_s_wallpaper_custom">My photo</string>

@@ -293,6 +293,8 @@ internal object LauncherModel {
     fun applyPreset(p: ColorPreset) {
         editColors(p.set(colorsEditDay)); saveColors()
         garland = p.garland; prefs.garland = p.garland
+        // фото-обои летние и с гирляндой не сочетаются: «Без обоев» в праздник рисуется «Огоньками»
+        if (p.garland) chooseWallpaper(WallpaperId.NONE)
     }
     /**
      * «Сбросить» на «Цветах и обоях»: правимый набор цветов - к золоту, обои - «Без обоев», размытие и затемнение - по

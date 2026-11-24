@@ -110,6 +110,9 @@ fun LauncherRoot(connected: Boolean) {
             LocalLocaleDirection provides localeDir) {
             Box(Modifier.fillMaxSize().launcherBackground(pal)) {
                 if (wallpaper != null && model.foreign == null) WallpaperLayer(wallpaper, model.wallpaperBlur, model.wallpaperDim, minOf(w, h))
+                // «Огоньки» (ADR 0063): праздничный набор и нет обоев - боке цветами гирлянды поверх градиента, под содержимым
+                val lights = model.garland && wallpaper == null && model.foreign == null
+                if (lights) LightsLayer(spec.t, (if (model.shownLight) model.dayColors else model.nightColors).accentHue, model.animations)
                 if (!connected) {
                     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         Txt(stringResource(R.string.l_connecting), spec.f1, color = Pal.SEC)
@@ -135,7 +138,7 @@ fun LauncherRoot(connected: Boolean) {
                         val glass = model.railStyle == RailStyle.GLASS
                         val railShown = !fullscreen && !model.railHidden
                         if (railShown) Rail(glass)
-                        Box(Modifier.weight(1f).fillMaxHeight().then(if (glass && railShown && wallpaper == null) Modifier.background(pal.bgSolid) else Modifier)
+                        Box(Modifier.weight(1f).fillMaxHeight().then(if (glass && railShown && wallpaper == null && !lights) Modifier.background(pal.bgSolid) else Modifier)
                             .onGloballyPositioned { model.areaRect = it.boundsInRoot() }) {
                             AreaContent()
                         }

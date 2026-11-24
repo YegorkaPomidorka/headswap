@@ -11,8 +11,8 @@ data class ColorPreset(val id: String, val night: ColorSet, val day: ColorSet, v
         val DEFAULT = ColorPreset("default", ColorSet.NIGHT, ColorSet.DAY, false)
         /** Ёлка: тёмно-зелёный фон, золотой акцент. Днём - светлый зеленоватый. */
         val TREE = ColorPreset("tree", ColorSet(46, 152, 70), ColorSet(46, 152, 60), true)
-        /** Новогодний: зелёный фон, красный акцент. */
-        val NEW_YEAR = ColorPreset("new_year", ColorSet(0, 140, 60), ColorSet(0, 140, 60), true)
+        /** Новогодний: тёмно-бордовый фон, зелёный акцент (Егор). */
+        val NEW_YEAR = ColorPreset("new_year", ColorSet(140, 350, 60), ColorSet(140, 350, 60), true)
         val ALL = listOf(DEFAULT, TREE, NEW_YEAR)
     }
 }

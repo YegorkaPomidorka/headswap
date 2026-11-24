@@ -775,9 +775,22 @@ private fun WallpaperThumbs(glass: Boolean, hasCustom: Boolean, thumbW: Int, thu
     val model = LauncherModel
     val pal = LocalPalette.current
     fun pick(id: WallpaperId) { model.chooseWallpaper(id) }
-    WallpaperThumb(stringResource(R.string.l_s_wallpaper_none), model.wallpaper == WallpaperId.NONE, glass, thumbW, thumbH, d, { pick(WallpaperId.NONE) }) {
+    WallpaperThumb(stringResource(if (model.garland) R.string.l_s_wallpaper_lights else R.string.l_s_wallpaper_none), model.wallpaper == WallpaperId.NONE, glass, thumbW, thumbH, d, { pick(WallpaperId.NONE) }) {
         Box(Modifier.fillMaxSize().background(Brush.linearGradient(pal.bgStops.map { it.second }))) {
             Box(Modifier.align(Alignment.BottomStart).fillMaxWidth(0.25f).fillMaxHeight(0.4f).background(pal.accent))
+            if (model.garland) {
+                val set = if (model.colorsEditDay) model.dayColors else model.nightColors
+                val lights = remember(set.accentHue) { GarlandLogic.colors(set.accentHue) }
+                val bokeh = remember { LightsLogic.layout(7) }
+                Canvas(Modifier.fillMaxSize()) {
+                    for (b in bokeh) {
+                        val c = lights[b.colorIdx % lights.size]
+                        val r = b.r * size.height * 0.45f
+                        val p = androidx.compose.ui.geometry.Offset(size.width * b.x, size.height * b.y)
+                        drawCircle(Brush.radialGradient(listOf(c.copy(alpha = b.alpha * 2f), c.copy(alpha = 0f)), center = p, radius = r), r, p)
+                    }
+                }
+            }
         }
     }
     WallpaperThumb(stringResource(R.string.l_s_wallpaper_headswap), model.wallpaper == WallpaperId.HEADSWAP, glass, thumbW, thumbH, d, { pick(WallpaperId.HEADSWAP) }) {
