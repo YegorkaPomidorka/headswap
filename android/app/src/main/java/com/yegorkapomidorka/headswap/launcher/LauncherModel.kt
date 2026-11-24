@@ -300,7 +300,7 @@ internal object LauncherModel {
         garland = p.garland; prefs.garland = p.garland
         val festive = if (p.garland) p.id else ColorPreset.NONE_ID
         festivePreset = festive; prefs.festivePreset = festive
-        // праздничный набор ставит свои обои; «По умолчанию» снимает праздничные, Headswap, «Горы» и своё фото не трогает
+        // праздничный набор ставит свои обои; «Как было» снимает праздничные, Headswap, «Горы» и своё фото не трогает
         if (p.wallpaper != null) chooseWallpaper(p.wallpaper)
         else if (wallpaper == WallpaperId.TREE || wallpaper == WallpaperId.WINTER_ROAD) chooseWallpaper(WallpaperId.NONE)
     }
