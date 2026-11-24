@@ -1209,6 +1209,8 @@ class BridgeService : Service() {
             core.mapHomeKey = true
             core.desktopInputEnabled = true
             core.volumeSwipeProvider = { aaPrefs.volumeSwipe }
+            core.railHiddenProvider = { DesktopKeys.rail?.hidden() }
+            core.railToggle = { hide -> DesktopKeys.rail?.setHidden(hide) }
             DesktopNavHints.target = core   // подсказки навигатора рабочего стола (свой хост Car App, теневая AA) в MetaRelay
             com.yegorkapomidorka.headswap.dex.DesktopMediaMeta.start(this, core)   // трек плеера телефона на приборку (h1054)
             // в машине adb нет: стартуем вместе с рабочим столом; у навигатора выключены подсказки на приборке - AA не трогаем (h800).

@@ -101,6 +101,8 @@ internal object LauncherModel {
     var homeLayout by mutableStateOf(HomeLayout.QUAD)
     /** Экран вертикальный (h921): ставит [LauncherRoot] по спеке. */
     var portrait by mutableStateOf(false)
+    /** Левая рейка скрыта свайпом по экрану ГУ ([com.yegorkapomidorka.headswap.aa.RailSwipe]); не сохраняется. Только ландшафт. */
+    var railHidden by mutableStateOf(false)
     /** Раскладка, по которой живут плашки: в портрете 2:1 и 1:2 не бывает (вся колонка - как «Справа»), сохранённая [homeLayout] не меняется. */
     val layout: HomeLayout get() = if (portrait) HomeLayout.QUAD else homeLayout
     /** Что листают «Слои» и в каком порядке ([LayerList]). */

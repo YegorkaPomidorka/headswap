@@ -480,6 +480,23 @@ class AaBridgeCore(
             else log("BRIDGE громкость ${if (steps > 0) "+" else ""}$steps -> ${media.adjustVolume(steps)}", true)
         },
     )
+
+    /** Рабочий стол: рейка лаунчера скрыта (true) / видна (false); null - прятать нечего (чужой лаунчер, нет активности, портрет). */
+    @Volatile var railHiddenProvider: () -> Boolean? = { null }
+    /** Свайп скрыл (hide = true) или вернул рейку лаунчера. Зовётся с потока тача. */
+    @Volatile var railToggle: (hide: Boolean) -> Unit = {}
+    private val railSwipe = RailSwipe(
+        onCancel = {
+            log("BRIDGE тач: свайп рейки, касание отменяю", true)
+            touchDecimator.reset()
+            touchPacer.reset()
+            dispatchTouch(3, 0, 0, 0, 0)
+        },
+        onToggle = { hide ->
+            log("BRIDGE рейка лаунчера: ${if (hide) "скрываю" else "показываю"}", true)
+            railToggle(hide)
+        },
+    )
     @Volatile private var touchDecimationLogged = 1
 
     /** Режим фильтра повторного DOWN без UP ([DupDownFilter]), читается на каждое касание. */
@@ -1146,6 +1163,7 @@ class AaBridgeCore(
             touchDecimator.reset()
             touchPacer.reset()
             volumeSwipe.reset()
+            railSwipe.reset()
         }
         synchronized(touchLock) {
             if (desktopInputEnabled && fingers.isNotEmpty()) peer?.let { sendFingers(it, 3, 0, "CANCEL") }
@@ -1180,6 +1198,8 @@ class AaBridgeCore(
         if (desktopInputEnabled) {
             val g = videoMode
             if (volumeSwipe.onTouch(action, x, y, px, py, g.outW, g.outH, volumeSwipeEnabled)) return
+            val hidden = railHiddenProvider()
+            if (railSwipe.onTouch(action, x, y, px, py, g.outW, g.outH, hidden != null, hidden == true)) return
         }
         if (desktopInputEnabled && action and 0xFF == 3) {
             // Discard delayed MOVE events instead of replaying them into an already cancelled gesture.
