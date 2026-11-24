@@ -227,7 +227,4 @@ internal object PhoneController {
             am.isMicrophoneMute = !am.isMicrophoneMute
         }
     }
-
-    val micMuted: Boolean
-        get() = runCatching { LauncherModel.context.getSystemService(AudioManager::class.java).isMicrophoneMute }.getOrDefault(false)
 }

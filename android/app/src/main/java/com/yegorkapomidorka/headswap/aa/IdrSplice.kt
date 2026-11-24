@@ -426,12 +426,6 @@ class IdrSplicer {
         return IdrSplice.unsupported(sps, pps)
     }
 
-    /** Кодированный размер последней картинки (по её SPS) или null. */
-    fun codedSize(): Pair<Int, Int>? {
-        val sps = lastPps?.let { spsMap[it.spsId] } ?: return null
-        return sps.codedW to sps.codedH
-    }
-
     /** Снимок для сборки своего IDR на другой нити: параметры потока у картинки seq. */
     class Job internal constructor(
         val seq: Long, internal val sps: IdrSplice.Sps, internal val pps: IdrSplice.Pps,

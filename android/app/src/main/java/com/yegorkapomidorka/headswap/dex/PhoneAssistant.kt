@@ -184,26 +184,6 @@ object PhoneAssistant {
             .onFailure { AppLog.i("ASSIST маршрут $uri -> $pkg: ${it.javaClass.simpleName}: ${it.message}") }
     }
 
-    /**
-     * Алиса только голосом: ASSIST на экране телефона. Яндекс, выбранный помощником, показывает оверлей
-     * VoiceInteractionSession; голос (USAGE_MEDIA, CONTENT_TYPE_SPEECH) уходит в ГУ захватом звука рабочего стола (стенд 07.11).
-     */
-    fun launchPhone(ctx: Context) {
-        for (pkg in ALICE_PACKAGES) {
-            val intent = Intent(Intent.ACTION_ASSIST).setPackage(pkg).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            try {
-                ctx.startActivity(intent)
-                AppLog.i("ASSIST Алиса ($pkg) -> экран телефона, только голос")
-                return
-            } catch (e: ActivityNotFoundException) {
-                AppLog.i("ASSIST $pkg не установлен")
-            } catch (e: SecurityException) {
-                AppLog.i("ASSIST $pkg на телефоне: ${e.message}")
-            }
-        }
-        AppLog.i("ASSIST Алиса не запущена: нужно приложение «Яндекс — с Алисой»")
-    }
-
     @Volatile private var phoneGen = 0
 
     /**

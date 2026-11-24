@@ -212,11 +212,6 @@ class RadioRow(val ctx: Context, title: String, sub: String, val onPick: () -> U
         setOnClickListener { onPick() }
     }
 
-    fun setSub(text: String) {
-        subView.text = text
-        subView.visibility = if (text.isBlank()) View.GONE else View.VISIBLE
-    }
-
     fun setSelected(sel: Boolean) {
         radio.isChecked = sel
         view.background = ctx.rippleBg(ctx.shape(ctx.clr(if (sel) R.color.pric else R.color.surf), 20), 20)
