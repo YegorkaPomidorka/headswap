@@ -573,7 +573,7 @@ class ProtocolTest {
     fun assemblerDoesNotHoldAbsurdDeclaredLen() {
         val a = InnerAssembler()
         val seen = ArrayList<ByteArray>()
-        // data: len = 0x7FFFFFFF > MAX_OUTER_LEN, и отрицательный (>= 2^31)
+        // data: len = 0x7FFFFFFF > MAX_RX_LEN, и отрицательный (>= 2^31)
         a.feed(Ch.VIDEO, hex("7F FF FF FF 00 00 00 01 00 02 00 01"), { _, i -> seen.add(i) })
         a.feed(Ch.VIDEO, hex("FF FF FF FF 00 00 00 01 00 02 00 01"), { _, i -> seen.add(i) })
         assertEquals(2, seen.size)
