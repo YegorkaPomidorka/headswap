@@ -365,10 +365,11 @@ fun Pressable(
     DisposableEffect(knob) { onDispose { LauncherKnob.focused(knob, false) } }
     val m = LocalMetrics.current
     Box(
-        Modifier
+        // рамка после modifier вызывающего: offset/absoluteOffset в нём двигает и кнопку, и рамку; до него рамка
+        // оставалась на несдвинутом месте - у ⇄, «развернуть» и линзы навигации она висела вверху рейки (h1413)
+        modifier
             .knobRing(focused && enabled && LauncherKnob.visible, focusShape ?: RoundedCornerShape(m.dp(m.spec.radius)),
                 ringColor ?: LocalAccent.current, LauncherKnob.gapColor(LocalPalette.current), m.spec.b4.toFloat())
-            .then(modifier)
             .onFocusChanged { focused = it.isFocused; LauncherKnob.focused(knob, it.isFocused) }
             .focusable(enabled)
             .semantics {

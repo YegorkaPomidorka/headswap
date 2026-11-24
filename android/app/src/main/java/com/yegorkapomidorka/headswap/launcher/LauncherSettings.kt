@@ -138,7 +138,7 @@ fun LauncherSettingsScreen() {
             fun cellH(row: Int, span: Int = 1): Int = SettingsGrid.bottom(row + span - 1, h, gap, rows) - SettingsGrid.top(row, h, gap, rows)
             fun cell(row: Int, span: Int = 1): Modifier =
                 Modifier.offset(y = m.dp(SettingsGrid.top(row, h, gap, rows))).height(m.dp(cellH(row, span)))
-            // кнопку (Pressable) в ряд ставит обёртка: рамку шайбы Pressable рисует до своего modifier, и offset из cell()
+            // кнопку (Pressable) в ряд ставит обёртка (до h1413 рамка шайбы не ехала за offset из modifier), и offset из cell()
             // её не сдвигал - рамки всех разделов рисовались поверх «Вид» (h737)
             @Composable
             fun Placed(row: Int, content: @Composable () -> Unit) =
