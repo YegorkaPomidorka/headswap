@@ -1516,11 +1516,12 @@ class BridgeService : Service() {
 
     /** Partial wake lock: keep the bridge and the encoders running while the session is live. */
     private fun acquireSessionWakeLocks() {
-        if (wakeLock == null) {
-            wakeLock = getSystemService(PowerManager::class.java)
-                .newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "headswap:session")
-                .apply { setReferenceCounted(false); acquire(4 * 60 * 60 * 1000L) }
-        }
+        // таймаут 4 ч снимает lock сам, но объект остаётся: проверяем isHeld, не null
+        val wl = wakeLock ?: getSystemService(PowerManager::class.java)
+            .newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "headswap:session")
+            .apply { setReferenceCounted(false) }
+            .also { wakeLock = it }
+        if (!wl.isHeld) wl.acquire(4 * 60 * 60 * 1000L)
     }
 
     private fun releaseSessionWakeLocks() {
