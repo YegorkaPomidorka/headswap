@@ -241,14 +241,12 @@ object BackNav {
 }
 
 /**
- * Плашка плеера поверх навигатора на весь экран (ADR 0061, макет «Плеер поверх навигатора»): когда видна, когда свёрнута
- * в кнопку «♪» и где стоит по горизонтали. Размеры - px макета 1280x720 ([k] переводит в px экрана).
+ * Плашка плеера поверх навигатора на весь экран (ADR 0063, макет «Плеер поверх навигатора»): когда видна и где стоит
+ * по горизонтали. Размеры - px макета 1280x720 ([k] переводит в px экрана).
  */
 object NavPlayerPlate {
-    enum class Look { HIDDEN, FULL, COLLAPSED }
+    enum class Look { HIDDEN, FULL }
 
-    /** Пауза дольше этого - плашка сворачивается в кнопку «♪». */
-    const val COLLAPSE_MS = 30_000L
     /**
      * Во сколько раз плашка крупнее макета 340x72: на Vezel x1 мелко, x2,5 огромная (Егор 24.11). x1,4 - ширина 476
      * ровно в промежутке между левой и правой панелями навигатора на Vezel.
@@ -294,12 +292,8 @@ object NavPlayerPlate {
 
     fun look(
         navArea: Boolean, navReady: Boolean, carHost: Boolean, access: Boolean, hasSession: Boolean,
-        playing: Boolean, pausedSinceMs: Long?, nowMs: Long, ringing: Boolean, alice: Boolean,
-    ): Look = when {
-        !navArea || !navReady || carHost || !access || !hasSession || ringing || alice -> Look.HIDDEN
-        !playing && pausedSinceMs != null && nowMs - pausedSinceMs >= COLLAPSE_MS -> Look.COLLAPSED
-        else -> Look.FULL
-    }
+        ringing: Boolean, alice: Boolean,
+    ): Look = if (!navArea || !navReady || carHost || !access || !hasSession || ringing || alice) Look.HIDDEN else Look.FULL
 
     /**
      * Левый край плашки шириной [plateW] от начала области шириной [areaW] (px экрана): по центру промежутка между левыми
