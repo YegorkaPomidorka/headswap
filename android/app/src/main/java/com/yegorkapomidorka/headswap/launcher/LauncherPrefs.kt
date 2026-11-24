@@ -180,6 +180,10 @@ class LauncherPrefs(private val context: Context) {
     fun mapScale(pkg: String): Int = prefs.getInt("map_scale:$pkg", com.yegorkapomidorka.headswap.carapp.CarConfigMath.AUTO_STEP)
     fun setMapScale(pkg: String, step: Int) { prefs.edit().putInt("map_scale:$pkg", step).apply() }
 
+    /** Куда перетащили плашку плеера над навигатором [pkg] ([NavPlayerPlate.Pos]); null - место по умолчанию. */
+    fun navPlayerPos(pkg: String): NavPlayerPlate.Pos? = NavPlayerPlate.Pos.restore(prefs.getString("nav_player_pos:$pkg", null))
+    fun setNavPlayerPos(pkg: String, pos: NavPlayerPlate.Pos) { prefs.edit().putString("nav_player_pos:$pkg", pos.save()).apply() }
+
     /** «Подсказки на приборке» навигатора [pkg]: машинная часть / теневая AA или окно как на телефоне ([NavigatorPick.hintsDefault]). */
     fun navHints(pkg: String): Boolean = prefs.getBoolean("nav_hints:$pkg", NavigatorPick.hintsDefault(pkg))
     fun setNavHints(pkg: String, on: Boolean) { prefs.edit().putBoolean("nav_hints:$pkg", on).apply() }

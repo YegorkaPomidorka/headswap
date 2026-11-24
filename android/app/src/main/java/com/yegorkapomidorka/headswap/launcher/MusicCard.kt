@@ -87,6 +87,23 @@ fun MusicCard(modifier: Modifier) {
     val model = LauncherModel
     val m = LocalMetrics.current
     val s = m.spec
+    MusicPolling()
+    val st = MusicController.state
+    val player = st.pkg ?: model.selectedPlayer
+    val colors = MusicColors.of(LocalAccent.current)
+    // «Стекло»: только кромка поверх обложки, сама обложка и затемнение не меняются
+    CardBox(modifier.homeGlassEdge(RoundedCornerShape(m.dp(s.radius)), s.t / 96f), background = Color.Transparent) {
+        MusicCardBody(st, player, colors)
+    }
+}
+
+/**
+ * Опрос сессий плеера раз в секунду, пока на экране карточка музыки или плашка плеера над навигатором ([NavPlayerPlate]),
+ * и выбор плеера чипа по тому, что играет. Без него [MusicController.state] стоит на месте.
+ */
+@Composable
+fun MusicPolling() {
+    val model = LauncherModel
     val ctx = model.context
     // плееры чипа: только их сессии попадают в карточку (Telegram, Teams - нет); второй слот без закрепления - любой онлайн
     val chip = PlayerChip.slots(model.installedPackages, model.musicPlayer, model.lastOnlinePlayer, model.localPlayer,
@@ -100,7 +117,6 @@ fun MusicCard(modifier: Modifier) {
         }
     }
     val st = MusicController.state
-    val player = st.pkg ?: model.selectedPlayer
     // играет онлайн-плеер - он и становится вторым слотом чипа
     LaunchedEffect(st.pkg) { model.noteOnlinePlayer(st.pkg) }
     // заиграл другой плеер чипа (Я.Музыку включили на телефоне) - выбор переключается на него и запоминается
@@ -108,13 +124,19 @@ fun MusicCard(modifier: Modifier) {
         val pkg = st.pkg
         if (st.playing && pkg != null && pkg != model.selectedPlayer && pkg in chip) LauncherActions.adoptPlayer(pkg)
     }
-    val colors = MusicColors.of(LocalAccent.current)
-    // «Стекло»: только кромка поверх обложки, сама обложка и затемнение не меняются
-    CardBox(modifier.homeGlassEdge(RoundedCornerShape(m.dp(s.radius)), s.t / 96f), background = Color.Transparent) {
+}
+
+@Composable
+private fun BoxScope.MusicCardBody(st: MusicState, player: String?, colors: MusicColors) {
+    val model = LauncherModel
+    val m = LocalMetrics.current
+    val s = m.spec
+    val ctx = model.context
+    run {
         Box(Modifier.fillMaxSize().musicBackground(colors))
         if (s.portrait) {
             MusicBodyPortrait(st, player, colors)
-            return@CardBox
+            return@run
         }
         if (st.art == null) {
             // нота лежит у золотого пятна фона, а оно нарисовано физически: Ltr, чтобы в RTL нота не уезжала от него
