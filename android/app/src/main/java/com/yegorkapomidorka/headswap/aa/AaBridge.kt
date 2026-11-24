@@ -2659,7 +2659,7 @@ class AaBridgeCore(
                 val t0 = clockMs()
                 val r = try {
                     b.build(job, pic)
-                } catch (e: RuntimeException) {
+                } catch (e: Throwable) {      // и ExecutionException слайса из пула: иначе spliceBuilding навсегда true
                     log("BRIDGE свой IDR: !!!!!! сборка упала: ${e.javaClass.simpleName}: ${e.message}", true)
                     null
                 }

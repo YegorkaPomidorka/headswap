@@ -558,6 +558,22 @@ class IdrSpliceBridgeTest {
         assertTrue(dec.stopped)
     }
 
+    /** Слайс в пуле упал (ExecutionException из get): сборка не должна остаться «идущей» навсегда, следующая попытка идёт. */
+    @Test
+    fun failedSliceDoesNotStallLaterBuilds() {
+        val pool = object : java.util.concurrent.ThreadPoolExecutor(1, 1, 0, java.util.concurrent.TimeUnit.SECONDS, java.util.concurrent.LinkedBlockingQueue()) {
+            override fun <T> invokeAll(tasks: MutableCollection<out java.util.concurrent.Callable<T>>): MutableList<java.util.concurrent.Future<T>> =
+                tasks.map { java.util.concurrent.CompletableFuture<T>().also { f -> f.completeExceptionally(IllegalStateException("слайс")) } as java.util.concurrent.Future<T> }.toMutableList()
+        }
+        // кадры теста малы и уходят без сжатия (бит-в-бит): target=1 гонит сборку в сжатый путь с пулом
+        val f = AaBridgeCore::class.java.getDeclaredField("builder").also { it.isAccessible = true }
+        f.set(core, IdrBuilder(pool, 4, target = 1))
+        startWith(3)
+        decoded(3)
+        repeat(6) { now += 2000; core.tick() }
+        assertTrue(logs.toString(), logs.count { it.contains("сборка упала") } >= 2)
+    }
+
     /** dispose() гасит нити сборки и пул слайсов; после него поздние кадры не собирают IDR и не падают на закрытых исполнителях. */
     @Test
     fun disposeShutsDownBuildThreads() {
