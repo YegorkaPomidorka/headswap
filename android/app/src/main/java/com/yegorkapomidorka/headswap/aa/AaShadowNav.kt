@@ -108,6 +108,18 @@ object AaShadowNav {
         log("выключаю")
     }
 
+    /**
+     * Ждёт, пока последняя теневая сессия полностью закрылась (ByeBye, EOF): сервер 5277 одноразовый, новое подключение
+     * при недозакрытой старой его глушит. Не ждёт, пока теневая включена (живая сессия не «закрывается»). Не звать с main.
+     */
+    fun awaitStopped(timeoutMs: Long = STOP_WAIT_MS): Boolean {
+        if (wanted) return true
+        val l = lastEnded ?: return true
+        if (l.await(timeoutMs, java.util.concurrent.TimeUnit.MILLISECONDS)) return true
+        log("прошлая сессия не закрылась за $timeoutMs мс, иду дальше")
+        return false
+    }
+
     /** Ещё [DUMP_MS] видео начиная с ключевого кадра. */
     fun dump() {
         val s = session
@@ -149,10 +161,18 @@ object AaShadowNav {
 
     @Volatile private var generation = 0
 
+    /** Открывается, когда последняя начатая сессия закончила shutdown (её onEnd). */
+    @Volatile private var lastEnded: java.util.concurrent.CountDownLatch? = null
+
     private fun loop(app: Context, gen: Int, withVideo: Boolean) {
         var attempt = 0
         while (generation == gen) {
             attempt++
+            // прошлая нить (после stop()) может ещё слать ByeBye: новое подключение к 5277 только после её конца
+            lastEnded?.let { prev ->
+                if (!prev.await(STOP_WAIT_MS, java.util.concurrent.TimeUnit.MILLISECONDS)) log("прошлая сессия не закрылась за $STOP_WAIT_MS мс, иду дальше")
+            }
+            if (generation != gen) break
             val creds = try { AaCreds.load(app, AaPrefs(app).certSet).creds } catch (e: Throwable) {
                 log("сертификаты не загрузились: ${e.javaClass.simpleName}: ${e.message}"); stop(); return
             }
@@ -167,6 +187,7 @@ object AaShadowNav {
                 onEnd = { reason, _ -> log("сессия #$attempt закончилась: $reason"); ended.countDown() })
             synchronized(this) {
                 if (generation != gen) return
+                lastEnded = ended
                 session = s
             }
             log("сессия #$attempt: подключаюсь к 127.0.0.1:5277 (video=$withVideo, ${mode.aaResolution})")
@@ -182,5 +203,6 @@ object AaShadowNav {
 
     /** Сервер 5277 после ByeBye поднимается заново за ~6 с (ServerFailures.RELISTEN_MS = 10 с). */
     private const val RETRY_MS = 10_000L
+    private const val STOP_WAIT_MS = 10_000L
     private const val DUMP_MS = 20_000L
 }
