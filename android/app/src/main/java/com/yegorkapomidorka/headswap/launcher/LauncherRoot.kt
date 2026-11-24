@@ -133,8 +133,9 @@ fun LauncherRoot(connected: Boolean) {
                         // «Стекло»: рейка прозрачная поверх общего фона, а область справа от неё - сплошной bgSolid без градиента;
                         // с обоями bgSolid не рисуем, иначе они закрыты
                         val glass = model.railStyle == RailStyle.GLASS
-                        if (!fullscreen) Rail(glass)
-                        Box(Modifier.weight(1f).fillMaxHeight().then(if (glass && !fullscreen && wallpaper == null) Modifier.background(pal.bgSolid) else Modifier)
+                        val railShown = !fullscreen && !model.railHidden
+                        if (railShown) Rail(glass)
+                        Box(Modifier.weight(1f).fillMaxHeight().then(if (glass && railShown && wallpaper == null) Modifier.background(pal.bgSolid) else Modifier)
                             .onGloballyPositioned { model.areaRect = it.boundsInRoot() }) {
                             AreaContent()
                         }

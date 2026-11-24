@@ -17,6 +17,16 @@ object DesktopKeys {
 
     @Volatile var sink: Sink? = null
 
+    /** Левая рейка лаунчера для свайпа по экрану ГУ ([com.yegorkapomidorka.headswap.aa.RailSwipe], ADR 0062). */
+    interface Rail {
+        /** true - рейка скрыта, false - видна, null - прятать нечего (чужой лаунчер, активность не на экране, портрет). Любой поток. */
+        fun hidden(): Boolean?
+        /** Скрыть или вернуть рейку. Любой поток. */
+        fun setHidden(hide: Boolean)
+    }
+
+    @Volatile var rail: Rail? = null
+
     /**
      * Нажатие клавиши в дисплей рабочего стола процессом активации (у shell на Xiaomi INJECT_EVENTS нет). Нужен Gemini:
      * KEYCODE_VOICE_ASSIST открывает помощника по умолчанию штатно, как долгое нажатие питания. null - сессии нет.

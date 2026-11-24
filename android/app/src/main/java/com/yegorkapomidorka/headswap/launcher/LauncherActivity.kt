@@ -88,6 +88,7 @@ class LauncherActivity : ComponentActivity() {
         })
         setContent { LauncherRoot(connected) }
         DesktopKeys.sink = LauncherKnob // шайба и NAVI/MUSIC/HOME ГУ идут сюда, а не инжектом в окно (ADR 0024)
+        DesktopKeys.rail = LauncherKnob // свайп по экрану ГУ прячет рейку (ADR 0062)
     }
 
     /**

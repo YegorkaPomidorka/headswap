@@ -104,6 +104,8 @@ CONTROL0, SENSOR1, VIDEO2, INPUT3, SPEECH4, SYSTEM5, MEDIA6, MIC7, BT8, MEDIA_PL
 `VideoGeometry.mapTouch` → `AapSession.sendTouch`. Кнопки руля — `onCarlifeHardKey`.
 На рабочем столе перед прореживателем стоит `VolumeSwipe`: два пальца у правого края двигают громкость медиа
 телефона (`DesktopMedia.adjustVolume`), на Vezel всегда, иначе по `AaPrefs.volumeSwipe` (ADR 0038).
+За ним `RailSwipe`: один палец, горизонтальный свайп из коридора 10–35% (возврат 0–35%) × 30–70% кадра прячет/возвращает левую рейку
+лаунчера (`DesktopKeys.Rail` → `LauncherModel.railHidden`); касание не задерживается, CANCEL после опознания (ADR 0062).
 
 **9. Навигация и приборка.** AA NAVIGATION(10) → `MetaRelay` → `sendNaviTurn` (NAVI_NEXT_TURN_INFO), только после
 подписки ГУ. Honda: `HondaClusterRoad` ужимает название улицы под приборку.
@@ -216,6 +218,7 @@ CONTROL0, SENSOR1, VIDEO2, INPUT3, SPEECH4, SYSTEM5, MEDIA6, MIC7, BT8, MEDIA_PL
 | Карточка музыки: Play/обложка ведут не в тот плеер, Play не запускает выбранный | выбор - `LauncherModel.selectedPlayer` (чип `PlayerChip.slots`), подбор сессии `MusicLogic.pickSession(chosenOnly, chip)` в `MusicController.refresh` - только плееры чипа; заигравший плеер чипа становится выбором (`LauncherActions.adoptPlayer`); запуск - `MusicController.startPlayer` (MediaBrowser + MEDIA_BUTTON, через 4 с `openPlayerApp`); в логе `MUSIC`, `LAUNCHER плеер`; ADR 0046 |
 | Шайба/кнопки ГУ не действуют в своём лаунчере | `DelegatedDexConnector.sendRotary/sendKey` → `DesktopKeys.sink` → `launcher/LauncherKnob` (фокус в `Pressable`), коды в `KnobLogic`, ADR 0024; в окне на всю область - `LauncherKnob.toWindow` → `EmbedHost.key` → `injectChildKey`, в логе `LAUNCHER шайба: клавиши идут в окно`, ADR 0037; два «Домой» за 700 мс - меню ГУ (`KnobLogic.doubleHome` → `LauncherActions.huDesktop`, в логе `HOME дважды`), ADR 0048 |
 | Рабочий стол: громкость двумя пальцами не работает | `VolumeSwipe` (зона 30% справа, шаг 1/12 высоты) в `AaBridgeCore.onCarlifeTouch`, тумблер `AaPrefs.volumeSwipe` / `huHondaVezel`, `DesktopMediaControl.adjustVolume`; в логе `жест громкости`, `BRIDGE громкость`; ADR 0038 |
+| Рабочий стол: рейка пропала / не скрывается свайпом | `RailSwipe` (коридор старта, пороги) в `AaBridgeCore.onCarlifeTouch`, `DesktopKeys.Rail` → `LauncherKnob.hidden/setHidden`, `LauncherModel.railHidden` (не сохраняется), `LauncherRoot`; в логе `свайп рейки`, `рейка лаунчера`; ADR 0062 |
 | 2ГИС на рабочем столе: нет лимита/камер, заставка висит, «Перезапустите 2ГИС» | `carapp/CarAppSession` (области, порядок stop), кнопка «Перезапустить навигатор»; ADR 0021 |
 | Навигатор окном вместо хоста, в логе `handshake: отказ ... Unknown host` | TEMPLATE_RENDERER в манифесте; ADR 0022 |
 | Огромная жёлтая стрелка и значки, мало подписей у Я.Навигатора/Я.Карт в окне | буфер дочернего дисплея крупнее окна: `launcher/EmbedRenderPolicy.geometry` (400 / DPI, пакеты `MAP_PACKAGES`) в `EmbedHost.reconcileInternal`; в логе `EMBED ... крупнее для карты`; ADR 0050 |
