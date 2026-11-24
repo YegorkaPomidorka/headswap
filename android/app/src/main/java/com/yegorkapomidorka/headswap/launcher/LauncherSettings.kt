@@ -738,8 +738,9 @@ private fun WallpaperCard(d: SettingsDims, glass: Boolean, modifier: Modifier, p
     Card(modifier) {
         BoxWithConstraints(Modifier.fillMaxSize().padding(start = m.dp(d.padStart), end = m.dp(d.padEnd), top = m.dp(d.padV), bottom = m.dp(d.padV))) {
             val g = s.g
-            val items = if (hasCustom) 5 else 4
-            val labelH = (d.sub * 1.3).roundToInt() + s.g4
+            val items = if (hasCustom) 7 else 6
+            // подпись в две строки: «Зимняя дорога», «Christmas tree» в узкой плитке переносятся
+            val labelH = 2 * (d.sub * 1.3).roundToInt() + s.g4
             val off = Modifier.alpha(if (glass) 1f else WALLPAPER_OFF_ALPHA)
             if (portrait) {
                 val titleH = ((s.f2 + d.sub) * 1.3).roundToInt() + 4
@@ -799,6 +800,12 @@ private fun WallpaperThumbs(glass: Boolean, hasCustom: Boolean, thumbW: Int, thu
     WallpaperThumb(stringResource(R.string.l_s_wallpaper_mountains), model.wallpaper == WallpaperId.MOUNTAINS, glass, thumbW, thumbH, d, { pick(WallpaperId.MOUNTAINS) }) {
         WallpaperPreview(WallpaperId.MOUNTAINS, model.wallpaperVer, thumbW, thumbH)
     }
+    WallpaperThumb(stringResource(R.string.l_s_wallpaper_tree), model.wallpaper == WallpaperId.TREE, glass, thumbW, thumbH, d, { pick(WallpaperId.TREE) }) {
+        WallpaperPreview(WallpaperId.TREE, model.wallpaperVer, thumbW, thumbH)
+    }
+    WallpaperThumb(stringResource(R.string.l_s_wallpaper_winter_road), model.wallpaper == WallpaperId.WINTER_ROAD, glass, thumbW, thumbH, d, { pick(WallpaperId.WINTER_ROAD) }) {
+        WallpaperPreview(WallpaperId.WINTER_ROAD, model.wallpaperVer, thumbW, thumbH)
+    }
     if (hasCustom) {
         WallpaperThumb(stringResource(R.string.l_s_wallpaper_custom), model.wallpaper == WallpaperId.CUSTOM, glass, thumbW, thumbH, d, { pick(WallpaperId.CUSTOM) }) {
             WallpaperPreview(WallpaperId.CUSTOM, model.wallpaperVer, thumbW, thumbH)
@@ -842,7 +849,7 @@ private fun WallpaperThumb(
                 if (pressed) Box(Modifier.matchParentSize().background(Pal.SURFACE_PRESSED))
             }
         }
-        Txt(label, d.sub, Modifier.fillMaxWidth(), color = if (selected) Pal.TEXT else Pal.SEC, align = TextAlign.Center)
+        Txt(label, d.sub, Modifier.fillMaxWidth(), color = if (selected) Pal.TEXT else Pal.SEC, align = TextAlign.Center, maxLines = 2, ellipsis = false)
     }
 }
 

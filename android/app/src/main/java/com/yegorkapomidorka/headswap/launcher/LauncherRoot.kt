@@ -111,7 +111,7 @@ fun LauncherRoot(connected: Boolean) {
             Box(Modifier.fillMaxSize().launcherBackground(pal)) {
                 if (wallpaper != null && model.foreign == null) WallpaperLayer(wallpaper, model.wallpaperBlur, model.wallpaperDim, minOf(w, h))
                 // «Огоньки» (ADR 0063): праздничный набор и нет обоев - боке цветами гирлянды поверх градиента, под содержимым
-                val lights = model.garland && wallpaper == null && model.foreign == null
+                val lights = model.garland && model.wallpaper == WallpaperId.NONE && model.foreign == null
                 if (lights) LightsLayer(spec.t, (if (model.shownLight) model.dayColors else model.nightColors).accentHue, model.animations)
                 if (!connected) {
                     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {

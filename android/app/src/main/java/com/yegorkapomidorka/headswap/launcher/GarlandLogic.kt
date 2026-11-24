@@ -4,15 +4,15 @@ import androidx.compose.ui.graphics.Color
 import kotlin.math.abs
 
 /** Готовый набор цветов «Вид › Цвета › Пресеты» (ADR 0063); [garland] - включать гирлянду при выборе. */
-data class ColorPreset(val id: String, val night: ColorSet, val day: ColorSet, val garland: Boolean) {
+data class ColorPreset(val id: String, val night: ColorSet, val day: ColorSet, val garland: Boolean, val wallpaper: WallpaperId? = null) {
     fun set(day: Boolean) = if (day) this.day else night
 
     companion object {
         val DEFAULT = ColorPreset("default", ColorSet.NIGHT, ColorSet.DAY, false)
         /** Ёлка: тёмно-зелёный фон, золотой акцент. Днём - светлый зеленоватый. */
-        val TREE = ColorPreset("tree", ColorSet(46, 152, 70), ColorSet(46, 152, 60), true)
+        val TREE = ColorPreset("tree", ColorSet(46, 152, 70), ColorSet(46, 152, 60), true, WallpaperId.TREE)
         /** Новогодний: тёмно-бордовый фон, зелёный акцент (Егор). */
-        val NEW_YEAR = ColorPreset("new_year", ColorSet(0, 350, 85), ColorSet(0, 350, 70), true)
+        val NEW_YEAR = ColorPreset("new_year", ColorSet(0, 350, 85), ColorSet(0, 350, 70), true, WallpaperId.WINTER_ROAD)
         val ALL = listOf(DEFAULT, TREE, NEW_YEAR)
     }
 }

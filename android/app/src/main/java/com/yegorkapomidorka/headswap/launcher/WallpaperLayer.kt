@@ -31,6 +31,8 @@ internal object WallpaperLoader {
     private fun resId(id: WallpaperId): Int? = when (id) {
         WallpaperId.HEADSWAP -> R.drawable.wallpaper_headswap
         WallpaperId.MOUNTAINS -> R.drawable.wallpaper_mountains
+        WallpaperId.TREE -> R.drawable.wallpaper_tree
+        WallpaperId.WINTER_ROAD -> R.drawable.wallpaper_winter_road
         else -> null
     }
 
