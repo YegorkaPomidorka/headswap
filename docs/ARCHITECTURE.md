@@ -206,6 +206,7 @@ CONTROL0, SENSOR1, VIDEO2, INPUT3, SPEECH4, SYSTEM5, MEDIA6, MIC7, BT8, MEDIA_PL
 | AA не подключается, `нет VERSION_RESPONSE` | сервер 5277 заглох: ADR 0003; база кейсов (память `hu/`) |
 | Обрывы по воздуху | `MultiSocketTransport`, `P2pJoin`, `CarNetwork`, строки `WL`; VPN рвёт сокеты |
 | Звук молчит / приглушён | `AaAudio`, AUDIO_TRANSMISSION_MODE, TTS_STOP; источник на ГУ |
+| Рабочий стол: после выключения машины / выдёргивания шнура музыка пару секунд играет в телефоне | пауза при обрыве `dex/DesktopMusicPlayback.linkClosed` (до снятия захвата, USB и Wi-Fi tcp6) и `physicalDetach` (USB detach), допуск `DesktopMusicUsbLink.pauseOnClose`, play после реконнекта `DesktopMusicResumePolicy`; в логе `DESKTOP MUSIC: paused current session on …` / `no pause on … (причина)`; ADR 0061 |
 | Нет подсказок на приборке | подписка ГУ, `MetaRelay.sendNaviTurn`, `HondaClusterRoad` |
 | Текст на ГУ не на языке интерфейса | заглушка: `DelegatedDexConnector.text()` (`desk_ph_*`, `desk_err_*`), режим AA — тексты `AaBridgeCore` из `BridgeService` (`aa_ph_*`); язык — `AppLocale` |
 | Автотест стенда падает | `out/autotest-*/<язык>/`: `steps/`, `fail/*-diff.png`, `actions.log`; «обрезан многоточием» — баг вёрстки; README `pc-headunit/autotest` |

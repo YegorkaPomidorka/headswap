@@ -1176,11 +1176,12 @@ class BridgeService : Service() {
         session = s
         // tcp-debug (эмулятор ГУ) и свисток (usb-tcp) для ГУ тот же USB-аксессуар: звук и захват рабочего стола как по кабелю
         val audioUsb = transport.caps.usbLike
-        DesktopMusicPlayback.attach(applicationContext, this, s, audioUsb,
-            ready = { session === s && DexState.running && s.hasFreshDesktopVideo() },
-            audioReady = { !DexPrefs(this).usbPlaybackAudio || !owner.core.audioViaUsb || DesktopAudioState.running })
         // h658: по Wi-Fi (tcp6) звук CarLife в режиме AA ходит, а BT A2DP ГУ рвёт сама — захват рабочего стола тоже пускаем в tcp6
         val desktopAudioLink = audioUsb || transport.caps === TransportCaps.TCP6
+        // h1407: пауза плеера при обрыве нужна и по Wi-Fi — там звук тоже идёт через захват
+        DesktopMusicPlayback.attach(applicationContext, this, s, desktopAudioLink,
+            ready = { session === s && DexState.running && s.hasFreshDesktopVideo() },
+            audioReady = { !DexPrefs(this).usbPlaybackAudio || !owner.core.audioViaUsb || DesktopAudioState.running })
         desktopAudio.attach(owner.core, desktopAudioLink) { session === s && s.canCaptureDesktopAudio() }
         s.start()
         owner.onUsbSessionStarted()
@@ -1337,8 +1338,10 @@ class BridgeService : Service() {
         if (!stopRequested && s.transportKind == TransportCaps.USB_AOA.kind) {
             observePhysicalUsbDetach("USB session closed and accessory absent")
         }
+        // h1407/h1408: пауза до снятия захвата — иначе музыка сразу уходит в динамик телефона
+        DesktopMusicPlayback.linkClosed(s, capturing = DesktopAudioState.running, stopRequested = stopRequested,
+            physicalUsb = s.transportKind == TransportCaps.USB_AOA.kind)
         desktopAudioImpl?.detach()
-        DesktopMusicPlayback.linkClosed(s)
         cancelDesktopRecovery()
     }
 

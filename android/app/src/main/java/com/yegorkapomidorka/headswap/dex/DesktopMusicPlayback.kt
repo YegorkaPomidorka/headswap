@@ -42,9 +42,10 @@ internal object DesktopMusicPlayback {
         }
     }
 
-    fun attach(context: Context, serviceOwner: Any, owner: Any, isUsb: Boolean,
+    /** [captureLink]: links where desktop audio may go through our capture (USB-like and tcp6 Wi-Fi). */
+    fun attach(context: Context, serviceOwner: Any, owner: Any, captureLink: Boolean,
         ready: () -> Boolean, audioReady: () -> Boolean) = onMain {
-        if (!isUsb || !allowed(context)) { clear("unsupported link"); return@onMain }
+        if (!captureLink || !allowed(context)) { clear("unsupported link"); return@onMain }
         this.context = context.applicationContext
         link.attach(serviceOwner, owner, SystemClock.elapsedRealtime())
         this.ready = ready
@@ -53,11 +54,21 @@ internal object DesktopMusicPlayback {
         tick.run()
     }
 
-    /** An old session cannot retire a replacement session. Physical detach may be reported later. */
-    fun linkClosed(owner: Any) = onMain {
+    /**
+     * An old session cannot retire a replacement session. Physical detach may be reported later.
+     * Call before the capture is detached: [capturing] is whether our capture carried the music to the HU.
+     * On physical USB a pause here needs a resumable item: a Samsung read error with the cable still in
+     * reconnects in 0.5 s, and an unresumable pause would stay; physical detach still decides that case.
+     */
+    fun linkClosed(owner: Any, capturing: Boolean, stopRequested: Boolean, physicalUsb: Boolean) = onMain {
+        val app = context
+        if (link.owner === owner && receivingVideo()) link.markReady() // The first frame may arrive between polls.
+        val pause = app != null && link.pauseOnClose(owner, capturing, stopRequested) &&
+            allowed(app) && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
         if (!link.close(owner, SystemClock.elapsedRealtime())) return@onMain
         ready = null
         audioReady = null
+        if (pause && app != null) pauseForLinkLoss(app, "desktop link close", requireResume = physicalUsb)
         scheduleNext()
     }
 
@@ -69,32 +80,40 @@ internal object DesktopMusicPlayback {
         // The selected media-key session API is Android 13+, like the whole delegated access.
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return@onMain
         if (receivingVideo()) link.markReady() // The first frame may arrive between readiness polls.
-        fun skip(why: String) = AppLog.i("DESKTOP MUSIC: no pause on physical USB detach ($why)", false)
-        if (!link.consumePhysicalDetach(serviceOwner, SystemClock.elapsedRealtime())) { skip("desktop was not ready"); return@onMain }
-        if (policy.hasPending) { skip("resume already pending"); return@onMain }
+        if (!link.consumePhysicalDetach(serviceOwner, SystemClock.elapsedRealtime())) {
+            AppLog.i("DESKTOP MUSIC: no pause on physical USB detach (desktop was not ready)", false); return@onMain
+        }
+        pauseForLinkLoss(app, "physical USB detach", requireResume = false)
+    }
+
+    /** Pauses only the one selected local media session; a pause with a known item is resumed on reconnect. */
+    private fun pauseForLinkLoss(app: Context, trigger: String, requireResume: Boolean) {
+        fun skip(why: String) = AppLog.i("DESKTOP MUSIC: no pause on $trigger ($why)", false)
+        if (policy.hasPending) { skip("resume already pending"); return }
         try {
             if (app.checkSelfPermission(android.Manifest.permission.MEDIA_CONTENT_CONTROL) != PackageManager.PERMISSION_GRANTED) {
-                skip("no MEDIA_CONTENT_CONTROL"); return@onMain
+                skip("no MEDIA_CONTENT_CONTROL"); return
             }
             val manager = app.getSystemService(MediaSessionManager::class.java)
-            val selected = manager.mediaKeyEventSession ?: run { skip("no media-key session"); return@onMain }
+            val selected = manager.mediaKeyEventSession ?: run { skip("no media-key session"); return }
             val active = manager.getActiveSessions(null)
             val playing = active.filter { it.playbackState?.state == PlaybackState.STATE_PLAYING }
             val target = playing.singleOrNull()?.takeIf { it.sessionToken == selected } ?: run {
-                skip("playing=${playing.size}: ${playing.joinToString { it.packageName }}, selected=${manager.mediaKeyEventSessionPackageName}"); return@onMain
+                skip("playing=${playing.size}: ${playing.joinToString { it.packageName }}, selected=${manager.mediaKeyEventSessionPackageName}"); return
             }
             val info = target.playbackInfo
             if (info.playbackType != MediaController.PlaybackInfo.PLAYBACK_TYPE_LOCAL ||
                 info.audioAttributes.usage != AudioAttributes.USAGE_MEDIA) {
-                skip("${target.packageName}: type=${info.playbackType} usage=${info.audioAttributes.usage}"); return@onMain
+                skip("${target.packageName}: type=${info.playbackType} usage=${info.audioAttributes.usage}"); return
             }
-            val before = snapshot(target) ?: run { skip("no playback state"); return@onMain }
+            val before = snapshot(target) ?: run { skip("no playback state"); return }
+            if (requireResume && before.item == null) { skip("item cannot be resumed; physical detach decides"); return }
             releaseObserver()
-            if (!policy.pause(before, SystemClock.elapsedRealtime())) { skip("policy refused"); return@onMain }
+            if (!policy.pause(before, SystemClock.elapsedRealtime())) { skip("policy refused"); return }
             if (!policy.hasPending) {
                 target.transportControls.pause()
-                AppLog.i("DESKTOP MUSIC: paused current session; item cannot be safely resumed", false)
-                return@onMain
+                AppLog.i("DESKTOP MUSIC: paused current session on $trigger; item cannot be safely resumed", false)
+                return
             }
             watched = target
             val listener = object : MediaController.Callback() {
@@ -121,7 +140,7 @@ internal object DesktopMusicPlayback {
                 }.getOrDefault(false)) cancelPending("selected player changed")
             }.also { manager.addOnMediaKeyEventSessionChangedListener(app.mainExecutor, it) }
             target.transportControls.pause()
-            AppLog.i("DESKTOP MUSIC: paused current session on physical USB detach", false)
+            AppLog.i("DESKTOP MUSIC: paused current session on $trigger", false)
             main.removeCallbacks(tick)
             tick.run()
         } catch (_: Exception) { cancelPending("pause unavailable") }
@@ -129,8 +148,9 @@ internal object DesktopMusicPlayback {
 
     fun serviceDestroyed(serviceOwner: Any, physicallyDetached: Boolean) = onMain {
         if (link.serviceOwner !== serviceOwner) return@onMain
-        link.owner?.let(::linkClosed)
-        // Only physicalDetach() can create this intention. A failed reconnect may end its own
+        // Service teardown is not a link loss: never a player decision here.
+        link.owner?.let { linkClosed(it, capturing = false, stopRequested = true, physicalUsb = false) }
+        // Only a link-loss pause (link close or physical detach) creates this intention. A failed reconnect may end its own
         // service before any new frames arrive; that lifecycle event is not a player decision.
         if (policy.hasPending) {
             link.clear()

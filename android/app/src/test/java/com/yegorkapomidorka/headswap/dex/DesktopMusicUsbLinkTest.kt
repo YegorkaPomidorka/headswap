@@ -70,6 +70,39 @@ class DesktopMusicUsbLinkTest {
         assertTrue(gate.consumePhysicalDetach(service, 7_001))
     }
 
+    @Test fun readyCapturingLinkPausesOnCloseWithoutWaitingForDetach() {
+        gate.attach(service, first, 0)
+        gate.markReady()
+        assertTrue(gate.pauseOnClose(first, capturing = true, stopRequested = false))
+    }
+
+    @Test fun stopUncapturedAudioOrUnreadyLinkDoNotPauseOnClose() {
+        gate.attach(service, first, 0)
+        assertFalse(gate.pauseOnClose(first, capturing = true, stopRequested = false)) // no frames yet
+        gate.markReady()
+        assertFalse(gate.pauseOnClose(first, capturing = true, stopRequested = true))  // explicit Stop
+        assertFalse(gate.pauseOnClose(first, capturing = false, stopRequested = false)) // music over BT A2DP
+    }
+
+    @Test fun staleOrAlreadyDetachedLinkDoesNotPauseOnClose() {
+        gate.attach(service, first, 0)
+        gate.markReady()
+        gate.attach(service, retry, 100)
+        assertFalse(gate.pauseOnClose(first, capturing = true, stopRequested = false))
+        gate.markReady()
+        assertTrue(gate.consumePhysicalDetach(service, 200)) // detach already paused the player
+        assertFalse(gate.pauseOnClose(retry, capturing = true, stopRequested = false))
+    }
+
+    @Test fun closeAfterPauseStillLetsLateDetachSeeTheReadyLink() {
+        gate.attach(service, first, 0)
+        gate.markReady()
+        assertTrue(gate.pauseOnClose(first, capturing = true, stopRequested = false))
+        gate.close(first, 1_000)
+        // Detach 3 s later stays eligible; the pending resume makes the player code skip a second pause.
+        assertTrue(gate.consumePhysicalDetach(service, 4_200))
+    }
+
     @Test fun aNewReadySessionQualifiesIndependentlyAfterLongIdle() {
         gate.attach(service, first, 100)
         gate.markReady()

@@ -25,6 +25,14 @@ internal class DesktopMusicUsbLink(private val graceMs: Long) {
 
     fun markReady() { if (owner != null && !physicallyDetached) sawReady = true }
 
+    /**
+     * Call before [close]: the ready link carried music through our capture, so the moment it closes the
+     * player falls back to the handset speaker. Waiting for USB detach left 3 s of speaker (h1408); over
+     * Wi-Fi there is no detach at all (h1407). An explicit Stop is the user's decision, not a link loss.
+     */
+    fun pauseOnClose(link: Any, capturing: Boolean, stopRequested: Boolean): Boolean =
+        owner === link && sawReady && !physicallyDetached && capturing && !stopRequested
+
     fun close(link: Any, now: Long): Boolean {
         if (owner !== link) return false
         if (sawReady && !physicallyDetached) readyLinkClosedAt = now
