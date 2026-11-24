@@ -196,7 +196,7 @@
     <string name="l_s_colors_bg_hue">درجة لون الخلفية</string>
     <string name="l_s_colors_bg_sat">تشبّع الخلفية</string>
     <string name="l_s_colors_hint">ما دامت هذه الشاشة مفتوحة، يعرض سطح المكتب الألوان التي تعدّلها. تظهر ألوان الليل في السمة الداكنة، وألوان النهار في الفاتحة.</string>
-    <string name="l_s_colors_presets">جاهزة</string>
+    <string name="l_s_colors_presets">إعدادات مسبقة</string>
     <string name="l_s_preset_default">افتراضي</string>
     <string name="l_s_preset_tree">شجرة الميلاد</string>
     <string name="l_s_preset_new_year">رأس السنة</string>

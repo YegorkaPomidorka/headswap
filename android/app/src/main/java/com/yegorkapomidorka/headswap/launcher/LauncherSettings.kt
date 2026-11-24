@@ -197,7 +197,7 @@ fun LauncherSettingsScreen() {
                         }
                         SettingsPage.COLORS -> if (s.portrait) {
                             // портрет: режим, три слайдера одной карточкой, обои (миниатюры в пропорции экрана), размытие
-                            // с затемнением, «Готовые»; доли высоты 1 : 3 : 4 : 2 : 1
+                            // с затемнением, «Пресеты»; доли высоты 1 : 3 : 4 : 2 : 1
                             val unitH = (h - 4 * gap) / 11
                             val dc = SettingsDims(s, unitH)
                             val set = if (model.colorsEditDay) model.dayColors else model.nightColors
@@ -224,7 +224,7 @@ fun LauncherSettingsScreen() {
                                 PresetsCard(dc, row.weight(1f), withLabel = false)
                             }
                         } else {
-                            // шесть долей высоты: режим, три цвета рядом, обои (две доли), размытие с затемнением, «Готовые»
+                            // шесть долей высоты: режим, три цвета рядом, обои (две доли), размытие с затемнением, «Пресеты»
                             val unitH = (h - 4 * gap) / 6
                             val dc = SettingsDims(s, unitH)
                             val set = if (model.colorsEditDay) model.dayColors else model.nightColors
@@ -567,7 +567,7 @@ private fun ColorsSwatch(pal: LauncherPalette, d: SettingsDims) {
 }
 
 /**
- * «Готовые» наборы цветов: три равные пилюли с миниатюрой и подписью (ADR 0063). Тап применяет набор к правимому
+ * пресеты цветов: три равные пилюли с миниатюрой и подписью (ADR 0063). Тап применяет набор к правимому
  * (ночному или дневному), выбранный - тот, чьи значения совпали с текущими. [withLabel] - слева подпись ряда (в портрете места нет).
  */
 @Composable

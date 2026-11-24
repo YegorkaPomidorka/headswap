@@ -128,7 +128,7 @@
     <string name="l_s_colors_bg_hue">Teinte du fond</string>
     <string name="l_s_colors_bg_sat">Saturation du fond</string>
     <string name="l_s_colors_hint">Tant que cet écran est ouvert, le bureau affiche les couleurs que vous modifiez. Les couleurs de nuit s\'affichent avec le thème sombre, celles de jour avec le thème clair.</string>
-    <string name="l_s_colors_presets">Prêts à l\'emploi</string>
+    <string name="l_s_colors_presets">Préréglages</string>
     <string name="l_s_preset_default">Par défaut</string>
     <string name="l_s_preset_tree">Sapin</string>
     <string name="l_s_preset_new_year">Nouvel An</string>

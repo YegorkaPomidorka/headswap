@@ -3,7 +3,7 @@ package com.yegorkapomidorka.headswap.launcher
 import androidx.compose.ui.graphics.Color
 import kotlin.math.abs
 
-/** Готовый набор цветов «Вид › Цвета › Готовые» (ADR 0063); [garland] - включать гирлянду при выборе. */
+/** Готовый набор цветов «Вид › Цвета › Пресеты» (ADR 0063); [garland] - включать гирлянду при выборе. */
 data class ColorPreset(val id: String, val night: ColorSet, val day: ColorSet, val garland: Boolean) {
     fun set(day: Boolean) = if (day) this.day else night
 
