@@ -14,6 +14,7 @@ data class ColorPreset(val id: String, val night: ColorSet, val day: ColorSet, v
         /** Новогодний: тёмно-бордовый фон, зелёный акцент (Егор). */
         val NEW_YEAR = ColorPreset("new_year", ColorSet(0, 350, 85), ColorSet(0, 350, 70), true, WallpaperId.WINTER_ROAD)
         val ALL = listOf(DEFAULT, TREE, NEW_YEAR)
+        const val NONE_ID = "none"
     }
 }
 

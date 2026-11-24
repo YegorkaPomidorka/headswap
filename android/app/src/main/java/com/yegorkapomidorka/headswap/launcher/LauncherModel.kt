@@ -88,6 +88,10 @@ internal object LauncherModel {
     var dayColors by mutableStateOf(ColorSet.DAY)
     /** Гирлянда по нижнему краю строки статуса ([LauncherPrefs.garland], [GarlandUi]). */
     var garland by mutableStateOf(false)
+    /** Выбранный праздничный пресет ([LauncherPrefs.festivePreset]): подменяет плитку «Без обоев» в «Цвета › Обои». */
+    var festivePreset by mutableStateOf(ColorPreset.NONE_ID)
+    /** Праздничные обои для первой плитки; null - обычная «Без обоев». */
+    val festiveWallpaper: WallpaperId? get() = ColorPreset.ALL.firstOrNull { it.id == festivePreset }?.wallpaper
     /** На экране «Цвета» настраиваются дневные (иначе ночные); пока он открыт, весь стол показывает этот набор. */
     var colorsEditDay by mutableStateOf(false)
     /** Страница «Цвета» открыта (в альбоме и в портрете - отдельная страница «Вида», ADR 0054). */
@@ -200,6 +204,7 @@ internal object LauncherModel {
         nightColors = prefs.nightColors
         dayColors = prefs.dayColors
         garland = prefs.garland
+        festivePreset = prefs.festivePreset
         railSize = prefs.railSize
         railStyle = prefs.railStyle
         wallpaper = prefs.wallpaper
@@ -293,8 +298,11 @@ internal object LauncherModel {
     fun applyPreset(p: ColorPreset) {
         editColors(p.set(colorsEditDay)); saveColors()
         garland = p.garland; prefs.garland = p.garland
-        // праздничный набор ставит свои обои; «Без обоев» при гирлянде рисуется «Огоньками»
-        p.wallpaper?.let { chooseWallpaper(it) }
+        val festive = if (p.garland) p.id else ColorPreset.NONE_ID
+        festivePreset = festive; prefs.festivePreset = festive
+        // праздничный набор ставит свои обои; «По умолчанию» снимает праздничные, Headswap, «Горы» и своё фото не трогает
+        if (p.wallpaper != null) chooseWallpaper(p.wallpaper)
+        else if (wallpaper == WallpaperId.TREE || wallpaper == WallpaperId.WINTER_ROAD) chooseWallpaper(WallpaperId.NONE)
     }
     /**
      * «Сбросить» на «Цветах и обоях»: правимый набор цветов - к золоту, обои - «Без обоев», размытие и затемнение - по
@@ -303,6 +311,7 @@ internal object LauncherModel {
     fun resetColors() {
         editColors(if (colorsEditDay) ColorSet.DAY else ColorSet.NIGHT); saveColors()
         garland = false; prefs.garland = false
+        festivePreset = ColorPreset.NONE_ID; prefs.festivePreset = ColorPreset.NONE_ID
         chooseWallpaper(WallpaperId.NONE)
         editWallpaper(blur = WallpaperLogic.BLUR_DEFAULT, dim = WallpaperLogic.DIM_DEFAULT); saveWallpaper()
     }

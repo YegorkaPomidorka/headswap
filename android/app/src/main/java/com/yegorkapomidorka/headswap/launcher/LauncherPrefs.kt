@@ -66,6 +66,11 @@ class LauncherPrefs(private val context: Context) {
         get() = prefs.getBoolean("garland", false)
         set(value) { prefs.edit().putBoolean("garland", value).apply() }
 
+    /** Какой праздничный пресет выбран тапом: tree / new_year / none ([ColorPreset.id]); от слайдеров не зависит, по нему первая плитка обоев подменяется. */
+    var festivePreset: String
+        get() = prefs.getString("festive_preset", null) ?: ColorPreset.NONE_ID
+        set(value) { prefs.edit().putString("festive_preset", value).apply() }
+
     var railSize: RailSize
         get() = RailSize.restore(prefs.getString("rail_size", null))
         set(value) { prefs.edit().putString("rail_size", value.name).apply() }

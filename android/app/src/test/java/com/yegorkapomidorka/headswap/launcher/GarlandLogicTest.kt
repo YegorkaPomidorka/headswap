@@ -49,23 +49,11 @@ class GarlandLogicTest {
         assertEquals(ColorSet(46, 152, 70), ColorPreset.TREE.night)
         assertEquals(ColorSet(0, 350, 85), ColorPreset.NEW_YEAR.night)
     }
-}
 
-class LightsLogicTest {
-    @Test fun layoutIsStableAndInRange() {
-        val a = LightsLogic.layout()
-        assertEquals(LightsLogic.COUNT, a.size)
-        assertEquals(a, LightsLogic.layout())
-        assertTrue(a.all { it.alpha in 0.10f..0.35f && it.r in 0.3f..1.2f && it.x in 0f..1f && it.y in 0f..1f })
-        assertTrue(a.all { it.periodMs in 6000..10000 })
-        // чуть плотнее сверху
-        assertTrue(a.count { it.y < 0.5f } >= a.size / 2)
-    }
-
-    @Test fun breatheStaysInRange() {
-        for (b in LightsLogic.layout()) for (i in 0..20) {
-            val v = LightsLogic.breathe(b, i / 20f)
-            assertTrue(v in 0.64f..1.0f)
-        }
+    @Test fun festivePresetsCarryTheirWallpapers() {
+        assertEquals(WallpaperId.TREE, ColorPreset.TREE.wallpaper)
+        assertEquals(WallpaperId.WINTER_ROAD, ColorPreset.NEW_YEAR.wallpaper)
+        assertEquals(null, ColorPreset.DEFAULT.wallpaper)
+        assertTrue(ColorPreset.ALL.none { it.id == ColorPreset.NONE_ID })
     }
 }

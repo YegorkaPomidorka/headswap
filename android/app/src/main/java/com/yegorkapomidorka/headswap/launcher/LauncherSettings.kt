@@ -738,7 +738,7 @@ private fun WallpaperCard(d: SettingsDims, glass: Boolean, modifier: Modifier, p
     Card(modifier) {
         BoxWithConstraints(Modifier.fillMaxSize().padding(start = m.dp(d.padStart), end = m.dp(d.padEnd), top = m.dp(d.padV), bottom = m.dp(d.padV))) {
             val g = s.g
-            val items = if (hasCustom) 7 else 6
+            val items = if (hasCustom) 5 else 4
             // подпись в две строки: «Зимняя дорога», «Christmas tree» в узкой плитке переносятся
             val labelH = 2 * (d.sub * 1.3).roundToInt() + s.g4
             val off = Modifier.alpha(if (glass) 1f else WALLPAPER_OFF_ALPHA)
@@ -776,22 +776,18 @@ private fun WallpaperThumbs(glass: Boolean, hasCustom: Boolean, thumbW: Int, thu
     val model = LauncherModel
     val pal = LocalPalette.current
     fun pick(id: WallpaperId) { model.chooseWallpaper(id) }
-    WallpaperThumb(stringResource(if (model.garland) R.string.l_s_wallpaper_lights else R.string.l_s_wallpaper_none), model.wallpaper == WallpaperId.NONE, glass, thumbW, thumbH, d, { pick(WallpaperId.NONE) }) {
-        Box(Modifier.fillMaxSize().background(Brush.linearGradient(pal.bgStops.map { it.second }))) {
-            Box(Modifier.align(Alignment.BottomStart).fillMaxWidth(0.25f).fillMaxHeight(0.4f).background(pal.accent))
-            if (model.garland) {
-                val set = if (model.colorsEditDay) model.dayColors else model.nightColors
-                val lights = remember(set.accentHue) { GarlandLogic.colors(set.accentHue) }
-                val bokeh = remember { LightsLogic.layout(7) }
-                Canvas(Modifier.fillMaxSize()) {
-                    for (b in bokeh) {
-                        val c = lights[b.colorIdx % lights.size]
-                        val r = b.r * size.height * 0.45f
-                        val p = androidx.compose.ui.geometry.Offset(size.width * b.x, size.height * b.y)
-                        drawCircle(Brush.radialGradient(listOf(c.copy(alpha = b.alpha * 2f), c.copy(alpha = 0f)), center = p, radius = r), r, p)
-                    }
-                }
+    // первая плитка: «Без обоев» или, пока выбран праздничный пресет, его обои («Ёлка», «Зимняя дорога»)
+    val festive = model.festiveWallpaper
+    if (festive == null) {
+        WallpaperThumb(stringResource(R.string.l_s_wallpaper_none), model.wallpaper == WallpaperId.NONE, glass, thumbW, thumbH, d, { pick(WallpaperId.NONE) }) {
+            Box(Modifier.fillMaxSize().background(Brush.linearGradient(pal.bgStops.map { it.second }))) {
+                Box(Modifier.align(Alignment.BottomStart).fillMaxWidth(0.25f).fillMaxHeight(0.4f).background(pal.accent))
             }
+        }
+    } else {
+        WallpaperThumb(stringResource(if (festive == WallpaperId.TREE) R.string.l_s_wallpaper_tree else R.string.l_s_wallpaper_winter_road),
+            model.wallpaper == festive, glass, thumbW, thumbH, d, { pick(festive) }) {
+            WallpaperPreview(festive, model.wallpaperVer, thumbW, thumbH)
         }
     }
     WallpaperThumb(stringResource(R.string.l_s_wallpaper_headswap), model.wallpaper == WallpaperId.HEADSWAP, glass, thumbW, thumbH, d, { pick(WallpaperId.HEADSWAP) }) {
@@ -799,12 +795,6 @@ private fun WallpaperThumbs(glass: Boolean, hasCustom: Boolean, thumbW: Int, thu
     }
     WallpaperThumb(stringResource(R.string.l_s_wallpaper_mountains), model.wallpaper == WallpaperId.MOUNTAINS, glass, thumbW, thumbH, d, { pick(WallpaperId.MOUNTAINS) }) {
         WallpaperPreview(WallpaperId.MOUNTAINS, model.wallpaperVer, thumbW, thumbH)
-    }
-    WallpaperThumb(stringResource(R.string.l_s_wallpaper_tree), model.wallpaper == WallpaperId.TREE, glass, thumbW, thumbH, d, { pick(WallpaperId.TREE) }) {
-        WallpaperPreview(WallpaperId.TREE, model.wallpaperVer, thumbW, thumbH)
-    }
-    WallpaperThumb(stringResource(R.string.l_s_wallpaper_winter_road), model.wallpaper == WallpaperId.WINTER_ROAD, glass, thumbW, thumbH, d, { pick(WallpaperId.WINTER_ROAD) }) {
-        WallpaperPreview(WallpaperId.WINTER_ROAD, model.wallpaperVer, thumbW, thumbH)
     }
     if (hasCustom) {
         WallpaperThumb(stringResource(R.string.l_s_wallpaper_custom), model.wallpaper == WallpaperId.CUSTOM, glass, thumbW, thumbH, d, { pick(WallpaperId.CUSTOM) }) {
