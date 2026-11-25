@@ -1,0 +1,42 @@
+Headswap
+https://github.com/YegorkaPomidorka/headswap
+Licensed under the GNU General Public License v3.0, see LICENSE.
+
+This product includes software derived from FT
+(https://github.com/OneAboveAll1964/ft-app), licensed under the
+Apache License, Version 2.0 (https://www.apache.org/licenses/LICENSE-2.0).
+
+Files derived from FT (package app.ft.iccoa), modified for Headswap
+(package rename, project protobuf helpers, socket-free state machines,
+merged files, Russian comments):
+
+  android/app/src/main/java/com/yegorkapomidorka/headswap/iccoa/
+    IccoaFrame.kt    from IccoaControl.kt, IccoaInboundFrame.kt, IccoaHandshakeException.kt
+    IccoaAuth.kt     from IccoaAuth.kt
+    IccoaRtsp.kt     from IccoaRtsp.kt
+    IccoaTs.kt       from IccoaTsMuxer.kt, IccoaStreamQueue.kt, IccoaAacEncoder.kt (IccoaPcmClock)
+    IccoaUibc.kt     from IccoaInputEvent.kt, IccoaInputServer.kt, IccoaMediaTransport.kt (IccoaInputJson),
+                     projection/CarTouch.kt
+    IccoaControl.kt  from IccoaHeartbeat.kt, IccoaPortNegotiation.kt, IccoaCarConfig.kt,
+                     IccoaAudioPlayerState.kt, IccoaMicrophone.kt (message body)
+
+  android/app/src/test/java/com/yegorkapomidorka/headswap/iccoa/
+    IccoaAuthTest.kt, IccoaQuickAuthTest.kt, IccoaFrameTest.kt (from IccoaControlTest.kt),
+    IccoaInputEventTest.kt, IccoaInputReaderTest.kt (from IccoaInputServerTest.kt),
+    IccoaMediaTest.kt, IccoaStreamQueueTest.kt, IccoaPortNegotiationTest.kt,
+    IccoaCarConfigTest.kt, IccoaHeartbeatTest.kt, IccoaAudioPlayerStateTest.kt
+
+The NOTICE file of FT follows.
+
+----------------------------------------------------------------------
+FT
+Copyright 2026 OneAboveAll1964
+https://github.com/OneAboveAll1964
+
+This product includes software developed by OneAboveAll1964.
+
+Anyone who forks, modifies or redistributes FT, in source or as an app,
+must keep this NOTICE file and credit OneAboveAll1964 with a link to
+https://github.com/OneAboveAll1964, as section 4 of the Apache License,
+Version 2.0 requires.
+----------------------------------------------------------------------

@@ -30,6 +30,20 @@ class PbWriter {
         return this
     }
 
+    fun int64(field: Int, v: Long): PbWriter {
+        tag(field, 0)
+        rawVarint(v)
+        return this
+    }
+
+    fun fixed64(field: Int, v: Long): PbWriter {
+        tag(field, 1)
+        for (i in 0 until 8) out.write(((v ushr (8 * i)) and 0xFF).toInt())
+        return this
+    }
+
+    fun double(field: Int, v: Double): PbWriter = fixed64(field, v.toRawBits())
+
     fun bool(field: Int, v: Boolean): PbWriter = int32(field, if (v) 1 else 0)
 
     fun bytes(field: Int, b: ByteArray): PbWriter {
@@ -99,6 +113,17 @@ object PbReader {
     /** Поле как int32 (первое с таким номером). */
     fun int(fields: List<PbField>, number: Int): Int? =
         fields.firstOrNull { it.number == number && it.wire == 0 }?.num?.toInt()
+
+    /** Поле как int64/uint64 без усечения до 32 бит. */
+    fun long(fields: List<PbField>, number: Int): Long? =
+        fields.firstOrNull { it.number == number && it.wire == 0 }?.num
+
+    /** fixed64 как сырые 64 бита. */
+    fun fixed64(fields: List<PbField>, number: Int): Long? =
+        fields.firstOrNull { it.number == number && it.wire == 1 }?.num
+
+    fun double(fields: List<PbField>, number: Int): Double? =
+        fixed64(fields, number)?.let { Double.fromBits(it) }
 
     fun str(fields: List<PbField>, number: Int): String? =
         fields.firstOrNull { it.number == number && it.wire == 2 }?.data?.toString(Charsets.UTF_8)
