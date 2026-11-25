@@ -19,6 +19,9 @@ merged files, Russian comments):
                      projection/CarTouch.kt
     IccoaControl.kt  from IccoaHeartbeat.kt, IccoaPortNegotiation.kt, IccoaCarConfig.kt,
                      IccoaAudioPlayerState.kt, IccoaMicrophone.kt (message body)
+    IccoaAacEncoder.kt  from IccoaAacEncoder.kt
+    IccoaSession.kt  own code; order of operations and timeouts follow IccoaSession.kt,
+                     IccoaService.kt, IccoaLaneServer.kt, IccoaMediaTransport.kt
 
   android/app/src/test/java/com/yegorkapomidorka/headswap/iccoa/
     IccoaAuthTest.kt, IccoaQuickAuthTest.kt, IccoaFrameTest.kt (from IccoaControlTest.kt),

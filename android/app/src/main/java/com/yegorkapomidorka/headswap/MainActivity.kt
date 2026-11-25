@@ -306,6 +306,10 @@ class MainActivity : Activity() {
                 // автостарт беспровода без Bluetooth машины: то же, что ACL_CONNECTED / ACL_DISCONNECTED выбранной машины
                 "car_auto" -> startForegroundService(Intent(this, BridgeService::class.java).setAction(BridgeService.ACTION_WIFI_B_AUTO))
                 "car_auto_off" -> startForegroundService(Intent(this, BridgeService::class.java).setAction(BridgeService.ACTION_WIFI_B_AUTO_OFF))
+                // стенд ICCOA без BLE и Wi-Fi: --es host 127.0.0.1 [--es pin 123456]; PIN по умолчанию — как у iccoa_hu.py
+                "iccoa_debug" -> startForegroundService(Intent(this, BridgeService::class.java)
+                    .putExtra("debug_iccoa", intent.getStringExtra("host") ?: "127.0.0.1")
+                    .putExtra("debug_iccoa_pin", intent.getStringExtra("pin") ?: "123456"))
                 "mic_test" -> Actions.micTest(this)
                 "transcode_test" -> Actions.transcodeTest(this, intent.getStringExtra("opts") ?: "")
                 "screen_main" -> toHome()

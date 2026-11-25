@@ -7,6 +7,8 @@ import android.os.ParcelFileDescriptor
 object DebugTransport {
     fun port(intent: Intent?): Int? = null
 
+    fun iccoa(intent: Intent?): Pair<String, String?>? = null
+
     fun tcp6(intent: Intent?): Boolean = false
 
     fun wifiB(intent: Intent?): Boolean = false
