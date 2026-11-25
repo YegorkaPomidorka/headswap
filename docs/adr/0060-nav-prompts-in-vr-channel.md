@@ -1,6 +1,6 @@
 # 0060. Подсказки навигатора в CarLife-канал VR: отдельная громкость на ГУ
 
-- Статус: принято
+- Статус: принято; дефолт VR заменён на TTS в ADR 0066
 - Дата: 2026-11-23
 - Источники: h1318 (VW Tiguan L Pro, CNS3 channel 20082141; лог 21.11, проверки Егора 20–23.11), `aa/NavChannel.kt`,
   `AaBridgeCore.sendNavViaVr` / `closeNavVr`, `dex/DesktopAudioLoopback.kt`, `DesktopAudioCapture.runNav`
