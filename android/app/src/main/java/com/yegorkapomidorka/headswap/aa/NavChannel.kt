@@ -13,8 +13,8 @@ enum class NavChannel(val titleRes: Int) {
     TTS(R.string.navch_tts);
 
     companion object {
-        /** В тестовой сборке h1318 по умолчанию VR. */
-        val DEFAULT = VR
+        /** TTS: на HSAE (h1455) и CN7 (h1452) VR-поток ставит музыку на паузу или рвёт её, ADR 0066. VR — вручную. */
+        val DEFAULT = TTS
 
         /** По имени из prefs; неизвестное/пустое = по умолчанию. */
         fun parse(key: String?): NavChannel = values().firstOrNull { it.name == key } ?: DEFAULT
