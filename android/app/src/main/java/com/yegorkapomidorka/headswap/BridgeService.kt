@@ -98,7 +98,7 @@ class BridgeService : Service() {
     }
 
     private val main = Handler(Looper.getMainLooper())
-    private var session: CarLifeSession? = null
+    private var session: HuSession? = null
     private var host: BridgeHost? = null
     private var stopRequested = false
 
@@ -114,7 +114,7 @@ class BridgeService : Service() {
     private var lastSessionWasUsb = false
     private var physicalUsbDetached = false
     private val desktopRecovery = DesktopRecoveryPolicy()
-    private data class Recovery(val attempt: DesktopRecoveryPolicy.Attempt, val session: CarLifeSession, val owner: BridgeHost)
+    private data class Recovery(val attempt: DesktopRecoveryPolicy.Attempt, val session: HuSession, val owner: BridgeHost)
     private var pendingDesktopRecovery: Recovery? = null
 
     /** debug tcp6: слушатель ждёт 6/6 (нить debug-tcp6); Стоп его отменяет. */
@@ -1265,7 +1265,7 @@ class BridgeService : Service() {
     }
 
     /** Всё состояние восстановления принадлежит сервису, а не Activity. */
-    private fun canRecoverDesktop(current: CarLifeSession): Boolean = runCatching {
+    private fun canRecoverDesktop(current: HuSession): Boolean = runCatching {
         alive && !stopRequested && session === current &&
             current.transportKind == TransportCaps.USB_AOA.kind && DesktopAccess.isReady(this) &&
             getSystemService(PowerManager::class.java).isInteractive &&
@@ -1344,7 +1344,7 @@ class BridgeService : Service() {
     }
 
     /** Закрытие сессии режима DESKTOP: физический detach USB, звук, музыка, восстановление. */
-    private fun onDesktopSessionClosing(s: CarLifeSession) {
+    private fun onDesktopSessionClosing(s: HuSession) {
         if (!stopRequested && s.transportKind == TransportCaps.USB_AOA.kind) {
             observePhysicalUsbDetach("USB session closed and accessory absent")
         }
@@ -1471,7 +1471,7 @@ class BridgeService : Service() {
         if (h == null) finish()
     }
 
-    private fun onSessionClosed(s: CarLifeSession, reason: String) {
+    private fun onSessionClosed(s: HuSession, reason: String) {
         AppLog.i("сервис: сессия завершена ($reason)")
         if (session !== s) return
         if (sessionMode == BridgeMode.DESKTOP) onDesktopSessionClosing(s)

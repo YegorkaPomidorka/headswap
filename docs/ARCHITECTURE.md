@@ -23,6 +23,10 @@
 есть только CHANGE_MD_THEME), передача и задний ход, скорость и прочие события машины (данные машины CarLife
 мы вслепую не запрашиваем, ADR 0010). Прежде чем обещать функцию AA, проверить, есть ли для неё сообщение в CarLife.
 
+Второй протокол ГУ — ICCOA CarLink (ADR 0066, в работе): та же роль, что у `CarLifeSession`, — реализация `CarlifeLink` для ядра
+и `HuSession` для `BridgeService`. Пока есть только шов: `HuSession`, `AaBridgeCore.onCarKey` (кнопка ГУ уже в Android keycode),
+`CustomVideoMode.fitCar` (экран машины → AA 1920×1080 с SPS-кропом), BSSID в `CarNetwork.request`.
+
 ## Стек и сборка
 
 - Один gradle-модуль `:app` (`android/`), minSdk 29, target 37, JDK 17.

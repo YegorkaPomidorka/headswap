@@ -85,3 +85,4 @@
 | 0063 | [Новогоднее оформление: пресеты, гирлянда, отсчёт в плитке часов](0063-new-year-ui.md) | принято |
 | 0064 | [Отладочные команды MainActivity только в debug, в release — allowlist](0064-debug-cmds-debug-only.md) | принято |
 | 0065 | [«Скрывать номера» на главном экране](0065-hide-caller.md) | принято |
+| 0066 | [ICCOA CarLink — второй протокол ГУ через тот же `CarlifeLink`](0066-iccoa-second-protocol.md) | принято |

@@ -571,6 +571,19 @@ class AaBridgeCoreTest {
     }
 
     @Test
+    fun carKeyGoesToAaAsIs() {
+        val peer = FakePeer()
+        core.peer = peer
+        core.onCarKey(87)
+        core.onCarKey(4)
+        assertEquals(listOf(87, 4), peer.keys.toList())
+        assertTrue(logs.any { it.contains("кнопка ГУ keycode=87 -> AA KEYCODE 87") })
+        core.peer = null
+        core.onCarKey(87)                                     // AA не подключён: игнор без исключений
+        assertEquals(2, peer.keys.size)
+    }
+
+    @Test
     fun desktopHomeMappingIsOptInAndKeepsMainAndBackKeys() {
         val peer = FakePeer()
         core.peer = peer

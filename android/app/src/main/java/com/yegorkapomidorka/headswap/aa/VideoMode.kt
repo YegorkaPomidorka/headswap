@@ -249,6 +249,18 @@ data class CustomVideoMode(override val outW: Int, override val outH: Int) : Vid
         fun resolve(enabled: Boolean, w: Int, h: Int, preset: VideoMode): VideoGeometry =
             (if (enabled) from(w, h) else null) ?: preset
 
+        /**
+         * Экран машины, размер которого узнаём на подключении (ICCOA: RTSP M3): кадр AA 1920×1080 с полем до пропорций
+         * экрана, область 1:1 - режется SPS-кропом в пробросе; до своего размера кадр растягивает сама машина.
+         * Поле кратно 4 ([spsCropable]): 2422×1272 → 1920×1008, 2764×1426 → 1920×992. Экран 16:9 - R1080 без полей.
+         */
+        fun fitCar(carW: Int, carH: Int): VideoGeometry {
+            fun cut(full: Int, area: Double) = full - (Math.round((full - area) / 4.0) * 4).toInt()
+            val w = if (carW * 1080L < carH * 1920L) cut(1920, 1080.0 * carW / carH) else 1920
+            val h = if (carW * 1080L > carH * 1920L) cut(1080, 1920.0 * carH / carW) else 1080
+            return if (w == 1920 && h == 1080) VideoMode.R1080 else CustomVideoMode(w, h)
+        }
+
         private fun plateFor(w: Int, h: Int): Pair<Int, Int> =
             platesFor(w, h).let { p -> p.firstOrNull { w <= it.first && h <= it.second } ?: p.last() }
 
