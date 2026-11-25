@@ -58,6 +58,8 @@ class Inputs(
     val videoRes: String = "1280×720",
     /** Сессия идёт по Wi-Fi: CarLife и звук идут к ГУ по воздуху, кабеля нет. */
     val wireless: Boolean = false,
+    /** Сессия по ICCOA CarLink, а не CarLife. */
+    val iccoa: Boolean = false,
     /** Сколько мс подряд сервер ГУ отказывает (ECONNREFUSED) настоящим подключениям моста; 0 = не отказывает. */
     val refusedForMs: Long = 0,
     /** Сколько попыток моста подряд принято по TCP без VERSION_RESPONSE (зависший сервер). */
@@ -84,6 +86,7 @@ object HomeLogic {
     private val NONE = UiText.raw("")
     private val CARLIFE = UiText.raw("CarLife 2.0")
     private val CARLIFE_WIFI = UiText.raw("CarLife 2.0 · Wi-Fi")
+    private val ICCOA = UiText.raw("ICCOA CarLink")
     private val TEXT_START_CHAIN = UiText.res(R.string.home_sub_start_chain)
 
     fun compute(i: Inputs): HomeState {
@@ -123,7 +126,7 @@ object HomeLogic {
                 UiText.res(if (i.wireless) R.string.home_sub_ok_wifi else R.string.home_sub_ok),
                 listOf(
                     StageState.DONE to UiText.res(R.string.home_stage_working),
-                    StageState.DONE to if (i.wireless) CARLIFE_WIFI else CARLIFE,
+                    StageState.DONE to if (i.iccoa) ICCOA else if (i.wireless) CARLIFE_WIFI else CARLIFE,
                     StageState.DONE to UiText.res(R.string.home_stage_connected),
                     StageState.DONE to UiText.raw("⁦${i.videoRes}⁩"), // LTR-изоляция: в RTL не «720×1280»
                     // настройка «Звук через Headswap» (бывш. «Звук через USB») - это звук по каналу CarLife; без кабеля он идёт по Wi-Fi
@@ -157,7 +160,7 @@ object HomeLogic {
                 UiText.res(if ("отключился" in st) R.string.home_sub_aa_dropped else R.string.home_sub_cable_ok),
                 listOf(
                     StageState.ACTIVE to UiText.res(R.string.home_stage_connecting),
-                    if (i.protocolKnown) StageState.DONE to CARLIFE else StageState.ACTIVE to UiText.res(R.string.home_stage_handshake),
+                    if (i.iccoa) StageState.DONE to ICCOA else if (i.protocolKnown) StageState.DONE to CARLIFE else StageState.ACTIVE to UiText.res(R.string.home_stage_handshake),
                     StageState.PEND to NONE, StageState.PEND to NONE, StageState.PEND to NONE,
                 ),
                 notifText = UiText.res(R.string.notif_cable_waiting),
@@ -323,6 +326,7 @@ object HeadswapStatus {
             setupError = AaState.setupError?.let { if (it == AaCreds.MISSING_TEXT) UiText.res(R.string.home_err_no_cert) else UiText.raw(it) },
             videoRes = (CarLifeState.videoMode ?: aaPrefs.videoGeometry.effective(aaPrefs.transcode)).outLabel,
             wireless = CarLifeState.wirelessSession,
+            iccoa = CarLifeState.iccoa,
             refusedForMs = AaState.serverFailures.refusedForMs,
             versionHangs = AaState.serverFailures.versionHangs,
             serverWorked = serverWorked,

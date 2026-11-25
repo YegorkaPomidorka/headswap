@@ -57,6 +57,12 @@ import com.yegorkapomidorka.headswap.dex.DexPrefs
 import com.yegorkapomidorka.headswap.dex.DexState
 import com.yegorkapomidorka.headswap.dex.PhoneAssistant
 import com.yegorkapomidorka.headswap.dex.UsbDetachPolicy
+import com.yegorkapomidorka.headswap.aa.CustomVideoMode
+import com.yegorkapomidorka.headswap.aa.NativeDesktopGeometry
+import com.yegorkapomidorka.headswap.iccoa.IccoaConfig
+import com.yegorkapomidorka.headswap.iccoa.IccoaSession
+import com.yegorkapomidorka.headswap.iccoa.IccoaTrustPrefs
+import com.yegorkapomidorka.headswap.iccoa.IccoaVideoConfig
 import com.yegorkapomidorka.headswap.link.CarTransport
 import com.yegorkapomidorka.headswap.link.DongleListener
 import com.yegorkapomidorka.headswap.link.LinkSetupException
@@ -374,6 +380,12 @@ class BridgeService : Service() {
         // только debug-сборка: беспроводной формат, 6 TCP-сокетов на 127.0.0.1 (adb forward), ГУ подключается сама
         if (DebugTransport.tcp6(intent)) {
             startTcp6Debug(DebugTransport.tcp6Bind(intent))
+            return
+        }
+        // только debug-сборка: ICCOA без BLE и Wi-Fi, машина = эмулятор на ПК (adb reverse/forward), в release iccoa() всегда null
+        val iccoa = DebugTransport.iccoa(intent)
+        if (iccoa != null) {
+            startIccoa(iccoa.first, iccoa.second)
             return
         }
         // беспровод, ветка B (хотспот телефона + маяк): кнопка в настройках бета-сборки или debug-вход
@@ -989,6 +1001,7 @@ class BridgeService : Service() {
         cancelBtHint()
         CarLifeState.accessory = transport.label
         CarLifeState.wirelessSession = transport.caps.kind == TransportCaps.TCP6.kind
+        CarLifeState.iccoa = false
         if (transport.caps.kind != TransportCaps.TCP6.kind) WLog.begin(transport.caps.kind)
 
         // режим моста снимается на подключение; DESKTOP на Android ниже 13 трактуется как Android Auto
@@ -1178,13 +1191,101 @@ class BridgeService : Service() {
         val audioUsb = transport.caps.usbLike
         // h658: по Wi-Fi (tcp6) звук CarLife в режиме AA ходит, а BT A2DP ГУ рвёт сама — захват рабочего стола тоже пускаем в tcp6
         val desktopAudioLink = audioUsb || transport.caps === TransportCaps.TCP6
+        attachDesktopAudio(s, owner, desktopAudioLink)
+        s.start()
+        owner.onUsbSessionStarted()
+    }
+
+    /** Звук рабочего стола на живую сессию с ГУ: пауза плеера при обрыве и захват в link (общее для CarLife и ICCOA). */
+    private fun attachDesktopAudio(s: HuSession, owner: BridgeHost, desktopAudioLink: Boolean) {
         // h1407: пауза плеера при обрыве нужна и по Wi-Fi — там звук тоже идёт через захват
         DesktopMusicPlayback.attach(applicationContext, this, s, desktopAudioLink,
             ready = { session === s && DexState.running && s.hasFreshDesktopVideo() },
             audioReady = { !DexPrefs(this).usbPlaybackAudio || !owner.core.audioViaUsb || DesktopAudioState.running })
         desktopAudio.attach(owner.core, desktopAudioLink) { session === s && s.canCaptureDesktopAudio() }
+    }
+
+    // --- ICCOA CarLink: второй протокол ГУ (ADR 0066). Логику CarLife (свисток, usb→air, ожидание Wi-Fi) не трогает ---
+
+    /**
+     * Сессия ICCOA стартует без хоста: экран машины известен только из RTSP M3, хост создаётся в [onIccoaScreen].
+     * Пока вход один — debug (машина на 127.0.0.1); BLE и Wi-Fi машины придут в Э4 вместе с localIp телефона.
+     */
+    private fun startIccoa(carHost: String, pin: String?, localIp: String = "127.0.0.1") {
+        val wantedMode = BridgeMode.effective(AaPrefs(this).bridgeMode, Build.VERSION.SDK_INT)
+        if (wantedMode == BridgeMode.DESKTOP && !DesktopAccess.isReady(this)) {
+            // shortcut: без уведомления desktopNotActivated (оно закрывает CarTransport), добавить с UI в Э4
+            AppLog.i("ICCOA: рабочий стол не активирован (${DelegatedDesktopAccess.status(this)}), сессия не стартует")
+            CarLifeState.status = getString(R.string.desk_not_activated)
+            failStart()
+            return
+        }
+        WLog.begin(IccoaSession.KIND)
+        reconcileHostMode(wantedMode)
+        sessionMode = wantedMode
+        DexState.desktopSession = wantedMode == BridgeMode.DESKTOP
+        CarLifeState.accessory = "ICCOA $carHost"
+        CarLifeState.iccoa = true
+        CarLifeState.wirelessSession = !java.net.InetAddress.getByName(carHost).isLoopbackAddress
+        acquireSessionWakeLocks()
+        CarLifeState.running = true
+        stopRequested = false
+        val loopback = java.net.InetAddress.getByName(carHost).isLoopbackAddress
+        val sref = arrayOfNulls<IccoaSession>(1)
+        val s = IccoaSession(
+            IccoaConfig(carHost, pin, localIp, Build.MODEL, bindHost = if (loopback) carHost else null), IccoaTrustPrefs(this),
+            onScreen = { screen -> main.post { onIccoaScreen(sref[0]!!, screen) } },
+        ) { reason -> main.post { onSessionClosed(sref[0]!!, reason) } }
+        sref[0] = s
+        session = s
+        CarLifeState.status = "ICCOA: вход"
         s.start()
-        owner.onUsbSessionStarted()
+    }
+
+    /** Экран машины известен: хост под геометрию [CustomVideoMode.fitCar] и привязка ядра к сессии. Главная нить. */
+    private fun onIccoaScreen(s: IccoaSession, screen: IccoaVideoConfig) {
+        if (session !== s || stopRequested) return
+        val aaPrefs = AaPrefs(this)
+        val car = CustomVideoMode.fitCar(screen.width, screen.height)
+        var h = host
+        val desktop = sessionMode == BridgeMode.DESKTOP
+        if (h != null && !h.isDead) {
+            // сервер AA одноразовый (ADR 0003): живой хост не пересоздаём, работаем в его геометрии
+            AppLog.i("ICCOA: хост уже есть, переиспользую (grace=${h.isInGrace}, режим ${h.core.videoMode.label})")
+        } else if (desktop) {
+            desktopUsed = true
+            lastSessionWasUsb = false
+            physicalUsbDetached = false
+            DexState.error = null
+            cancelDesktopRecovery()
+            desktopRecovery.newConnection()
+            // рабочий стол рисуется сразу в пропорциях экрана машины, без подложки AA и кропа
+            val geometry = NativeDesktopGeometry(car.outW, car.outH)
+            val density = DexPrefs(this).desktopDensity.let { if (it == 0) geometry.density else it }
+            h = createDesktopHost(aaPrefs, geometry, density, previous = h)
+        } else {
+            h = createHost(aaPrefs, car, car, aaPrefs.aaDensity, previous = h)
+        }
+        host = h
+        if (h == null) {
+            s.close(AaState.setupError ?: "мост не стартовал")
+            return
+        }
+        if (desktop) {
+            attachDesktopAudio(s, h, desktopAudioLink = true)
+        } else {
+            // те же правила, что в startSession: проброс, если поля режутся SPS-кропом; свой IDR не нужен — машина просит IDR сама
+            h.core.transcodeEnabled = aaPrefs.transcode || (h.core.videoMode.needsTranscode && !h.core.videoMode.spsCropable)
+            h.core.spliceMs = 0L
+            h.core.phoneAssistant = null
+            DesktopKeys.voiceStatus = null
+        }
+        AppLog.i("ICCOA: экран машины ${screen.width}x${screen.height}, ${h.core.videoMode.describe(h.core.densityOverride)}")
+        CarLifeState.status = "ICCOA: ${if (desktop) "рабочий стол" else "мост"}"
+        CarLifeState.videoMode = h.core.videoMode
+        CarLifeState.densityOverride = h.core.densityOverride
+        s.bind(h.core)
+        h.onUsbSessionStarted()
     }
 
     /** Режим DESKTOP использует видеоконвейер CarLife; сертификаты Android Auto не нужны. */
@@ -1476,6 +1577,15 @@ class BridgeService : Service() {
         if (session !== s) return
         if (sessionMode == BridgeMode.DESKTOP) onDesktopSessionClosing(s)
         session = null
+        if (s is IccoaSession) {
+            CarLifeState.iccoa = false
+            // ICCOA: только общая часть — хост в grace и finish при пустоте; свисток, usb→air и ожидание Wi-Fi не её
+            CarLifeState.status = "ICCOA закрыто: $reason"
+            val h = host
+            if (h != null) h.onUsbSessionClosed(immediate = stopRequested)
+            else if ((!linkWaiting && !wifiBMode && !usbToAirPending && dongle == null) || stopRequested) finish()
+            return
+        }
         markCarSeen()
         CarLifeState.wirelessSession = false
         if (dongle != null && !stopRequested) {

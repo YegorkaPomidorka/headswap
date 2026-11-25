@@ -27,6 +27,13 @@ object DebugTransport {
     /** Адрес bind для tcp6: по умолчанию 127.0.0.1; `--es debug_tcp6_bind 0.0.0.0` для проверки входящего TCP из LAN. */
     fun tcp6Bind(intent: Intent?): String = intent?.getStringExtra("debug_tcp6_bind") ?: "127.0.0.1"
 
+    /**
+     * ICCOA без BLE и Wi-Fi: машина = `pc-headunit/iccoa_hu.py` (`--es debug_iccoa 127.0.0.1 [--es debug_iccoa_pin 123456]`).
+     * На ПК: `adb reverse` 57209 и 15550, `adb forward` 57219, 57229, 57239, 7236, 4321. Пара (адрес машины, PIN).
+     */
+    fun iccoa(intent: Intent?): Pair<String, String?>? =
+        intent?.getStringExtra("debug_iccoa")?.let { it to intent.getStringExtra("debug_iccoa_pin") }
+
     fun port(intent: Intent?): Int? =
         intent?.getIntExtra(EXTRA_PORT, 0)?.takeIf { it in 1..65535 }
 

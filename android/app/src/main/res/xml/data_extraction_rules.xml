@@ -1,12 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Android 12+: пароль Wi-Fi машины (car_wifi.xml) и токен активации с компьютера (headswap_activation.xml) не уходят ни в облачный бэкап, ни при переносе на другое устройство -->
+<!-- Android 12+: пароль Wi-Fi машины (car_wifi.xml), токен активации с компьютера (headswap_activation.xml) и ключи ICCOA (iccoa_trust.xml) не уходят ни в облачный бэкап, ни при переносе на другое устройство -->
 <data-extraction-rules>
     <cloud-backup>
         <exclude domain="sharedpref" path="car_wifi.xml" />
         <exclude domain="sharedpref" path="headswap_activation.xml" />
+        <exclude domain="sharedpref" path="iccoa_trust.xml" />
     </cloud-backup>
     <device-transfer>
         <exclude domain="sharedpref" path="car_wifi.xml" />
         <exclude domain="sharedpref" path="headswap_activation.xml" />
+        <exclude domain="sharedpref" path="iccoa_trust.xml" />
     </device-transfer>
 </data-extraction-rules>
