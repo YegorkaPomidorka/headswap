@@ -278,6 +278,11 @@ class MainActivity : Activity() {
         val cmd = intent?.getStringExtra(EXTRA_CMD)
         if (intent != null && cmd != null) {
             intent.removeExtra(EXTRA_CMD)        // не повторять команду при пересоздании activity
+            // MainActivity экспортирован: в release чужое приложение не должно гнать отладочные команды; свои (лаунчер) идут из RELEASE_CMDS
+            if (!BuildConfig.DEBUG && cmd !in RELEASE_CMDS) {
+                AppLog.i("команда из intent отклонена (release): $cmd")
+                return
+            }
             AppLog.i("команда из intent: $cmd")
             when (cmd) {
                 "aa_selftest" -> Actions.aaSelftest(this)
@@ -376,6 +381,8 @@ class MainActivity : Activity() {
         /** adb shell am start -n com.yegorkapomidorka.headswap/.MainActivity --es cmd aa_selftest */
         private const val REQ_WALLPAPER = 43        // 42 - PhoneActivationBlock
         const val EXTRA_CMD = "cmd"
+        /** Команды, которые приложение шлёт себе само (LauncherActions); остальные - только debug/smoke. */
+        private val RELEASE_CMDS = setOf("phone_card_perm", "wallpaper_pick")
         /** Разрешения карточки «Телефон» лаунчера; тот же код, что SettingsScreen.REQ_PHONE_CARD. */
         const val REQ_PHONE_CARD = 41
         private const val STATE_SCREENS = "screens"

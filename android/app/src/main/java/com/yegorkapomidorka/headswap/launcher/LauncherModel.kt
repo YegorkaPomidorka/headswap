@@ -239,7 +239,6 @@ internal object LauncherModel {
         CarAppHost.scaleFor = { pkg -> CarConfigMath.step(prefs.mapScale(pkg)) }
         EmbedHost.mapScaleFor = { pkg -> prefs.mapScale(pkg) }
         CarAppHost.allowFor = { pkg -> prefs.navHints(pkg) && !NavigatorPick.noHints(pkg) }
-        LauncherActions.startRouteCatcher(context.applicationContext)
         ready = true
         reloadCatalog()
     }

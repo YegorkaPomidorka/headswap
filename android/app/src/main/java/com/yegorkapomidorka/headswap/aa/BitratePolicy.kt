@@ -168,7 +168,6 @@ class BitratePolicy(ceilingBps: Int, floorBps: Int = FLOOR_BPS, val profile: Bit
         const val DOWN_BACKLOG_MS = 300L
         const val UP_BACKLOG_MS = 100L
         const val DOWN_INTERVAL_MS = 1000L
-        const val UP_WAIT_MS = 10_000L
         const val DOWN_FACTOR = 0.8
         const val UP_FACTOR = 1.1
         private const val TAU_MS = 1000.0

@@ -32,7 +32,6 @@ import java.util.concurrent.Executors
 import java.util.concurrent.ScheduledExecutorService
 import java.util.concurrent.TimeUnit
 import com.yegorkapomidorka.headswap.dex.DesktopAudioOutputLease
-import com.yegorkapomidorka.headswap.dex.DesktopConnectionState
 import com.yegorkapomidorka.headswap.dex.DesktopVideoDelivery
 import java.util.concurrent.atomic.AtomicBoolean
 import com.yegorkapomidorka.headswap.link.CarTransport
@@ -121,8 +120,6 @@ class CarLifeSession(
     /** No enqueue/capture counter can substitute for successful transport writes. */
     fun canCaptureDesktopAudio(): Boolean = !closed.get() &&
         desktopAudioOutputLease.canCapture(SystemClock.elapsedRealtime())
-    fun healthyDesktopForIdleTimer(): Boolean = !closed.get() && desktopVideoDelivery.hasPicture() &&
-        canCaptureDesktopAudio()
     fun hasFreshDesktopVideo(): Boolean = !closed.get() &&
         desktopVideoDelivery.isFlowing(SystemClock.elapsedRealtime())
 
@@ -203,7 +200,6 @@ class CarLifeSession(
     private val vrReassembler = DataReassembler()  // h425: Delphi режет VR MIC_DATA на кадры по 256 Б
 
     fun start() {
-        DesktopConnectionState.attach(desktopVideoDelivery)
         bridge.attach(this)
         AppLog.i("сессия: старт")
         CarLifeState.resetSession()
@@ -277,7 +273,6 @@ class CarLifeSession(
     fun close(reason: String) {
         if (!closed.compareAndSet(false, true)) return
         desktopVideoDelivery.close()
-        DesktopConnectionState.detach(desktopVideoDelivery)
         desktopAudioOutputLease.close()
         AppLog.i("сессия: закрытие, причина: $reason")
         bridge.onCarlifeClosed(this)
@@ -551,7 +546,7 @@ class CarLifeSession(
                 val f = PbReader.parse(m.body)
                 val module = f?.let { PbReader.int(it, 1) }
                 val status = f?.let { PbReader.int(it, 2) }
-                if (module == CarlifeAudio.MODULE_MUSIC && AaBridgeCore.MODULE_MUSIC_ENABLED) {
+                if (module == CarlifeAudio.MODULE_MUSIC) {
                     val on = bridge.onCarlifeMusicControl(status)
                     AppLog.i("== MODULE_CONTROL MUSIC status=$status, отвечаю MODULE_STATUS MUSIC=${if (on) 1 else 0}", ui = false)
                     sendModuleStatus(CarlifeAudio.MODULE_MUSIC, if (on) 1 else 0)
@@ -1469,7 +1464,7 @@ class CarLifeSession(
         get() = bridge.huVw20082120 || (air && (bridge.huVwBt1420 || bridge.huDesayG6S))
 
     private fun pauseHeartbeat() {
-        if (closed.get() || !PAUSE_KEEPALIVE_ENABLED) return
+        if (closed.get()) return
         if (!paused) {
             idleHeartbeat()
             return
@@ -1667,9 +1662,6 @@ class CarLifeSession(
 
         /** На воздухе раз в ~1 с: ГУ на Wi-Fi рвут видео-сокет быстрее (план 5.2 п.4). */
         private const val PAUSE_KEEPALIVE_AIR_MS = 900L
-
-        /** Keepalive на PAUSE: пустой VIDEO_DATA, у VW 20082120 VIDEO_HEARTBEAT. */
-        @Volatile @JvmStatic var PAUSE_KEEPALIVE_ENABLED = true
 
         private const val FEATURE_CONTENT_ENCRYPTION = "CONTENT_ENCRYPTION"
 

@@ -170,7 +170,8 @@ CONTROL0, SENSOR1, VIDEO2, INPUT3, SPEECH4, SYSTEM5, MEDIA6, MIC7, BT8, MEDIA_PL
 
 - **Сервер AA 5277 одноразовый.** Грязный обрыв или голый TCP connect/close его глушат, перезапустить его приложение не может.
   Закрывать только через ByeBye; новую AA-сессию — после полного закрытия старой; живую AA не рвать из-за смены режима/DPI
-  (новый режим — после ручного перезапуска сервера). `AaServerCheck`/`AaProbe` не запускать при живом мосте. ADR 0003.
+  (новый режим — после ручного перезапуска сервера). `AaServerCheck`/`AaProbe` не запускать при живом мосте. Теневая AA
+  перед новым подключением к 5277 ждёт конца прошлой сессии (`AaShadowNav.awaitStopped`). ADR 0003.
 - **Потеряли видеокадр — P-кадры не слать**, ждать IDR (запрос IDR не чаще раза в 1,5 с).
 - **Весь H.264 в ГУ — через `AnnexB.fixSps`**: SPS от Exynos ГУ не принимают.
 - **CAR_DATA_START не слать вслепую.** В коде его сейчас нет вообще; слепой START вешал видео на Vezel. Только по RSP
@@ -188,8 +189,9 @@ CONTROL0, SENSOR1, VIDEO2, INPUT3, SPEECH4, SYSTEM5, MEDIA6, MIC7, BT8, MEDIA_PL
   `VdmHostLink`; без хоста экран уходит в группу 0 и гаснет с телефоном. Хост живёт в группе adbd и гибнет при каждой смене
   USB-режима; `VdmHostRestart` поднимает его через свою беспроводную отладку, для этого на 17 нужна «Отладка по USB» (требуем только на Samsung). ADR 0033.
 - Пароли, SSID, ключи в лог не пишутся.
-- Рубильники экспериментов в companion `AaBridgeCore`: `PAUSE_KEEPALIVE_ENABLED`, `NAVI_STATUS_ENABLED`,
-  `MODULE_MUSIC_ENABLED`, `ROUTE_NAVI_STATUS_ENABLED`, `AIR_WARM_RESUME_ENABLED`, `CN7_CALL_HOLD_ENABLED`.
+- **Входящие кадры от ГУ ≤ `Wire.MAX_RX_LEN` (1 МиБ):** длина из заголовка аллоцируется сразу, больше — разрыв.
+- **Отладочные команды `cmd` в `MainActivity` работают только в debug/smoke**, в release — allowlist `MainActivity.RELEASE_CMDS`
+  (команды, которые приложение шлёт само себе). ADR 0064.
 
 ## Симптом → куда смотреть
 

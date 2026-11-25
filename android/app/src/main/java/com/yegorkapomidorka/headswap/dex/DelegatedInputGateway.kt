@@ -295,6 +295,5 @@ internal class DelegatedInputGateway(context: Context) : IDelegatedInputGateway.
         private val activeGateway = java.util.concurrent.atomic.AtomicReference<DelegatedInputGateway?>()
         /** Пульс активации: повторить LOCAL для дисплеев, где Android не применил его сразу. */
         fun refreshImeRoutes() { activeGateway.get()?.refreshIme() }
-        fun ownsFocusedDisplay(id: Int): Boolean = id > 0 && activeGateway.get()?.liveDisplayIds?.contains(id) == true
     }
 }

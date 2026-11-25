@@ -6,6 +6,7 @@ import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executor
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
+import java.util.concurrent.RejectedExecutionException
 import java.util.concurrent.ScheduledExecutorService
 import java.util.concurrent.TimeUnit
 
@@ -406,12 +407,17 @@ class AaBridgeCore(
         private set
 
     // Серийность аудио, по MD Baidu: NAVI перед TTS, MEDIA отпускается PAUSE, TTS_STOP с задержкой.
-    private val audioTimer: ScheduledExecutorService by lazy {
+    private val audioTimerLazy = lazy {
         Executors.newSingleThreadScheduledExecutor { r -> Thread(r, "aa-audio-timer").also { it.isDaemon = true } }
     }
+    private val audioTimer: ScheduledExecutorService by audioTimerLazy
     private val audioSched: (Long, Runnable) -> MicTimerHandle = audioSchedule ?: { delayMs, task ->
-        val f = audioTimer.schedule(task, delayMs, TimeUnit.MILLISECONDS)
-        MicTimerHandle { f.cancel(false) }
+        try {
+            val f = audioTimer.schedule(task, delayMs, TimeUnit.MILLISECONDS)
+            MicTimerHandle { f.cancel(false) }
+        } catch (_: RejectedExecutionException) {      // ядро уже dispose()
+            MicTimerHandle { }
+        }
     }
 
     /** Одноразовый отменяемый таймер; задача идёт под блокировкой ядра, отменённая (даже уже вставшая в очередь) не выполняется. */
@@ -587,9 +593,10 @@ class AaBridgeCore(
     /** Микрофон телефона (AudioRecord); null = нет. Один экземпляр на всё время: router вызывает start/stop по очереди. */
     @Volatile var phoneMic: PhoneMic? = null
 
-    private val micTimer: ScheduledExecutorService by lazy {
+    private val micTimerLazy = lazy {
         Executors.newSingleThreadScheduledExecutor { r -> Thread(r, "aa-mic-timer").also { it.isDaemon = true } }
     }
+    private val micTimer: ScheduledExecutorService by micTimerLazy
 
     private val mic = AaMicRouter(
         log = log,
@@ -599,8 +606,12 @@ class AaBridgeCore(
         phone = { phoneMic },
         toAa = { pcm, ts -> peer?.sendMicPcm(pcm, ts) },
         schedule = micSchedule ?: { delayMs, task ->
-            val f = micTimer.schedule(task, delayMs, TimeUnit.MILLISECONDS)
-            MicTimerHandle { f.cancel(false) }
+            try {
+                val f = micTimer.schedule(task, delayMs, TimeUnit.MILLISECONDS)
+                MicTimerHandle { f.cancel(false) }
+            } catch (_: RejectedExecutionException) {      // ядро уже dispose()
+                MicTimerHandle { }
+            }
         },
         nowMs = clockMs,
         nowUs = clockUs,
@@ -688,7 +699,7 @@ class AaBridgeCore(
         // состояние живо. Не ждём IDR от AA (цикл VideoFocus, 0.2-2 с тишины), а сразу берём IDR у энкодера.
         // VW BT 1420 (лог Павла 2026-10-16) закрывал сокет через 0.16-0.42 с после такого START. Только для него:
         // остальные ГУ (Mazda G6S по воздуху, задний ход) - как было, через IDR от AA.
-        val resume = AIR_WARM_RESUME_ENABLED && huVwBt1420 && link.isAir && carlifeStarted && carlifePaused &&
+        val resume = huVwBt1420 && link.isAir && carlifeStarted && carlifePaused &&
             transcodeEnabled && transcoder != null && gotIdr && active == Source.AA
         // START после PAUSE - та же живая сессия: отложенный TTS STOP шлём сразу, иначе resetAudio его съест,
         // ГУ так и держит канал подсказок открытым и глушит музыку до следующей подсказки (h482, ix35 HSAE).
@@ -757,7 +768,7 @@ class AaBridgeCore(
             return false
         }
         desktopMedia?.let { return onDesktopMusicControl(it, status) }
-        if (HU_MUSIC_FOLLOW_ENABLED && status == 0 && carlifeStarted) {
+        if (status == 0 && carlifeStarted) {
             val p = peer
             if (meta.playing && !huPausedAa && p != null) {
                 log("BRIDGE ГУ ушло на свой источник (MUSIC=0${if (carlifePaused) " после PAUSE" else ""}): AA KEYCODE $KEYCODE_MEDIA_PAUSE, MEDIA на паузу", true)
@@ -773,7 +784,7 @@ class AaBridgeCore(
         }
         // Toyota Desay G6SA (h1334, bZ4X 21050016): на звонке MUSIC=0, после звонка на наш MUSIC=1 ещё раз MUSIC=0
         // (ГУ не вышла из звонка), через ~1,4 с MUSIC=1 - тут и возвращаем play (лог 2026-11-21, три звонка).
-        if (HU_MUSIC_RESUME_ENABLED && status == 1 && (huDesayG6S || huHondaVezel || huToyotaDesay)) {
+        if (status == 1 && (huDesayG6S || huHondaVezel || huToyotaDesay)) {
             val now = clockMs()
             val p = peer
             if (huPausedAa && resumeOnHuMusic && p != null) {
@@ -790,7 +801,7 @@ class AaBridgeCore(
         }
         // Honda Civic 2021 (h629, звук по BT): после задней плеер AA встаёт на паузу извне, через 50-100 мс ГУ шлёт MUSIC=1.
         // Ответ MUSIC=0 ГУ повторяет раз, потом уходит на свой источник и обратно не возвращается (лог 2026-10-31).
-        if (HU_MUSIC_RESUME_ENABLED && status == 1 && huHonda20772104) {
+        if (status == 1 && huHonda20772104) {
             val now = clockMs()
             val p = peer
             if (!meta.playing && p != null && now - lastExternalStopMs < HONDA_RESUME_AFTER_STOP_MS &&
@@ -816,7 +827,7 @@ class AaBridgeCore(
      */
     private fun onDesktopMusicControl(media: DesktopMedia, status: Int?): Boolean {
         val now = clockMs()
-        if (HU_MUSIC_FOLLOW_ENABLED && status == 0 && carlifeStarted) {
+        if (status == 0 && carlifeStarted) {
             if (!huPausedAa) {
                 if (media.isPlaying()) {
                     log("BRIDGE ГУ ушло на свой источник (MUSIC=0): плеер телефона на паузу", true)
@@ -838,7 +849,7 @@ class AaBridgeCore(
             if (cn7CallEndMs != NEVER) log("BRIDGE CN7: ГУ вернула MUSIC=1 через ${clockMs() - cn7CallEndMs} мс после звонка", true)
             cn7CallActive = false
             cn7CallEndMs = NEVER
-            if (HU_MUSIC_RESUME_ENABLED && resumeOnHuMusic && (huDesayG6S || huHondaVezel || huToyotaDesay)) {
+            if (resumeOnHuMusic && (huDesayG6S || huHondaVezel || huToyotaDesay)) {
                 resumeOnHuMusic = false
                 lastHuResumeMs = now
                 lastUserInputMs = now
@@ -875,7 +886,7 @@ class AaBridgeCore(
      * Поэтому на CN7 во время звонка и CN7_CALL_HOLD_MS после него ждём MUSIC=1 от ГУ, потом - как раньше.
      */
     private fun cn7CallHold(now: Long): Boolean {
-        if (!CN7_CALL_HOLD_ENABLED || !huHyundaiCn7) return false
+        if (!huHyundaiCn7) return false
         val hold = cn7CallActive || (cn7CallEndMs != NEVER && now - cn7CallEndMs < CN7_CALL_HOLD_MS)
         if (hold && !cn7HoldLogged) {
             cn7HoldLogged = true
@@ -928,7 +939,7 @@ class AaBridgeCore(
         if (!huPausedAa) return
         val now = clockMs()
         val p = peer
-        if (BT_AUTOPLAY_GUARD_ENABLED && p != null && now - lastHfpConnectMs < BT_AUTOPLAY_WINDOW_MS &&
+        if (p != null && now - lastHfpConnectMs < BT_AUTOPLAY_WINDOW_MS &&
             now - lastUserInputMs > USER_INPUT_WINDOW_MS) {
             if (now - lastPauseKeyMs >= REPAUSE_MIN_MS) {
                 log("BRIDGE $why через ${now - lastHfpConnectMs} мс после BT HFP без ввода пользователя: автоплей, снова KEYCODE $KEYCODE_MEDIA_PAUSE", true)
@@ -1125,7 +1136,7 @@ class AaBridgeCore(
      */
     @Synchronized
     private fun rearmNavi() {
-        if (!huHonda || huDesayG6S || !ROUTE_NAVI_STATUS_ENABLED) return
+        if (!huHonda || huDesayG6S) return
         if (naviSent && !naviShownSinceRaise && clockMs() - naviRaisedAt < NAVI_REARM_FRESH_MS) {
             naviShownSinceRaise = true
             return
@@ -1627,7 +1638,7 @@ class AaBridgeCore(
                 else -> setting.hz ?: if (huHyundaiCn7) MEDIA_RATE_CN7 else MEDIA_RATE
             }
             val channels = if (ch == CarlifeAudio.CH_MEDIA) 2 else 1
-            if (ch == CarlifeAudio.CH_TTS && NAVI_STATUS_ENABLED) {
+            if (ch == CarlifeAudio.CH_TTS) {
                 ttsNaviHeld = true
                 // как MD: перед TTS шлёт MODULE_STATUS NAVI=1 и держит его
                 if (!naviSent && link.sendModuleStatus(CarlifeAudio.MODULE_NAVI, 1)) {
@@ -1747,13 +1758,9 @@ class AaBridgeCore(
         }
         if (ch == CarlifeAudio.CH_MEDIA) {
             requestMediaPause("AA STOP ch$chan")
-        } else if (TTS_DEBOUNCE_ENABLED) {
-            if (audioInited[ch] == true && !ttsStopTimer.pending) {
-                log("BRIDGE CarLife TTS STOP отложен на ${TTS_STOP_DELAY_MS} мс", true)
-                ttsStopTimer.start(TTS_STOP_DELAY_MS) { ttsStopNow() }
-            }
-        } else {
-            stopAudio(ch)
+        } else if (audioInited[ch] == true && !ttsStopTimer.pending) {
+            log("BRIDGE CarLife TTS STOP отложен на ${TTS_STOP_DELAY_MS} мс", true)
+            ttsStopTimer.start(TTS_STOP_DELAY_MS) { ttsStopNow() }
         }
     }
 
@@ -1853,7 +1860,6 @@ class AaBridgeCore(
     // --- голосовая сессия Ассистента: MEDIA на паузу, данные не пересылаем; выход со сглаживанием пачки 2/2/1/2/2 ---
     @Synchronized
     override fun onVoiceSession(status: Int) {
-        if (!VOICE_SESSION_ENABLED) return
         when (status) {
             1 -> {
                 val cancelled = voiceExitTimer.cancel()
@@ -1878,7 +1884,7 @@ class AaBridgeCore(
     }
 
     // --- управляющие пакеты MEDIA (PAUSE) идут по очереди: не пока TTS инициализирован или до TTS_STOP+300 мс ---
-    private fun mediaBlocked() = TTS_DEBOUNCE_ENABLED && (audioInited[CarlifeAudio.CH_TTS] == true || mediaGuard)
+    private fun mediaBlocked() = (audioInited[CarlifeAudio.CH_TTS] == true || mediaGuard)
 
     /** Желаемое состояние MEDIA = пауза: сразу или, пока занят TTS, после TTS_STOP+300 мс. */
     private fun requestMediaPause(why: String) {
@@ -1896,10 +1902,6 @@ class AaBridgeCore(
     }
 
     private fun pauseMedia(why: String) {
-        if (!MEDIA_PAUSE_ENABLED) {
-            stopAudio(CarlifeAudio.CH_MEDIA)
-            return
-        }
         audioInited[CarlifeAudio.CH_MEDIA] = false
         mediaPaused = true
         link.sendAudio(CarlifeAudio.CH_MEDIA, CarlifeAudio.MEDIA_PAUSE, ByteArray(0))
@@ -2030,7 +2032,7 @@ class AaBridgeCore(
     private fun admitMedia(): Boolean {
         if (huPausedAa && !callPausedAa) releaseDesktopPauseIfPlaying()
         val why = when {
-            VOICE_SESSION_ENABLED && voice -> "идёт голосовая сессия"
+            voice -> "идёт голосовая сессия"
             huPausedAa -> "ГУ на своём источнике, AA на паузе (хвост буфера)"
             audioInited[CarlifeAudio.CH_MEDIA] != true && mediaBlocked() -> "TTS занят, MEDIA ждёт INIT"
             else -> null
@@ -2051,7 +2053,7 @@ class AaBridgeCore(
     private val hondaBtMusic get() = huHonda20772104 && !audioViaUsb
 
     private fun musicStatus(status: Int) {
-        if (MODULE_MUSIC_ENABLED) link.sendModuleStatus(CarlifeAudio.MODULE_MUSIC, status)
+        link.sendModuleStatus(CarlifeAudio.MODULE_MUSIC, status)
     }
 
     /**
@@ -2061,7 +2063,7 @@ class AaBridgeCore(
      */
     @Synchronized
     fun onModuleListSent() {
-        if (audioInited[CarlifeAudio.CH_MEDIA] == true && MODULE_MUSIC_ENABLED) {
+        if (audioInited[CarlifeAudio.CH_MEDIA] == true) {
             musicStatus(1)
             log("BRIDGE CarLife MODULE_STATUS MUSIC=1 повторно: стартовая пачка его обнулила", true)
         }
@@ -2080,7 +2082,7 @@ class AaBridgeCore(
             log("BRIDGE AA плеер остановился: наш KEYCODE $KEYCODE_MEDIA_PAUSE ${ago(lastPauseKeyMs)}, ввод пользователя ${ago(lastUserInputMs)}, BT HFP ${ago(lastHfpConnectMs)}", true)
             muteMediaOnCall("плеер AA остановился")
         }
-        if (audioViaUsb || !MODULE_MUSIC_ENABLED || !carlifeStarted) return
+        if (audioViaUsb || !carlifeStarted) return
         if (hondaBtMusic) {
             log("BRIDGE Honda 20772104: MODULE_STATUS MUSIC не шлю, звук по BT - ГУ держит свой BT-источник", false)
             return
@@ -2090,13 +2092,12 @@ class AaBridgeCore(
         }
     }
 
-    /** Маршрут держит / отпускает NAVI. NAVI=0 уходит, только когда его не держит и TTS. */
+    /**
+     * Маршрут держит / отпускает NAVI. NAVI=0 уходит, только когда его не держит и TTS. NAVI=1 на весь маршрут нужен
+     * приборке Honda Vezel («Turn by turn waiting for your smartphone»); Desay G6S с ним глушит штатное радио (лог Ивана
+     * 2026-10-12), там NAVI=1 только вокруг TTS.
+     */
     private fun routeNavi(on: Boolean) {
-        if (!ROUTE_NAVI_STATUS_ENABLED) {
-            routeNaviHeld = false
-            if (on) log("BRIDGE маршрут: MODULE_STATUS NAVI=1 не шлю (только вокруг TTS)", false)
-            return
-        }
         if (huDesayG6S) {
             routeNaviHeld = false
             if (on) log("BRIDGE маршрут: MODULE_STATUS NAVI=1 не шлю (Desay G6S: глушит радио)", false)
@@ -2624,7 +2625,7 @@ class AaBridgeCore(
             val ready = refPicSeq == seq                // сначала номер, потом картинка: она не старше номера
             val pic = refPic
             val sp = splicer
-            if (seq == 0L || spliceBuilding || !ready || pic == null || sp == null) return
+            if (seq == 0L || spliceBuilding || !ready || pic == null || sp == null || disposed) return
             val job = sp.prepare()
             if (job == null || job.seq != seq) {
                 // в фоне: AA прислал кадр раньше, чем декодер отдал картинку
@@ -2643,16 +2644,36 @@ class AaBridgeCore(
         // копия: в фоне декодер может писать в тот же буфер следующую картинку (тогда этот IDR и так устареет)
         val pic = task.pic.copy()
         val exec = task.exec
-        exec.execute {
-            val t0 = clockMs()
-            val r = try {
-                b.build(job, pic)
-            } catch (e: RuntimeException) {
-                log("BRIDGE свой IDR: !!!!!! сборка упала: ${e.javaClass.simpleName}: ${e.message}", true)
-                null
+        try {
+            exec.execute {
+                val t0 = clockMs()
+                val r = try {
+                    b.build(job, pic)
+                } catch (e: Throwable) {      // и ExecutionException слайса из пула: иначе spliceBuilding навсегда true
+                    log("BRIDGE свой IDR: !!!!!! сборка упала: ${e.javaClass.simpleName}: ${e.message}", true)
+                    null
+                }
+                spliceComplete(job, r, clockMs() - t0)
             }
-            spliceComplete(job, r, clockMs() - t0)
+        } catch (_: RejectedExecutionException) {      // dispose() успел между блокировкой и execute
+            spliceComplete(job, null, 0)
         }
+    }
+
+    @Volatile private var disposed = false
+
+    /**
+     * Ядро окончательно снесено (хост закрыт, переиспользовать не будем): гасим нити сборки IDR и таймеры.
+     * Поздние кадры после этого свой IDR не собирают и в закрытые исполнители не пишут.
+     */
+    @Synchronized
+    fun dispose() {
+        if (disposed) return
+        disposed = true
+        (spliceExecutor as? ExecutorService)?.shutdownNow()
+        spliceSlicePool?.shutdownNow()
+        if (audioTimerLazy.isInitialized()) audioTimer.shutdownNow()
+        if (micTimerLazy.isInitialized()) micTimer.shutdownNow()
     }
 
     private class BuildTask(val job: IdrSplicer.Job, val builder: IdrBuilder, val exec: Executor, val pic: IdrSplice.Picture)
@@ -3308,35 +3329,6 @@ class AaBridgeCore(
             AapMessages.TOUCH_POINTER_DOWN to "POINTER_DOWN", AapMessages.TOUCH_POINTER_UP to "POINTER_UP",
         )
 
-        // Флаги нового звукового поведения (по умолчанию включены): в машине отключаются по одному.
-        /** MODULE_STATUS NAVI=1 перед первым TTS_INIT, NAVI=0 при остановке звука. */
-        @Volatile @JvmStatic var NAVI_STATUS_ENABLED = true
-
-        /** Debounce TTS_STOP (1500 мс) и очередь управляющих пакетов MEDIA до TTS_STOP+300 мс. */
-        @Volatile @JvmStatic var TTS_DEBOUNCE_ENABLED = true
-
-        /** Голосовая сессия Ассистента: MEDIA на паузу, MEDIA_DATA не пересылать, выход через 500 мс. */
-        @Volatile @JvmStatic var VOICE_SESSION_ENABLED = true
-
-        /** MODULE_STATUS MUSIC(3) вместе с MEDIA INIT/PAUSE/STOP и ответ на MODULE_CONTROL (CarLifeSession). */
-        @Volatile @JvmStatic var MODULE_MUSIC_ENABLED = true
-
-        /** onAudioStop(MEDIA) шлёт MEDIA_PAUSE (как MD) вместо MEDIA_STOP; выключено = старое поведение. */
-        @Volatile @JvmStatic var MEDIA_PAUSE_ENABLED = true
-
-        /**
-         * MODULE_STATUS NAVI=1 на весь маршрут (MetaRelay): без него приборка Honda Vezel пишет «Turn by turn waiting
-         * for your smartphone». Desay G6S (Mazda CX-5) с NAVI=1 глушит штатное радио при входе в CarLife (лог Ивана
-         * 2026-10-12), там NAVI=1 только вокруг TTS (huDesayG6S). Выключено = NAVI=1 только вокруг TTS на всех ГУ.
-         */
-        @Volatile @JvmStatic var ROUTE_NAVI_STATUS_ENABLED = true
-
-        /** ГУ ушло на свой источник (MODULE_CONTROL MUSIC=0): AA на паузу; на START play не шлём. */
-        @Volatile @JvmStatic var HU_MUSIC_FOLLOW_ENABLED = true
-
-        /** Desay G6S: MUSIC=1 после нашей паузы по MUSIC=0 - AA play (KEYCODE 126) и ответ MUSIC=1. */
-        @Volatile @JvmStatic var HU_MUSIC_RESUME_ENABLED = true
-
         /** Сколько отвечать MUSIC=1 на пачку MUSIC=1 после нашего play, пока MEDIA INIT ещё не пришёл. */
         const val HU_RESUME_ANSWER_MS = 3_000L
 
@@ -3344,7 +3336,6 @@ class AaBridgeCore(
         const val DESKTOP_RESUME_GUARD_MS = 2_000L
 
         /** h1049 CN7: после конца HFP-звонка ждём MUSIC=1 от ГУ (сама вернула через 0,8 с), потом MEDIA шлём сами. */
-        @Volatile @JvmStatic var CN7_CALL_HOLD_ENABLED = true
         const val CN7_CALL_HOLD_MS = 5_000L
 
         /** Desktop: «играет ли плеер» - binder-вызов, при закрытом MEDIA спрашиваем не чаще раза в секунду. */
@@ -3354,11 +3345,6 @@ class AaBridgeCore(
          * Mazda CX-5: AA сам запускает музыку через 5-9 с после BT_HFP_CONNECTION. Пока ГУ на своём источнике, такой play
          * (в окне после HFP, без ввода с ГУ) паузу не снимает, а снова получает KEYCODE 127.
          */
-        @Volatile @JvmStatic var BT_AUTOPLAY_GUARD_ENABLED = true
-
-        /** Воздух, VW BT 1420: START после PAUSE сразу с IDR энкодера (декодер жив), без ожидания IDR от AA. */
-        @Volatile @JvmStatic var AIR_WARM_RESUME_ENABLED = true
-
         const val BT_AUTOPLAY_WINDOW_MS = 20_000L
         const val USER_INPUT_WINDOW_MS = 3_000L
         const val HONDA_RESUME_AFTER_STOP_MS = 3_000L      // MUSIC=1 от Honda 20772104 позже паузы AA извне - уже не про неё
