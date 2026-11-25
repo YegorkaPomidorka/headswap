@@ -275,7 +275,8 @@ class SettingsScreen(host: MainActivity) : Screen(host) {
         val mode = c.getString(if (aa.transcode) R.string.set_transcode_title else R.string.set_direct_title)
         val geo = aa.videoGeometry.effective(aa.transcode)
         val res = if (geo is VideoMode) c.getString(geo.titleRes) else geo.outLabel
-        val dpi = aa.aaDensity.takeIf { it != AaDensity.AUTO }?.let { c.getString(R.string.set_sum_density, it) }
+        val dpi = aa.aaDensity.takeIf { it != AaDensity.AUTO && BridgeMode.effective(aa.bridgeMode, Build.VERSION.SDK_INT) != BridgeMode.DESKTOP }
+            ?.let { c.getString(R.string.set_sum_density, it) }
         set(SettingsSection.VIDEO, listOfNotNull(mode, res, dpi, c.getString(aa.fpsSetting.titleRes)).joinToString(" · "))
 
         if (c.micMissing(aa)) {
@@ -409,7 +410,6 @@ class SettingsSectionScreen(host: MainActivity, val section: SettingsSection) : 
     private var fpsSeg: Segmented? = null
     private var desktopFpsSeg: Segmented? = null
     private var desktopFpsNote: TextView? = null
-    private var desktopTranscodeSeg: Segmented? = null
     private var videoRangeSeg: Segmented? = null
     private var densityValue: TextView? = null
     private var densitySub: TextView? = null
@@ -923,20 +923,9 @@ class SettingsSectionScreen(host: MainActivity, val section: SettingsSection) : 
 
     private fun buildVideo() {
         val c = ctx
-        body.addView(c.sectionTitle(c.getString(R.string.set_mode)))
         val desktop = BridgeMode.effective(aa.bridgeMode, Build.VERSION.SDK_INT) == BridgeMode.DESKTOP
-        if (desktop) {
-            // «Свой лаунчер»: по умолчанию промежуточный H.264, как в AA transcode.
-            val dt = Segmented(c, listOf(
-                c.getString(R.string.set_desktop_direct_title),
-                c.getString(R.string.set_desktop_transcode_title),
-            ), 15f) { setDesktopTranscode(it == 1) }
-            desktopTranscodeSeg = dt
-            body.addView(dt.view, lp(MATCH, WRAP))
-            body.addView(c.text(c.getString(R.string.set_desktop_transcode_note), 13f, 400, c.clr(R.color.on2)).apply { setLineSpacing(0f, 1.4f) },
-                lp(MATCH, WRAP).margins(c, 8, 4, 8, 0))
-            refreshDesktopTranscode()
-        } else {
+        if (!desktop) {
+            body.addView(c.sectionTitle(c.getString(R.string.set_mode)))
             val seg = Segmented(c, listOf(c.getString(R.string.set_transcode_title), c.getString(R.string.set_direct_title)), 15f) { setTranscode(it == 0) }
             transcodeSeg = seg
             body.addView(seg.view, lp(MATCH, WRAP))
@@ -959,9 +948,12 @@ class SettingsSectionScreen(host: MainActivity, val section: SettingsSection) : 
         body.addView(resolutionField(), lp(MATCH, WRAP))
         note(c.getString(R.string.set_apply_next))
 
-        body.addView(c.sectionTitle(c.getString(R.string.set_aa_density)))
-        body.addView(densityCard(), lp(MATCH, WRAP))
-        note(c.getString(R.string.set_aa_density_note))
+        // h1453: «Свой лаунчер» берёт dpi рабочего стола сам, масштаб AA там ни на что не влияет
+        if (!desktop) {
+            body.addView(c.sectionTitle(c.getString(R.string.set_aa_density)))
+            body.addView(densityCard(), lp(MATCH, WRAP))
+            note(c.getString(R.string.set_aa_density_note))
+        }
 
         if (desktop) {
             body.addView(c.sectionTitle(c.getString(R.string.set_desktop_fps_title)))
@@ -1288,15 +1280,6 @@ class SettingsSectionScreen(host: MainActivity, val section: SettingsSection) : 
     private fun setDesktopFps(f: FpsSetting) {
         DexPrefs(ctx).desktopFps = f
         refreshDesktopFps()
-    }
-
-    private fun setDesktopTranscode(on: Boolean) {
-        DexPrefs(ctx).desktopTranscode = on
-        refreshDesktopTranscode()
-    }
-
-    private fun refreshDesktopTranscode() {
-        desktopTranscodeSeg?.setSelected(if (DexPrefs(ctx).desktopTranscode) 1 else 0)
     }
 
     private fun setVideoRangeMode(mode: VideoRangeMode) {

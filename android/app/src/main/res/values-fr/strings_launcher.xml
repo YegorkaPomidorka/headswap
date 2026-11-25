@@ -64,6 +64,11 @@
     <string name="l_phone_talk">Appel : %1$s</string>
     <string name="l_phone_calling">Appel en cours…</string>
     <string name="l_phone_none">Aucun appel</string>
+    <string name="l_call_hidden">Appel</string>
+    <plurals name="l_missed_hidden">
+        <item quantity="one">%d appel</item>
+        <item quantity="other">%d appels</item>
+    </plurals>
     <string name="l_phone_grant">Autoriser sur le téléphone</string>
     <string name="l_call_back">Rappeler</string>
     <string name="l_call">Appeler</string>
@@ -120,7 +125,7 @@
     <string name="l_s_theme_auto">Auto</string>
     <string name="l_s_theme_sub">Auto suit les phares</string>
     <string name="l_s_colors">Couleurs</string>
-    <string name="l_s_colors_sub">Accent et fond, nuit et jour séparément</string>
+    <string name="l_s_colors_sub">Accent, fond et fond d\'écran</string>
     <string name="l_s_colors_night">Nuit</string>
     <string name="l_s_colors_day">Jour</string>
     <string name="l_s_colors_reset">Réinitialiser</string>
@@ -128,7 +133,26 @@
     <string name="l_s_colors_bg_hue">Teinte du fond</string>
     <string name="l_s_colors_bg_sat">Saturation du fond</string>
     <string name="l_s_colors_hint">Tant que cet écran est ouvert, le bureau affiche les couleurs que vous modifiez. Les couleurs de nuit s\'affichent avec le thème sombre, celles de jour avec le thème clair.</string>
-    <string name="l_s_rail">Panneau latéral</string>
+    <string name="l_s_colors_presets">Préréglages</string>
+    <string name="l_s_preset_default">Par défaut</string>
+    <string name="l_s_preset_tree">Sapin</string>
+    <string name="l_s_preset_new_year">Nouvel An</string>
+    <string name="l_ny_countdown">Avant le Nouvel An</string>
+    <string name="l_ny_greeting">Bonne année %1$s !</string>
+    <string name="l_s_wallpaper">Fond d\'écran</string>
+    <string name="l_s_wallpaper_sub_glass">Sous le verre, sur tout le bureau</string>
+    <string name="l_s_wallpaper_sub_solid">Uniquement avec le style Verre</string>
+    <string name="l_s_wallpaper_none">Aucun</string>
+    <string name="l_s_wallpaper_headswap">Headswap</string>
+    <string name="l_s_wallpaper_mountains">Montagnes</string>
+    <string name="l_s_wallpaper_tree">Sapin</string>
+    <string name="l_s_wallpaper_winter_road">Route</string>
+    <string name="l_s_wallpaper_custom">Ma photo</string>
+    <string name="l_s_wallpaper_gallery">Galerie</string>
+    <string name="l_s_wallpaper_blur">Flou</string>
+    <string name="l_s_wallpaper_dim">Assombrir</string>
+    <string name="l_wallpaper_set">Fond d\'écran défini</string>
+    <string name="l_wallpaper_failed">Impossible de définir le fond d\'écran</string>
     <string name="l_s_rail_bottom">Panneau du bas</string>
     <string name="l_s_layout_tile_top">Tuile en haut</string>
     <string name="l_s_layout_music_top">Musique en haut</string>
@@ -138,6 +162,14 @@
     <string name="l_s_rail_cut">Compact</string>
     <string name="l_s_anim">Animations des boutons</string>
     <string name="l_s_battery">Batterie du téléphone</string>
+    <string name="l_s_clock12">Horloge 12 h</string>
+    <string name="l_s_rail_size">Taille du panneau</string>
+    <string name="l_s_rail_style">Style</string>
+    <string name="l_s_style_solid">Plein</string>
+    <string name="l_s_style_glass">Verre</string>
+    <string name="l_s_date">Date</string>
+    <string name="l_s_date_dmy">JJ.MM</string>
+    <string name="l_s_date_mdy">MM.JJ</string>
     <string name="l_s_map_scale">Échelle</string>
     <string name="l_s_map_scale_sub">Uniquement pour %1$s · s\'applique immédiatement</string>
     <string name="l_s_scale_smaller">Plus petite</string>
@@ -168,6 +200,8 @@
     <string name="l_nav_2gis">2GIS</string>
     <string name="l_nav_yandex_maps">Yandex Maps</string>
     <string name="l_nav_google_maps">Google Maps</string>
+    <string name="l_nav_amap">Amap</string>
+    <string name="l_nav_amap_auto">Amap Auto</string>
     <!-- навигатор на своём хосте Car App -->
     <string name="l_u_m">m</string>
     <string name="l_u_km">km</string>
@@ -185,6 +219,8 @@
     <string name="l_s_alice_voice">Alice par la voix uniquement</string>
     <string name="l_s_alice_voice_on">Sans fenêtre, une pastille en bas ; fonctionne avec le téléphone verrouillé</string>
     <string name="l_s_alice_voice_off">Alice dans un panneau à gauche</string>
+    <string name="l_s_hide_caller">Masquer les numéros</string>
+    <string name="l_s_hide_caller_sub">L’appelant n’apparaît que dans Appels</string>
     <string name="l_notif_show_all">Notifications : %1$d. Tout afficher</string>
     <string name="l_notif_collapse">Réduire les notifications</string>
     <string name="l_notif_clear_all">Tout effacer</string>

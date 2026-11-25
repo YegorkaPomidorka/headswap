@@ -31,6 +31,15 @@ enum class RailSize {
     }
 }
 
+/** Общий «Стиль»: боковая рейка (сплошная с золотым блоком навигации или стеклянная колонка на всю высоту; в портрете - нижняя стеклянная полоса), плитки главного и обои. */
+enum class RailStyle {
+    SOLID, GLASS;
+
+    companion object {
+        fun restore(name: String?): RailStyle = entries.firstOrNull { it.name == name } ?: SOLID
+    }
+}
+
 /** Настройки лаунчера - SharedPreferences, как остальной проект (DexPrefs/AaSettings). */
 class LauncherPrefs(private val context: Context) {
     private val prefs = context.getSharedPreferences("headswap_launcher", Context.MODE_PRIVATE)
@@ -52,9 +61,41 @@ class LauncherPrefs(private val context: Context) {
         get() = ColorSet.decode(prefs.getString("colors_day", null), ColorSet.DAY)
         set(value) { prefs.edit().putString("colors_day", value.encode()).apply() }
 
+    /** Гирлянда на строке статуса: включается праздничным набором «Вид › Цвета › Пресеты», «Как было» и «Сбросить» её гасят. */
+    var garland: Boolean
+        get() = prefs.getBoolean("garland", false)
+        set(value) { prefs.edit().putBoolean("garland", value).apply() }
+
+    /** Какой праздничный пресет выбран тапом: tree / new_year / none ([ColorPreset.id]); от слайдеров не зависит, по нему первая плитка обоев подменяется. */
+    var festivePreset: String
+        get() = prefs.getString("festive_preset", null) ?: ColorPreset.NONE_ID
+        set(value) { prefs.edit().putString("festive_preset", value).apply() }
+
     var railSize: RailSize
         get() = RailSize.restore(prefs.getString("rail_size", null))
         set(value) { prefs.edit().putString("rail_size", value.name).apply() }
+
+    /** «Стиль» ([RailStyle]): рейка (в портрете игнорируется) и нижний ряд главного. */
+    var railStyle: RailStyle
+        get() = RailStyle.restore(prefs.getString("rail_style", null))
+        set(value) { prefs.edit().putString("rail_style", value.name).apply() }
+
+    /** Обои стола в стиле «Стекло» ([WallpaperId.key]), размытие и затемнение 0..100; ver растёт при смене своего фото (сброс кэша). */
+    var wallpaper: WallpaperId
+        get() = WallpaperId.restore(prefs.getString("wallpaper", null))
+        set(value) { prefs.edit().putString("wallpaper", value.key).apply() }
+
+    var wallpaperBlur: Int
+        get() = WallpaperLogic.clamp(prefs.getInt("wallpaper_blur", WallpaperLogic.BLUR_DEFAULT))
+        set(value) { prefs.edit().putInt("wallpaper_blur", WallpaperLogic.clamp(value)).apply() }
+
+    var wallpaperDim: Int
+        get() = WallpaperLogic.clamp(prefs.getInt("wallpaper_dim", WallpaperLogic.DIM_DEFAULT))
+        set(value) { prefs.edit().putInt("wallpaper_dim", WallpaperLogic.clamp(value)).apply() }
+
+    var wallpaperVer: Int
+        get() = prefs.getInt("wallpaper_ver", 0)
+        set(value) { prefs.edit().putInt("wallpaper_ver", value).apply() }
 
     /**
      * «Карта на главном» слева, физически. Новый ключ: старый right_hand двигал рейку.
@@ -74,6 +115,21 @@ class LauncherPrefs(private val context: Context) {
     var showBattery: Boolean
         get() = prefs.getBoolean("show_battery", true)
         set(value) { prefs.edit().putBoolean("show_battery", value).apply() }
+
+    /** «Скрывать номера»: карточка «Телефон» и полоса звонка без имени и номера звонящего (h1431); «Вызовы» не трогает. */
+    var hideCaller: Boolean
+        get() = prefs.getBoolean("hide_caller", false)
+        set(value) { prefs.edit().putBoolean("hide_caller", value).apply() }
+
+    /** Часы 12 ч «2:05» вместо 24 ч ([ClockFormat]); пока не выбирали - как в настройках телефона. */
+    var clock12h: Boolean
+        get() = prefs.getBoolean("clock_12h", !android.text.format.DateFormat.is24HourFormat(context))
+        set(value) { prefs.edit().putBoolean("clock_12h", value).apply() }
+
+    /** Дата в строке статуса «ММ.ДД» вместо «ДД.ММ» ([DateFormatChoice]). */
+    var dateMdy: Boolean
+        get() = prefs.getBoolean("date_mdy", false)
+        set(value) { prefs.edit().putBoolean("date_mdy", value).apply() }
 
     /** «Включать музыку автоматически»: при старте сессии сразу играет, как в Android Auto. */
     var autoplay: Boolean
@@ -138,6 +194,10 @@ class LauncherPrefs(private val context: Context) {
     /** «Масштаб карты» навигатора [pkg]: ступень [com.yegorkapomidorka.headswap.carapp.CarConfigMath.STEPS]. */
     fun mapScale(pkg: String): Int = prefs.getInt("map_scale:$pkg", com.yegorkapomidorka.headswap.carapp.CarConfigMath.AUTO_STEP)
     fun setMapScale(pkg: String, step: Int) { prefs.edit().putInt("map_scale:$pkg", step).apply() }
+
+    /** Куда перетащили плашку плеера над навигатором [pkg] ([NavPlayerPlate.Pos]); null - место по умолчанию. */
+    fun navPlayerPos(pkg: String): NavPlayerPlate.Pos? = NavPlayerPlate.Pos.restore(prefs.getString("nav_player_pos:$pkg", null))
+    fun setNavPlayerPos(pkg: String, pos: NavPlayerPlate.Pos) { prefs.edit().putString("nav_player_pos:$pkg", pos.save()).apply() }
 
     /** «Подсказки на приборке» навигатора [pkg]: машинная часть / теневая AA или окно как на телефоне ([NavigatorPick.hintsDefault]). */
     fun navHints(pkg: String): Boolean = prefs.getBoolean("nav_hints:$pkg", NavigatorPick.hintsDefault(pkg))

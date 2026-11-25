@@ -16,6 +16,8 @@
     <string name="dev_meta_time_sub">int32 time до манёвра, с (как apollo-DuerOS)</string>
     <string name="dev_meta_progress_title">Прогресс в секундах</string>
     <string name="dev_meta_progress_sub">MEDIA_PROGRESS_BAR в с вместо мс (если на ГУ в 1000 раз больше)</string>
+    <string name="dev_meta_art16k_title">Обложка трека не больше 16 КБ</string>
+    <string name="dev_meta_art16k_sub">Для приборок, которые не показывают обложку (например Honda CR-V 2026, SEMIDRIVE X9). Качество на ГУ ниже</string>
 
     <string name="dev_section_music_chunk">Размер пакета музыки (эксперимент)</string>
     <string name="dev_music_chunk_note">Мельче — меньше буфер на ГУ, но больше пакетов по USB. Если звук заикается, верните «Как отдаёт Android Auto»</string>
@@ -23,6 +25,8 @@
     <string name="dev_voice_chunk_note">Речь ассистента и подсказки навигатора. Авто: 1024 Б на VW CNS2 Delphi, иначе как отдаёт AA</string>
     <string name="dev_section_tts_preroll">Тишина перед подсказкой (эксперимент)</string>
     <string name="dev_tts_preroll_note">Нули после начала подсказки, ГУ успевает открыть звук. Авто: 400 мс на VW</string>
+    <string name="dev_section_nav_channel">Канал подсказок навигации (эксперимент)</string>
+    <string name="dev_nav_channel_note">VR: подсказки идут в голосовой канал без NAVI=1, ГУ может переключить кнопки громкости на «голос». TTS: как раньше. Действует со следующей подсказки</string>
     <string name="dev_volume_swipe_title">Громкость двумя пальцами</string>
     <string name="dev_volume_swipe_sub">Рабочий стол: два пальца у правого края, вверх — громче, вниз — тише. На Honda Vezel включено всегда.</string>
     <string name="dev_section_touch_decimation">Прореживание тача (эксперимент)</string>
@@ -41,6 +45,8 @@
     <string name="dev_section_desktop">Рабочий стол на ГУ</string>
     <string name="dev_hide_status_title">Скрыть строку статуса</string>
     <string name="dev_hide_status_sub">Для ГУ, у которых сверху своя строка с часами и значками (часть VW). Уведомления висят чёлкой с золотой полоской: потяните вниз — шторка</string>
+    <string name="dev_vdm_host_title">Хост VirtualDevice на Android 16</string>
+    <string name="dev_vdm_host_sub">Для Samsung на Android 16, если экран машины гаснет вместе с экраном телефона. Нужна отладка по USB. После переключения заново активируйте рабочий стол.</string>
     <string name="dev_custom_w">Ширина</string>
     <string name="dev_custom_h">Высота</string>
     <string name="dev_custom_hint">Ширина 640–2240, высота 640–1080 (вертикальный — наоборот), чётные</string>

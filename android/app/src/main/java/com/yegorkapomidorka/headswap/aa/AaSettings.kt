@@ -46,6 +46,11 @@ class AaPrefs(ctx: Context) {
         get() = TtsPreroll.parse(sp.getString("ttsPreroll", TtsPreroll.DEFAULT.name))
         set(v) = sp.edit().putString("ttsPreroll", v.name).apply()
 
+    /** Канал подсказок навигации в CarLife (имя NavChannel, по умолчанию VR в сборке h1318; эксперимент, не входит в пресеты авто). Мост читает на каждый пакет речи. */
+    var navChannel: NavChannel
+        get() = NavChannel.parse(sp.getString("navChannel", NavChannel.DEFAULT.name))
+        set(v) = sp.edit().putString("navChannel", v.name).apply()
+
     /** Прореживание MOVE тача (имя TouchDecimation, по умолчанию Выкл; эксперимент, не входит в пресеты авто). Мост читает на каждое событие. */
     var touchDecimation: TouchDecimation
         get() = TouchDecimation.parse(sp.getString("touchDecimation", TouchDecimation.DEFAULT.name))
@@ -189,6 +194,11 @@ class AaPrefs(ctx: Context) {
     var metaMusic: Boolean
         get() = sp.getBoolean("metaMusic", true)
         set(v) = sp.edit().putBoolean("metaMusic", v).apply()
+
+    /** Обложка трека в MEDIA_INFO не больше 16 КБ вместо 30 КБ (приборка Honda CR-V 2026, SEMIDRIVE X9, h219/h606). По умолчанию выкл. Читается на подключение. */
+    var metaArt16k: Boolean
+        get() = sp.getBoolean("metaArt16k", false)
+        set(v) = sp.edit().putBoolean("metaArt16k", v).apply()
 
     /** Подсказки поворотов из AA -> NAVI_NEXT_TURN_INFO (если ГУ подписалась). Читается на подключение. */
     var metaNavi: Boolean

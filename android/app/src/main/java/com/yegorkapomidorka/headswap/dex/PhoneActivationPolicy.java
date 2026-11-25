@@ -61,6 +61,7 @@ public final class PhoneActivationPolicy {
         return REMOVE_LOGS + "\n"
             + "CLASSPATH='" + apkPath + "' /system/bin/setsid /system/bin/nohup /system/bin/app_process / " + ENTRY
             + " --package " + options.packageName + " --token " + options.token + (options.audio ? " --audio" : "")
+            + (options.vdm ? " --vdm" : "")
             + " </dev/null >" + log + " 2>&1 &\n"
             + "echo " + DISPATCHED + nonce;
     }

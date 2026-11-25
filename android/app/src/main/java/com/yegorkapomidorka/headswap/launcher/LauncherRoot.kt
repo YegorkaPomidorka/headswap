@@ -1,10 +1,14 @@
 package com.yegorkapomidorka.headswap.launcher
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.wrapContentHeight
@@ -35,6 +39,8 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.graphicsLayer
+import kotlin.math.roundToInt
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.platform.LocalContext
@@ -62,7 +68,7 @@ fun LauncherRoot(connected: Boolean) {
     val localeDir = LocalLayoutDirection.current
     LaunchedEffect(Unit) {
         while (true) {
-            model.status = withContext(Dispatchers.Default) { StatusReader.read(model.context) }
+            model.status = withContext(Dispatchers.Default) { StatusReader.read(model.context, model.clock12h, model.dateMdy) }
             // режим фар от ГУ для темы «Авто»
             model.huTheme = CarLifeState.huTheme
             delay(1000)
@@ -92,14 +98,18 @@ fun LauncherRoot(connected: Boolean) {
         val w = constraints.maxWidth
         val h = constraints.maxHeight
         val railSize = model.railSize
-        val spec = remember(w, h, railSize) { LauncherSpecs.forSize(w, h, railSize) }
+        val twelveHour = model.clock12h
+        val spec = remember(w, h, railSize, twelveHour) { LauncherSpecs.forSize(w, h, railSize, twelveHour) }
         val metrics = remember(spec, density) { LauncherMetrics(spec, density) }
         // раскладка плашек в портрете своя ([LauncherModel.layout]): флаг ведёт модель, спека у каждого экрана своя
         SideEffect { model.portrait = spec.portrait }
         val pal = model.palette
+        // обои - только в «Стекле»; null (нет обоев, файла, картинка ещё читается) = всё как без них: градиент и bgSolid справа от рейки
+        val wallpaper = rememberWallpaper(model.railStyle == RailStyle.GLASS, model.wallpaper, model.wallpaperVer, w, h, model.context)
         CompositionLocalProvider(LocalMetrics provides metrics, LocalAccent provides pal.accent, LocalPalette provides pal,
             LocalLocaleDirection provides localeDir) {
             Box(Modifier.fillMaxSize().launcherBackground(pal)) {
+                if (wallpaper != null && model.foreign == null) WallpaperLayer(wallpaper, model.wallpaperBlur, model.wallpaperDim, minOf(w, h))
                 if (!connected) {
                     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         Txt(stringResource(R.string.l_connecting), spec.f1, color = Pal.SEC)
@@ -112,16 +122,21 @@ fun LauncherRoot(connected: Boolean) {
                     // Полноэкранный YouTube забирает и её место: выход - кнопкой самого YouTube (FullscreenApp)
                     val fullscreen = model.area is Area.App && EmbedHost.app.fullscreen
                     if (spec.portrait) {
-                        // вертикальный экран: область на всю ширину, рейка снизу (h921)
+                        // вертикальный экран: область на всю ширину, рейка снизу (h921); в «Стекле» - стеклянная полоса (ADR 0054)
                         Column(Modifier.fillMaxSize()) {
                             Box(Modifier.weight(1f).fillMaxWidth().onGloballyPositioned { model.areaRect = it.boundsInRoot() }) {
                                 AreaContent()
                             }
-                            if (!fullscreen) BottomRail()
+                            if (!fullscreen) BottomRail(model.railStyle == RailStyle.GLASS)
                         }
                     } else Row(Modifier.fillMaxSize()) {
-                        if (!fullscreen) Rail()
-                        Box(Modifier.weight(1f).fillMaxHeight().onGloballyPositioned { model.areaRect = it.boundsInRoot() }) {
+                        // «Стекло»: рейка прозрачная поверх общего фона, а область справа от неё - сплошной bgSolid без градиента;
+                        // с обоями bgSolid не рисуем, иначе они закрыты
+                        val glass = model.railStyle == RailStyle.GLASS
+                        val railShown = !fullscreen && !model.railHidden
+                        if (railShown) Rail(glass)
+                        Box(Modifier.weight(1f).fillMaxHeight().then(if (glass && railShown && wallpaper == null) Modifier.background(pal.bgSolid) else Modifier)
+                            .onGloballyPositioned { model.areaRect = it.boundsInRoot() }) {
                             AreaContent()
                         }
                     }
@@ -133,6 +148,8 @@ fun LauncherRoot(connected: Boolean) {
                                 EmbedLayers()
                                 HomeTileButtons() // ⇄ и «Слои» ленты - над живыми окнами плашек
                                 NavHostOverlay() // шаблоны навигатора на своём хосте Car App - над его картой, в границах области
+                                NavPlayerPlateOverlay() // плашка плеера над навигатором на весь экран (ADR 0063), под шторкой
+                                Garland(spec) // гирлянда на нижнем краю строки статуса: над окнами плиток, под язычком и шторкой
                                 NotificationsOverlay() // язычок и шторка уведомлений телефона из-под строки статуса; касания берёт только сам
                                 AliceVoicePill() // скрытая Алиса: слушаю / думаю / говорю / маршрут - снизу по центру
                                 // входящий звонок поверх чужого приложения или экрана без карточки «Телефон»
@@ -183,14 +200,29 @@ private fun AreaContent() {
 }
 
 
-/** Рейка на всю высоту (S-образно распределена) и под ней отдельный золотой блок навигации. Макет v2. */
+/**
+ * Рейка на всю высоту (S-образно распределена) и под ней отдельный золотой блок навигации. Макет v2.
+ * [glass] ([RailStyle.GLASS]; в портрете - [BottomRail]): одна стеклянная колонка на весь экран, вместо блока - круглая золотая линза.
+ */
 @Composable
-private fun Rail() {
+private fun Rail(glass: Boolean) {
     val m = LocalMetrics.current
     val s = m.spec
-    val accent = LocalAccent.current
-    val model = LauncherModel
-    val status = model.status
+    if (glass) {
+        Box(Modifier.width(m.dp(s.rail)).fillMaxHeight().glassRail(s.t / 96f)) {
+            // кнопки на тех же местах, что в сплошной рейке: верхняя часть - до зазора над рядом навигации
+            Column(
+                Modifier.fillMaxWidth().height(m.dp(s.h - s.navH - s.g)).padding(top = m.dp(s.g), bottom = m.dp(s.g8)),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.SpaceBetween,
+            ) { RailItems(glass = true) }
+            // разделитель посередине зазора между рядами плиток
+            Box(Modifier.align(Alignment.TopCenter).offset(y = m.dp(s.dividerY)).width(m.dp(s.rb)).height(m.dp(maxOf(1, s.t / 96)))
+                .background(Brush.horizontalGradient(listOf(Color.Transparent, Color.White.copy(alpha = 0.4f), Color.Transparent))))
+            NavLens(Modifier.align(Alignment.TopCenter).offset(y = m.dp(s.lensTop)))
+        }
+        return
+    }
     Column(Modifier.width(m.dp(s.rail)).fillMaxHeight(), verticalArrangement = Arrangement.spacedBy(m.dp(s.g))) {
         Column(
             Modifier.weight(1f).fillMaxWidth()
@@ -198,32 +230,155 @@ private fun Rail() {
                 .padding(top = m.dp(s.g), bottom = m.dp(s.g8)),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.SpaceBetween,
-        ) {
-            if (s.clockInRail) Txt(status.time, s.f1, color = Pal.RAIL, weight = FontWeight.SemiBold, mono = true)
-            // «Средняя»: часы, золотая чёрточка и минуты столбиком; в «Маленькой» и «Обрезанной» часов нет
-            if (s.clockStacked) {
-                val parts = status.time.split(":", limit = 2)
-                Column(Modifier.height(m.dp(s.clockH)), horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(m.dp(s.clockGap))) {
-                    // строка Txt выше шрифта (lineHeight 1.15): центруем цифры в рамке clockHr, иначе зазоры у чёрточки разные
-                    Box(Modifier.height(m.dp(s.clockHr)), contentAlignment = Alignment.Center) {
-                        Txt(parts[0], s.clockHr, Modifier.wrapContentHeight(unbounded = true), color = Pal.RAIL,
-                            weight = FontWeight.SemiBold, mono = true)
-                    }
-                    Box(Modifier.width(m.dp(s.sepW)).height(m.dp(s.sepH)).clip(RoundedCornerShape(m.dp(s.sepH))).background(accent))
-                    Box(Modifier.height(m.dp(s.clockHr)), contentAlignment = Alignment.Center) {
-                        Txt(parts.getOrElse(1) { "" }, s.clockHr, Modifier.wrapContentHeight(unbounded = true), color = Pal.SEC2,
-                            weight = FontWeight.SemiBold, mono = true)
+        ) { RailItems(glass = false) }
+        NavBlock(Modifier.width(m.dp(s.rail)).height(m.dp(s.navH)), RoundedCornerShape(topEnd = m.dp(s.radius)))
+    }
+}
+
+/** Содержимое рейки сверху вниз: часы, «Назад», лого, настройки, «Вид карточки». Одно и то же в сплошной и стеклянной. */
+@Composable
+private fun ColumnScope.RailItems(glass: Boolean) {
+    val m = LocalMetrics.current
+    val s = m.spec
+    val accent = LocalAccent.current
+    val status = LauncherModel.status
+    if (s.clockInRail && !s.clockRailAmPm) Txt(status.time, s.f1, color = Pal.RAIL, weight = FontWeight.SemiBold, mono = true)
+    // 12 ч: «9:05», под ним плашка AM/PM с золотой обводкой
+    if (s.clockRailAmPm) Column(horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(m.dp(s.clockGap))) {
+        Txt(status.time, s.f1, color = Pal.RAIL, weight = FontWeight.SemiBold, mono = true)
+        Box(Modifier.height(m.dp(s.amPmPillH)).border(m.dp(s.amPmPillBorder), accent, RoundedCornerShape(m.dp(s.amPmPillH)))
+            .padding(horizontal = m.dp(s.amPmPillPadH)), contentAlignment = Alignment.Center) {
+            Txt(if (status.pm) "PM" else "AM", s.railAmPmFs, Modifier.wrapContentHeight(unbounded = true),
+                color = accent, weight = FontWeight.Bold, mono = true)
+        }
+    }
+    // «Средняя»: часы, золотая чёрточка и минуты столбиком; в «Маленькой» и «Обрезанной» часов нет
+    if (s.clockStacked) {
+        val parts = status.time.split(":", limit = 2)
+        Column(Modifier.height(m.dp(s.clockH)), horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(m.dp(s.clockGap))) {
+            // строка Txt выше шрифта (lineHeight 1.15): центруем цифры в рамке clockHr, иначе зазоры у чёрточки разные
+            Box(Modifier.height(m.dp(s.clockHr)), contentAlignment = Alignment.Center) {
+                Txt(parts[0], s.clockHr, Modifier.wrapContentHeight(unbounded = true), color = Pal.RAIL,
+                    weight = FontWeight.SemiBold, mono = true)
+            }
+            if (!s.clockAmPm) Box(Modifier.width(m.dp(s.sepW)).height(m.dp(s.sepH)).clip(RoundedCornerShape(m.dp(s.sepH))).background(accent))
+            else {
+                // 12 ч: «—PM—» на месте чёрточки; не влезает в ширину рейки - столбиком
+                val dash = @Composable {
+                    Box(Modifier.width(m.dp(s.amPmSepW)).height(m.dp(s.sepH)).clip(RoundedCornerShape(m.dp(s.sepH))).background(accent))
+                }
+                val label = @Composable {
+                    Box(Modifier.height(m.dp(s.amPmFs)), contentAlignment = Alignment.Center) {
+                        Txt(if (status.pm) "PM" else "AM", s.amPmFs, Modifier.wrapContentHeight(unbounded = true),
+                            color = accent, weight = FontWeight.Bold, mono = true)
                     }
                 }
+                if (s.amPmInline) Ltr {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(m.dp(s.clockGap))) {
+                        dash(); label(); dash()
+                    }
+                } else Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(m.dp(s.clockGap))) {
+                    dash(); label(); dash()
+                }
             }
-            RailBackButton()
-            RailLogoButton()
-            RailGearButton()
-            // «Вид карточки» в рейке; в ленте с обычной рейкой - стеклянная кнопка в углу большой плашки (HomeTileButtons)
-            if (s.cardViewInRail) CardViewButton(s.rb, s.ric, Color.Transparent, Pal.SEC2)
+            Box(Modifier.height(m.dp(s.clockHr)), contentAlignment = Alignment.Center) {
+                Txt(parts.getOrElse(1) { "" }, s.clockHr, Modifier.wrapContentHeight(unbounded = true), color = Pal.SEC2,
+                    weight = FontWeight.SemiBold, mono = true)
+            }
         }
-        NavBlock(Modifier.width(m.dp(s.rail)).height(m.dp(s.navH)), RoundedCornerShape(topEnd = m.dp(s.radius)))
+    }
+    RailBackButton()
+    RailLogoButton(glass)
+    RailGearButton()
+    // «Вид карточки» в рейке; в ленте с обычной рейкой - стеклянная кнопка в углу большой плашки (HomeTileButtons)
+    if (s.cardViewInRail) CardViewButton(s.rb, s.ric, Color.Transparent, Pal.SEC2)
+}
+
+/**
+ * Стекло рейки поверх общего фона: белый градиент под 170° (0.18 -> 0.06 -> 0.03 -> 0.10), светлая линия по краю у
+ * области и мягкое свечение рядом с ней (в RTL край слева). [k] - масштаб от макета 1280x720, px макета в px экрана.
+ */
+private fun Modifier.glassRail(k: Float): Modifier = drawBehind {
+    val w = size.width
+    val h = size.height
+    val rad = Math.toRadians(170.0)
+    val dx = kotlin.math.sin(rad).toFloat()
+    val dy = (-kotlin.math.cos(rad)).toFloat()
+    val len = kotlin.math.abs(w * dx) + kotlin.math.abs(h * dy)
+    val c = Offset(w / 2, h / 2)
+    drawRect(Brush.linearGradient(
+        0f to Color.White.copy(alpha = 0.18f), 0.28f to Color.White.copy(alpha = 0.06f),
+        0.72f to Color.White.copy(alpha = 0.03f), 1f to Color.White.copy(alpha = 0.10f),
+        start = Offset(c.x - dx * len / 2, c.y - dy * len / 2), end = Offset(c.x + dx * len / 2, c.y + dy * len / 2)))
+    val rtl = layoutDirection == LayoutDirection.Rtl
+    val glow = 8f * k
+    val line = 1.5f * k
+    // свечение: от кромки внутрь на 8px, белый 0.18 -> 0
+    val edge = if (rtl) 0f else w
+    val inner = if (rtl) glow else w - glow
+    drawRect(Brush.horizontalGradient(listOf(Color.White.copy(alpha = 0.18f), Color.White.copy(alpha = 0f)), startX = edge, endX = inner),
+        topLeft = Offset(if (rtl) 0f else w - glow, 0f), size = Size(glow, h))
+    drawRect(Color.White.copy(alpha = 0.5f), Offset(if (rtl) 0f else w - line, 0f), Size(line, h))
+}
+
+/**
+ * Стекло нижней рейки портрета: то же, что [glassRail], повёрнутое к верхнему краю - белый градиент сверху вниз,
+ * светлая линия по верхней кромке и свечение под ней.
+ */
+private fun Modifier.glassBottom(k: Float): Modifier = drawBehind {
+    val w = size.width
+    drawRect(Brush.verticalGradient(
+        0f to Color.White.copy(alpha = 0.18f), 0.3f to Color.White.copy(alpha = 0.06f),
+        0.7f to Color.White.copy(alpha = 0.03f), 1f to Color.White.copy(alpha = 0.10f)))
+    val glow = 8f * k
+    drawRect(Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.18f), Color.White.copy(alpha = 0f)), startY = 0f, endY = glow),
+        size = Size(w, glow))
+    drawRect(Color.White.copy(alpha = 0.5f), Offset.Zero, Size(w, 1.5f * k))
+}
+
+/** Доля размера иконки, на которую центр масс стрелки Ico.NAV смещён от центра: 1.67 / 24. */
+private const val NAV_MASS_SHIFT = 1.67f / 24f
+
+/**
+ * Круглая золотая линза навигации стеклянной рейки: диаметр rb, радиальный градиент из точки (32%, 24%) и блик сверху.
+ * Цвета - от акцента темы (при золоте #D4AF37 выходит близко к макету). Тап - как у [NavBlock].
+ */
+@Composable
+private fun NavLens(modifier: Modifier) {
+    val m = LocalMetrics.current
+    val s = m.spec
+    val accent = LocalAccent.current
+    val hi = androidx.compose.ui.graphics.lerp(accent, Color.White, 0.8f).copy(alpha = 0.95f)
+    val mid = androidx.compose.ui.graphics.lerp(accent, Color.White, 0.15f).copy(alpha = 0.88f)
+    val lo = androidx.compose.ui.graphics.lerp(accent, Color.Black, 0.2f).copy(alpha = 0.92f)
+    Pressable(
+        modifier.size(m.dp(s.rb)).clip(CircleShape).drawBehind {
+            // CSS circle at 32% 24%: радиус до дальнего угла
+            val at = Offset(size.width * 0.32f, size.height * 0.24f)
+            drawCircle(Brush.radialGradient(0f to hi, 0.38f to mid, 1f to lo, center = at, radius = size.width * 1.02f))
+            // внутренний блик сверху 2px: круг минус он же, сдвинутый вниз
+            val dy = 2f * s.t / 96f
+            val full = androidx.compose.ui.graphics.Path().apply {
+                addOval(androidx.compose.ui.geometry.Rect(0f, 0f, size.width, size.height))
+            }
+            val lower = androidx.compose.ui.graphics.Path().apply {
+                addOval(androidx.compose.ui.geometry.Rect(0f, dy, size.width, size.height + dy))
+            }
+            val crescent = androidx.compose.ui.graphics.Path.combine(androidx.compose.ui.graphics.PathOperation.Difference, full, lower)
+            drawPath(crescent, Color.White.copy(alpha = 0.7f))
+        },
+        description = stringResource(R.string.l_navigation), onTap = { LauncherActions.openNavigator() },
+        focusShape = CircleShape, ringColor = Color.White,
+    ) { pressed ->
+        if (pressed) Box(Modifier.matchParentSize().background(Color(0x33000000)))
+        Box(Modifier.matchParentSize(), contentAlignment = Alignment.Center) {
+            // центр масс стрелки Ico.NAV (13.67, 10.33) из 24 смещён вправо-вверх: сдвигаем на (-1.67, +1.67), иначе в круге она не по центру
+            // размер от диаметра линзы, а не icBig: в маленькой и средней рейке icBig почти во всю линзу (58 из 77)
+            SvgIcon(Ico.NAV, (s.rb * 0.52f).roundToInt(), Color(0xFF2A1E02), fill = true,
+                modifier = Modifier.graphicsLayer { translationX = -size.width * NAV_MASS_SHIFT; translationY = size.height * NAV_MASS_SHIFT })
+        }
     }
 }
 
@@ -241,7 +396,7 @@ private fun RailBackButton() {
 
 /** Лого: на главном - «Все приложения», на любом другом экране - домой; долгое нажатие - в меню ГУ (h1061). */
 @Composable
-private fun RailLogoButton() {
+private fun RailLogoButton(glass: Boolean = false) {
     val s = LocalMetrics.current.spec
     val accent = LocalAccent.current
     val logo = rememberPressAnim(1000)
@@ -249,12 +404,13 @@ private fun RailLogoButton() {
     val ctx = LocalContext.current
     RoundButton(s.rb, stringResource(if (home) R.string.l_all_apps else R.string.l_home), onTap = { LauncherActions.logo() },
         onLong = { BridgeService.requestHuDesktop(ctx) }, longMs = PressLogic.LONG_HU_EXIT_MS, onPress = logo::play) {
-        Box(Modifier.matchParentSize().drawBehind {
+        // в стекле золотого свечения за лого нет: он белый, как остальные значки
+        Box(Modifier.matchParentSize().then(if (glass) Modifier else Modifier.drawBehind {
             // как CSS circle farthest-corner: радиус 0.707 стороны, стопы 0 / 40% / 70%
             drawCircle(Brush.radialGradient(
                 0f to accent.copy(alpha = 0.6f), 0.4f to accent.copy(alpha = 0.25f), 0.7f to accent.copy(alpha = 0f),
                 center = center, radius = size.minDimension * 0.7071f))
-        }, contentAlignment = Alignment.Center) {
+        }), contentAlignment = Alignment.Center) {
             LogoIcon(s.logoIn, Pal.RAIL) { logo.progress }
         }
     }
@@ -294,11 +450,27 @@ private fun NavBlock(modifier: Modifier, shape: Shape) {
 /**
  * Нижняя рейка портрета (h921): слева панель цвета карточек с «Назад», лого, настройками, «Видом карточки» и громкостью
  * «−»/«+» (капсула), справа блок навигации шириной рейки. Скругление сверху, прибита к низу экрана.
+ * [glass] ([RailStyle.GLASS]): одна стеклянная полоса на всю ширину, навигация - золотая линза у правого края (ADR 0054).
  */
 @Composable
-private fun BottomRail() {
+private fun BottomRail(glass: Boolean) {
     val m = LocalMetrics.current
     val s = m.spec
+    if (glass) {
+        Row(Modifier.fillMaxWidth().height(m.dp(s.bottomRailH)).glassBottom(s.t / 96f).padding(horizontal = m.dp(s.g)),
+            verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+            RailBackButton()
+            RailLogoButton(glass = true)
+            RailGearButton()
+            CardViewButton(s.rb, s.ric, Color.Transparent, Pal.SEC2)
+            VolumeGroup()
+            // разделитель перед линзой, как в боковой стеклянной рейке
+            Box(Modifier.width(m.dp(maxOf(1, s.t / 96))).height(m.dp(s.rb * 3 / 4))
+                .background(Brush.verticalGradient(listOf(Color.Transparent, Color.White.copy(alpha = 0.4f), Color.Transparent))))
+            NavLens(Modifier)
+        }
+        return
+    }
     val r = m.dp(s.radius)
     val top = RoundedCornerShape(topStart = r, topEnd = r)
     Row(Modifier.fillMaxWidth().height(m.dp(s.bottomRailH)).padding(horizontal = m.dp(s.g)),
@@ -363,6 +535,7 @@ fun StatusBar(title: String? = null, showNet: Boolean = true) {
         return
     }
     DisposableEffect(Unit) { onDispose { model.statusBottom = null; model.statusBusyX = emptyList() } }
+    val glassStatus = homeGlassStyle
     // где на строке текст: полоска уведомлений встаёт над стыком плиток и наезжала на дату (Vezel, 08.11)
     var timeX by remember { mutableStateOf<ClosedFloatingPointRange<Float>?>(null) }
     var iconsX by remember { mutableStateOf<ClosedFloatingPointRange<Float>?>(null) }
@@ -379,16 +552,25 @@ fun StatusBar(title: String? = null, showNet: Boolean = true) {
                 val rtl = layoutDirection == LayoutDirection.Rtl
                 val left = if (rtl) s.padEnd else s.g
                 val right = if (rtl) s.g else s.padEnd
-                drawRect(bar, Offset(-left.toFloat(), -s.g8.toFloat()), Size(size.width + left + right, s.statusBandH.toFloat()))
+                if (!glassStatus) drawRect(bar, Offset(-left.toFloat(), -s.g8.toFloat()), Size(size.width + left + right, s.statusBandH.toFloat()))
+                // в стекле сплошной полосы нет: строка лежит прямо на фоне (Егор 20.11); вид в стекле решаем в макете
             }
             // строка по центру полосы: родитель опускает её на g8, полоса ниже строки на 3/4 g8
-            .offset(y = -m.dp(s.g8 / 4)),
+            .offset(y = -m.dp(s.g8 / 4))
+            // стекло, вариант Г (макет 20.11): полосы нет, текст и значки приглушены до 70%, чтобы не спорили с плитками
+            .then(if (glassStatus) Modifier.graphicsLayer { alpha = 0.7f } else Modifier),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(m.dp(s.g), Alignment.End),
     ) {
         // в узкой рейке часов нет: время слева, прижато к краю (перед заголовком, если он есть)
         if (s.clockInStatus) {
-            Txt(st.time, s.statusFs, Modifier.busy { timeX = it }, color = Pal.TEXT, weight = FontWeight.SemiBold, mono = true)
+            // 12 ч: «9:17 PM», AM/PM тем же кеглем, золотом (вариант J, Егор 16.11)
+            if (s.twelveHour) Ltr {
+                Row(Modifier.busy { timeX = it }, horizontalArrangement = Arrangement.spacedBy(m.dp(maxOf(4, s.statusFs / 4)))) {
+                    Txt(st.time, s.statusFs, color = Pal.TEXT, weight = FontWeight.SemiBold, mono = true)
+                    Txt(if (st.pm) "PM" else "AM", s.statusFs, color = LocalAccent.current, weight = FontWeight.SemiBold, mono = true)
+                }
+            } else Txt(st.time, s.statusFs, Modifier.busy { timeX = it }, color = Pal.TEXT, weight = FontWeight.SemiBold, mono = true)
             if (title == null) Spacer(Modifier.weight(1f))
         }
         // заголовок экрана у начала (слева; в RTL справа), статус у конца; сам ряд значков всегда слева направо (создан внутри Ltr)

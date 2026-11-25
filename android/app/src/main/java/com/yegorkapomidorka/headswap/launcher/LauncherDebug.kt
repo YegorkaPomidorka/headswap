@@ -40,6 +40,14 @@ internal object LauncherDebug {
                 "open" -> NotificationsRepo.openShade()
                 "close" -> NotificationsRepo.closeShade()
             }
+            // подмена времени плитки «Часы» для новогоднего отсчёта: --es now 2026-12-31T23:59:50 (сбросить: --es now off)
+            intent.getStringExtra("now")?.let { n ->
+                NewYearClock.shiftMs = if (n == "off") 0L else runCatching {
+                    java.time.Duration.between(java.time.LocalDateTime.now(), java.time.LocalDateTime.parse(n)).toMillis()
+                }.getOrDefault(0L)
+            }
+            // набор цветов для снимков стенда: --es preset default|tree|new_year (как тап по «Готовым»)
+            intent.getStringExtra("preset")?.let { id -> ColorPreset.ALL.firstOrNull { it.id == id }?.let(model::applyPreset) }
             AppLog.i("LAUNCHER debug: экран=${model.area} раздел=${model.settingsPage} тема=${model.theme} карта слева=${model.mapLeft}", false)
         }
     }

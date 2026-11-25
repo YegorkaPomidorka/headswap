@@ -48,8 +48,8 @@ enum class CarPreset(val titleRes: Int, val settings: CarSettings = CarSettings(
     HONDA_CRV_2026_HYBRID(R.string.car_honda_crv_2026_hybrid, CarSettings(
         transcode = true, videoMode = VideoMode.WIDE_HD, fps = FpsSetting.FPS30, desktopFps = FpsSetting.FPS30,
         limitedRange = true, crvDesktopPacing = true)),
-    /** Машина Егора: 1920×1080, 30 кадров. */
-    HONDA_VEZEL_2022(R.string.car_honda_vezel_2022, CarSettings(videoMode = VideoMode.R1080)),
+    /** Машина Егора: 1280×720. */
+    HONDA_VEZEL_2022(R.string.car_honda_vezel_2022, CarSettings(videoMode = VideoMode.R720)),
     /** ГУ CN7: прямой проброс моргает и гаснет (h638), канал слабый - перекодирование 1280×480 на 15 кадрах. */
     HYUNDAI_ELANTRA_7(R.string.car_hyundai_elantra_7, KOREAN.copy(transcode = true, videoMode = VideoMode.WIDE, fps = FpsSetting.FPS15)),
     /** HSAE, вертикальный экран: 1280×480 работает шустро (h86). */
@@ -71,6 +71,8 @@ enum class CarPreset(val titleRes: Int, val settings: CarSettings = CarSettings(
     SKODA_KAMIQ_GT_2021(R.string.car_skoda_kamiq_gt_2021),
     /** CNS3 просит 2:1, 1280×640 (h292); на 1080p виснет (h305). */
     SKODA_OCTAVIA_PRO(R.string.car_skoda_octavia_pro, CarSettings(videoMode = VideoMode.WIDE_2_1)),
+    /** Экран 1280×720: всё по умолчанию (Егор, 22.11). */
+    TOYOTA_BZ4X(R.string.car_toyota_bz4x),
     /** HSAE 21070007, 1920×720 (h420): энкодер Xiaomi на 1920×720 падает, ГУ игнорирует кроп SPS и берёт верхние 720 строк - прямой проброс с полями снизу. */
     TOYOTA_COROLLA_CROSS_2024(R.string.car_toyota_corolla_cross_2024, CarSettings(videoMode = VideoMode.WIDE_HD)),
     TOYOTA_LEVIN(R.string.car_toyota_levin),

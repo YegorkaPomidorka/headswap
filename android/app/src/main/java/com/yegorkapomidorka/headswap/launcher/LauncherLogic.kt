@@ -115,12 +115,27 @@ object NavigatorPick {
     const val GOOGLE_MAPS = "com.google.android.apps.maps"
     const val DGIS = "ru.dublgis.dgismobile"
     const val WAZE = "com.waze"
+    /** Amap (高德地图), телефонный; идея из форка TNTfish/headswap. */
+    const val AMAP = "com.autonavi.minimap"
+    /** Amap Auto (高德地图车机版), версия для ГУ; ставится на телефон отдельно от [AMAP]. */
+    const val AMAP_AUTO = "com.autonavi.amapauto"
     val KNOWN = listOf(YANDEX_NAVI, YANDEX_MAPS, DGIS,
         GOOGLE_MAPS, WAZE, "app.organicmaps")
-    /** Арабский интерфейс (h1003): только Google Карты и Waze, Яндекса и 2ГИС нет ни в выборе, ни по умолчанию. */
+    /** Арабский и французский интерфейс (h1003): только Google Карты и Waze, Яндекса и 2ГИС нет ни в выборе, ни по умолчанию. */
     val KNOWN_AR = listOf(GOOGLE_MAPS, WAZE)
+    /** Китайский интерфейс: только Amap и Amap Auto, Google и Waze в Китае не работают (Егор 16.11). */
+    val KNOWN_ZH = listOf(AMAP, AMAP_AUTO)
 
-    fun known(arabic: Boolean): List<String> = if (arabic) KNOWN_AR else KNOWN
+    /** Плитки раздела «Навигатор» в порядке показа, по две в ряд; больше четырёх не влезает в пять рядов настроек. */
+    val TILES = listOf(YANDEX_NAVI, DGIS, YANDEX_MAPS, GOOGLE_MAPS)
+
+    /** [chinese] - китайский интерфейс, он же глобальный ([arabic] тогда тоже true, но решает [chinese]). */
+    fun known(arabic: Boolean, chinese: Boolean = false): List<String> = when {
+        chinese -> KNOWN_ZH
+        arabic -> KNOWN_AR
+        else -> KNOWN
+    }
+    fun tiles(arabic: Boolean, chinese: Boolean = false): List<String> = if (arabic || chinese) known(arabic, chinese) else TILES
 
     /** Машинная часть только с подпиской Яндекс Плюс (у Карт тот же NavigationCarAppService, что у Навигатора). */
     fun needsPlus(pkg: String?): Boolean = pkg == YANDEX_NAVI || pkg == YANDEX_MAPS
@@ -136,8 +151,9 @@ object NavigatorPick {
      * Подсказок на приборке нет совсем - только окно (h1003, стенд 09.11). Waze: свой хост Car App не пускает (HostValidator
      * со списком подписей gearhead, TEMPLATE_RENDERER засчитывает лишь на AAOS), а при теневой AA телефонный Waze уходит
      * в режим «на экране машины» - список манёвров без карты, и манёвров в AA не шлёт (навигатор AA - Google Карты).
+     * Amap и Amap Auto: машинной части Car App у них нет, без тумблера наш хост Car App их и не пробует.
      */
-    fun noHints(pkg: String?): Boolean = pkg == WAZE
+    fun noHints(pkg: String?): Boolean = pkg == WAZE || pkg == AMAP || pkg == AMAP_AUTO
 
     /**
      * Теневая AA нужна только Google Картам с включёнными подсказками: свой хост Car App они не пускают, а манёвры AA
@@ -147,11 +163,15 @@ object NavigatorPick {
     fun shadowWanted(metaNavi: Boolean, navPkg: String?, hints: (String) -> Boolean): Boolean =
         metaNavi && navPkg == GOOGLE_MAPS && hints(navPkg)
 
-    fun defaultFor(installed: Set<String>, arabic: Boolean = false): String? = known(arabic).firstOrNull { it in installed }
+    fun defaultFor(installed: Set<String>, arabic: Boolean = false, chinese: Boolean = false): String? =
+        known(arabic, chinese).firstOrNull { it in installed }
 
-    /** Сохранённый, пока он установлен (в арабском - только из [KNOWN_AR]); иначе по умолчанию. null - выбрать нечего. */
-    fun effective(saved: String?, installed: Set<String>, arabic: Boolean = false): String? =
-        saved?.takeIf { it in installed && (!arabic || it in KNOWN_AR) } ?: defaultFor(installed, arabic)
+    /**
+     * Сохранённый, пока он установлен (в арабском - только из [KNOWN_AR], в китайском - из [KNOWN_ZH]); иначе по умолчанию.
+     * null - выбрать нечего.
+     */
+    fun effective(saved: String?, installed: Set<String>, arabic: Boolean = false, chinese: Boolean = false): String? =
+        saved?.takeIf { it in installed && (!(arabic || chinese) || it in known(arabic, chinese)) } ?: defaultFor(installed, arabic, chinese)
 }
 
 /** Ответы taskState дочернего дисплея и решения по ним (EmbedHost): что делать после Back и при повторном показе. */
@@ -218,6 +238,72 @@ object BackNav {
 
     /** Серый «Назад» - только на главном: идти некуда. */
     fun enabled(current: Area): Boolean = current != Area.Home
+}
+
+/**
+ * Плашка плеера поверх навигатора на весь экран (ADR 0063, макет «Плеер поверх навигатора»): когда видна и где стоит
+ * по горизонтали. Размеры - px макета 1280x720 ([k] переводит в px экрана).
+ */
+object NavPlayerPlate {
+    enum class Look { HIDDEN, FULL }
+
+    /**
+     * Во сколько раз плашка крупнее макета 340x72: на Vezel x1 мелко, x2,5 огромная (Егор 24.11). x1,4 - ширина 476
+     * ровно в промежутке между левой и правой панелями навигатора на Vezel.
+     */
+    const val SCALE = 1.4f
+    const val W = 476
+    const val H = 101
+    /** Отступ снизу места по умолчанию: справа от левой нижней панели навигатора (Егор 24.11), дальше тащит сам. */
+    const val BOTTOM = 19
+
+    /**
+     * Место, куда плашку перетащили (долгое нажатие и тащить): доли свободного хода по x и y, 0..1, чтобы место
+     * пережило другой размер экрана и ширину рейки. Хранится по пакету навигатора: у каждого свои панели.
+     */
+    data class Pos(val fx: Float, val fy: Float) {
+        fun save(): String = "$fx,$fy"
+        companion object {
+            fun restore(s: String?): Pos? {
+                val p = s?.split(',')?.mapNotNull { it.toFloatOrNull() } ?: return null
+                return if (p.size == 2) Pos(p[0].coerceIn(0f, 1f), p[1].coerceIn(0f, 1f)) else null
+            }
+        }
+    }
+
+    /** Левый верхний угол плашки в области (px экрана): сохранённое место [pos] или по умолчанию снизу в промежутке. */
+    fun origin(pos: Pos?, areaW: Int, areaH: Int, plateW: Int, plateH: Int, k: Float): Pair<Int, Int> {
+        val roomX = (areaW - plateW).coerceAtLeast(0)
+        val roomY = (areaH - plateH).coerceAtLeast(0)
+        if (pos == null) return left(areaW, plateW, k).coerceAtMost(roomX) to (roomY - (BOTTOM * k).toInt()).coerceAtLeast(0)
+        return (pos.fx * roomX).toInt() to (pos.fy * roomY).toInt()
+    }
+
+    /** Отпустили плашку с левым верхним углом [x], [y] - доли для [Pos], за край области не выходит. */
+    fun pos(x: Float, y: Float, areaW: Int, areaH: Int, plateW: Int, plateH: Int): Pos {
+        val roomX = (areaW - plateW).coerceAtLeast(1)
+        val roomY = (areaH - plateH).coerceAtLeast(1)
+        return Pos((x / roomX).coerceIn(0f, 1f), (y / roomY).coerceIn(0f, 1f))
+    }
+    /** Левые нижние панели навигаторов (маршрут ЯН, 2ГИС, шторка Google Карт) кончаются ~515 px от края области. */
+    const val LEFT_PANEL = 515
+    /** Правая колонка кнопок Google Карт, «Сообщить» и мини-карта 2ГИС занимают ~145 px от правого края. */
+    const val RIGHT_PANEL = 145
+
+    fun look(
+        navArea: Boolean, navReady: Boolean, carHost: Boolean, access: Boolean, hasSession: Boolean,
+        ringing: Boolean, alice: Boolean,
+    ): Look = if (!navArea || !navReady || carHost || !access || !hasSession || ringing || alice) Look.HIDDEN else Look.FULL
+
+    /**
+     * Левый край плашки шириной [plateW] от начала области шириной [areaW] (px экрана): по центру промежутка между левыми
+     * и правыми панелями навигаторов; промежуток уже плашки - прижать к правой панели, не залезая за начало области.
+     */
+    fun left(areaW: Int, plateW: Int, k: Float): Int {
+        val from = (LEFT_PANEL * k).toInt()
+        val to = areaW - (RIGHT_PANEL * k).toInt()
+        return if (to - from >= plateW) from + (to - from - plateW) / 2 else (to - plateW).coerceAtLeast(0)
+    }
 }
 
 /**

@@ -16,6 +16,8 @@
     <string name="dev_meta_time_sub">int32 time حتى المناورة، بالثواني (مثل apollo-DuerOS)</string>
     <string name="dev_meta_progress_title">التقدّم بالثواني</string>
     <string name="dev_meta_progress_sub">MEDIA_PROGRESS_BAR بالثواني بدل المللي ثانية (إذا عرضت شاشة السيارة قيمة أكبر 1000 مرة)</string>
+    <string name="dev_meta_art16k_title">غلاف المقطع بحد أقصى 16 كيلوبايت</string>
+    <string name="dev_meta_art16k_sub">للوحات العدادات التي لا تعرض الغلاف (مثل Honda CR-V 2026، SEMIDRIVE X9). جودة أقل على شاشة السيارة</string>
 
     <string name="dev_section_music_chunk">حجم حزمة الموسيقى (تجريبي)</string>
     <string name="dev_music_chunk_note">كلما صغر الحجم صغرت الذاكرة المؤقتة في شاشة السيارة وزادت الحزم عبر USB. إذا تقطّع الصوت، فارجع إلى «كما يرسله Android Auto»</string>
@@ -23,6 +25,8 @@
     <string name="dev_voice_chunk_note">ردود المساعد وتنبيهات الملاحة. تلقائي: 1024 B على VW CNS2 Delphi، وفي غيره كما يرسله AA</string>
     <string name="dev_section_tts_preroll">صمت قبل التنبيه (تجريبي)</string>
     <string name="dev_tts_preroll_note">أصفار بعد بدء التنبيه لتتمكّن شاشة السيارة من فتح مسار الصوت. تلقائي: 400 مللي ثانية على VW</string>
+    <string name="dev_section_nav_channel">قناة تنبيهات الملاحة (تجريبي)</string>
+    <string name="dev_nav_channel_note">VR: تذهب التنبيهات إلى قناة الصوت دون NAVI=1، وقد تحوّل شاشة السيارة أزرار الصوت إلى «الصوت». TTS: كما كان. يسري من التنبيه التالي</string>
     <string name="dev_section_touch_decimation">تقليل أحداث اللمس (تجريبي)</string>
     <string name="dev_touch_decimation_note">تخطّي كل حدث MOVE ثانٍ: ترسل شاشة السيارة حتى ~70 حدثًا في الثانية، والفيديو يعمل حتى 30 FPS. آخر نقطة قبل رفع الإصبع لا تُفقد أبدًا.</string>
 

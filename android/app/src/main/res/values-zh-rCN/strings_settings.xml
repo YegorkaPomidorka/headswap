@@ -185,6 +185,10 @@
     <string name="tpreroll_200">200 毫秒</string>
     <string name="tpreroll_400">400 毫秒</string>
 
+    <!-- 导航提示通道（NavChannel） -->
+    <string name="navch_vr">VR（语音通道）</string>
+    <string name="navch_tts">TTS（导航通道）</string>
+
     <!-- 触摸抽样（TouchDecimation） -->
     <string name="tdec_off">关闭</string>
     <string name="tdec_x2">×2</string>
@@ -256,6 +260,7 @@
     <string name="car_skoda_kamiq_gt_2021">斯柯达 柯米克 GT 2021款</string>
     <string name="car_skoda_octavia_pro">斯柯达 明锐 Pro</string>
     <string name="car_toyota_corolla_cross_2024">丰田 锋兰达 2024–2025款</string>
+    <string name="car_toyota_bz4x">丰田 bZ4X</string>
     <string name="car_toyota_levin">丰田 雷凌</string>
     <string name="car_toyota_rav4_2025">丰田 RAV4荣放 2025款</string>
     <string name="car_vw_bora_2021">大众 宝来 2021款</string>
@@ -295,4 +300,12 @@
     <string name="about_author_ildar">Ildar Sadykov</string>
     <string name="about_open_project">项目主页</string>
     <string name="about_license_unavailable">许可证文本不可用。请查看项目主页。</string>
+    <string name="set_video_range_title">色彩范围</string>
+    <string name="set_video_range_auto">自动</string>
+    <string name="set_video_range_limited">有限（16–235）</string>
+    <string name="set_video_range_full">全范围（0–255）</string>
+    <string name="set_video_range_note">“自动”对本田 CR-V 2026 / CR-V 2026 混动预设使用有限范围（16–235），其他车型沿用原视频流；手动选择对所有车型生效。下次连接时生效。</string>
+    <string name="dongle_start">等待 USB 转 Wi-Fi 适配器</string>
+    <string name="dongle_stop">停止等待适配器</string>
+    <string name="dongle_note">将适配器插入车机 USB 口，手机开启 2.4 GHz 热点</string>
 </resources>

@@ -106,7 +106,6 @@ object CarAppHost {
      * [topPx] полоса сверху. null - по умолчанию ([CarAreas.default]).
      */
     fun setAreas(leftPx: Int, rightPx: Int, topPx: Int) { h.post { areas = Triple(leftPx, rightPx, topPx); push() } }
-    fun clearAreas() { h.post { areas = null; push() } }
 
     /**
      * Карточка на главном показывает вырезку [crop] полноэкранной поверхности 1:1; null - навигатор на весь экран.
@@ -130,8 +129,8 @@ object CarAppHost {
     /** Сохранённый «Масштаб карты» навигатора (пакет -> множитель); берётся при старте сессии. */
     @Volatile var scaleFor: ((String) -> Float)? = null
 
-    /** Касание окна навигатора, координаты уже в поверхности. */
-    fun touch(action: Int, x: Float, y: Float) { h.post { session?.touch(action, x, y) } }
+    /** Касание окна навигатора: все пальцы, координаты уже в поверхности; [index] - палец POINTER_DOWN/UP. */
+    fun touch(action: Int, index: Int, xs: FloatArray, ys: FloatArray) { h.post { session?.touch(action, index, xs, ys) } }
 
     /** «Назад» хоста: приложение само решает, что закрыть. */
     fun back() { h.post { session?.back() } }

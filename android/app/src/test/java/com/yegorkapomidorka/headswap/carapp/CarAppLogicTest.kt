@@ -133,4 +133,57 @@ class CarAppLogicTest {
         assertNull(t.feed(2, 10f, 10f))   // MOVE без DOWN
         assertNull(t.feed(0, 1f, 1f)); assertNull(t.feed(3, 1f, 1f)); assertNull(t.feed(1, 1f, 1f))
     }
+
+    private fun f(vararg v: Float) = v
+
+    @Test fun pinchIsScaleRelativeToPreviousEventAndNoClickAfter() {
+        val t = CarTouch()
+        assertNull(t.feed(0, 0, f(100f), f(100f)))
+        assertNull(t.feed(5, 1, f(100f, 200f), f(100f, 100f)))          // span 100
+        assertEquals(CarTouch.Scale(160f, 100f, 1.2f), t.feed(2, 0, f(100f, 220f), f(100f, 100f)))  // 120/100
+        val s = t.feed(2, 0, f(100f, 160f), f(100f, 100f)) as CarTouch.Scale                  // 60/120
+        assertEquals(0.5f, s.factor, 1e-4f)
+        assertNull(t.feed(6, 1, f(100f, 160f), f(100f, 100f)))
+        assertNull(t.feed(1, 0, f(100f), f(100f)))                       // после щипка не клик
+    }
+
+    @Test fun remainingFingerAfterPointerUpDoesNotJump() {
+        val t = CarTouch()
+        t.feed(0, 0, f(100f), f(100f))
+        t.feed(5, 1, f(100f, 300f), f(100f, 100f))
+        t.feed(2, 0, f(100f, 320f), f(100f, 100f))
+        assertNull(t.feed(6, 0, f(100f, 320f), f(100f, 100f)))           // поднят первый, остался (320,100)
+        assertNull(t.feed(2, 0, f(325f), f(100f)))                       // в пределах SLOP от оставшегося
+        assertEquals(CarTouch.Scroll(-25f, 0f), t.feed(2, 0, f(345f), f(100f)))  // от (320,100), без рывка к 100
+    }
+
+    @Test fun secondFingerOnTopOfFirstWaitsForRealSpan() {
+        val t = CarTouch()
+        t.feed(0, 0, f(100f), f(100f))
+        assertNull(t.feed(5, 1, f(100f, 100f), f(100f, 100f)))           // жестовый режим: палец в той же точке
+        assertNull(t.feed(2, 0, f(100f, 150f), f(100f, 100f)))           // первая настоящая дистанция - якорь
+        assertEquals(CarTouch.Scale(137.5f, 100f, 1.5f), t.feed(2, 0, f(100f, 175f), f(100f, 100f)))
+    }
+
+    @Test fun doubleTapZoomsInOnlyWithinTimeAndDistance() {
+        var clock = 1000L
+        val t = CarTouch { clock }
+        t.feed(0, 50f, 50f); assertEquals(CarTouch.Click(50f, 50f), t.feed(1, 50f, 50f))
+        clock += 200
+        t.feed(0, 55f, 52f); assertEquals(CarTouch.Scale(55f, 52f, CarTouch.DOUBLE_TAP_ZOOM), t.feed(1, 55f, 52f))
+        clock += 200                                                       // третий тап - снова обычный клик
+        t.feed(0, 55f, 52f); assertEquals(CarTouch.Click(55f, 52f), t.feed(1, 55f, 52f))
+        clock += 500                                                       // поздно
+        t.feed(0, 55f, 52f); assertEquals(CarTouch.Click(55f, 52f), t.feed(1, 55f, 52f))
+        clock += 100                                                       // далеко
+        t.feed(0, 300f, 52f); assertEquals(CarTouch.Click(300f, 52f), t.feed(1, 300f, 52f))
+    }
+
+    @Test fun cancelDropsPinch() {
+        val t = CarTouch()
+        t.feed(0, 0, f(100f), f(100f))
+        t.feed(5, 1, f(100f, 200f), f(100f, 100f))
+        assertNull(t.feed(3, 0, f(100f, 200f), f(100f, 100f)))
+        assertNull(t.feed(2, 0, f(100f, 300f), f(100f, 100f)))           // MOVE после CANCEL - мимо
+    }
 }

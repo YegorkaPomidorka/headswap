@@ -64,6 +64,13 @@
     <string name="l_phone_talk">Разговор %1$s</string>
     <string name="l_phone_calling">Вызов…</string>
     <string name="l_phone_none">Звонков нет</string>
+    <string name="l_call_hidden">Звонок</string>
+    <plurals name="l_missed_hidden">
+        <item quantity="one">%d вызов</item>
+        <item quantity="few">%d вызова</item>
+        <item quantity="many">%d вызовов</item>
+        <item quantity="other">%d вызовов</item>
+    </plurals>
     <string name="l_phone_grant">Разрешите на телефоне</string>
     <string name="l_call_back">Перезвонить</string>
     <string name="l_call">Позвонить</string>
@@ -120,7 +127,7 @@
     <string name="l_s_theme_auto">Авто</string>
     <string name="l_s_theme_sub">Авто — по фарам</string>
     <string name="l_s_colors">Цвета</string>
-    <string name="l_s_colors_sub">Акцент и фон, отдельно ночью и днём</string>
+    <string name="l_s_colors_sub">Акцент, фон и обои</string>
     <string name="l_s_colors_night">Ночные</string>
     <string name="l_s_colors_day">Дневные</string>
     <string name="l_s_colors_reset">Сбросить</string>
@@ -128,7 +135,26 @@
     <string name="l_s_colors_bg_hue">Оттенок фона</string>
     <string name="l_s_colors_bg_sat">Насыщенность фона</string>
     <string name="l_s_colors_hint">Пока открыт этот экран, стол показывает настраиваемые цвета. Ночные видны в тёмной теме, дневные — в светлой.</string>
-    <string name="l_s_rail">Боковая панель</string>
+    <string name="l_s_colors_presets">Пресеты</string>
+    <string name="l_s_preset_default">Как было</string>
+    <string name="l_s_preset_tree">Ёлка</string>
+    <string name="l_s_preset_new_year">Новогодний</string>
+    <string name="l_ny_countdown">До Нового года</string>
+    <string name="l_ny_greeting">С Новым %1$s годом!</string>
+    <string name="l_s_wallpaper">Обои</string>
+    <string name="l_s_wallpaper_sub_glass">Под стеклом на всём столе</string>
+    <string name="l_s_wallpaper_sub_solid">Работают только в стиле «Стекло»</string>
+    <string name="l_s_wallpaper_none">Без обоев</string>
+    <string name="l_s_wallpaper_headswap">Headswap</string>
+    <string name="l_s_wallpaper_mountains">Горы</string>
+    <string name="l_s_wallpaper_tree">Ёлка</string>
+    <string name="l_s_wallpaper_winter_road">Дорога</string>
+    <string name="l_s_wallpaper_custom">Своё фото</string>
+    <string name="l_s_wallpaper_gallery">Галерея</string>
+    <string name="l_s_wallpaper_blur">Размытие</string>
+    <string name="l_s_wallpaper_dim">Затемнение</string>
+    <string name="l_wallpaper_set">Обои установлены</string>
+    <string name="l_wallpaper_failed">Не получилось поставить обои</string>
     <string name="l_s_rail_bottom">Нижняя панель</string>
     <string name="l_s_layout_tile_top">Плитка сверху</string>
     <string name="l_s_layout_music_top">Музыка сверху</string>
@@ -138,6 +164,14 @@
     <string name="l_s_rail_cut">Обрезанная</string>
     <string name="l_s_anim">Анимации кнопок</string>
     <string name="l_s_battery">Заряд телефона</string>
+    <string name="l_s_clock12">12-часовой формат</string>
+    <string name="l_s_rail_size">Размер панели</string>
+    <string name="l_s_rail_style">Стиль</string>
+    <string name="l_s_style_solid">Сплошная</string>
+    <string name="l_s_style_glass">Стекло</string>
+    <string name="l_s_date">Дата</string>
+    <string name="l_s_date_dmy">ДД.ММ</string>
+    <string name="l_s_date_mdy">ММ.ДД</string>
     <string name="l_s_map_scale">Масштаб карты</string>
     <string name="l_s_map_scale_sub">Только для %1$s · меняется сразу</string>
     <string name="l_s_scale_smaller">Мельче</string>
@@ -168,6 +202,8 @@
     <string name="l_nav_2gis">2ГИС</string>
     <string name="l_nav_yandex_maps">Яндекс Карты</string>
     <string name="l_nav_google_maps">Google Карты</string>
+    <string name="l_nav_amap">Amap</string>
+    <string name="l_nav_amap_auto">Amap Auto</string>
     <!-- навигатор на своём хосте Car App -->
     <string name="l_u_m">м</string>
     <string name="l_u_km">км</string>
@@ -185,6 +221,8 @@
     <string name="l_s_alice_voice">Алиса только голосом</string>
     <string name="l_s_alice_voice_on">Окна нет, снизу плашка; работает и на заблокированном телефоне</string>
     <string name="l_s_alice_voice_off">Алиса в панели слева на экране</string>
+    <string name="l_s_hide_caller">Скрывать номера</string>
+    <string name="l_s_hide_caller_sub">Кто звонит — только в «Вызовах»</string>
     <string name="l_notif_show_all">Уведомления: %1$d. Показать все</string>
     <string name="l_notif_collapse">Свернуть уведомления</string>
     <string name="l_notif_clear_all">Очистить всё</string>

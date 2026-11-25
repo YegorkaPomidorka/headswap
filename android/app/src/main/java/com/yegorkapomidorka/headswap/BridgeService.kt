@@ -1012,7 +1012,7 @@ class BridgeService : Service() {
         val screenOn = getSystemService(PowerManager::class.java).isInteractive
         val cfg = SessionConfig(
             screenOn, aaPrefs.micVrStatus, aaPrefs.fpsSetting,
-            metaMusic = aaPrefs.metaMusic, metaNavi = aaPrefs.metaNavi, naviField6 = aaPrefs.naviField6,
+            metaMusic = aaPrefs.metaMusic, metaArt16k = aaPrefs.metaArt16k, metaNavi = aaPrefs.metaNavi, naviField6 = aaPrefs.naviField6,
         )
         MetaRelay.PROGRESS_UNIT = if (aaPrefs.progressSeconds) 1 else 1000
         applyVideoTime(aaPrefs)
@@ -1137,8 +1137,9 @@ class BridgeService : Service() {
         val screenOn = getSystemService(PowerManager::class.java).isInteractive
         val cfg = SessionConfig(
             screenOn, false, dexPrefs.desktopFps,
-            // ПРОБНИК: навигация из теневой AA-сессии (AaShadowNav), без неё подписку ГУ просто никто не кормит
-            metaMusic = false, metaNavi = aaPrefs.metaNavi, naviField6 = aaPrefs.naviField6, desktopVideo = desktopVideo,
+            // ПРОБНИК: навигация из теневой AA-сессии (AaShadowNav), без неё подписку ГУ просто никто не кормит.
+            // Музыку кормит DesktopMediaMeta из MediaSession (h1054); с false MEDIA_INFO резался в sendMediaInfo
+            metaMusic = aaPrefs.metaMusic, metaArt16k = aaPrefs.metaArt16k, metaNavi = aaPrefs.metaNavi, naviField6 = aaPrefs.naviField6, desktopVideo = desktopVideo,
         )
         MetaRelay.PROGRESS_UNIT = if (aaPrefs.progressSeconds) 1 else 1000
         applyVideoTime(aaPrefs)
@@ -1166,7 +1167,6 @@ class BridgeService : Service() {
         val owner: BridgeHost = h
         // темп кадров CarLife, повтор статичных кадров и энкодер остаются как в основном видеоконвейере
         owner.core.transcodeEnabled = true
-        owner.core.desktopTranscode = dexPrefs.desktopTranscode
         owner.core.videoLimitedRange = dexPrefs.effectiveLimitedRange(aaPrefs.carPreset)
         owner.core.crvDesktopPacing = aaPrefs.carPreset?.settings?.crvDesktopPacing == true
         owner.core.spliceMs = 0L
@@ -1182,11 +1182,12 @@ class BridgeService : Service() {
         session = s
         // tcp-debug (эмулятор ГУ) и свисток (usb-tcp) для ГУ тот же USB-аксессуар: звук и захват рабочего стола как по кабелю
         val audioUsb = transport.caps.usbLike
-        DesktopMusicPlayback.attach(applicationContext, this, s, audioUsb,
-            ready = { session === s && DexState.running && s.hasFreshDesktopVideo() },
-            audioReady = { !DexPrefs(this).usbPlaybackAudio || !owner.core.audioViaUsb || DesktopAudioState.running })
         // h658: по Wi-Fi (tcp6) звук CarLife в режиме AA ходит, а BT A2DP ГУ рвёт сама — захват рабочего стола тоже пускаем в tcp6
         val desktopAudioLink = audioUsb || transport.caps === TransportCaps.TCP6
+        // h1407: пауза плеера при обрыве нужна и по Wi-Fi — там звук тоже идёт через захват
+        DesktopMusicPlayback.attach(applicationContext, this, s, desktopAudioLink,
+            ready = { session === s && DexState.running && s.hasFreshDesktopVideo() },
+            audioReady = { !DexPrefs(this).usbPlaybackAudio || !owner.core.audioViaUsb || DesktopAudioState.running })
         desktopAudio.attach(owner.core, desktopAudioLink) { session === s && s.canCaptureDesktopAudio() }
         s.start()
         owner.onUsbSessionStarted()
@@ -1215,6 +1216,8 @@ class BridgeService : Service() {
             core.mapHomeKey = true
             core.desktopInputEnabled = true
             core.volumeSwipeProvider = { aaPrefs.volumeSwipe }
+            core.railHiddenProvider = { DesktopKeys.rail?.hidden() }
+            core.railToggle = { hide -> DesktopKeys.rail?.setHidden(hide) }
             DesktopNavHints.target = core   // подсказки навигатора рабочего стола (свой хост Car App, теневая AA) в MetaRelay
             com.yegorkapomidorka.headswap.dex.DesktopMediaMeta.start(this, core)   // трек плеера телефона на приборку (h1054)
             // в машине adb нет: стартуем вместе с рабочим столом; у навигатора выключены подсказки на приборке - AA не трогаем (h800).
@@ -1223,9 +1226,13 @@ class BridgeService : Service() {
             val lp = com.yegorkapomidorka.headswap.launcher.LauncherPrefs(this)
             val pick = com.yegorkapomidorka.headswap.launcher.NavigatorPick
             val arabic = AppLocale.usesGlobalApps(this)
-            val installed = pick.known(arabic).filterTo(HashSet()) { packageManager.getLaunchIntentForPackage(it) != null }
-            if (pick.shadowWanted(aaPrefs.metaNavi, pick.effective(lp.navigator, installed, arabic), lp::navHints)) AaShadowNav.start(this)
+            val chinese = AppLocale.usesChineseApps(this)
+            val installed = pick.known(arabic, chinese).filterTo(HashSet()) { packageManager.getLaunchIntentForPackage(it) != null }
+            if (pick.shadowWanted(aaPrefs.metaNavi, pick.effective(lp.navigator, installed, arabic, chinese), lp::navHints)) AaShadowNav.start(this)
             else if (aaPrefs.metaNavi) AppLog.i("SHADOWNAV не стартую: у навигатора выключены подсказки на приборке", false)
+            core.voiceChunkProvider = { aaPrefs.voiceChunk }
+            core.ttsPrerollProvider = { aaPrefs.ttsPreroll }
+            core.navChannelProvider = { aaPrefs.navChannel }   // h1318: голос навигатора лаунчера (nav-микс) -> VR/TTS
             core.touchDecimationProvider = { aaPrefs.touchDecimation }
             core.dupDownFilterProvider = { aaPrefs.dupDownFilter }
             core.transcodeEnabled = true
@@ -1298,7 +1305,9 @@ class BridgeService : Service() {
         DesktopNavHints.target = null
         com.yegorkapomidorka.headswap.dex.DesktopMediaMeta.stop()
         val recovery = pendingDesktopRecovery
-        if (recovery != null && recovery.owner === owner && desktopRecovery.isCurrent(recovery.attempt)) {
+        val recovering = recovery != null && recovery.owner === owner && desktopRecovery.isCurrent(recovery.attempt)
+        if (!recovering) owner.core.dispose()      // recoverDesktop переиспользует ядро этого хоста
+        if (recovery != null && recovering) {
             // колбэк подтверждает закрытие и привилегированного производителя, и энкодера с Surface
             DexState.error = null
             DexState.status = getString(R.string.desk_recovering, recovery.attempt.number)
@@ -1308,25 +1317,31 @@ class BridgeService : Service() {
     }
 
     private fun recoverDesktop(recovery: Recovery) {
-        if (pendingDesktopRecovery !== recovery || !desktopRecovery.consume(recovery.attempt)) return
+        // ядро хоста держали ради восстановления: не вышло - гасим его нити
+        if (!tryRecoverDesktop(recovery)) recovery.owner.core.dispose()
+    }
+
+    private fun tryRecoverDesktop(recovery: Recovery): Boolean {
+        if (pendingDesktopRecovery !== recovery || !desktopRecovery.consume(recovery.attempt)) return false
         pendingDesktopRecovery = null
-        if (host != null || session !== recovery.session || !recovery.owner.isTornDown) return
+        if (host != null || session !== recovery.session || !recovery.owner.isTornDown) return false
         // после паузы проверяем заново: Стоп, отключение, отозванный доступ, смерть сервера или блокировка отменяют восстановление
         if (!canRecoverDesktop(recovery.session)) {
             DexState.error = getString(R.string.desk_recovery_stopped)
             AppLog.i("DESKTOP recovery cancelled: current session/access no longer eligible", false)
-            return
+            return false
         }
         val core = recovery.owner.core
         if (!core.rearmDesktopSurfaceAfterStop()) {
             DexState.error = getString(R.string.desk_recovery_screen_busy)
-            return
+            return false
         }
         val replacement = createDesktopHost(AaPrefs(this), core.videoMode, core.densityOverride,
-            previous = recovery.owner, recoveredCore = core) ?: return
+            previous = recovery.owner, recoveredCore = core) ?: return false
         host = replacement
         AppLog.i("DESKTOP recovery bind attempt=${recovery.attempt.number}/2; fresh producer and encoder generation", false)
         replacement.onUsbSessionStarted()
+        return true
     }
 
     private fun cancelDesktopRecovery() {
@@ -1339,8 +1354,10 @@ class BridgeService : Service() {
         if (!stopRequested && s.transportKind == TransportCaps.USB_AOA.kind) {
             observePhysicalUsbDetach("USB session closed and accessory absent")
         }
+        // h1407/h1408: пауза до снятия захвата — иначе музыка сразу уходит в динамик телефона
+        DesktopMusicPlayback.linkClosed(s, capturing = DesktopAudioState.running, stopRequested = stopRequested,
+            physicalUsb = s.transportKind == TransportCaps.USB_AOA.kind)
         desktopAudioImpl?.detach()
-        DesktopMusicPlayback.linkClosed(s)
         cancelDesktopRecovery()
     }
 
@@ -1360,7 +1377,14 @@ class BridgeService : Service() {
             AaState.cert = loaded.creds.certSet + if (loaded.error != null) " (ОТКАТ с ${loaded.requested})" else ""
             AaState.status = "мост: старт"
             val log = { line: String, ui: Boolean -> AppLog.i(line, ui) }
-            val core = AaBridgeCore(log, clockUs = { SystemClock.elapsedRealtimeNanos() / 1_000 })
+            val core = AaBridgeCore(
+                log,
+                clockUs = { SystemClock.elapsedRealtimeNanos() / 1_000 },
+                connectingText = getString(R.string.aa_ph_connecting),
+                waitingText = getString(R.string.aa_ph_wait_frame),
+                disconnectedText = getString(R.string.aa_ph_lost),
+                startServerText = getString(R.string.aa_ph_start_server),
+            )
             core.micModeProvider = { aaPrefs.micMode }
             val audio = getSystemService(AudioManager::class.java)
             core.phoneCallProvider = {
@@ -1374,6 +1398,7 @@ class BridgeService : Service() {
             core.mediaChunkProvider = { aaPrefs.mediaChunk }
             core.voiceChunkProvider = { aaPrefs.voiceChunk }
             core.ttsPrerollProvider = { aaPrefs.ttsPreroll }
+            core.navChannelProvider = { aaPrefs.navChannel }
             core.touchDecimationProvider = { aaPrefs.touchDecimation }
             core.dupDownFilterProvider = { aaPrefs.dupDownFilter }
             core.phoneMic = PhoneMicCapture(applicationContext)
@@ -1399,6 +1424,7 @@ class BridgeService : Service() {
             val ref = arrayOfNulls<BridgeHost>(1)
             val h = BridgeHost(core, conn, scheduler, log, previous = previous, onTornDown = {
                 main.post {
+                    core.dispose()      // режим AA ядро не переиспользует: новый хост = новое ядро
                     if (host === ref[0]) host = null
                     AppLog.i("BRIDGE: AA закрыта полностью")
                     if (session == null && host == null && !linkWaiting && !wifiBMode && !usbToAirPending && dongle == null) finish()
@@ -1520,11 +1546,12 @@ class BridgeService : Service() {
 
     /** Partial wake lock: keep the bridge and the encoders running while the session is live. */
     private fun acquireSessionWakeLocks() {
-        if (wakeLock == null) {
-            wakeLock = getSystemService(PowerManager::class.java)
-                .newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "headswap:session")
-                .apply { setReferenceCounted(false); acquire(4 * 60 * 60 * 1000L) }
-        }
+        // таймаут 4 ч снимает lock сам, но объект остаётся: проверяем isHeld, не null
+        val wl = wakeLock ?: getSystemService(PowerManager::class.java)
+            .newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "headswap:session")
+            .apply { setReferenceCounted(false) }
+            .also { wakeLock = it }
+        if (!wl.isHeld) wl.acquire(4 * 60 * 60 * 1000L)
     }
 
     private fun releaseSessionWakeLocks() {
@@ -1567,6 +1594,7 @@ class BridgeService : Service() {
         }
         session?.close("сервис уничтожен")
         host?.shutdown("сервис уничтожен")
+        scheduler.shutdownNow()      // после stopRequested BridgeHost закрывается сразу (immediate), grace больше не планируется
         releaseSessionWakeLocks()
         super.onDestroy()
     }

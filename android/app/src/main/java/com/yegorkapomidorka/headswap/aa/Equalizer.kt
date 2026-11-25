@@ -67,8 +67,8 @@ object EqLive {
  * Чистый Kotlin, без Android API.
  */
 class Equalizer(sampleRate: Int = 48000, channels: Int = 2) {
-    private var rate = sampleRate
-    private var chans = channels
+    private val rate = sampleRate
+    private val chans = channels
     private var settings = EqSettings()
     private var preGain = 1.0
 
@@ -86,19 +86,9 @@ class Equalizer(sampleRate: Int = 48000, channels: Int = 2) {
     private val a2 = DoubleArray(BANDS)
 
     /** Состояние TDF-II: [канал * BANDS + полоса]. */
-    private var z1 = DoubleArray(BANDS * chans)
-    private var z2 = DoubleArray(BANDS * chans)
+    private val z1 = DoubleArray(BANDS * chans)
+    private val z2 = DoubleArray(BANDS * chans)
     private var bypassed = true
-
-    /** Смена формата сбрасывает состояние и пересчитывает коэффициенты. */
-    fun configure(sampleRate: Int, channels: Int) {
-        if (sampleRate == rate && channels == chans) return
-        rate = sampleRate
-        chans = channels
-        z1 = DoubleArray(BANDS * chans)
-        z2 = DoubleArray(BANDS * chans)
-        recompute()
-    }
 
     /** Новые настройки: пересчёт коэффициентов без сброса состояния (без щелчка при движении слайдера). */
     fun update(s: EqSettings) {
@@ -107,8 +97,6 @@ class Equalizer(sampleRate: Int = 48000, channels: Int = 2) {
         settings = n
         recompute()
     }
-
-    val isBypass: Boolean get() = settings.isFlat
 
     private fun recompute() {
         preGain = 10.0.pow(settings.preamp / 20.0)
@@ -152,20 +140,6 @@ class Equalizer(sampleRate: Int = 48000, channels: Int = 2) {
                 pcm[p] = out.toByte()
                 pcm[p + 1] = (out shr 8).toByte()
                 p += 2
-            }
-        }
-    }
-
-    /** То же для ShortArray (interleaved). */
-    fun process(pcm: ShortArray, offset: Int = 0, length: Int = pcm.size - offset) {
-        if (enterBypass()) return
-        val frames = length / chans
-        var p = offset
-        for (f in 0 until frames) {
-            rampFrame()
-            for (c in 0 until chans) {
-                pcm[p] = sample(pcm[p], c).toShort()
-                p++
             }
         }
     }

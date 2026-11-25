@@ -141,6 +141,10 @@ class NotificationsLogicTest {
         assertEquals("09:35", NotificationsLogic.time(9 * 3600_000L + 35 * 60_000L, ZoneId.of("UTC")))
     }
 
+    @Test fun timeLabelTwelveHour() {
+        assertEquals("2:05", NotificationsLogic.time(14 * 3600_000L + 5 * 60_000L, ZoneId.of("UTC"), twelveHour = true))
+    }
+
     @Test fun tongueWidthScalesWithT() {
         // 1280x720: T 96, область справа от рейки 1136, «ухо» 32
         assertEquals(480 to 900, NotifGeom.tongueWidth(96, 1136, 32, 20))

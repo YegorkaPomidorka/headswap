@@ -4,6 +4,7 @@ import android.app.AlertDialog
 import android.content.Intent
 import android.media.MediaCodecInfo
 import android.media.MediaCodecList
+import android.os.Build
 import android.provider.Settings
 import android.text.Editable
 import android.text.InputFilter
@@ -33,9 +34,13 @@ import com.yegorkapomidorka.headswap.aa.CustomResError
 import com.yegorkapomidorka.headswap.aa.CustomVideoMode
 import com.yegorkapomidorka.headswap.aa.DupDownFilter
 import com.yegorkapomidorka.headswap.aa.MediaChunk
+import com.yegorkapomidorka.headswap.aa.NavChannel
 import com.yegorkapomidorka.headswap.aa.TouchDecimation
 import com.yegorkapomidorka.headswap.aa.TtsPreroll
 import com.yegorkapomidorka.headswap.aa.VoiceChunk
+import com.yegorkapomidorka.headswap.dex.DexPrefs
+import com.yegorkapomidorka.headswap.dex.VdmDesktop
+import com.yegorkapomidorka.headswap.dex.VdmHostPolicy
 
 /** «Для разработчиков» (Dev.dc.html): отладочные флажки, кнопки, статус и живой лог (последние ~200 строк). */
 class DevScreen(host: MainActivity) : Screen(host) {
@@ -59,6 +64,7 @@ class DevScreen(host: MainActivity) : Screen(host) {
     private val chunkRows = LinkedHashMap<MediaChunk, RadioRow>()
     private val voiceChunkRows = LinkedHashMap<VoiceChunk, RadioRow>()
     private val ttsPrerollRows = LinkedHashMap<TtsPreroll, RadioRow>()
+    private val navChannelRows = LinkedHashMap<NavChannel, RadioRow>()
     private val touchDecimationRows = LinkedHashMap<TouchDecimation, RadioRow>()
     private val dupDownRows = LinkedHashMap<DupDownFilter, RadioRow>()
 
@@ -94,6 +100,7 @@ class DevScreen(host: MainActivity) : Screen(host) {
         body.addView(
             group(listOf(
                 row(c.getString(R.string.dev_meta_music_title), c.getString(R.string.dev_meta_music_sub), aa.metaMusic) { aa.metaMusic = it },
+                row(c.getString(R.string.dev_meta_art16k_title), c.getString(R.string.dev_meta_art16k_sub), aa.metaArt16k) { aa.metaArt16k = it },
                 row(c.getString(R.string.dev_meta_navi_title), c.getString(R.string.dev_meta_navi_sub), aa.metaNavi) { aa.metaNavi = it },
                 row(c.getString(R.string.dev_meta_icon_title), c.getString(R.string.dev_meta_icon_sub), aa.naviIcon) { aa.naviIcon = it },
                 row(c.getString(R.string.dev_meta_time_title), c.getString(R.string.dev_meta_time_sub), aa.naviTime) { aa.naviTime = it },
@@ -137,6 +144,18 @@ class DevScreen(host: MainActivity) : Screen(host) {
         )
         refreshTtsPreroll()
 
+        body.addView(c.sectionTitle(c.getString(R.string.dev_section_nav_channel)))
+        for (m in NavChannel.values()) {
+            val row = RadioRow(c, c.getString(m.titleRes), "") { setNavChannel(m) }
+            navChannelRows[m] = row
+            body.addView(row.view, lp(MATCH, WRAP))
+        }
+        body.addView(
+            c.text(c.getString(R.string.dev_nav_channel_note), 13f, 400, c.clr(R.color.on2)),
+            lp(WRAP, WRAP).margins(c, 8, 2, 8, 0),
+        )
+        refreshNavChannel()
+
         body.addView(c.sectionTitle(c.getString(R.string.dev_section_touch_decimation)))
         for (m in TouchDecimation.values()) {
             val row = RadioRow(c, c.getString(m.titleRes), "") { setTouchDecimation(m) }
@@ -174,10 +193,19 @@ class DevScreen(host: MainActivity) : Screen(host) {
         body.addView(customResCard())
 
         body.addView(c.sectionTitle(c.getString(R.string.dev_section_desktop)))
-        body.addView(
-            group(listOf(row(c.getString(R.string.dev_hide_status_title), c.getString(R.string.dev_hide_status_sub),
-                LauncherPrefs(c).hideStatusBar) { LauncherModel.chooseHideStatusBar(c, it) })),
+        val desktopRows = mutableListOf(
+            row(c.getString(R.string.dev_hide_status_title), c.getString(R.string.dev_hide_status_sub),
+                LauncherPrefs(c).hideStatusBar) { LauncherModel.chooseHideStatusBar(c, it) },
         )
+        // h1091: хост VirtualDevice на Samsung с Android 16 включается вручную, остальным тумблер не нужен
+        if (VdmHostPolicy.optInAvailable(Build.VERSION.SDK_INT, Build.MANUFACTURER)) {
+            desktopRows += row(c.getString(R.string.dev_vdm_host_title), c.getString(R.string.dev_vdm_host_sub),
+                DexPrefs(c).vdmHostOnAndroid16) {
+                DexPrefs(c).vdmHostOnAndroid16 = it
+                VdmDesktop.hostOnAndroid16 = it
+            }
+        }
+        body.addView(group(desktopRows))
 
         body.addView(c.sectionTitle(c.getString(R.string.dev_section_actions)))
         val actions = listOf(
@@ -291,6 +319,15 @@ class DevScreen(host: MainActivity) : Screen(host) {
 
     private fun refreshTtsPreroll() {
         for ((m, row) in ttsPrerollRows) row.setSelected(aa.ttsPreroll == m)
+    }
+
+    private fun setNavChannel(m: NavChannel) {
+        aa.navChannel = m
+        refreshNavChannel()
+    }
+
+    private fun refreshNavChannel() {
+        for ((m, row) in navChannelRows) row.setSelected(aa.navChannel == m)
     }
 
     private fun setTouchDecimation(m: TouchDecimation) {

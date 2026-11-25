@@ -150,10 +150,10 @@ object CarFormat {
         }
     }
 
-    /** Время прибытия «ЧЧ:ММ» в часовом поясе, который прислало приложение. */
-    fun clock(epochMillis: Long, zoneOffsetSeconds: Int): String {
+    /** Время прибытия «ЧЧ:ММ» (или «Ч:ММ» при 12 ч) в часовом поясе, который прислало приложение. */
+    fun clock(epochMillis: Long, zoneOffsetSeconds: Int, twelveHour: Boolean = false): String {
         val local = Math.floorMod(epochMillis / 1000 + zoneOffsetSeconds, 86_400L)
-        return "%02d:%02d".format(Locale.ROOT, local / 3600, local % 3600 / 60)
+        return com.yegorkapomidorka.headswap.launcher.ClockFormat.format((local / 3600).toInt(), (local % 3600 / 60).toInt(), twelveHour)
     }
 }
 

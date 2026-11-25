@@ -57,6 +57,15 @@
     <string name="l_phone_talk">اتصال بـ %1$s</string>
     <string name="l_phone_calling">جارٍ الاتصال…</string>
     <string name="l_phone_none">لا توجد مكالمات</string>
+    <string name="l_call_hidden">مكالمة</string>
+    <plurals name="l_missed_hidden">
+        <item quantity="zero">%d مكالمة</item>
+        <item quantity="one">%d مكالمة</item>
+        <item quantity="two">%d مكالمتان</item>
+        <item quantity="few">%d مكالمات</item>
+        <item quantity="many">%d مكالمة</item>
+        <item quantity="other">%d مكالمة</item>
+    </plurals>
     <string name="l_phone_grant">اسمح على الهاتف</string>
     <string name="l_call_back">معاودة الاتصال</string>
     <string name="l_call">اتصال</string>
@@ -110,7 +119,6 @@
     <string name="l_s_theme_light">ذهبي فاتح</string>
     <string name="l_s_theme_auto">تلقائي</string>
     <string name="l_s_theme_sub">يتبع الوضع التلقائي مصابيح السيارة الأمامية</string>
-    <string name="l_s_rail">الشريط الجانبي</string>
     <string name="l_s_rail_bottom">الشريط السفلي</string>
     <string name="l_s_layout_tile_top">البطاقة في الأعلى</string>
     <string name="l_s_layout_music_top">الموسيقى في الأعلى</string>
@@ -120,6 +128,14 @@
     <string name="l_s_rail_cut">مضغوط</string>
     <string name="l_s_anim">حركات الأزرار</string>
     <string name="l_s_battery">بطارية الهاتف</string>
+    <string name="l_s_clock12">نظام 12 ساعة</string>
+    <string name="l_s_rail_size">حجم الشريط</string>
+    <string name="l_s_rail_style">النمط</string>
+    <string name="l_s_style_solid">مصمت</string>
+    <string name="l_s_style_glass">زجاجي</string>
+    <string name="l_s_date">التاريخ</string>
+    <string name="l_s_date_dmy">DD.MM</string>
+    <string name="l_s_date_mdy">MM.DD</string>
     <string name="l_s_map_scale">مقياس الخريطة</string>
     <string name="l_s_map_scale_sub">لـ %1$s فقط · يُطبَّق فورًا</string>
     <string name="l_s_scale_smaller">أصغر</string>
@@ -150,6 +166,8 @@
     <string name="l_nav_2gis">2GIS</string>
     <string name="l_nav_yandex_maps">Yandex Maps</string>
     <string name="l_nav_google_maps">Google Maps</string>
+    <string name="l_nav_amap">Amap</string>
+    <string name="l_nav_amap_auto">Amap Auto</string>
     <!-- навигатор на своём хосте Car App -->
     <string name="l_u_m">م</string>
     <string name="l_u_km">كم</string>
@@ -179,7 +197,7 @@
     <string name="l_favorites">المفضّلة</string>
     <string name="l_favorites_empty">لا توجد جهات اتصال مفضّلة. ضع عليها نجمة في دفتر الهاتف</string>
     <string name="l_s_colors">الألوان</string>
-    <string name="l_s_colors_sub">لون التمييز والخلفية، لليل والنهار كلٌّ على حدة</string>
+    <string name="l_s_colors_sub">لون التمييز والخلفية والخلفية الجدارية</string>
     <string name="l_s_colors_night">الليل</string>
     <string name="l_s_colors_day">النهار</string>
     <string name="l_s_colors_reset">إعادة الضبط</string>
@@ -187,7 +205,29 @@
     <string name="l_s_colors_bg_hue">درجة لون الخلفية</string>
     <string name="l_s_colors_bg_sat">تشبّع الخلفية</string>
     <string name="l_s_colors_hint">ما دامت هذه الشاشة مفتوحة، يعرض سطح المكتب الألوان التي تعدّلها. تظهر ألوان الليل في السمة الداكنة، وألوان النهار في الفاتحة.</string>
+    <string name="l_s_colors_presets">إعدادات مسبقة</string>
+    <string name="l_s_preset_default">افتراضي</string>
+    <string name="l_s_preset_tree">شجرة الميلاد</string>
+    <string name="l_s_preset_new_year">رأس السنة</string>
+    <string name="l_ny_countdown">حتى رأس السنة</string>
+    <string name="l_ny_greeting">سنة %1$s سعيدة!</string>
+    <string name="l_s_wallpaper">خلفية الشاشة</string>
+    <string name="l_s_wallpaper_sub_glass">تحت الزجاج على سطح المكتب كله</string>
+    <string name="l_s_wallpaper_sub_solid">تعمل بنمط الزجاج فقط</string>
+    <string name="l_s_wallpaper_none">بدون خلفية</string>
+    <string name="l_s_wallpaper_headswap">Headswap</string>
+    <string name="l_s_wallpaper_mountains">جبال</string>
+    <string name="l_s_wallpaper_tree">شجرة</string>
+    <string name="l_s_wallpaper_winter_road">طريق</string>
+    <string name="l_s_wallpaper_custom">صورتي</string>
+    <string name="l_s_wallpaper_gallery">المعرض</string>
+    <string name="l_s_wallpaper_blur">تمويه</string>
+    <string name="l_s_wallpaper_dim">تعتيم</string>
+    <string name="l_wallpaper_set">تم تعيين الخلفية</string>
+    <string name="l_wallpaper_failed">تعذّر تعيين الخلفية</string>
     <string name="l_s_alice_voice">Alice بالصوت فقط</string>
     <string name="l_s_alice_voice_on">بلا نافذة، شريط صغير في الأسفل؛ يعمل حتى والهاتف مقفل</string>
     <string name="l_s_alice_voice_off">Alice في لوحة بجانب الشريط الجانبي</string>
+    <string name="l_s_hide_caller">إخفاء الأرقام</string>
+    <string name="l_s_hide_caller_sub">المتصل يظهر في «المكالمات» فقط</string>
 </resources>

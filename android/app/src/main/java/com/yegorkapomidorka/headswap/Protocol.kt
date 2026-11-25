@@ -65,6 +65,7 @@ object Msg {
     const val MEDIA_PROGRESS_BAR = 0x00010036
     const val CAR_DATA_SUBSCRIBE = 0x00010031
     const val CONNECT_EXCEPTION = 0x00010037
+    const val BT_HFP_INDICATION = 0x00018041
     const val BT_HFP_CONNECTION = 0x00018042
     const val CARLIFE_DATA_SUBSCRIBE = 0x00018043
     const val CARLIFE_DATA_SUBSCRIBE_DONE = 0x00010044
@@ -251,7 +252,8 @@ class DataMsg(val type: Int, val time: Int, val declaredLen: Int, val data: Byte
 object Wire {
     /** Максимум одного куска bulk-записи (спека §1.4). */
     const val CHUNK = 16384
-    const val MAX_OUTER_LEN = 64 * 1024 * 1024
+    /** Предел длины входящего кадра: от ГУ приходят только мелкие кадры, а длина из заголовка аллоцируется сразу. */
+    const val MAX_RX_LEN = 1 * 1024 * 1024
 
     fun u16(b: ByteArray, o: Int) = ((b[o].toInt() and 0xFF) shl 8) or (b[o + 1].toInt() and 0xFF)
 
@@ -406,7 +408,7 @@ class FrameParser {
             if (have < 8) break
             val chan = Wire.u32(buf, start)
             val len = Wire.u32(buf, start + 4)
-            if (chan < 0 || chan > 0xFF || len < 0 || len > Wire.MAX_OUTER_LEN) {
+            if (chan < 0 || chan > 0xFF || len < 0 || len > Wire.MAX_RX_LEN) {
                 throw ProtocolDesync("плохой внешний заголовок: chan=$chan len=$len, ${Hex.compact(buf.copyOfRange(start, start + minOf(have, 16)), 16)}")
             }
             if (have < 8 + len) break
@@ -507,7 +509,7 @@ class InnerAssembler {
     private fun headerOk(chan: Int, b: ByteArray, o: Int): Boolean {
         val cmd = Ch.isCmdStyle(chan)
         val declared = declared(chan, b, o)
-        val limit = if (cmd) MAX_CMD_DECLARED else Wire.MAX_OUTER_LEN
+        val limit = if (cmd) MAX_CMD_DECLARED else Wire.MAX_RX_LEN
         val type = Wire.u32(b, o + if (cmd) 4 else 8)
         return declared in 0..limit && type ushr 16 == chan
     }

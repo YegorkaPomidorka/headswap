@@ -16,6 +16,8 @@
     <string name="dev_meta_time_sub">int32 durée avant la manœuvre, en s (comme apollo-DuerOS)</string>
     <string name="dev_meta_progress_title">Progression en secondes</string>
     <string name="dev_meta_progress_sub">MEDIA_PROGRESS_BAR en s au lieu de ms (si l\'autoradio affiche 1000× trop)</string>
+    <string name="dev_meta_art16k_title">Pochette du titre de 16 Ko max</string>
+    <string name="dev_meta_art16k_sub">Pour les combinés qui n\'affichent pas la pochette (ex. Honda CR-V 2026, SEMIDRIVE X9). Qualité moindre sur l\'autoradio</string>
 
     <string name="dev_section_music_chunk">Taille des paquets musique (expérimental)</string>
     <string name="dev_music_chunk_note">Plus petite, elle réduit le tampon de l\'autoradio mais augmente le nombre de paquets sur l\'USB. Si le son saccade, revenez à « Comme l\'envoie Android Auto »</string>
@@ -23,6 +25,8 @@
     <string name="dev_voice_chunk_note">Réponses de l\'assistant et consignes de navigation. Auto : 1024 o sur VW CNS2 Delphi, sinon comme l\'envoie AA</string>
     <string name="dev_section_tts_preroll">Silence avant la consigne (expérimental)</string>
     <string name="dev_tts_preroll_note">Des zéros après le début de la consigne, pour que l\'autoradio ouvre le canal audio. Auto : 400 ms sur VW</string>
+    <string name="dev_section_nav_channel">Canal des consignes de navigation (expérimental)</string>
+    <string name="dev_nav_channel_note">VR : les consignes passent par le canal vocal sans NAVI=1, l\'autoradio peut basculer les boutons de volume sur « voix ». TTS : comme avant. Pris en compte dès la consigne suivante</string>
     <string name="dev_volume_swipe_title">Volume à deux doigts</string>
     <string name="dev_volume_swipe_sub">Lanceur : deux doigts sur le bord droit, vers le haut pour monter, vers le bas pour baisser. Toujours activé sur Honda Vezel.</string>
     <string name="dev_section_touch_decimation">Décimation du toucher (expérimental)</string>

@@ -47,9 +47,6 @@
     <string name="set_direct_minus">− Frame rate is not adjustable</string>
     <string name="set_direct_desktop_desc">In Own launcher mode the phone captures the desktop and encodes it once; this is not Android Auto transcoding.</string>
     <string name="set_desktop_single_encode_title">Single screen encode</string>
-    <string name="set_desktop_direct_title">Direct</string>
-    <string name="set_desktop_transcode_title">Transcode</string>
-    <string name="set_desktop_transcode_note">Applies on the next connection. Transcode inserts an intermediate H.264 stage, like Android Auto: more latency and heat, but steadier on some head units.</string>
     <string name="set_desktop_fps_title">Desktop frame rate</string>
     <string name="set_desktop_fps_note">Applies on the next connection. Auto picks 30 fps unless the head unit asks for less.</string>
     <string name="set_video_range_title">Color range</string>
@@ -193,6 +190,10 @@
     <string name="tpreroll_200">200 ms</string>
     <string name="tpreroll_400">400 ms</string>
 
+    <!-- Navigation prompts channel (NavChannel) -->
+    <string name="navch_vr">VR (voice channel)</string>
+    <string name="navch_tts">TTS (navigation channel)</string>
+
     <!-- Touch decimation (TouchDecimation) -->
     <string name="tdec_off">Off</string>
     <string name="tdec_x2">×2</string>
@@ -267,6 +268,7 @@
     <string name="car_skoda_kamiq_gt_2021">Skoda Kamiq GT 2021</string>
     <string name="car_skoda_octavia_pro">Skoda Octavia Pro</string>
     <string name="car_toyota_corolla_cross_2024">Toyota Corolla Cross 2024–2025</string>
+    <string name="car_toyota_bz4x">Toyota bZ4X</string>
     <string name="car_toyota_levin">Toyota Levin</string>
     <string name="car_toyota_rav4_2025">Toyota RAV4 2025</string>
     <string name="car_vw_bora_2021">Volkswagen Bora 2021</string>

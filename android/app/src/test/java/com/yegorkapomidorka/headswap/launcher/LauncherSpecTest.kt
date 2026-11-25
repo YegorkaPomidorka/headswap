@@ -6,6 +6,30 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class LauncherSpecTest {
+    /** Спека с 12 ч не равна спеке с 24 ч: иначе remember в LauncherRoot не перестраивает рейку и «—AM—» залипает. */
+    @Test fun twelveHourChangesSpecEquality() {
+        val a = LauncherSpecs.forSize(1280, 720, RailSize.MEDIUM, twelveHour = false)
+        val b = LauncherSpecs.forSize(1280, 720, RailSize.MEDIUM, twelveHour = true)
+        assertFalse(a == b)
+        assertFalse(a.clockAmPm)
+        assertTrue(b.clockAmPm)
+        assertTrue(b.amPmInline)
+    }
+
+    @Test fun normalRailTwelveHourReservesAmPmLine() {
+        val a = LauncherSpecs.forSize(1280, 720, RailSize.NORMAL, twelveHour = false)
+        val b = LauncherSpecs.forSize(1280, 720, RailSize.NORMAL, twelveHour = true)
+        assertTrue(b.clockRailAmPm)
+        assertEquals(a.clockH + b.clockGap + b.amPmPillH, b.clockH)
+    }
+
+    /** «—PM—» одной строкой влезает в «Среднюю» рейку на всех экранах таблицы. */
+    @Test fun amPmInlineFitsOnAllLandscapeSizes() {
+        for (row in LauncherSpecs.TABLE) {
+            val s = LauncherSpecs.forSize(row[0], row[1], RailSize.MEDIUM, twelveHour = true)
+            assertTrue("${row[0]}x${row[1]}", !s.clockAmPm || s.amPmInline)
+        }
+    }
     @Test fun tableRowsComeBackExactly() {
         for (row in LauncherSpecs.TABLE) {
             val s = LauncherSpecs.forSize(row[0], row[1])
@@ -148,9 +172,9 @@ class LauncherSpecTest {
         assertEquals(92 * 5 - 21, LauncherSpecs.forSize(1280, 480).phone) // только для оверлея входящего
     }
 
-    @Test fun quickAppsFourPlusAddOrFiveInStrip() {
+    @Test fun quickAppsFourPlusAddOrFiveInStripAndWide() {
         assertEquals(4, LauncherSpecs.forSize(800, 480).quickApps)
-        assertEquals(4, LauncherSpecs.forSize(1920, 720).quickApps)
+        assertEquals(5, LauncherSpecs.forSize(1920, 720).quickApps)
         assertEquals(5, LauncherSpecs.forSize(1280, 480).quickApps)
     }
 
@@ -203,5 +227,26 @@ class LauncherSpecTest {
         assertTrue(LauncherSpecs.forSize(3840, 1440).t > 110)
         // меньше любой строки таблицы не падает в ноль
         assertTrue(LauncherSpecs.forSize(320, 200).t >= 1)
+    }
+
+    /** Линза стеклянной рейки: центр - в центре нижнего ряда плиток, черта - посередине зазора над рядом (1280x720: 652 и 574). */
+    @Test fun glassLensAndDividerGeometry() {
+        val s = LauncherSpecs.forSize(1280, 720)
+        assertEquals(652, s.lensCenterY)
+        assertEquals(574, s.dividerY)
+        assertEquals(s.lensCenterY, s.lensTop + s.rb / 2)
+        for (row in LauncherSpecs.TABLE) {
+            val sp = LauncherSpecs.forSize(row[0], row[1])
+            // центр линзы - середина нижнего ряда (высота navH, прибит к низу), черта - середина зазора g над ним
+            assertEquals("${row[0]}x${row[1]}", sp.h - sp.navH / 2, sp.lensCenterY)
+            assertEquals("${row[0]}x${row[1]}", sp.h - sp.navH - sp.g / 2, sp.dividerY)
+            assertTrue("${row[0]}x${row[1]}", sp.dividerY < sp.lensTop)
+        }
+    }
+
+    @Test fun railStyleRestore() {
+        assertEquals(RailStyle.SOLID, RailStyle.restore(null))
+        assertEquals(RailStyle.SOLID, RailStyle.restore("мусор"))
+        assertEquals(RailStyle.GLASS, RailStyle.restore("GLASS"))
     }
 }

@@ -123,6 +123,18 @@ class PhoneLogicTest {
         assertTrue(!MusicLogic.isLiked(MusicLogic.Action("like", "Like")))
     }
 
+    @Test fun trackProgress() {
+        // пауза: позиция как есть
+        assertEquals(0.5f, MusicLogic.progress(30_000, 0, 0f, false, 60_000, 99_999)!!, 1e-4f)
+        // играет: +6 с с момента отметки
+        assertEquals(0.6f, MusicLogic.progress(30_000, 1_000, 1f, true, 60_000, 7_000)!!, 1e-4f)
+        // убежала за конец - упор в 1
+        assertEquals(1f, MusicLogic.progress(59_000, 0, 1f, true, 60_000, 10_000)!!, 1e-4f)
+        // нет длительности или позиции - полосы нет
+        assertNull(MusicLogic.progress(30_000, 0, 1f, true, 0, 0))
+        assertNull(MusicLogic.progress(-1, 0, 1f, true, 60_000, 0))
+    }
+
     @Test fun sessionPickPrefersPlayingThenChosen() {
         data class S(val pkg: String, val playing: Boolean)
         val list = listOf(S("a", false), S("b", true), S("c", false))
@@ -135,5 +147,32 @@ class PhoneLogicTest {
         assertEquals("c", MusicLogic.pickSession(list.map { it.copy(playing = false) }, { it.pkg }, { it.playing }, "c")?.pkg)
         assertEquals("a", MusicLogic.pickSession(list.map { it.copy(playing = false) }, { it.pkg }, { it.playing }, null)?.pkg)
         assertNull(MusicLogic.pickSession(emptyList<S>(), { it.pkg }, { it.playing }, "a"))
+    }
+
+    @Test fun chosenPlayerNotReplacedByIdleForeignSession() {
+        data class S(val pkg: String, val playing: Boolean)
+        val ya = "ru.yandex.music"
+        // поездки 16-17.11: Я.Музыка не запущена, у Telegram и Teams сессии на паузе - карточка брала их
+        val idle = listOf(S("org.telegram.messenger", false), S("com.microsoft.teams", false))
+        assertNull(MusicLogic.pickSession(idle, { it.pkg }, { it.playing }, ya, chosenOnly = true))
+        assertEquals("org.telegram.messenger", MusicLogic.pickSession(idle, { it.pkg }, { it.playing }, ya)?.pkg)
+        // выбранный на паузе среди чужих на паузе - выбранный
+        assertEquals(ya, MusicLogic.pickSession(idle + S(ya, false), { it.pkg }, { it.playing }, ya, chosenOnly = true)?.pkg)
+        // чужая даже играет (голосовое) - карточка всё равно у выбранного
+        assertEquals(ya,
+            MusicLogic.pickSession(listOf(S("org.telegram.messenger", true), S(ya, false)), { it.pkg }, { it.playing }, ya, chosenOnly = true)?.pkg)
+        assertNull(MusicLogic.pickSession(listOf(S("org.telegram.messenger", true)), { it.pkg }, { it.playing }, ya, chosenOnly = true))
+        // выбрана Музыка Xiaomi - Яндекс её не подменяет
+        assertEquals("com.miui.player",
+            MusicLogic.pickSession(listOf(S(ya, true), S("com.miui.player", false)), { it.pkg }, { it.playing }, "com.miui.player", chosenOnly = true)?.pkg)
+        // ничего не выбрано - чужие всё равно не берём
+        assertNull(MusicLogic.pickSession(idle, { it.pkg }, { it.playing }, null, chosenOnly = true))
+        // выбрана «нота» (Музыка Xiaomi), а на телефоне заиграла Я.Музыка со второго слота - карточка её
+        val chip = setOf("com.miui.player", ya)
+        assertEquals(ya, MusicLogic.pickSession(listOf(S("com.miui.player", false), S(ya, true)), { it.pkg }, { it.playing },
+            "com.miui.player", chosenOnly = true, chip = chip)?.pkg)
+        // играющий Telegram не с чипа - нет
+        assertEquals("com.miui.player", MusicLogic.pickSession(listOf(S("com.miui.player", false), S("org.telegram.messenger", true)),
+            { it.pkg }, { it.playing }, "com.miui.player", chosenOnly = true, chip = chip)?.pkg)
     }
 }

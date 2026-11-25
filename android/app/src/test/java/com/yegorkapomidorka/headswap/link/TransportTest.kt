@@ -232,7 +232,7 @@ class TransportTest {
     @Test
     fun codecRejectsHugeLength() {
         val h = ByteArray(12)
-        Wire.putU32(h, 0, Wire.MAX_OUTER_LEN + 1)
+        Wire.putU32(h, 0, Wire.MAX_RX_LEN + 1)
         Wire.putU32(h, 8, Msg.VIDEO_DATA)
         try {
             readInners(Ch.VIDEO, ByteArrayInputStream(h))

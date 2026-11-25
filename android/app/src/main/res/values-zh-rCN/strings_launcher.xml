@@ -64,6 +64,10 @@
     <string name="l_phone_talk">通话中 %1$s</string>
     <string name="l_phone_calling">正在呼叫…</string>
     <string name="l_phone_none">没有通话</string>
+    <string name="l_call_hidden">来电</string>
+    <plurals name="l_missed_hidden">
+        <item quantity="other">%d 个未接来电</item>
+    </plurals>
     <string name="l_phone_grant">请在手机上允许</string>
     <string name="l_call_back">回拨</string>
     <string name="l_call">拨打</string>
@@ -120,7 +124,7 @@
     <string name="l_s_theme_auto">自动</string>
     <string name="l_s_theme_sub">自动模式跟随车灯</string>
     <string name="l_s_colors">颜色</string>
-    <string name="l_s_colors_sub">强调色和背景，夜间与白天分别设置</string>
+    <string name="l_s_colors_sub">强调色、背景和壁纸</string>
     <string name="l_s_colors_night">夜间</string>
     <string name="l_s_colors_day">白天</string>
     <string name="l_s_colors_reset">重置</string>
@@ -128,7 +132,26 @@
     <string name="l_s_colors_bg_hue">背景色相</string>
     <string name="l_s_colors_bg_sat">背景饱和度</string>
     <string name="l_s_colors_hint">此页面打开期间，桌面会显示您正在编辑的颜色。夜间颜色用于深色主题，白天颜色用于浅色主题。</string>
-    <string name="l_s_rail">侧边栏</string>
+    <string name="l_s_colors_presets">预设</string>
+    <string name="l_s_preset_default">默认</string>
+    <string name="l_s_preset_tree">圣诞树</string>
+    <string name="l_s_preset_new_year">新年</string>
+    <string name="l_ny_countdown">距离新年</string>
+    <string name="l_ny_greeting">%1$s 新年快乐！</string>
+    <string name="l_s_wallpaper">壁纸</string>
+    <string name="l_s_wallpaper_sub_glass">毛玻璃下方，铺满整个桌面</string>
+    <string name="l_s_wallpaper_sub_solid">仅在“玻璃”样式下生效</string>
+    <string name="l_s_wallpaper_none">无壁纸</string>
+    <string name="l_s_wallpaper_headswap">Headswap</string>
+    <string name="l_s_wallpaper_mountains">山景</string>
+    <string name="l_s_wallpaper_tree">圣诞树</string>
+    <string name="l_s_wallpaper_winter_road">公路</string>
+    <string name="l_s_wallpaper_custom">我的照片</string>
+    <string name="l_s_wallpaper_gallery">图库</string>
+    <string name="l_s_wallpaper_blur">模糊</string>
+    <string name="l_s_wallpaper_dim">变暗</string>
+    <string name="l_wallpaper_set">壁纸已设置</string>
+    <string name="l_wallpaper_failed">无法设置壁纸</string>
     <string name="l_s_rail_bottom">底部栏</string>
     <string name="l_s_layout_tile_top">卡片在上</string>
     <string name="l_s_layout_music_top">音乐在上</string>
@@ -138,6 +161,14 @@
     <string name="l_s_rail_cut">紧凑</string>
     <string name="l_s_anim">按钮动画</string>
     <string name="l_s_battery">手机电量</string>
+    <string name="l_s_clock12">12 小时制</string>
+    <string name="l_s_rail_size">侧边栏大小</string>
+    <string name="l_s_rail_style">样式</string>
+    <string name="l_s_style_solid">实色</string>
+    <string name="l_s_style_glass">玻璃</string>
+    <string name="l_s_date">日期</string>
+    <string name="l_s_date_dmy">日.月</string>
+    <string name="l_s_date_mdy">月.日</string>
     <string name="l_s_map_scale">地图缩放</string>
     <string name="l_s_map_scale_sub">仅适用于%1$s · 立即生效</string>
     <string name="l_s_scale_smaller">较小</string>
@@ -168,6 +199,8 @@
     <string name="l_nav_2gis">2GIS</string>
     <string name="l_nav_yandex_maps">Yandex Maps</string>
     <string name="l_nav_google_maps">Google 地图</string>
+    <string name="l_nav_amap">高德地图</string>
+    <string name="l_nav_amap_auto">高德地图车机版</string>
     <!-- 自有 Car App 宿主中的导航 -->
     <string name="l_u_m">米</string>
     <string name="l_u_km">公里</string>
@@ -185,6 +218,8 @@
     <string name="l_s_alice_voice">Alice 仅语音</string>
     <string name="l_s_alice_voice_on">无窗口，仅在底部显示一个胶囊条；锁屏时也可使用</string>
     <string name="l_s_alice_voice_off">Alice 显示在左侧面板中</string>
+    <string name="l_s_hide_caller">隐藏号码</string>
+    <string name="l_s_hide_caller_sub">来电信息仅在“通话”中显示</string>
     <string name="l_notif_show_all">通知：%1$d 条。查看全部</string>
     <string name="l_notif_collapse">收起通知</string>
     <string name="l_notif_clear_all">全部清除</string>

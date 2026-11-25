@@ -14,7 +14,9 @@ import android.os.Looper
 import android.os.SystemClock
 import com.yegorkapomidorka.headswap.AppLog
 import com.yegorkapomidorka.headswap.aa.AaBridgeCore
+import com.yegorkapomidorka.headswap.aa.AapMessages
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicReference
 
 object DesktopAudioAccess {
     fun hasPermission(context: Context): Boolean = context.checkSelfPermission(DesktopAudioPolicy.PERMISSION) ==
@@ -172,7 +174,11 @@ class DesktopAudioCapture(context: Context) {
 
     private fun runCapture(capture: Capture) {
         var record: AudioRecord? = null
+        var navRecord: AudioRecord? = null
         var loopback: DesktopAudioLoopback? = null
+        var navThread: Thread? = null
+        val navStop = AtomicBoolean()
+        val navFailure = AtomicReference<Throwable?>()
         var started = false
         var failure: Throwable? = null
         try {
@@ -180,6 +186,16 @@ class DesktopAudioCapture(context: Context) {
                 try {
                     loopback = DesktopAudioLoopback.open(context, DesktopAudioPolicy.SAMPLE_RATE)
                     record = loopback.record
+                    navRecord = loopback.navRecord
+                    if (navRecord != null && !startNav(navRecord)) {
+                        // навигационный микс без читателя глушил бы подсказки: возвращаем старую схему, голос в MEDIA
+                        AppLog.i("DESKTOP h1318: микс навигации не стартовал, голос в MEDIA", false)
+                        val broken = loopback
+                        loopback = null; record = null; navRecord = null
+                        broken.release()
+                        loopback = DesktopAudioLoopback.open(context, DesktopAudioPolicy.SAMPLE_RATE, withNav = false)
+                        record = loopback.record
+                    }
                 } catch (error: Throwable) {
                     AppLog.i("DESKTOP AUDIO: AudioMix loopback недоступен (${error.javaClass.simpleName}: ${error.message}), беру REMOTE_SUBMIX", false)
                 }
@@ -196,6 +212,8 @@ class DesktopAudioCapture(context: Context) {
             audio.startRecording()
             check(audio.recordingState == AudioRecord.RECORDSTATE_RECORDING) { "Android не запустил передачу звука" }
             started = true
+            // Один START на захват: повторный снял бы huPausedAa, и подсказка уводила бы ГУ с радио.
+            // MEDIA INIT/MUSIC=1 уходят с первым MEDIA_DATA, его пускает DesktopSilenceGate (h913).
             sessions.runIfCurrent(capture.generation) {
                 if (!capture.cancelled.get()) capture.core.onAudioStart(DesktopAudioPolicy.MEDIA_CHANNEL)
             }
@@ -204,10 +222,16 @@ class DesktopAudioCapture(context: Context) {
                 DesktopAudioState.status = "Звук передаётся по USB"
             } }
             AppLog.i("DESKTOP AUDIO: ${if (loopback != null) "AudioMix loopback (media/game/unknown)" else "REMOTE_SUBMIX"} PCM 48000 Hz stereo16 started (memory only)")
+            navRecord?.let { nav ->
+                // отдельная нить: подпор CarLife на MEDIA не должен задерживать подсказки, а подсказки - музыку
+                navThread = Thread({ runNav(capture, nav, navStop, navFailure) }, "headswap-nav-audio").also { it.start() }
+            }
             val input = ByteArray(DesktopAudioPolicy.READ_BYTES)
             val frames = DesktopPcmFrames()
+            val gate = DesktopSilenceGate()
             var statsAt = SystemClock.elapsedRealtime()
             while (!capture.cancelled.get()) {
+                navFailure.get()?.let { throw it }   // читатель навигации умер: микс без него глушит подсказки, закрываем захват целиком
                 val now = SystemClock.elapsedRealtime()
                 if (now - statsAt >= STATS_MS) {
                     statsAt = now
@@ -221,10 +245,20 @@ class DesktopAudioCapture(context: Context) {
                 DesktopAudioState.pcmBytes += pcm.size
                 if (pcm.any { it != 0.toByte() }) DesktopAudioState.nonSilentBuffers++
                 DesktopAudioState.level = peak(pcm) // до громкости: волны «Говорю» не гаснут на тихой
+                // Слышимость по сырому PCM, до громкости: ползунок не должен открывать MEDIA на тишине (h913).
+                val step = gate.step(DesktopSilenceGate.audible(pcm), SystemClock.elapsedRealtime())
+                if (step == DesktopSilenceGate.Step.DROP) continue
+                if (step == DesktopSilenceGate.Step.START) AppLog.i("DESKTOP AUDIO: звук пошёл, открываю MEDIA на ГУ", false)
+                if (step == DesktopSilenceGate.Step.STOP) AppLog.i("DESKTOP AUDIO: тишина ${DesktopSilenceGate.HOLD_MS} мс, закрываю MEDIA на ГУ", false)
                 DesktopVolumeGain.apply(pcm, gain)
                 sessions.runIfCurrent(capture.generation) {
-                    if (!capture.cancelled.get()) capture.core.onAudioData(DesktopAudioPolicy.MEDIA_CHANNEL, pcm,
-                        SystemClock.elapsedRealtimeNanos() / 1000)
+                    if (capture.cancelled.get()) return@runIfCurrent
+                    when (step) {
+                        DesktopSilenceGate.Step.START, DesktopSilenceGate.Step.SEND ->
+                            capture.core.onAudioData(DesktopAudioPolicy.MEDIA_CHANNEL, pcm, SystemClock.elapsedRealtimeNanos() / 1000)
+                        DesktopSilenceGate.Step.STOP -> capture.core.onAudioStop(DesktopAudioPolicy.MEDIA_CHANNEL)
+                        DesktopSilenceGate.Step.DROP -> Unit
+                    }
                 }
             }
         } catch (error: Exception) {
@@ -234,6 +268,9 @@ class DesktopAudioCapture(context: Context) {
             }
         } finally {
             // Stop rerouting output before notifying CarLife; never retain capture during USB grace.
+            navStop.set(true)
+            runCatching { navThread?.join(NAV_JOIN_MS) }   // нить сама шлёт SPEECH STOP, если поток был открыт; запись закрываем после неё
+            runCatching { navRecord?.stop() }
             if (started) runCatching { record?.stop() }
             if (loopback != null) loopback.release() else runCatching { record?.release() }
             if (started) runCatching { sessions.runIfCurrent(capture.generation) {
@@ -255,5 +292,62 @@ class DesktopAudioCapture(context: Context) {
         }
     }
 
-    private companion object { const val STATS_MS = 5_000L }
+    private fun startNav(nav: AudioRecord): Boolean = runCatching {
+        nav.startRecording()
+        nav.recordingState == AudioRecord.RECORDSTATE_RECORDING
+    }.getOrDefault(false)
+
+    /**
+     * h1318: голос навигатора из отдельного микса -> SPEECH ядра (CarLife VR/TTS по navChannelProvider). Моно 16 кГц,
+     * без громкости STREAM_MUSIC (подсказки крутит ГУ) и без DesktopAudioState.level. Гейт тишины с коротким удержанием:
+     * пауза между фразами закрывает поток, первая слышимая порция открывает его сразу и не теряется.
+     */
+    private fun runNav(capture: Capture, nav: AudioRecord, stop: AtomicBoolean, failure: AtomicReference<Throwable?>) {
+        val input = ByteArray(DesktopAudioPolicy.READ_BYTES)
+        val frames = DesktopPcmFrames()
+        val downmix = NavPcmDownmix()
+        val gate = DesktopSilenceGate(NAV_HOLD_MS)
+        var open = false
+        try {
+            while (!capture.cancelled.get() && !stop.get()) {
+                val count = nav.read(input, 0, input.size, AudioRecord.READ_NON_BLOCKING)
+                check(count >= 0) { "Ошибка чтения звука навигации Android: $count" }
+                if (count == 0) { Thread.sleep(5); continue }
+                val stereo = frames.append(input, count)
+                if (stereo.isEmpty() || capture.cancelled.get()) continue
+                val step = gate.step(DesktopSilenceGate.audible(stereo), SystemClock.elapsedRealtime())
+                if (step == DesktopSilenceGate.Step.DROP) continue
+                val mono = downmix.process(stereo)
+                if (step == DesktopSilenceGate.Step.START) AppLog.i("DESKTOP h1318: голос навигатора пошёл, SPEECH START", false)
+                if (step == DesktopSilenceGate.Step.STOP) AppLog.i("DESKTOP h1318: голос навигатора затих ${NAV_HOLD_MS} мс, SPEECH STOP", false)
+                sessions.runIfCurrent(capture.generation) {
+                    if (capture.cancelled.get()) return@runIfCurrent
+                    when (step) {
+                        DesktopSilenceGate.Step.START -> {
+                            open = true
+                            capture.core.onAudioStart(AapMessages.CH_AUDIO_SPEECH)
+                            capture.core.onAudioData(AapMessages.CH_AUDIO_SPEECH, mono, SystemClock.elapsedRealtimeNanos() / 1000)
+                        }
+                        DesktopSilenceGate.Step.SEND ->
+                            capture.core.onAudioData(AapMessages.CH_AUDIO_SPEECH, mono, SystemClock.elapsedRealtimeNanos() / 1000)
+                        DesktopSilenceGate.Step.STOP -> { open = false; capture.core.onAudioStop(AapMessages.CH_AUDIO_SPEECH) }
+                        DesktopSilenceGate.Step.DROP -> Unit
+                    }
+                }
+            }
+        } catch (error: Throwable) {
+            if (!capture.cancelled.get() && !stop.get()) {
+                AppLog.e("DESKTOP h1318: чтение голоса навигатора оборвалось", error)
+                failure.set(error)
+            }
+        } finally {
+            if (open) runCatching { sessions.runIfCurrent(capture.generation) { capture.core.onAudioStop(AapMessages.CH_AUDIO_SPEECH) } }
+        }
+    }
+
+    private companion object {
+        const val STATS_MS = 5_000L
+        const val NAV_HOLD_MS = 400L
+        const val NAV_JOIN_MS = 1_000L
+    }
 }

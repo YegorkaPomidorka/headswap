@@ -48,6 +48,23 @@ public final class ManualAccessPolicyTest {
         assertTrue(ManualAccessPolicy.Options.parse(new String[]{"--help"}).help);
     }
 
+    @Test public void vdmFlagIsParsedOnceAndReachesTheCommandsButNotTheInstrumentation() {
+        assertFalse(options().vdm);
+        assertTrue(options("--vdm").vdm);
+        assertTrue(options("--audio", "--vdm").audio);
+        rejected(() -> options("--vdm", "--vdm"));
+        rejected(() -> ManualAccessPolicy.Options.parse(new String[]{"--help", "--vdm"}));
+        assertFalse(ManualAccessPolicy.Options.parse(new String[]{"--help"}).vdm);
+        String shell = ManualAccessPolicy.shellCommand(APK, options("--audio", "--vdm"));
+        assertTrue(shell.endsWith(" --audio --vdm"));
+        assertTrue(ManualAccessPolicy.adbCommand(APK, options("--vdm")).endsWith(" --token " + TOKEN + " --vdm"));
+        assertFalse(ManualAccessPolicy.shellCommand(APK, options()).contains("--vdm"));
+        // am instrument его не получает: иначе ownsLauncher не узнал бы собственный процесс запуска
+        assertEquals(ManualAccessPolicy.arguments(options()), ManualAccessPolicy.arguments(options("--vdm")));
+        String[] args = shell.substring(shell.indexOf("--package")).split(" ");
+        assertTrue(ManualAccessPolicy.Options.parse(args).vdm);
+    }
+
     @Test public void packageIsValidatedBeforeItReachesAShellString() {
         for (String bad : Arrays.asList("", "app", "com.example;id", "com.example app", "com.example\nx", "com..example",
                 "1com.example", "com.example/", "$(id)", "com.example`id`")) {

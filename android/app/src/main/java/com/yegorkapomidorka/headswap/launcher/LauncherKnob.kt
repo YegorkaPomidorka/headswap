@@ -26,7 +26,7 @@ import com.yegorkapomidorka.headswap.dex.DesktopKeys
  * Поворот - следующий/предыдущий элемент, наклоны - сосед по направлению, OK - нажатие. Первое движение после
  * касания только показывает рамку; любое касание экрана её прячет. NAVI/MUSIC/HOME - действия лаунчера.
  */
-object LauncherKnob : DesktopKeys.Sink {
+object LauncherKnob : DesktopKeys.Sink, DesktopKeys.Rail {
     /** Кнопка, которая может получить фокус шайбы; [tap] - её действие по OK. */
     class Target { var tap: () -> Unit = {}; var description: String? = null }
 
@@ -73,6 +73,20 @@ object LauncherKnob : DesktopKeys.Sink {
         return true
     }
 
+    /**
+     * Свайп по экрану ГУ прячет рейку (ADR 0062). Нечего прятать - null, свайп идёт в окно как обычное касание: активность
+     * не на экране, чужой лаунчер, портрет (рейка снизу), полноэкранное приложение (рейки уже нет).
+     */
+    override fun hidden(): Boolean? = when {
+        owner == null || LauncherModel.foreign != null || LauncherModel.portrait -> null
+        LauncherModel.area is Area.App && EmbedHost.app.fullscreen -> null
+        else -> LauncherModel.railHidden
+    }
+
+    override fun setHidden(hide: Boolean) {
+        main.post { LauncherModel.railHidden = hide }
+    }
+
     private fun take(k: Knob?): Boolean {
         if (k == null) return false
         // чужой лаунчер: его окно само разбирает стрелки, HOME идёт через showDesktop
@@ -114,6 +128,8 @@ object LauncherKnob : DesktopKeys.Sink {
         return sent
     }
 
+    private var lastHome = 0L // только главный поток
+
     private fun run(k: Knob) {
         when (k) {
             Knob.OK -> {
@@ -123,7 +139,18 @@ object LauncherKnob : DesktopKeys.Sink {
                     t.tap()
                 } else reveal()
             }
-            Knob.HOME -> act(k) { LauncherActions.home() }
+            Knob.HOME -> {
+                val now = android.os.SystemClock.uptimeMillis()
+                if (KnobLogic.doubleHome(lastHome, now)) {
+                    lastHome = 0
+                    visible = false
+                    AppLog.i("LAUNCHER кнопка ГУ HOME дважды за ${KnobLogic.DOUBLE_HOME_MS} мс: меню ГУ", false)
+                    LauncherActions.huDesktop()
+                } else {
+                    lastHome = now
+                    act(k) { LauncherActions.home() }
+                }
+            }
             Knob.NAVI -> act(k) { LauncherActions.openNavigator() }
             Knob.MUSIC -> act(k) { LauncherActions.openMusic() }
             else -> if (!visible || target == null) reveal() else {
