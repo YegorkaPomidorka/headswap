@@ -73,13 +73,13 @@ class CarLifeSession(
     /** Размер кадра из VIDEO_ENCODER_INIT ГУ (для подсказки «Как просит ГУ» в разделе для разработчиков). */
     private val onHuSize: (Int, Int) -> Unit = { _, _ -> },
     private val onClosed: (String) -> Unit,
-) : VideoSource.Listener, CarlifeLink {
+) : VideoSource.Listener, CarlifeLink, HuSession {
 
     /** Видео-режим хоста, снятый при подключении: одинаков для INIT_DONE, энкодера и тача в течение всей сессии. */
     @Volatile private var mode: VideoGeometry = bridge.videoMode
 
     /** Транспорт сессии: usb-aoa, tcp-debug или tcp6. */
-    val transportKind: String get() = transport.caps.kind
+    override val transportKind: String get() = transport.caps.kind
 
     /** Воздух (6 сокетов): своя лесенка битрейта, PAUSE-keepalive чаще, WL-строки видео. USB и tcp-debug - как было. */
     private val air = transport.caps == TransportCaps.TCP6
@@ -118,9 +118,9 @@ class CarLifeSession(
     private val desktopVideoDelivery = DesktopVideoDelivery()
 
     /** No enqueue/capture counter can substitute for successful transport writes. */
-    fun canCaptureDesktopAudio(): Boolean = !closed.get() &&
+    override fun canCaptureDesktopAudio(): Boolean = !closed.get() &&
         desktopAudioOutputLease.canCapture(SystemClock.elapsedRealtime())
-    fun hasFreshDesktopVideo(): Boolean = !closed.get() &&
+    override fun hasFreshDesktopVideo(): Boolean = !closed.get() &&
         desktopVideoDelivery.isFlowing(SystemClock.elapsedRealtime())
 
     // протокол
@@ -199,7 +199,7 @@ class CarLifeSession(
     @Volatile private var carlifeStarted = false
     private val vrReassembler = DataReassembler()  // h425: Delphi режет VR MIC_DATA на кадры по 256 Б
 
-    fun start() {
+    override fun start() {
         bridge.attach(this)
         AppLog.i("сессия: старт")
         CarLifeState.resetSession()
@@ -270,7 +270,7 @@ class CarLifeSession(
         }
     }
 
-    fun close(reason: String) {
+    override fun close(reason: String) {
         if (!closed.compareAndSet(false, true)) return
         desktopVideoDelivery.close()
         desktopAudioOutputLease.close()

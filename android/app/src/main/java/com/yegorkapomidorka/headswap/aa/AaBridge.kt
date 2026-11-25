@@ -1469,15 +1469,24 @@ class AaBridgeCore(
             log("BRIDGE руль keycode=$code: нет аналога в AA, игнор", true)
             return
         }
-        if (android == KEYCODE_SEARCH && toPhoneAssistant("руль keycode=$code")) return
+        sendCarKey(android, "руль keycode=$code", if (call != PhoneCall.IDLE) " (звонок ${call.name})" else "")
+    }
+
+    /** Кнопка ГУ, которая уже пришла как Android keycode (ICCOA): без таблицы CarLife и обходов под ГУ CarLife. */
+    fun onCarKey(androidKeyCode: Int) {
+        lastUserInputMs = clockMs()
+        sendCarKey(androidKeyCode, "кнопка ГУ keycode=$androidKeyCode", "")
+    }
+
+    private fun sendCarKey(android: Int, what: String, note: String) {
+        if (android == KEYCODE_SEARCH && toPhoneAssistant(what)) return
         val p = peer
         if (p == null) {
-            log("BRIDGE руль keycode=$code проигнорирован: AA не подключён", true)
+            log("BRIDGE $what проигнорирован: AA не подключён", true)
             return
         }
-        if (android == KEYCODE_SEARCH && voiceKeyBounce("руль keycode=$code")) return
-        val note = if (call != PhoneCall.IDLE) " (звонок ${call.name})" else ""
-        log("BRIDGE руль keycode=$code -> AA KEYCODE $android$note", true)
+        if (android == KEYCODE_SEARCH && voiceKeyBounce(what)) return
+        log("BRIDGE $what -> AA KEYCODE $android$note", true)
         p.sendKey(android)
     }
 

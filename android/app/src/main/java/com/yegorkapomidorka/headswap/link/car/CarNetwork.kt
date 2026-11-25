@@ -3,6 +3,7 @@ package com.yegorkapomidorka.headswap.link.car
 import android.content.Context
 import android.net.ConnectivityManager
 import android.net.LinkProperties
+import android.net.MacAddress
 import android.net.Network
 import android.net.NetworkCapabilities
 import android.net.NetworkRequest
@@ -63,11 +64,13 @@ class CarNetwork(ctx: Context, private val onState: (CarNetState) -> Unit = {}) 
         val onAvailable: (Network) -> Unit,
         val onUnavailable: (String) -> Unit,
         val onLost: () -> Unit,
+        val bssid: String?,
     )
 
     /**
      * Запросить сеть. Уже просим или получили - ничего не делаем. [onAvailable] зовётся, когда известны и сеть, и имя
      * интерфейса; [onUnavailable] - сеть не нашлась, отказ в диалоге или ошибка запроса (reason - короткий код).
+     * [bssid] (aa:bb:cc:dd:ee:ff) сужает specifier до одной точки доступа: ICCOA присылает его вместе с SSID.
      */
     fun request(
         ssid: String,
@@ -76,10 +79,11 @@ class CarNetwork(ctx: Context, private val onState: (CarNetState) -> Unit = {}) 
         onAvailable: (Network) -> Unit,
         onUnavailable: (String) -> Unit,
         onLost: () -> Unit,
+        bssid: String? = null,
     ) {
         if (state == CarNetState.REQUESTING || state == CarNetState.AVAILABLE) return
         logStaConcurrency()
-        val p = Params(ssid, pass, timeoutMs, onAvailable, onUnavailable, onLost)
+        val p = Params(ssid, pass, timeoutMs, onAvailable, onUnavailable, onLost, bssid)
         val lan = rememberedLan(ssid)
         if (lan != null && classify(lan) != Seen.OTHER) {
             hold(p, lan)
@@ -193,6 +197,7 @@ class CarNetwork(ctx: Context, private val onState: (CarNetState) -> Unit = {}) 
     private fun start(p: Params, sec: Sec) {
         val req = try {
             val spec = WifiNetworkSpecifier.Builder().setSsid(p.ssid).apply {
+                p.bssid?.let { setBssid(MacAddress.fromString(it)) }
                 when (sec) {
                     Sec.OPEN -> {}
                     Sec.WPA2 -> setWpa2Passphrase(p.pass)

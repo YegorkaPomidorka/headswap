@@ -156,6 +156,20 @@ class SpsCropTest {
     }
 
     @Test
+    fun fitCarKeepsPassthrough() {
+        // ICCOA: экран машины из RTSP M3 -> кадр AA 1920x1080 с полем, которое режет SPS-кроп
+        for ((car, out) in listOf((2422 to 1272) to (1920 to 1008), (2764 to 1426) to (1920 to 992), (1440 to 1080) to (1440 to 1080))) {
+            val g = CustomVideoMode.fitCar(car.first, car.second)
+            assertEquals("$car", out, g.outW to g.outH)
+            assertEquals("1920x1080", g.aaResolution)
+            assertTrue("$car", g.spsCropable)
+            assertSame(g, g.effective(transcode = false))
+        }
+        assertSame(VideoMode.R1080, CustomVideoMode.fitCar(1920, 1080))
+        assertSame(VideoMode.R1080, CustomVideoMode.fitCar(2560, 1440))
+    }
+
+    @Test
     fun tiguanWide976BecomesWide836InPassthrough() {
         // WIDE_976 масштабирует область 1920x836 -> 2240x976, SPS-кропом не режется: в passthrough та же полоса 1:1
         assertFalse(VideoMode.WIDE_976.spsCropable)
