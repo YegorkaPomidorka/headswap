@@ -144,10 +144,8 @@ if ($Iccoa) {
     $pyArgs += $HuArgs
     $huProc = Start-Process python -ArgumentList $pyArgs -WorkingDirectory $Here -NoNewWindow -PassThru
     Start-Sleep -Seconds 3
-    # TODO(E3): the app has no iccoa_debug command yet (IccoaSession lands in stage E3). When it does, replace the
-    # message with: AdbOk @iccoaDebug | Out-Null
-    Write-Host "TODO: the ICCOA debug sign-in is not sent yet (the app side is stage E3 of docs/plans/iccoa-port.md)." -ForegroundColor Yellow
-    Write-Host "      The emulator waits on 57209 (PIN 123456). Command to send: adb $($iccoaDebug -join ' ')" -ForegroundColor Yellow
+    AdbOk @iccoaDebug | Out-Null
+    Step 'ICCOA sign-in sent (PIN 123456); close the window or wait -Duration to finish'
     $emuLog = 'iccoa_hu.log'
 } else {
     AdbOk reverse tcp:7240 tcp:7240 | Out-Null
