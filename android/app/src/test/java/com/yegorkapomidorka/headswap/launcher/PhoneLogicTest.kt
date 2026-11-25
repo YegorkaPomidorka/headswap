@@ -123,6 +123,18 @@ class PhoneLogicTest {
         assertTrue(!MusicLogic.isLiked(MusicLogic.Action("like", "Like")))
     }
 
+    @Test fun trackProgress() {
+        // пауза: позиция как есть
+        assertEquals(0.5f, MusicLogic.progress(30_000, 0, 0f, false, 60_000, 99_999)!!, 1e-4f)
+        // играет: +6 с с момента отметки
+        assertEquals(0.6f, MusicLogic.progress(30_000, 1_000, 1f, true, 60_000, 7_000)!!, 1e-4f)
+        // убежала за конец - упор в 1
+        assertEquals(1f, MusicLogic.progress(59_000, 0, 1f, true, 60_000, 10_000)!!, 1e-4f)
+        // нет длительности или позиции - полосы нет
+        assertNull(MusicLogic.progress(30_000, 0, 1f, true, 0, 0))
+        assertNull(MusicLogic.progress(-1, 0, 1f, true, 60_000, 0))
+    }
+
     @Test fun sessionPickPrefersPlayingThenChosen() {
         data class S(val pkg: String, val playing: Boolean)
         val list = listOf(S("a", false), S("b", true), S("c", false))

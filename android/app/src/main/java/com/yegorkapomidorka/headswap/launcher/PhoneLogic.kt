@@ -118,6 +118,16 @@ object MusicLogic {
     }
 
     /**
+     * Доля прослушанного 0..1 из PlaybackState: позиция на момент [updatedAt] плюс прошедшее с тех пор, пока играет.
+     * null - плеер не отдал длительность или позицию (тогда полосы нет).
+     */
+    fun progress(position: Long, updatedAt: Long, speed: Float, playing: Boolean, duration: Long, now: Long): Float? {
+        if (duration <= 0 || position < 0) return null
+        val pos = if (playing) position + ((now - updatedAt) * speed).toLong() else position
+        return (pos.toFloat() / duration).coerceIn(0f, 1f)
+    }
+
+    /**
      * Подбор сессии: играющая (выбранный плеер среди играющих первым), иначе выбранный плеер, иначе первая.
      * [chosenOnly] (карточка музыки с выбранным на чипе плеером): только сессия выбранного, чужие (даже играющие) карточку
      * не занимают - нет его сессии, null, и Play запускает выбранный. Иначе после голосового в Telegram или звонка
