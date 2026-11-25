@@ -392,7 +392,7 @@ internal object LauncherModel {
     }
 
     /** Смена «Масштаба карты» - перерисовать карточку (сами ступени в prefs, по пакету). */
-    /** Место плашки плеера над навигатором [pkg] (перетаскивание, ADR 0061). */
+    /** Место плашки плеера над навигатором [pkg] (перетаскивание, ADR 0063). */
     fun navPlayerPos(pkg: String): NavPlayerPlate.Pos? = prefs.navPlayerPos(pkg)
     fun saveNavPlayerPos(pkg: String, pos: NavPlayerPlate.Pos) = prefs.setNavPlayerPos(pkg, pos)
 

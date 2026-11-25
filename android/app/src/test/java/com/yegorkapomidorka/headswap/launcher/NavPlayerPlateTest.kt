@@ -7,9 +7,8 @@ import org.junit.Test
 class NavPlayerPlateTest {
     private fun look(
         navArea: Boolean = true, navReady: Boolean = true, carHost: Boolean = false, access: Boolean = true,
-        hasSession: Boolean = true, playing: Boolean = true, pausedSince: Long? = null, now: Long = 100_000,
-        ringing: Boolean = false, alice: Boolean = false,
-    ) = NavPlayerPlate.look(navArea, navReady, carHost, access, hasSession, playing, pausedSince, now, ringing, alice)
+        hasSession: Boolean = true, ringing: Boolean = false, alice: Boolean = false,
+    ) = NavPlayerPlate.look(navArea, navReady, carHost, access, hasSession, ringing, alice)
 
     @Test fun showsOnlyOverReadyWindowedNavigatorWithSession() {
         assertEquals(Look.FULL, look())
@@ -23,15 +22,6 @@ class NavPlayerPlateTest {
     @Test fun ringingAndAliceHideIt() {
         assertEquals(Look.HIDDEN, look(ringing = true))
         assertEquals(Look.HIDDEN, look(alice = true))
-        assertEquals(Look.HIDDEN, look(playing = false, pausedSince = 0, alice = true))
-    }
-
-    @Test fun collapsesAfterLongPause() {
-        assertEquals(Look.FULL, look(playing = false, pausedSince = null))
-        assertEquals(Look.FULL, look(playing = false, pausedSince = 100_000 - NavPlayerPlate.COLLAPSE_MS + 1))
-        assertEquals(Look.COLLAPSED, look(playing = false, pausedSince = 100_000 - NavPlayerPlate.COLLAPSE_MS))
-        // заиграло - снова полная, даже если отсчёт паузы ещё не сброшен
-        assertEquals(Look.FULL, look(playing = true, pausedSince = 0))
     }
 
     @Test fun sitsBetweenLeftAndRightPanels() {
