@@ -36,6 +36,8 @@ data class MusicState(
     val art: ImageBitmap? = null,
     val playing: Boolean = false,
     val like: LikeInfo? = null,
+    /** Доля прослушанного 0..1; null - плеер не отдал длительность, полосы нет. */
+    val progress: Float? = null,
 )
 
 /**
@@ -86,9 +88,14 @@ internal object MusicController {
         val artist = md?.getString(MediaMetadata.METADATA_KEY_ARTIST) ?: md?.getString(MediaMetadata.METADATA_KEY_DISPLAY_SUBTITLE).orEmpty()
         val actions = ps?.customActions.orEmpty().map { MusicLogic.Action(it.action, it.name.toString()) }
         val like = MusicLogic.findLike(actions)?.let { LikeInfo(it, MusicLogic.isLiked(it)) }
+        val playing = ps?.state == PlaybackState.STATE_PLAYING
+        val progress = ps?.let {
+            MusicLogic.progress(it.position, it.lastPositionUpdateTime, it.playbackSpeed, playing,
+                md?.getLong(MediaMetadata.METADATA_KEY_DURATION) ?: 0, SystemClock.elapsedRealtime())
+        }
         val next = MusicState(
             access = true, hasSession = true, pkg = c.packageName, title = title, artist = artist, art = art(md),
-            playing = ps?.state == PlaybackState.STATE_PLAYING, like = like,
+            playing = playing, like = like, progress = progress,
         )
         if (next != state) state = next
     }
