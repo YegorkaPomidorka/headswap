@@ -1,7 +1,5 @@
 package com.yegorkapomidorka.headswap.launcher
 
-import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
@@ -340,11 +338,7 @@ private fun PlayerChipColumn(modifier: Modifier) {
  */
 @Composable
 private fun WaveProgress(progress: Float, playing: Boolean, modifier: Modifier) {
-    val frac = remember { Animatable(progress) }
-    // опрос раз в секунду: тянем линейно за секунду, назад (новый трек, перемотка) - сразу
-    LaunchedEffect(progress) {
-        if (progress < frac.value) frac.snapTo(progress) else frac.animateTo(progress, tween(1000, easing = LinearEasing))
-    }
+    // край шагает раз в секунду (опрос) без анимации: плавный ход перерисовывал стол каждый кадр и гнал видео в ГУ
     val amp by animateFloatAsState(if (playing) 1f else 0f, tween(400), label = "waveAmp")
     // волна неподвижна (фаза привязана к началу дорожки), двигается только её конец
     Canvas(modifier) {
@@ -367,7 +361,7 @@ private fun WaveProgress(progress: Float, playing: Boolean, modifier: Modifier) 
         }
         // серая волна на всю длину, белая по той же волне закрывает пройденное
         wave(x1, Color.White.copy(alpha = 0.3f))
-        val fx = x0 + (x1 - x0) * frac.value
+        val fx = x0 + (x1 - x0) * progress
         if (fx > x0) wave(fx, Color.White)
     }
 }
