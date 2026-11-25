@@ -64,6 +64,11 @@
     <string name="l_phone_talk">Call %1$s</string>
     <string name="l_phone_calling">Calling…</string>
     <string name="l_phone_none">No calls</string>
+    <string name="l_call_hidden">Call</string>
+    <plurals name="l_missed_hidden">
+        <item quantity="one">%d call</item>
+        <item quantity="other">%d calls</item>
+    </plurals>
     <string name="l_phone_grant">Allow on the phone</string>
     <string name="l_call_back">Call back</string>
     <string name="l_call">Call</string>
@@ -215,6 +220,8 @@
     <string name="l_s_alice_voice">Alice by voice only</string>
     <string name="l_s_alice_voice_on">No window, a pill at the bottom; works on a locked phone</string>
     <string name="l_s_alice_voice_off">Alice in a panel on the left</string>
+    <string name="l_s_hide_caller">Hide numbers</string>
+    <string name="l_s_hide_caller_sub">Caller shown only in Calls</string>
     <string name="l_notif_show_all">Notifications: %1$d. Show all</string>
     <string name="l_notif_collapse">Collapse notifications</string>
     <string name="l_notif_clear_all">Clear all</string>

@@ -57,6 +57,15 @@
     <string name="l_phone_talk">اتصال بـ %1$s</string>
     <string name="l_phone_calling">جارٍ الاتصال…</string>
     <string name="l_phone_none">لا توجد مكالمات</string>
+    <string name="l_call_hidden">مكالمة</string>
+    <plurals name="l_missed_hidden">
+        <item quantity="zero">%d مكالمة</item>
+        <item quantity="one">%d مكالمة</item>
+        <item quantity="two">%d مكالمتان</item>
+        <item quantity="few">%d مكالمات</item>
+        <item quantity="many">%d مكالمة</item>
+        <item quantity="other">%d مكالمة</item>
+    </plurals>
     <string name="l_phone_grant">اسمح على الهاتف</string>
     <string name="l_call_back">معاودة الاتصال</string>
     <string name="l_call">اتصال</string>
@@ -219,4 +228,6 @@
     <string name="l_s_alice_voice">Alice بالصوت فقط</string>
     <string name="l_s_alice_voice_on">بلا نافذة، شريط صغير في الأسفل؛ يعمل حتى والهاتف مقفل</string>
     <string name="l_s_alice_voice_off">Alice في لوحة بجانب الشريط الجانبي</string>
+    <string name="l_s_hide_caller">إخفاء الأرقام</string>
+    <string name="l_s_hide_caller_sub">المتصل يظهر في «المكالمات» فقط</string>
 </resources>
