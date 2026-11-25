@@ -24,6 +24,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <time.h>
+#include <poll.h>
 #include <pthread.h>
 #include <sys/socket.h>
 #include <sys/select.h>
@@ -144,13 +145,15 @@ static int connect_phone(const char *host) {
 struct dirn {
     int usb_fd;
     int sock;
+    volatile int peer_dead;  /* ставит та нить, что умерла, чтобы разбудить другую */
 };
 
 /* телефон → ГУ, кадрами: заголовок отдельно, тело кусками ≤ CHUNK. */
 static void *pump_down(void *arg) {
     struct dirn *d = arg;
     unsigned char head[8], body[CHUNK];
-    long frames = 0, bytes = 0;
+    long frames = 0;
+    unsigned long long bytes = 0;
     while (1) {
         if (readn(d->sock, head, 8) < 0) break;
         uint32_t len = ((uint32_t) head[4] << 24) | ((uint32_t) head[5] << 16) |
@@ -173,22 +176,36 @@ static void *pump_down(void *arg) {
         bytes += 8 + (long) len;
     }
 done:
-    logts("вниз остановлено после %ld кадров (%ld Б)", frames, bytes);
-    /* будим pump_up: его запись в сокет упадёт */
+    logts("вниз остановлено после %ld кадров (%llu Б)", frames, bytes);
+    /* будим pump_up: сокет закрываем, флаг — на случай тихой ГУ (read аксессуара не проснётся сам) */
+    d->peer_dead = 1;
     shutdown(d->sock, SHUT_RDWR);
     return NULL;
 }
 
-/* ГУ → телефон, сырые байты. 0 — чистый EOF, -1 — ошибка. */
+/* ГУ → телефон, сырые байты. Выходит по EOF/ошибке ГУ или когда умерла нить вниз. */
 static void pump_up(struct dirn *d) {
     unsigned char buf[CHUNK];
-    long total = 0, first = 1;
+    unsigned long long total = 0;
+    int first = 1;
     while (1) {
+        /* не голый read: иначе при тихой ГУ зависнем навсегда, когда телефон уже отвалился */
+        struct pollfd pfd = { d->usb_fd, POLLIN, 0 };
+        int pr = poll(&pfd, 1, 1000);
+        if (pr == 0) {
+            if (d->peer_dead) { logts("нить вниз умерла, вверх закрываю (%llu Б)", total); return; }
+            continue;
+        }
+        if (pr < 0) {
+            if (errno == EINTR) continue;
+            logts("ГУ: poll ошибка: %s", strerror(errno));
+            return;
+        }
         ssize_t n = read(d->usb_fd, buf, CHUNK);
-        if (n == 0) { logts("ГУ: EOF, вверх %ld Б", total); return; }
+        if (n == 0) { logts("ГУ: EOF, вверх %llu Б", total); return; }
         if (n < 0) {
             if (errno == EINTR) continue;
-            logts("ГУ: ошибка чтения: %s, вверх %ld Б", strerror(errno), total);
+            logts("ГУ: ошибка чтения: %s, вверх %llu Б", strerror(errno), total);
             return;
         }
         if (first) {
@@ -199,7 +216,7 @@ static void pump_up(struct dirn *d) {
             first = 0;
         }
         if (writen(d->sock, buf, (size_t) n) < 0) {
-            logts("ГУ→телефон: сокет закрыт, вверх %ld Б", total);
+            logts("ГУ→телефон: сокет закрыт, вверх %llu Б", total);
             return;
         }
         total += n;
@@ -225,7 +242,7 @@ static int run_session(const char *host, const char *dev) {
     }
     logts("аксессуар %s открыт, труба пошла", dev);
 
-    struct dirn d = { usb_fd, sock };
+    struct dirn d = { usb_fd, sock, 0 };
     pthread_t down;
     pthread_create(&down, NULL, pump_down, &d);
     pump_up(&d);

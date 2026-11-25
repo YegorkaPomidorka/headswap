@@ -53,7 +53,10 @@ def main():
     tty.setraw(slave)
     slave_path = os.ttyname(slave)
 
-    proc = subprocess.Popen(runner + [relay_bin, "127.0.0.1", slave_path])
+    # stderr реле — в DEVNULL: иначе после теста реле уходит в цикл переподключения
+    # и держит унаследованный пайп открытым
+    proc = subprocess.Popen(runner + [relay_bin, "127.0.0.1", slave_path],
+                            stderr=subprocess.DEVNULL)
     os.close(slave)  # slave держит реле
 
     srv.settimeout(10)
@@ -88,11 +91,11 @@ def main():
     srv.close()
     os.close(master)
     time.sleep(0.3)
-    proc.terminate()
+    proc.kill()  # qemu в sleep() игнорирует SIGTERM — сразу SIGKILL
     try:
         proc.wait(timeout=3)
     except subprocess.TimeoutExpired:
-        proc.kill()
+        pass
 
     print("ИТОГ:", "OK" if ok else "ПРОВАЛ")
     sys.exit(0 if ok else 1)
