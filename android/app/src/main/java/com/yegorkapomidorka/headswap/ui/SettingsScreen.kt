@@ -275,7 +275,8 @@ class SettingsScreen(host: MainActivity) : Screen(host) {
         val mode = c.getString(if (aa.transcode) R.string.set_transcode_title else R.string.set_direct_title)
         val geo = aa.videoGeometry.effective(aa.transcode)
         val res = if (geo is VideoMode) c.getString(geo.titleRes) else geo.outLabel
-        val dpi = aa.aaDensity.takeIf { it != AaDensity.AUTO }?.let { c.getString(R.string.set_sum_density, it) }
+        val dpi = aa.aaDensity.takeIf { it != AaDensity.AUTO && BridgeMode.effective(aa.bridgeMode, Build.VERSION.SDK_INT) != BridgeMode.DESKTOP }
+            ?.let { c.getString(R.string.set_sum_density, it) }
         set(SettingsSection.VIDEO, listOfNotNull(mode, res, dpi, c.getString(aa.fpsSetting.titleRes)).joinToString(" · "))
 
         if (c.micMissing(aa)) {
@@ -947,9 +948,12 @@ class SettingsSectionScreen(host: MainActivity, val section: SettingsSection) : 
         body.addView(resolutionField(), lp(MATCH, WRAP))
         note(c.getString(R.string.set_apply_next))
 
-        body.addView(c.sectionTitle(c.getString(R.string.set_aa_density)))
-        body.addView(densityCard(), lp(MATCH, WRAP))
-        note(c.getString(R.string.set_aa_density_note))
+        // h1453: «Свой лаунчер» берёт dpi рабочего стола сам, масштаб AA там ни на что не влияет
+        if (!desktop) {
+            body.addView(c.sectionTitle(c.getString(R.string.set_aa_density)))
+            body.addView(densityCard(), lp(MATCH, WRAP))
+            note(c.getString(R.string.set_aa_density_note))
+        }
 
         if (desktop) {
             body.addView(c.sectionTitle(c.getString(R.string.set_desktop_fps_title)))
