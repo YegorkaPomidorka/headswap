@@ -43,6 +43,8 @@ class DesktopInputs(
     val status: String,
     val error: String?,
     val wireless: Boolean = false,
+    /** Сессия по ICCOA CarLink, а не CarLife. */
+    val iccoa: Boolean = false,
     /** Размер видео текущей сессии («1280×720»). */
     val videoRes: String = "1280×720",
     /** Подпись выбранного лаунчера на экране машины. */
@@ -62,6 +64,7 @@ object DesktopHomeLogic {
     private val NONE = UiText.raw("")
     private val CARLIFE = UiText.raw("CarLife 2.0")
     private val CARLIFE_WIFI = UiText.raw("CarLife 2.0 · Wi-Fi")
+    private val ICCOA = UiText.raw("ICCOA CarLink")
     private val ACTIVE = UiText.res(R.string.home_desk_st_active)
 
     /** Порядок проверки: активация, ошибка, восстановление, работает, ждём. */
@@ -84,7 +87,7 @@ object DesktopHomeLogic {
             DesktopPhase.ERROR, Tone.ERR, HeroIcon.ALERT, UiText.res(R.string.home_desk_title_error), UiText.raw(i.error),
             listOf(
                 StageState.DONE to ACTIVE,
-                if (i.bridgeRunning) StageState.DONE to (if (i.wireless) CARLIFE_WIFI else CARLIFE) else StageState.PEND to NONE,
+                if (i.bridgeRunning) StageState.DONE to (if (i.iccoa) ICCOA else if (i.wireless) CARLIFE_WIFI else CARLIFE) else StageState.PEND to NONE,
                 StageState.ERR to UiText.res(R.string.home_desk_st_error), StageState.PEND to NONE, StageState.PEND to NONE,
             ),
             // «Остановить» только пока сессия жива
@@ -104,7 +107,7 @@ object DesktopHomeLogic {
             UiText.res(R.string.home_desk_sub_ok, i.desktopName),
             listOf(
                 StageState.DONE to ACTIVE,
-                StageState.DONE to (if (i.wireless) CARLIFE_WIFI else CARLIFE),
+                StageState.DONE to (if (i.iccoa) ICCOA else if (i.wireless) CARLIFE_WIFI else CARLIFE),
                 StageState.DONE to UiText.raw(i.desktopName),
                 StageState.DONE to UiText.raw("⁦${i.videoRes}⁩"), // LTR-изоляция: в RTL не «720×1280»
                 StageState.DONE to UiText.raw(if (!i.usbAudio) "Bluetooth" else if (i.wireless) "Wi-Fi" else "USB"),
@@ -158,6 +161,7 @@ object DesktopHomeStatus {
             status = status,
             error = DexState.error,
             wireless = CarLifeState.wirelessSession,
+            iccoa = CarLifeState.iccoa,
             videoRes = (CarLifeState.videoMode ?: aa.videoGeometry.effective(aa.transcode)).outLabel,
             desktopName = desktopName(ctx),
             usbAudio = DesktopAudioState.running && DesktopAudioState.nonSilentBuffers > 0,

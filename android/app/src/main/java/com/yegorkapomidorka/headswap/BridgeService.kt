@@ -1001,6 +1001,7 @@ class BridgeService : Service() {
         cancelBtHint()
         CarLifeState.accessory = transport.label
         CarLifeState.wirelessSession = transport.caps.kind == TransportCaps.TCP6.kind
+        CarLifeState.iccoa = false
         if (transport.caps.kind != TransportCaps.TCP6.kind) WLog.begin(transport.caps.kind)
 
         // режим моста снимается на подключение; DESKTOP на Android ниже 13 трактуется как Android Auto
@@ -1224,6 +1225,8 @@ class BridgeService : Service() {
         sessionMode = wantedMode
         DexState.desktopSession = wantedMode == BridgeMode.DESKTOP
         CarLifeState.accessory = "ICCOA $carHost"
+        CarLifeState.iccoa = true
+        CarLifeState.wirelessSession = !java.net.InetAddress.getByName(carHost).isLoopbackAddress
         acquireSessionWakeLocks()
         CarLifeState.running = true
         stopRequested = false
@@ -1279,6 +1282,8 @@ class BridgeService : Service() {
         }
         AppLog.i("ICCOA: экран машины ${screen.width}x${screen.height}, ${h.core.videoMode.describe(h.core.densityOverride)}")
         CarLifeState.status = "ICCOA: ${if (desktop) "рабочий стол" else "мост"}"
+        CarLifeState.videoMode = h.core.videoMode
+        CarLifeState.densityOverride = h.core.densityOverride
         s.bind(h.core)
         h.onUsbSessionStarted()
     }
@@ -1573,6 +1578,7 @@ class BridgeService : Service() {
         if (sessionMode == BridgeMode.DESKTOP) onDesktopSessionClosing(s)
         session = null
         if (s is IccoaSession) {
+            CarLifeState.iccoa = false
             // ICCOA: только общая часть — хост в grace и finish при пустоте; свисток, usb→air и ожидание Wi-Fi не её
             CarLifeState.status = "ICCOA закрыто: $reason"
             val h = host

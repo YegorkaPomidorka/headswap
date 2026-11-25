@@ -22,6 +22,9 @@ object CarLifeState {
     /** Текущая сессия идёт по Wi-Fi (TCP), а не по кабелю; false - сессии нет или она по USB. */
     @Volatile var wirelessSession: Boolean = false
 
+    /** Текущая сессия - ICCOA CarLink, а не CarLife (строка «Магнитола» на главном). */
+    @Volatile var iccoa: Boolean = false
+
     /** ГУ из HU_INFO: «производитель модель» и carlifeversion (раздел «Система» лаунчера); null - ещё не приходило. */
     @Volatile var huName: String? = null
     @Volatile var huCarlifeVersion: String? = null
