@@ -17,6 +17,7 @@ CarLife по воздуху устроен по-разному. У Mazda G6S —
 - Ветка A (Mazda): телефон — RFCOMM-сервер `carlife`, в P2P-группу ГУ входит клиентом (`P2pJoin.kt`); `MD_WIFI_IP` отвечает на
   `IP_REQUEST` (`BtFrames.kt:16-17`). При распаде группы и живом BT идёт rejoin (PR #48, #68, общая логика).
 - VW BT 1420: сеть машины и UDP-маяк (`HotspotBeacon.kt`).
+- ICCOA CarLink ходит в точку доступа машины через тот же `CarNetwork`, с BSSID из BLE (ADR 0066, «Подъём по воздуху»).
 - Хотспот мост не поднимает; `HotspotDetect` (PR #117) только подсказывает, включён ли он.
 - `targetSdk = 37` и `ACCESS_LOCAL_NETWORK` (`build.gradle.kts:20`, `AndroidManifest.xml:26`): без разрешения входящий TCP
   из LAN молча режется, loopback (AA 5277) разрешения не требует.

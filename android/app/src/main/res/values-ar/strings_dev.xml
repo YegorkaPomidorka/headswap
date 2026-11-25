@@ -76,6 +76,12 @@
     <string name="dev_check_server_usb">ملحق USB (السيارة) متصل: الفحص سيقطع الاتصال. افصل الكابل.</string>
     <string name="dev_check_server_running">الفحص جارٍ بالفعل</string>
 
+    <string name="dev_section_iccoa">ICCOA CarLink (تجريبي)</string>
+    <string name="dev_iccoa_note">اتصال لاسلكي بسيارة تدعم ICCOA CarLink. افتح CarLink على شاشة السيارة وأدخل رمز PIN المكوّن من 6 أرقام الظاهر عليها. اتركه فارغًا إذا كانت السيارة تعرف هذا الهاتف مسبقًا.</string>
+    <string name="dev_iccoa_connect">اتصال ICCOA</string>
+    <string name="dev_iccoa_pin_bad">رمز PIN مكوّن من 6 أرقام</string>
+    <string name="dev_iccoa_no_permission">لا يمكن العثور على السيارة بدون الأذونات</string>
+
     <string name="dev_section_status">الحالة</string>
     <string name="dev_section_log">السجل</string>
     <plurals name="dev_log_lines">

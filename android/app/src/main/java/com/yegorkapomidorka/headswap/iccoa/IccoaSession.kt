@@ -59,13 +59,18 @@ class IccoaConfig(
     val sensorPort: Int = IccoaFrame.SENSOR_PORT,
     val rtspPort: Int = IccoaRtsp.PORT,
     val uibcPort: Int = IccoaRtsp.UIBC_PORT,
+    /**
+     * Подъём по воздуху (BLE): машина уже получила в CLIENT_INFO либо PIN, либо быстрый вход, и по TCP ждёт то же самое.
+     * Быстрый вход — только без PIN, а отказ в нём по PIN не повторяется: PIN машине нужен заново по BLE.
+     */
+    val air: Boolean = false,
 )
 
 /** Всё, что в бою требует Android или сети машины; тест подставляет своё. */
 class IccoaPlatform(
     val log: (String) -> Unit = { AppLog.i(it, false) },
     val nowUs: () -> Long = { System.nanoTime() / 1000 },
-    /** Исходящие сокеты (auth, RTP); в Э4 сюда придёт Network.bindSocket. */
+    /** Исходящие сокеты (auth, RTP); по воздуху — привязанные к сети машины (Network.bindSocket). */
     val socket: () -> Socket = { Socket() },
     /** Заглушка: ширина, высота, fps, битрейт, слушатель, видимая область, формат рабочего стола. null — заглушки нет. */
     val stub: (Int, Int, Int, Int, VideoSource.Listener, Rect?, Boolean) -> VideoSource? =
@@ -249,7 +254,7 @@ class IccoaSession(
         try {
             val identity = trust.identity()
             val pinned = trust.carKey(cfg.carId)
-            var quick = pinned != null
+            var quick = pinned != null && (cfg.pin == null || !cfg.air)
             var workMode = 0
             while (!closed.get()) {
                 if (!quick && cfg.pin == null) {
@@ -266,6 +271,10 @@ class IccoaSession(
                     if (result == 4L && workMode < WORK_MODES.lastIndex) {
                         workMode++
                         ev("auth", "retry", "why" to "work-mode", "next" to WORK_MODES[workMode])
+                    } else if (result == 1L && quick && cfg.air) {
+                        ev("auth", "normal-required")
+                        close("машина не узнала телефон, введите PIN")
+                        return
                     } else if (result == 1L && quick && cfg.pin != null) {
                         // Машина нас забыла: знакомимся заново по PIN.
                         quick = false

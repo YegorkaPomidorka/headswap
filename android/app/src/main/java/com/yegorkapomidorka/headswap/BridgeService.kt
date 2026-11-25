@@ -59,10 +59,15 @@ import com.yegorkapomidorka.headswap.dex.PhoneAssistant
 import com.yegorkapomidorka.headswap.dex.UsbDetachPolicy
 import com.yegorkapomidorka.headswap.aa.CustomVideoMode
 import com.yegorkapomidorka.headswap.aa.NativeDesktopGeometry
+import com.yegorkapomidorka.headswap.iccoa.IccoaBle
+import com.yegorkapomidorka.headswap.iccoa.IccoaBleInfo
 import com.yegorkapomidorka.headswap.iccoa.IccoaConfig
+import com.yegorkapomidorka.headswap.iccoa.IccoaPlatform
 import com.yegorkapomidorka.headswap.iccoa.IccoaSession
 import com.yegorkapomidorka.headswap.iccoa.IccoaTrustPrefs
 import com.yegorkapomidorka.headswap.iccoa.IccoaVideoConfig
+import com.yegorkapomidorka.headswap.iccoa.IccoaWifiInfo
+import com.yegorkapomidorka.headswap.iccoa.icLog
 import com.yegorkapomidorka.headswap.link.CarTransport
 import com.yegorkapomidorka.headswap.link.DongleListener
 import com.yegorkapomidorka.headswap.link.LinkSetupException
@@ -180,6 +185,10 @@ class BridgeService : Service() {
     /** Висит уведомление «включите Wi-Fi» (Wi-Fi Direct упёрся в выключенный Wi-Fi). Только главная нить. */
     private var wifiOffShown = false
     private val btHintTick = Runnable { checkBtHint() }
+    /** ICCOA по воздуху: скан/GATT идущего подъёма, потом держится до конца сессии (ADR 0066). Только главная нить. */
+    private var iccoaBle: IccoaBle? = null
+    /** Сеть машины в [carNet] запросил подъём ICCOA: ему её и снимать. Только главная нить. */
+    private var iccoaNet = false
     private var wakeLock: PowerManager.WakeLock? = null
     private val audioDiag = AudioDiag()
     /** Ветка A, диагностика: RFCOMM `carlife` слушаем, пока ждём машину по Wi-Fi. Колбэки с bt-нити перекидываем на главную. */
@@ -255,20 +264,20 @@ class BridgeService : Service() {
             val accepted = !stopRequested && s != null
             AppLog.i("DESKTOP «Домой» долгое: меню ГУ, accepted=$accepted", true)
             if (accepted) s!!.goToDesktop()
-            if (session == null && host == null && !linkWaiting && dongle == null) stopSelfResult(startId)
+            if (session == null && host == null && !linkWaiting && dongle == null && iccoaBle == null) stopSelfResult(startId)
             return stickiness()
         }
         if (intent?.action == ACTION_DESKTOP_HOME) {
             // команда относится только к живой desktop-сессии: опоздавший клик не должен поднимать сервис и новый рабочий стол
             val accepted = !stopRequested && session != null && host?.showDesktop() == true
             AppLog.i("DESKTOP home request accepted=$accepted", false)
-            if (session == null && host == null && !linkWaiting && dongle == null) stopSelfResult(startId)
+            if (session == null && host == null && !linkWaiting && dongle == null && iccoaBle == null) stopSelfResult(startId)
             return stickiness()
         }
         if (intent?.action == ACTION_LAUNCHER_DEBUG) {
             // стенд лаунчера: экран, раздел, тема и карта без тапов и без окна MainActivity поверх рабочего стола
             com.yegorkapomidorka.headswap.launcher.LauncherDebug.apply(this, intent)
-            if (session == null && host == null && !linkWaiting && dongle == null) stopSelfResult(startId)
+            if (session == null && host == null && !linkWaiting && dongle == null && iccoaBle == null) stopSelfResult(startId)
             return stickiness()
         }
         DexState.desktopSession = foregroundMode() == BridgeMode.DESKTOP
@@ -327,6 +336,7 @@ class BridgeService : Service() {
             autoStarted = false
             cancelAutoOff()
             cancelHint()
+            endIccoaAir("stop")
             stopCarNet(CarNetEvent.STOP, "stop")
             CarLifeState.wireless = null
             btProbe.stop("стоп")
@@ -386,6 +396,11 @@ class BridgeService : Service() {
         val iccoa = DebugTransport.iccoa(intent)
         if (iccoa != null) {
             startIccoa(iccoa.first, iccoa.second)
+            return
+        }
+        // ICCOA по воздуху (Э4, бета): кнопка в «Для разработчиков», работает и в release
+        if (intent?.action == ACTION_ICCOA_AIR) {
+            startIccoaAir(intent.getStringExtra(EXTRA_ICCOA_PIN)?.takeIf { it.isNotEmpty() })
             return
         }
         // беспровод, ветка B (хотспот телефона + маяк): кнопка в настройках бета-сборки или debug-вход
@@ -1209,13 +1224,13 @@ class BridgeService : Service() {
 
     /**
      * Сессия ICCOA стартует без хоста: экран машины известен только из RTSP M3, хост создаётся в [onIccoaScreen].
-     * Пока вход один — debug (машина на 127.0.0.1); BLE и Wi-Fi машины придут в Э4 вместе с localIp телефона.
+     * Два входа: debug (машина на 127.0.0.1, без [network]) и по воздуху из [startIccoaAir] — [network] это Wi-Fi машины,
+     * [carHost] её шлюз, [localIp] адрес телефона в ней, [carId] — под каким именем хранится ключ машины.
      */
-    private fun startIccoa(carHost: String, pin: String?, localIp: String = "127.0.0.1") {
+    private fun startIccoa(carHost: String, pin: String?, localIp: String = "127.0.0.1", network: Network? = null, carId: String = carHost) {
         val wantedMode = BridgeMode.effective(AaPrefs(this).bridgeMode, Build.VERSION.SDK_INT)
-        if (wantedMode == BridgeMode.DESKTOP && !DesktopAccess.isReady(this)) {
-            // shortcut: без уведомления desktopNotActivated (оно закрывает CarTransport), добавить с UI в Э4
-            AppLog.i("ICCOA: рабочий стол не активирован (${DelegatedDesktopAccess.status(this)}), сессия не стартует")
+        if (iccoaDesktopBlocked(wantedMode)) {
+            endIccoaAir("desktop")
             CarLifeState.status = getString(R.string.desk_not_activated)
             failStart()
             return
@@ -1224,7 +1239,7 @@ class BridgeService : Service() {
         reconcileHostMode(wantedMode)
         sessionMode = wantedMode
         DexState.desktopSession = wantedMode == BridgeMode.DESKTOP
-        CarLifeState.accessory = "ICCOA $carHost"
+        CarLifeState.accessory = if (network != null) "ICCOA CarLink" else "ICCOA $carHost"
         CarLifeState.iccoa = true
         CarLifeState.wirelessSession = !java.net.InetAddress.getByName(carHost).isLoopbackAddress
         acquireSessionWakeLocks()
@@ -1233,13 +1248,128 @@ class BridgeService : Service() {
         val loopback = java.net.InetAddress.getByName(carHost).isLoopbackAddress
         val sref = arrayOfNulls<IccoaSession>(1)
         val s = IccoaSession(
-            IccoaConfig(carHost, pin, localIp, Build.MODEL, bindHost = if (loopback) carHost else null), IccoaTrustPrefs(this),
+            IccoaConfig(carHost, pin, localIp, Build.MODEL, carId = carId,
+                bindHost = if (loopback) carHost else if (network != null) localIp else null, air = network != null),
+            IccoaTrustPrefs(this),
+            // По воздуху исходящие сокеты (вход, RTP) идут через сеть машины, а не через сеть по умолчанию.
+            if (network != null) IccoaPlatform(socket = { java.net.Socket().also(network::bindSocket) }) else IccoaPlatform(),
             onScreen = { screen -> main.post { onIccoaScreen(sref[0]!!, screen) } },
         ) { reason -> main.post { onSessionClosed(sref[0]!!, reason) } }
         sref[0] = s
         session = s
         CarLifeState.status = "ICCOA: вход"
         s.start()
+    }
+
+    private fun iccoaDesktopBlocked(wantedMode: BridgeMode): Boolean {
+        if (wantedMode != BridgeMode.DESKTOP || DesktopAccess.isReady(this)) return false
+        // shortcut: без уведомления desktopNotActivated (оно закрывает CarTransport), добавить вместе с экраном ICCOA
+        AppLog.i("ICCOA: рабочий стол не активирован (${DelegatedDesktopAccess.status(this)}), сессия не стартует")
+        return true
+    }
+
+    /**
+     * ICCOA по воздуху (Э4, ADR 0066): BLE → GATT → Wi-Fi машины ([carNet]) → [startIccoa]. [pin] — с экрана машины,
+     * null — быстрый вход по сохранённому ключу. PIN живёт только в этой попытке. Главная нить.
+     */
+    private fun startIccoaAir(pin: String?) {
+        if (iccoaBle != null) {
+            AppLog.i("ICCOA: подключение уже идёт, повторный старт игнорирую")
+            return
+        }
+        val refuse = when {
+            pin != null && !IccoaBleInfo.validPin(pin) -> "ICCOA: PIN — 6 цифр с экрана машины"
+            iccoaDesktopBlocked(BridgeMode.effective(AaPrefs(this).bridgeMode, Build.VERSION.SDK_INT)) -> getString(R.string.desk_not_activated)
+            // targetSdk 37: без ACCESS_LOCAL_NETWORK сеть машины молча режется, вход упёрся бы в таймаут
+            NetProbe.localNetworkGranted(this) == "denied" -> {
+                icLog("air", "no-local-network")
+                "ICCOA: нет доступа к локальной сети, выдайте его в разрешениях приложения"
+            }
+            else -> null
+        }
+        if (refuse != null) {
+            CarLifeState.status = refuse
+            failStart()
+            return
+        }
+        stopRequested = false
+        CarLifeState.status = "ICCOA: поиск машины"
+        var carId = "ble"
+        val ref = arrayOfNulls<IccoaBle>(1)
+        val ble = IccoaBle(this, IccoaTrustPrefs(this), pin,
+            onFound = { id ->
+                carId = id
+                CarLifeState.status = "ICCOA: подключение к машине"
+            },
+            onWifi = { info -> iccoaWifi(ref[0]!!, info, pin, carId) },
+            onFail = { code -> iccoaAirFailed(ref[0]!!, code) })
+        ref[0] = ble
+        iccoaBle = ble
+        ble.start()
+    }
+
+    /** SERVER_INFO получен: входим в Wi-Fi машины. GATT при этом остаётся открытым. */
+    private fun iccoaWifi(ble: IccoaBle, info: IccoaWifiInfo, pin: String?, carId: String) {
+        if (iccoaBle !== ble) return
+        // сеть машины занята ожиданием CarLife или уже идёт другая сессия: чужой запрос не снимаем
+        if (carNetBusy || session != null) return iccoaAirFailed(ble, "busy", "wifi")
+        CarLifeState.status = "ICCOA: Wi-Fi машины"
+        val since = SystemClock.elapsedRealtime()
+        icLog("wifi", "request", "bssid" to if (info.bssid != null) "yes" else "no")
+        iccoaNet = true
+        carNet.request(info.ssid, info.psk, ICCOA_WIFI_MS,
+            onAvailable = { network -> iccoaGateway(ble, network, pin, carId, since, 0) },
+            onUnavailable = { why -> iccoaAirFailed(ble, why, "wifi") },
+            onLost = {
+                icLog("wifi", "lost")
+                val s = session
+                if (s is IccoaSession) s.close("Wi-Fi машины пропал") else iccoaAirFailed(ble, "lost", "wifi")
+            },
+            bssid = info.bssid)
+    }
+
+    /** Сеть машины поднялась: ждём адрес телефона и шлюз (машину), DHCP может отстать от onAvailable. */
+    private fun iccoaGateway(ble: IccoaBle, network: Network, pin: String?, carId: String, since: Long, tries: Int) {
+        if (iccoaBle !== ble || carNet.current != network) return
+        if (session != null) return iccoaAirFailed(ble, "busy", "wifi")
+        val (local, gateway) = carNet.addresses()
+        if (local == null || gateway == null) {
+            if (tries >= ICCOA_GATEWAY_TRIES) return iccoaAirFailed(ble, if (local == null) "no-ipv4" else "no-gateway", "wifi")
+            main.postDelayed({ iccoaGateway(ble, network, pin, carId, since, tries + 1) }, 1_000)
+            return
+        }
+        icLog("wifi", "up", "ms" to SystemClock.elapsedRealtime() - since, "local" to IccoaBleInfo.mask(local), "gw" to IccoaBleInfo.mask(gateway))
+        startIccoa(gateway, pin, local, network, carId)
+    }
+
+    /** Подъём по воздуху не удался: всё снять и показать причину. [phase] != null — отказ ещё не в логе (Wi-Fi). */
+    private fun iccoaAirFailed(ble: IccoaBle, code: String, phase: String? = null) {
+        if (iccoaBle !== ble) return
+        if (phase != null) icLog(phase, "fail", "why" to code)
+        endIccoaAir(code)
+        CarLifeState.status = when {
+            code == "no-permission" -> "ICCOA: нет разрешения на Bluetooth"
+            code == "bt-off" -> "ICCOA: включите Bluetooth"
+            code == "location-off" -> "ICCOA: включите геолокацию, без неё поиск по Bluetooth не работает"
+            code == "not-found" || code == "not-connectable" -> "ICCOA: машина не найдена. Включите на ней CarLink и подойдите ближе"
+            code == "need-pin" -> "ICCOA: введите PIN с экрана машины"
+            code == "no-server-info" || code == "write-rejected" -> "ICCOA: машина не ответила. Проверьте PIN и экран машины"
+            code == "p2p-unsupported" -> "ICCOA: машина предлагает только Wi-Fi Direct, он пока не поддержан"
+            code == "busy" -> "ICCOA: сначала остановите мост"
+            phase == "wifi" -> "ICCOA: Wi-Fi машины не подключился ($code)"
+            else -> "ICCOA: сбой Bluetooth ($code)"
+        }
+        failStart()
+    }
+
+    /** Конец подъёма или сессии ICCOA по воздуху: закрыть GATT и снять свою сеть машины. Без подъёма ничего не делает. */
+    private fun endIccoaAir(why: String) {
+        val ble = iccoaBle ?: return
+        iccoaBle = null
+        ble.close()
+        if (iccoaNet) carNetImpl?.release("iccoa-$why")
+        iccoaNet = false
+        if (session == null) CarLifeState.status = "ICCOA: остановлено"
     }
 
     /** Экран машины известен: хост под геометрию [CustomVideoMode.fitCar] и привязка ядра к сессии. Главная нить. */
@@ -1566,7 +1696,7 @@ class BridgeService : Service() {
 
     /** Старт не удался: если жив AA-хост (идёт grace), сервис не гасим, иначе finish. */
     private fun failStart() {
-        if (linkWaiting || dongle != null) return      // идёт ожидание машины по воздуху или свистка: сервис нужен
+        if (linkWaiting || dongle != null || iccoaBle != null) return      // идёт ожидание машины по воздуху, свистка или подъём ICCOA: сервис нужен
         val h = host
         if (h != null && !h.isDead) return
         if (h == null) finish()
@@ -1579,6 +1709,8 @@ class BridgeService : Service() {
         session = null
         if (s is IccoaSession) {
             CarLifeState.iccoa = false
+            CarLifeState.wirelessSession = false
+            endIccoaAir("session")      // GATT держали до конца сессии; сеть машины тоже больше не нужна
             // ICCOA: только общая часть — хост в grace и finish при пустоте; свисток, usb→air и ожидание Wi-Fi не её
             CarLifeState.status = "ICCOA закрыто: $reason"
             val h = host
@@ -1671,6 +1803,7 @@ class BridgeService : Service() {
         autoMode = false
         cancelAutoOff()
         cancelHint()
+        endIccoaAir("destroy")
         stopCarNet(CarNetEvent.DESTROY, "destroy")
         pendingTcp6?.abort()
         stopDongle("сервис уничтожен")
@@ -1702,6 +1835,12 @@ class BridgeService : Service() {
         const val ACTION_WIFI_B = "com.yegorkapomidorka.headswap.WIFI_B"
         /** Свисток: слушать :7250, стик в USB ГУ подключается по Wi-Fi и несёт поток аксессуара. Выключается общим [ACTION_STOP]. */
         const val ACTION_DONGLE = "com.yegorkapomidorka.headswap.DONGLE"
+        /** ICCOA CarLink по воздуху (бета, «Для разработчиков»): BLE → Wi-Fi машины → сессия. [EXTRA_ICCOA_PIN] — PIN с экрана машины, без него быстрый вход. */
+        const val ACTION_ICCOA_AIR = "com.yegorkapomidorka.headswap.ICCOA_AIR"
+        const val EXTRA_ICCOA_PIN = "iccoa_pin"
+        private const val ICCOA_WIFI_MS = 60_000L
+        /** Сколько раз (через 1 с) ждать адрес и шлюз после появления сети машины. */
+        private const val ICCOA_GATEWAY_TRIES = 10
         /** Новый сокет свистка ждёт закрытия старой сессии: 15 × 200 мс. */
         private const val DONGLE_REPLACE_TRIES = 15
         private const val DONGLE_REPLACE_STEP_MS = 200L

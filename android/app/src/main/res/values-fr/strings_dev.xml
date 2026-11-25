@@ -80,6 +80,12 @@
     <string name="dev_check_server_usb">Un accessoire USB (la voiture) est connecté : la vérification couperait la connexion. Débranchez le câble.</string>
     <string name="dev_check_server_running">Une vérification est déjà en cours</string>
 
+    <string name="dev_section_iccoa">ICCOA CarLink (bêta)</string>
+    <string name="dev_iccoa_note">Connexion sans fil à une voiture avec ICCOA CarLink. Ouvrez CarLink sur l\'écran de la voiture et saisissez le code PIN à 6 chiffres affiché. Laissez vide si la voiture connaît déjà ce téléphone.</string>
+    <string name="dev_iccoa_connect">Connecter ICCOA</string>
+    <string name="dev_iccoa_pin_bad">Le code PIN comporte 6 chiffres</string>
+    <string name="dev_iccoa_no_permission">Sans les autorisations, la voiture est introuvable</string>
+
     <string name="dev_section_status">État</string>
     <string name="dev_section_log">Journal</string>
     <plurals name="dev_log_lines">

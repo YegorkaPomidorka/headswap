@@ -1,7 +1,9 @@
 package com.yegorkapomidorka.headswap.ui
 
+import android.Manifest
 import android.app.AlertDialog
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.media.MediaCodecInfo
 import android.media.MediaCodecList
 import android.os.Build
@@ -24,6 +26,7 @@ import android.widget.TextView
 import android.widget.Toast
 import com.yegorkapomidorka.headswap.MainActivity
 import com.yegorkapomidorka.headswap.AppLog
+import com.yegorkapomidorka.headswap.BridgeService
 import com.yegorkapomidorka.headswap.CarLifeState
 import com.yegorkapomidorka.headswap.R
 import com.yegorkapomidorka.headswap.aa.AaPrefs
@@ -41,6 +44,7 @@ import com.yegorkapomidorka.headswap.aa.VoiceChunk
 import com.yegorkapomidorka.headswap.dex.DexPrefs
 import com.yegorkapomidorka.headswap.dex.VdmDesktop
 import com.yegorkapomidorka.headswap.dex.VdmHostPolicy
+import com.yegorkapomidorka.headswap.iccoa.IccoaBleInfo
 
 /** «Для разработчиков» (Dev.dc.html): отладочные флажки, кнопки, статус и живой лог (последние ~200 строк). */
 class DevScreen(host: MainActivity) : Screen(host) {
@@ -61,6 +65,9 @@ class DevScreen(host: MainActivity) : Screen(host) {
     private var customCalc: View? = null
     private val customVals = arrayOfNulls<TextView>(4)
     private var customUpdating = false
+    private var iccoaPin: EditText? = null
+    /** Ждём ответа на запрос разрешений, чтобы продолжить подключение ICCOA. */
+    private var iccoaAwaiting = false
     private val chunkRows = LinkedHashMap<MediaChunk, RadioRow>()
     private val voiceChunkRows = LinkedHashMap<VoiceChunk, RadioRow>()
     private val ttsPrerollRows = LinkedHashMap<TtsPreroll, RadioRow>()
@@ -224,6 +231,9 @@ class DevScreen(host: MainActivity) : Screen(host) {
             if (pair.size == 1) r.addView(View(c), lp(0, c.dp(52), 1f))
             body.addView(r, lp(MATCH, WRAP))
         }
+
+        body.addView(c.sectionTitle(c.getString(R.string.dev_section_iccoa)))
+        body.addView(iccoaCard(), lp(MATCH, WRAP))
 
         body.addView(c.sectionTitle(c.getString(R.string.dev_section_status)))
         statusView = c.text("", 12f, 400, c.clr(R.color.on), monospace = true).apply {
@@ -461,6 +471,58 @@ class DevScreen(host: MainActivity) : Screen(host) {
         filters = arrayOf(InputFilter.LengthFilter(4))
     }
 
+    /** ICCOA CarLink по воздуху (бета, ADR 0066): PIN с экрана машины и кнопка. PIN живёт только в поле, не сохраняется. */
+    private fun iccoaCard(): LinearLayout {
+        val c = ctx
+        val pin = customField().apply {
+            hint = c.getString(R.string.dev_iccoa_pin_hint)
+            inputType = InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_VARIATION_PASSWORD
+            typeface = c.sans(500)      // парольный inputType ставит моноширинный
+            filters = arrayOf(InputFilter.LengthFilter(6))
+        }
+        iccoaPin = pin
+        return c.vbox(10).apply {
+            background = c.shape(c.clr(R.color.surf), 20)
+            pad(c, 16, 14, 16, 14)
+            addView(c.text(c.getString(R.string.dev_iccoa_note), 14f, 400, c.clr(R.color.on2)).apply { lineHeight = c.dp(20) })
+            addView(pin, lp(MATCH, c.dp(52)))
+            addView(c.tonalButton(c.getString(R.string.dev_iccoa_connect)).apply { setOnClickListener { onIccoaConnect() } }, lp(MATCH, c.dp(52)))
+        }
+    }
+
+    /** Чего не хватает для ICCOA по воздуху: поиск по BLE (до Android 12 — геолокация) и локальная сеть на Android 17+. */
+    private fun iccoaMissing(): List<String> {
+        val need = if (Build.VERSION.SDK_INT >= 31) mutableListOf(Manifest.permission.BLUETOOTH_SCAN, Manifest.permission.BLUETOOTH_CONNECT)
+            else mutableListOf(Manifest.permission.ACCESS_FINE_LOCATION)
+        if (Build.VERSION.SDK_INT >= 37) need += Manifest.permission.ACCESS_LOCAL_NETWORK
+        return need.filter { ctx.checkSelfPermission(it) != PackageManager.PERMISSION_GRANTED }
+    }
+
+    private fun onIccoaConnect() {
+        val pin = iccoaPin?.text?.toString().orEmpty()
+        if (pin.isNotEmpty() && !IccoaBleInfo.validPin(pin)) {
+            Toast.makeText(ctx, ctx.getString(R.string.dev_iccoa_pin_bad), Toast.LENGTH_SHORT).show()
+            return
+        }
+        val ask = iccoaMissing()
+        if (ask.isNotEmpty()) {
+            iccoaAwaiting = true
+            host.requestPermissions(ask.toTypedArray(), REQ_ICCOA)
+            return
+        }
+        AppLog.i("кнопка «Подключить ICCOA»")
+        ctx.startForegroundService(Intent(ctx, BridgeService::class.java).setAction(BridgeService.ACTION_ICCOA_AIR)
+            .putExtra(BridgeService.EXTRA_ICCOA_PIN, pin))
+    }
+
+    /** Ответ на запрос разрешений ICCOA: выдали — подключаемся, нет — второй раз не спрашиваем. */
+    override fun onPermissionResult() {
+        if (!iccoaAwaiting) return
+        iccoaAwaiting = false
+        if (iccoaMissing().isEmpty()) onIccoaConnect()
+        else Toast.makeText(ctx, ctx.getString(R.string.dev_iccoa_no_permission), Toast.LENGTH_LONG).show()
+    }
+
     /** Кнопка «Как просит ГУ» видна, только когда ГУ уже называла размер. */
     private fun refreshCustomFromHu() {
         val ok = aa.lastHuW > 0 && aa.lastHuH > 0
@@ -578,6 +640,8 @@ class DevScreen(host: MainActivity) : Screen(host) {
     }
 
     private companion object {
+        /** Разрешения ICCOA; коды 37–43 заняты (MainActivity, SettingsScreen, PhoneActivationBlock). */
+        const val REQ_ICCOA = 44
         val ERR_RE = Regex("ERROR|ОШИБКА|FAIL|упал|Exception")
         val WARN_RE = Regex("ОТКАТ|потерян|не пришёл|недоступен|не вышло|!!!|не удалось|отброшен")
         val OK_RE = Regex("\\bOK\\b|загружен|подключена|первый IDR|успеш")

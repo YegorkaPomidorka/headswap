@@ -80,6 +80,12 @@
     <string name="dev_check_server_usb">已连接 USB 配件（车机）：检查会中断连接。请拔下数据线。</string>
     <string name="dev_check_server_running">检查已在进行中</string>
 
+    <string name="dev_section_iccoa">ICCOA CarLink（测试版）</string>
+    <string name="dev_iccoa_note">无线连接支持 ICCOA CarLink 的车辆。在车机屏幕上打开 CarLink，输入显示的 6 位 PIN 码。如果车辆已认识此手机，可留空。</string>
+    <string name="dev_iccoa_connect">连接 ICCOA</string>
+    <string name="dev_iccoa_pin_bad">PIN 码为 6 位数字</string>
+    <string name="dev_iccoa_no_permission">没有权限就无法找到车辆</string>
+
     <string name="dev_section_status">状态</string>
     <string name="dev_section_log">日志</string>
     <plurals name="dev_log_lines">

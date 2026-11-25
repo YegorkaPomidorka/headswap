@@ -1,0 +1,10 @@
+09:00:00.000 кнопка «Подключить ICCOA»
+09:00:00.050 IC ble scan-start
+09:00:01.200 IC ble found rssi=-58 conn=true token=0102… name=CarLink-HU
+09:00:04.210 IC ble pick rssi=-57 token=0102… cars=1 ms=4160
+09:00:04.900 IC gatt connected ms=690
+09:00:05.100 IC gatt mtu v=512 status=0
+09:00:05.600 IC gatt services ok=true status=0 ms=1390
+09:00:05.610 IC gatt client-info bytes=168 quick=false queued=true
+09:00:17.620 IC gatt fail why=no-server-info ms=13410
+09:00:17.630 IC gatt closed

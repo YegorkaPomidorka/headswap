@@ -22,6 +22,8 @@ merged files, Russian comments):
     IccoaAacEncoder.kt  from IccoaAacEncoder.kt
     IccoaSession.kt  own code; order of operations and timeouts follow IccoaSession.kt,
                      IccoaService.kt, IccoaLaneServer.kt, IccoaMediaTransport.kt
+    IccoaBleInfo.kt  from IccoaEvidence.kt, IccoaClientProfile.kt, IccoaSession.kt (receiveBootstrap)
+    IccoaBle.kt      own code; scan and GATT sequence follow IccoaDiscovery.kt, IccoaSession.kt
 
   android/app/src/test/java/com/yegorkapomidorka/headswap/iccoa/
     IccoaAuthTest.kt, IccoaQuickAuthTest.kt, IccoaFrameTest.kt (from IccoaControlTest.kt),

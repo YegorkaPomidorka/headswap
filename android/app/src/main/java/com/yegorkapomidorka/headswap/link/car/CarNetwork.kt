@@ -81,7 +81,10 @@ class CarNetwork(ctx: Context, private val onState: (CarNetState) -> Unit = {}) 
         onLost: () -> Unit,
         bssid: String? = null,
     ) {
-        if (state == CarNetState.REQUESTING || state == CarNetState.AVAILABLE) return
+        if (state == CarNetState.REQUESTING || state == CarNetState.AVAILABLE) {
+            WLog.ev(NET, "car-request-skip", "state" to state.label)
+            return
+        }
         logStaConcurrency()
         val p = Params(ssid, pass, timeoutMs, onAvailable, onUnavailable, onLost, bssid)
         val lan = rememberedLan(ssid)
@@ -267,8 +270,11 @@ class CarNetwork(ctx: Context, private val onState: (CarNetState) -> Unit = {}) 
             current = network
             ifaceName = name
             state = CarNetState.AVAILABLE
-            CarWifi(app).let { if (it.ssid == p.ssid) it.rememberSec(sec.label) }
-            rememberLan(linkProperties)
+            // Только сохранённая сеть машины: сеть ICCOA (ssid из BLE) её подсеть и защиту затирать не должна.
+            if (CarWifi(app).ssid == p.ssid) {
+                CarWifi(app).rememberSec(sec.label)
+                rememberLan(linkProperties)
+            }
             WLog.ev(NET, "car-available", "iface" to name, "sec" to sec.label, "addr" to v4(linkProperties))
             p.onAvailable(network)
         }
@@ -387,6 +393,16 @@ class CarNetwork(ctx: Context, private val onState: (CarNetState) -> Unit = {}) 
 
     private fun v4(lp: LinkProperties): String? =
         lp.linkAddresses.firstOrNull { it.address is Inet4Address }?.address?.hostAddress
+
+    /**
+     * Адрес телефона и шлюз в сети [current] (ICCOA: шлюз и есть машина). Сразу после onAvailable DHCP мог ещё не
+     * закончиться: тогда null, вызывающий повторяет. Шлюз — первый IPv4 из маршрутов; его нет — адрес DHCP-сервера.
+     */
+    fun addresses(): Pair<String?, String?> {
+        val lp = current?.let { runCatching { cm.getLinkProperties(it) }.getOrNull() } ?: return null to null
+        val routed = lp.routes.firstOrNull { it.hasGateway() && it.gateway is Inet4Address }?.gateway?.hostAddress
+        return v4(lp) to (routed ?: gateway(lp))
+    }
 
     private fun gateway(lp: LinkProperties): String? {
         if (Build.VERSION.SDK_INT >= 30) {

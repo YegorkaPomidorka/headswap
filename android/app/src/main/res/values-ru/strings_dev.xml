@@ -82,6 +82,12 @@
     <string name="dev_check_server_usb">Подключён USB-аксессуар (машина): проверка сбила бы подключение. Отключите кабель.</string>
     <string name="dev_check_server_running">Проверка уже идёт</string>
 
+    <string name="dev_section_iccoa">ICCOA CarLink (бета)</string>
+    <string name="dev_iccoa_note">Подключение по воздуху к машине с ICCOA CarLink. Откройте CarLink на экране машины и введите PIN из 6 цифр, который она покажет. Оставьте пустым, если машина уже знает этот телефон.</string>
+    <string name="dev_iccoa_connect">Подключить ICCOA</string>
+    <string name="dev_iccoa_pin_bad">PIN — 6 цифр</string>
+    <string name="dev_iccoa_no_permission">Без разрешений машину не найти</string>
+
     <string name="dev_section_status">Статус</string>
     <string name="dev_section_log">Лог</string>
     <plurals name="dev_log_lines">

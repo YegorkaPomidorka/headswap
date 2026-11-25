@@ -85,6 +85,13 @@
     <string name="dev_action_aa_selftest" translatable="false">AA selftest</string>
     <string name="dev_action_mic_test" translatable="false">Mic test</string>
 
+    <string name="dev_section_iccoa">ICCOA CarLink (beta)</string>
+    <string name="dev_iccoa_note">Wireless connection to a car with ICCOA CarLink. Open CarLink on the car screen and enter the 6-digit PIN it shows. Leave it empty if the car already knows this phone.</string>
+    <string name="dev_iccoa_pin_hint" translatable="false">PIN</string>
+    <string name="dev_iccoa_connect">Connect ICCOA</string>
+    <string name="dev_iccoa_pin_bad">The PIN is 6 digits</string>
+    <string name="dev_iccoa_no_permission">Without the permissions the car can\'t be found</string>
+
     <string name="dev_section_status">Status</string>
     <string name="dev_section_log">Log</string>
     <plurals name="dev_log_lines">

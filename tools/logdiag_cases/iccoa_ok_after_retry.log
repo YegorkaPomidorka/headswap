@@ -1,0 +1,10 @@
+09:00:00.050 IC ble scan-start
+09:00:30.060 IC ble scan-timeout seen=0 ms=30010
+09:01:00.050 IC air no-local-network
+09:02:00.050 IC ble scan-start
+09:02:01.200 IC ble found rssi=-58 conn=true token=0102… name=CarLink-HU
+09:02:04.210 IC ble pick rssi=-57 token=0102… cars=1 ms=4160
+09:02:06.300 IC gatt server-info bytes=118 type=1002 ms=2090
+09:02:09.100 IC wifi up ms=2790 local=x.x.x.23 gw=x.x.x.1
+09:02:09.400 IC auth ok quick=false
+09:02:12.000 IC video first-frame bytes=41213 key=true
