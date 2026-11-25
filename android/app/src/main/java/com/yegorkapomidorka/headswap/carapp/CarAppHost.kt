@@ -106,7 +106,6 @@ object CarAppHost {
      * [topPx] полоса сверху. null - по умолчанию ([CarAreas.default]).
      */
     fun setAreas(leftPx: Int, rightPx: Int, topPx: Int) { h.post { areas = Triple(leftPx, rightPx, topPx); push() } }
-    fun clearAreas() { h.post { areas = null; push() } }
 
     /**
      * Карточка на главном показывает вырезку [crop] полноэкранной поверхности 1:1; null - навигатор на весь экран.

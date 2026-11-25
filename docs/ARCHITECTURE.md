@@ -170,7 +170,8 @@ CONTROL0, SENSOR1, VIDEO2, INPUT3, SPEECH4, SYSTEM5, MEDIA6, MIC7, BT8, MEDIA_PL
 
 - **Сервер AA 5277 одноразовый.** Грязный обрыв или голый TCP connect/close его глушат, перезапустить его приложение не может.
   Закрывать только через ByeBye; новую AA-сессию — после полного закрытия старой; живую AA не рвать из-за смены режима/DPI
-  (новый режим — после ручного перезапуска сервера). `AaServerCheck`/`AaProbe` не запускать при живом мосте. ADR 0003.
+  (новый режим — после ручного перезапуска сервера). `AaServerCheck`/`AaProbe` не запускать при живом мосте. Теневая AA
+  перед новым подключением к 5277 ждёт конца прошлой сессии (`AaShadowNav.awaitStopped`). ADR 0003.
 - **Потеряли видеокадр — P-кадры не слать**, ждать IDR (запрос IDR не чаще раза в 1,5 с).
 - **Весь H.264 в ГУ — через `AnnexB.fixSps`**: SPS от Exynos ГУ не принимают.
 - **CAR_DATA_START не слать вслепую.** В коде его сейчас нет вообще; слепой START вешал видео на Vezel. Только по RSP
@@ -188,8 +189,9 @@ CONTROL0, SENSOR1, VIDEO2, INPUT3, SPEECH4, SYSTEM5, MEDIA6, MIC7, BT8, MEDIA_PL
   `VdmHostLink`; без хоста экран уходит в группу 0 и гаснет с телефоном. Хост живёт в группе adbd и гибнет при каждой смене
   USB-режима; `VdmHostRestart` поднимает его через свою беспроводную отладку, для этого на 17 нужна «Отладка по USB» (требуем только на Samsung). ADR 0033.
 - Пароли, SSID, ключи в лог не пишутся.
-- Рубильники экспериментов в companion `AaBridgeCore`: `PAUSE_KEEPALIVE_ENABLED`, `NAVI_STATUS_ENABLED`,
-  `MODULE_MUSIC_ENABLED`, `ROUTE_NAVI_STATUS_ENABLED`, `AIR_WARM_RESUME_ENABLED`, `CN7_CALL_HOLD_ENABLED`.
+- **Входящие кадры от ГУ ≤ `Wire.MAX_RX_LEN` (1 МиБ):** длина из заголовка аллоцируется сразу, больше — разрыв.
+- **Отладочные команды `cmd` в `MainActivity` работают только в debug/smoke**, в release — allowlist `MainActivity.RELEASE_CMDS`
+  (команды, которые приложение шлёт само себе). ADR 0064.
 
 ## Симптом → куда смотреть
 
@@ -199,7 +201,7 @@ CONTROL0, SENSOR1, VIDEO2, INPUT3, SPEECH4, SYSTEM5, MEDIA6, MIC7, BT8, MEDIA_PL
 | EIO сразу после крупного IDR | `IdrBitrateCeiling`, потолки по каналу; ADR 0008 |
 | Рабочий стол: кнопка голоса молчит / Алиса не в панели | `AaBridgeCore.phoneAssistant` → `DesktopKeys.voice` → `LauncherActions.toggleAssistant`, слот `EmbedHost.alice`; запасной `dex/PhoneAssistant`; в логе `ASSIST`, `EMBED alice`; ADR 0026 |
 | Маршрут от Алисы не в плитке / висит на телефоне | `LauncherActions.assistantOpened`, `carapp/RouteIntent`, `CarAppSession.newIntent` (повторный getTemplate), `PhoneAssistant.closePhoneTasks`; в логе `ASSIST маршрут`, `CARAPP onNewIntent`; ADR 0026 |
-| Плеер над навигатором: нет плашки / не там / кнопки жмут карту | `launcher/NavPlayerPlateUi.kt` (слой над `EmbedLayers`, под шторкой уведомлений), `NavPlayerPlate` в `LauncherLogic` (видимость, место по умолчанию, доли перетаскивания), место по пакету `nav_player_pos:<pkg>` в `LauncherPrefs`, опрос `MusicPolling`; ADR 0061 |
+| Плеер над навигатором: нет плашки / не там / кнопки жмут карту | `launcher/NavPlayerPlateUi.kt` (слой над `EmbedLayers`, под шторкой уведомлений), `NavPlayerPlate` в `LauncherLogic` (видимость, место по умолчанию, доли перетаскивания), место по пакету `nav_player_pos:<pkg>` в `LauncherPrefs`, опрос `MusicPolling`; на паузе не сворачивается; ADR 0063 |
 | «Алиса только голосом»: молчит на блокировке / плашка врёт | `LauncherActions.voiceOnly` (скрытый слот `alice`, слой 1×1, `assistantHidden`), `PhoneAssistant.watch` (перенос MainActivity Яндекса), `launcher/AliceVoice` (состояния по микрофону, речи и `DesktopAudioState.level`), `AliceVoiceUi`; в логе `ASSIST скрытая`, `ASSIST плашка`; ADR 0034 |
 | Gemini голосом: молчит / маршрут или музыка не туда | `LauncherActions.voiceOnly` (`gemini()`: нет Яндекса → KEYCODE_VOICE_ASSIST через `DesktopKeys.injectKey`), `PhoneAssistant.watchPhone` (Google Карты → `RouteIntent.googleMapsDir`, YouTube Music → `musicFromGemini`), голос USAGE_ASSISTANT в `DesktopAudioLoopback`; в логе `ASSIST Gemini`, `ASSIST YouTube Music`, `ASSIST маршрут`; ADR 0035 |
 | Рабочий стол: голос навигатора лаунчера смешан с музыкой / крутилка ГУ не отдельно (h1318) | `DesktopAudioLoopback` (два микса одной политики: медиа без навигаторов и звук приложений-навигаторов по uid (`NavigatorPick.KNOWN`+`KNOWN_ZH`; Яндекс говорит как USAGE_MEDIA, не NAVIGATION_GUIDANCE); нет nav-микса → один как раньше, `navRecord` = null), нить `headswap-nav-audio` в `DesktopAudioCapture.runNav` → `NavPcmDownmix` (стерео 48 кГц → моно 16 кГц) → `core.onAudio*(CH_AUDIO_SPEECH)` → `navChannelProvider` (VR/TTS), `desktopVoiceStatus` держит VR=1 панели Алисы; в логе `DESKTOP h1318`, `BRIDGE h1318` |

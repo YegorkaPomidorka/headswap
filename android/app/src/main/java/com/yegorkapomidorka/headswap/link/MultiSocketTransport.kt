@@ -54,7 +54,7 @@ object InnerCodec {
         val cmd = Ch.isCmdStyle(chan)
         val declared = if (cmd) Wire.u16(hdr, 0) else Wire.u32(hdr, 0)
         val type = Wire.u32(hdr, if (cmd) 4 else 8)
-        val limit = if (cmd) InnerAssembler.MAX_CMD_DECLARED else Wire.MAX_OUTER_LEN
+        val limit = if (cmd) InnerAssembler.MAX_CMD_DECLARED else Wire.MAX_RX_LEN
         if (declared !in 0..limit) throw BadInnerHeader("длина $declared вне 0..$limit (тип ${Msg.hex(type)}, заголовок ${hexBytes(hdr)})")
         // VW CNS3 (Tiguan L Pro, h129) шлёт VIDEO_HEARTBEAT в CMD-сокет в CMD-кадре: 8 байт, длина 0
         val cmdHb = chan == Ch.CMD && type == Msg.VIDEO_HEARTBEAT && declared == 0

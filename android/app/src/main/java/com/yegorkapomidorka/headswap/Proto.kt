@@ -79,7 +79,7 @@ object PbReader {
                 }
                 2 -> {
                     val l = varint() ?: return null
-                    if (l < 0 || p + l > b.size) return null
+                    if (l < 0 || l > b.size - p) return null     // не p + l: на мусорной длине сумма переполняется
                     res.add(PbField(field, 2, 0, b.copyOfRange(p, p + l.toInt())))
                     p += l.toInt()
                 }

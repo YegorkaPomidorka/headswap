@@ -1717,31 +1717,6 @@ class AaBridgeAudioTest {
         core.onAudioStop(MEDIA)
         assertFalse(core.isMediaInited)
     }
-
-    @Test
-    fun flagsOffRestoreImmediateBehaviour() {
-        try {
-            AaBridgeCore.TTS_DEBOUNCE_ENABLED = false
-            AaBridgeCore.NAVI_STATUS_ENABLED = false
-            AaBridgeCore.MODULE_MUSIC_ENABLED = false
-            AaBridgeCore.MEDIA_PAUSE_ENABLED = false
-            AaBridgeCore.VOICE_SESSION_ENABLED = false
-            core.onCarlifeStart()
-            core.onAudioData(MEDIA, pcm(100), 1)
-            core.onAudioData(SPEECH, pcm(100), 2)
-            core.onAudioStop(MEDIA)                                      // без очереди и без PAUSE: сразу MEDIA_STOP
-            core.onAudioStop(SPEECH)                                     // без debounce: сразу TTS_STOP
-            core.onVoiceSession(1)
-            assertEquals(listOf(0x30001, 0x30006, 0x40001, 0x40003, 0x30002, 0x40002), link.audio.map { it.type })
-            assertEquals(0, link.modules.size)
-        } finally {
-            AaBridgeCore.TTS_DEBOUNCE_ENABLED = true
-            AaBridgeCore.NAVI_STATUS_ENABLED = true
-            AaBridgeCore.MODULE_MUSIC_ENABLED = true
-            AaBridgeCore.MEDIA_PAUSE_ENABLED = true
-            AaBridgeCore.VOICE_SESSION_ENABLED = true
-        }
-    }
 }
 
 /** AA-сессия моста против скриптового телефона по loopback: видео -> CarLife-ссылка, тачи CarLife -> телефон. */

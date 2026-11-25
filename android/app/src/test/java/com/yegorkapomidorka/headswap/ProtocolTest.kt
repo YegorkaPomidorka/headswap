@@ -80,6 +80,17 @@ class ProtocolTest {
     }
 
     @Test
+    fun pbReaderGarbageLengthIsNullNotException() {
+        // поле 1, len-delimited, длина varint ~Long.MAX: p + l переполнялось и проходило проверку
+        assertNull(PbReader.parse(hex("0A FF FF FF FF FF FF FF FF 7F")))
+        // длина больше остатка
+        assertNull(PbReader.parse(hex("0A 05 61 62")))
+        // обрыв fixed64 / fixed32
+        assertNull(PbReader.parse(hex("09 01 02 03")))
+        assertNull(PbReader.parse(hex("0D 01 02")))
+    }
+
+    @Test
     fun touchActionDown() {
         val body = hex("08 00 10 80 05 18 E8 02")
         assertArrayEquals(body, Msgs.touchAction(0, 640, 360))
@@ -562,7 +573,7 @@ class ProtocolTest {
     fun assemblerDoesNotHoldAbsurdDeclaredLen() {
         val a = InnerAssembler()
         val seen = ArrayList<ByteArray>()
-        // data: len = 0x7FFFFFFF > MAX_OUTER_LEN, и отрицательный (>= 2^31)
+        // data: len = 0x7FFFFFFF > MAX_RX_LEN, и отрицательный (>= 2^31)
         a.feed(Ch.VIDEO, hex("7F FF FF FF 00 00 00 01 00 02 00 01"), { _, i -> seen.add(i) })
         a.feed(Ch.VIDEO, hex("FF FF FF FF 00 00 00 01 00 02 00 01"), { _, i -> seen.add(i) })
         assertEquals(2, seen.size)
