@@ -335,7 +335,7 @@ private fun PlayerChipColumn(modifier: Modifier) {
 }
 
 /**
- * Прогресс трека волной, как в Android Auto (h1449): пройденное - неподвижная синусоида, остаток - прямая тусклая дорожка.
+ * Прогресс трека волной, как в Android Auto (h1449): серая неподвижная синусоида на всю длину, белая по ней закрывает пройденное.
  * На паузе волна выпрямляется. Рисуется слева направо, как кнопки плеера.
  */
 @Composable
@@ -353,21 +353,22 @@ private fun WaveProgress(progress: Float, playing: Boolean, modifier: Modifier) 
         val a = (h - stroke) / 2 * amp
         val k = (2 * Math.PI / (h * 2.4f)).toFloat()
         val cy = h / 2
-        val fx = size.width * frac.value
-        val gap = stroke * 1.5f
-        if (fx + gap < size.width) {
-            drawLine(Color.White.copy(alpha = 0.3f), Offset(fx + gap, cy), Offset(size.width - stroke / 2, cy), stroke, StrokeCap.Round)
-        }
-        if (fx > stroke / 2) {
+        val x0 = stroke / 2
+        val x1 = size.width - stroke / 2
+        fun wave(to: Float, color: Color) {
             val path = Path()
-            var x = stroke / 2
+            var x = x0
             path.moveTo(x, cy + a * sin(k * x))
-            while (x < fx) {
-                x = minOf(x + 2f, fx)
+            while (x < to) {
+                x = minOf(x + 2f, to)
                 path.lineTo(x, cy + a * sin(k * x))
             }
-            drawPath(path, Color.White, style = Stroke(stroke, cap = StrokeCap.Round, join = StrokeJoin.Round))
+            drawPath(path, color, style = Stroke(stroke, cap = StrokeCap.Round, join = StrokeJoin.Round))
         }
+        // серая волна на всю длину, белая по той же волне закрывает пройденное
+        wave(x1, Color.White.copy(alpha = 0.3f))
+        val fx = x0 + (x1 - x0) * frac.value
+        if (fx > x0) wave(fx, Color.White)
     }
 }
 
