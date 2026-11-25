@@ -157,7 +157,7 @@ python -X utf8 iccoa_hu.py --no-view     # без окна
 
 Флаги: `--phone HOST`, `--screen 2422x1272`, `--dpi`, `--fps`, `--pin` (по умолчанию 123456), `--force-result N` (отказ во входе с кодом N), `--bind`, все порты (`--auth-port`, `--rtp-port`, `--control-port`, `--audio-port`, `--sensor-port`, `--rtsp-port`, `--uibc-port`), `--dump-audio`, `--duration`, `--out`, `--log`, `--trust`. После входа с PIN клиент запоминается в `out/iccoa_trust.json` (там же закрытый ключ фейковой машины), следующий вход идёт без PIN. Закрылся control — эмулятор ждёт новый вход. Видео пишется в `out/iccoa_video.h264`, лог в `out/iccoa_hu.log`; PIN и ключи в лог не попадают.
 
-Окно — то же `carlife_view.py`: мышь → UIBC-тач в пикселях экрана машины, ПКМ/Esc — Back, СКМ/Home — Home, кнопки под видео — руль (m12) и запрос IDR.
+Окно — то же `carlife_view.py`: мышь → UIBC-тач в пикселях экрана машины, ПКМ/Esc — Back, СКМ/Home — Home, кнопки под видео — руль (m12) и запрос IDR. С `--no-view` то же строками в stdin: `touch ACTION X Y` (0 down, 1 up, 2 move), `key CODE` (UIBC), `wheel CODE` (m12), `idr`.
 
 ## Тесты
 

@@ -23,9 +23,12 @@
 есть только CHANGE_MD_THEME), передача и задний ход, скорость и прочие события машины (данные машины CarLife
 мы вслепую не запрашиваем, ADR 0010). Прежде чем обещать функцию AA, проверить, есть ли для неё сообщение в CarLife.
 
-Второй протокол ГУ — ICCOA CarLink (ADR 0066, в работе): та же роль, что у `CarLifeSession`, — реализация `CarlifeLink` для ядра
-и `HuSession` для `BridgeService`. Пока есть только шов: `HuSession`, `AaBridgeCore.onCarKey` (кнопка ГУ уже в Android keycode),
-`CustomVideoMode.fitCar` (экран машины → AA 1920×1080 с SPS-кропом), BSSID в `CarNetwork.request`.
+Второй протокол ГУ — ICCOA CarLink (ADR 0066, в работе, пока только debug-вход для стенда): `iccoa/IccoaSession` — та же роль,
+что у `CarLifeSession` (`CarlifeLink` для ядра, `HuSession` для `BridgeService`). Телефон входит на машину (auth 57209), слушает
+control 57219 / audio 57229 / sensor 57239 / RTSP 7236 / UIBC 4321 и после PLAY шлёт H.264 (+AAC) в MPEG-TS по RTP/TCP.
+Экран машины известен только из RTSP M3, поэтому сессия стартует без ядра: `BridgeService.startIccoa` → `onIccoaScreen`
+(`CustomVideoMode.fitCar`, хост рабочего стола или AA) → `IccoaSession.bind(core)`. Кнопки машины — `AaBridgeCore.onCarKey`.
+Стенд: `pc-headunit/iccoa_hu.py` (роль машины), `stand.ps1 -Iccoa`, вход `cmd iccoa_debug` (только debug/smoke). В логе строки `IC`.
 
 ## Стек и сборка
 
@@ -48,13 +51,13 @@
 | `$P/` (корень) | Сторона CarLife и сервис. `BridgeService` — оркестратор. `CarLifeSession` — одна сессия с ГУ. `Handshake`, `HuAuth` — рукопожатие и HU_AUTHEN. `Protocol.kt` (`Ch`, `Msg`, `Wire`, `FrameParser`), `Proto.kt` (свой protobuf). `VideoSource` — заглушка до прихода AA. `AppLog`, `CrashLog`. |
 | `$P/aa/` | Сторона AA и мозг моста. `AapSession` (TCP+TLS к 5277), `AapMessages` (SDR, каналы), `AaBridge.kt` (`AaBridgeCore` — всё связывание и флаги ГУ; `AaConnector` — переподключение), `BridgeHost` (держит AA между сессиями CarLife). Видео: `AaTranscoder`, `GlRelay`, `FeedQueue`, `IdrSplice`/`IdrIntra`/`RefDecoder`, `SpsCrop`, `VideoMode`, `CarPreset`, `BitratePolicy`, `IdrBitrateCeiling`, `ThermalThrottle`. Звук: `AaAudio`, `MusicResampler`, `Equalizer`, `TtsPreroll`, `NavChannel` (h1318: подсказки навигации в CarLife-канал VR вместо TTS, флаг `navVr` в `AaBridgeCore`). Микрофон: `AaMic`, `PhoneMicCapture`. Мета: `AaMeta` (`MetaRelay`). Тач: `TouchPacer`, `TouchDecimator`. Настройки: `AaSettings` (`AaPrefs`). Диагностика: `AaServerCheck`, `AaProbe`. |
 | `$P/link/` | Транспорт к ГУ. `CarTransport` + `TransportCaps`, `StreamTransport` (USB и debug-TCP, один поток), `MultiSocketTransport` (воздух, 6 сокетов). `link/bt` — RFCOMM `carlife`, вход в Wi-Fi Direct (`CarlifeBtProbe`, `P2pJoin`). `link/car` — выбранная машина, автостарт по ACL, «Wi-Fi машины» (`CarProfile`, `CarAclReceiver`, `CarNetwork`, `CarLogic`). `link/wifi` — маяк `HotspotBeacon` (UDP 7999), `HotspotDetect`. `link/diag/WLog` — лог воздуха. |
-| `$P/iccoa/` | Ядро ICCOA CarLink на чистой JVM, без сокетов и Android (ADR 0066; перенос из FT, Apache-2.0, см. `NOTICE`). `IccoaFrame` (кадр 20 Б, CRC-16/ARC, AES-GCM-конверты), `IccoaAuth` (P-256, HMAC от PIN, быстрый вход по ключу машины), `IccoaRtsp` (WFD-источник, экран машины из M3), `IccoaTs` (TS + RTP PT33 + RFC 4571, очередь с выбросом GOP), `IccoaUibc` (тач и кнопки JSON), `IccoaControl` (heartbeat, порты, конфиг, плеер). Сессии и сети пока нет. |
+| `$P/iccoa/` | Ядро ICCOA CarLink на чистой JVM, без сокетов и Android (ADR 0066; перенос из FT, Apache-2.0, см. `NOTICE`). `IccoaFrame` (кадр 20 Б, CRC-16/ARC, AES-GCM-конверты), `IccoaAuth` (P-256, HMAC от PIN, быстрый вход по ключу машины), `IccoaRtsp` (WFD-источник, экран машины из M3), `IccoaTs` (TS + RTP PT33 + RFC 4571, очередь с выбросом GOP), `IccoaUibc` (тач и кнопки JSON), `IccoaControl` (heartbeat, порты, конфиг, плеер) — без сокетов и Android. `IccoaSession` (сокеты, оркестрация, заглушка, энкодеры), `IccoaTrust` (свой ключ и ключи машин, prefs `iccoa_trust` вне бэкапа), `IccoaAacEncoder`. |
 | `$P/ui/` | Экраны (`HomeScreen`, `OnboardingScreen`, `SettingsScreen`, `DevScreen`, `DiagScreen`, `CarChooser`), чистая логика (`HeadswapState`/`HomeLogic`, `Readiness`), `LogShare` (zip логов). |
 | `$P/carapp/` | Свой хост Car App Library для навигатора рабочего стола (ADR 0021). `CarAppCatalog` (поиск по CarAppService + NAVIGATION), `CarAppSession` (одна сессия: bind → handshake → create/start/resume, поверхность, области, Trip → `aa/DesktopNavHints`), `CarAppHost` (фасад для лаунчера), `CarUiMapper` + `CarUi` (шаблоны → модель для Compose), `CarAppLogic` (чистая: области, dpi, вердикты). Шаблоны рисует `launcher/NavHostUi.kt`. |
 | `$P/diag/` | `LogDiag` — Kotlin-порт `tools/logdiag.py`, те же правила. |
 | `$P/update/` | `UpdateLogic` (GitHub releases/latest, чистая), `Updater` (скачать, SHA-256, PackageInstaller). ADR 0012. |
 | `src/debug`, `src/release` | `DebugTransport.kt`: в debug — TCP к эмулятору ГУ, в release — заглушка. |
-| `pc-headunit/` | Python. `hu.py` — AA-ГУ для ПК (эталоны `golden.txt` для тестов). `carlife_hu.py` — эмулятор ГУ CarLife для проверки моста. `stand.ps1` — стенд одной командой (smoke на телефоне + окно ГУ; `-PrepareOnly` — только подготовка телефона). `autotest/` — автотесты UI без LLM: `Stand` (тапы, кнопки ГУ, OCR Windows, сравнение с эталонами `refs/<hu>-<W>x<H>/<язык>/`), `strings.py` (строки по ключам из `res/values*`), сценарии pytest в `autotest/scenarios`. |
+| `pc-headunit/` | Python. `hu.py` — AA-ГУ для ПК (эталоны `golden.txt` для тестов). `carlife_hu.py` — эмулятор ГУ CarLife для проверки моста. `iccoa_hu.py` + `iccoa_wire.py` — эмулятор машины ICCOA. `stand.ps1` — стенд одной командой (smoke на телефоне + окно ГУ; `-PrepareOnly` — только подготовка телефона). `autotest/` — автотесты UI без LLM: `Stand` (тапы, кнопки ГУ, OCR Windows, сравнение с эталонами `refs/<hu>-<W>x<H>/<язык>/`), `strings.py` (строки по ключам из `res/values*`), сценарии pytest в `autotest/scenarios`. |
 | `tools/` | `logdiag.py` + `logdiag_rules.json` (причина обрыва по логу), `logdigest.py` (сводка лога). |
 
 Три файла-ядра большие: `AaBridge.kt` (~2800 строк), `CarLifeSession.kt` (~1500), `BridgeService.kt` (~1100).

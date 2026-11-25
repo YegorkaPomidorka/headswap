@@ -34,7 +34,7 @@ class IccoaSessionTest {
 
     @After fun tearDown() = toClose.forEach { runCatching { it.close() } }
 
-    private class MemoryTrust : IccoaTrust {
+    internal class MemoryTrust : IccoaTrust {
         override val clientId = "a1b2c3"
         private val pair = IccoaAuth.newKeyPair()
         val cars = HashMap<String, ByteArray>()

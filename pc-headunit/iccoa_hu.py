@@ -19,7 +19,7 @@ After the control lane closes the emulator waits for the next sign-in.
 
 By default a live window opens (carlife_view.py: tkinter + ffmpeg from PATH): mouse = UIBC touches in pixels of the car
 screen (--screen), right click / Esc = Back (keycode 4), middle click / Home = Home (3), the button row = steering wheel
-keys over control m12. --no-view: no window. Video goes to out/iccoa_video.h264, the log to out/iccoa_hu.log,
+keys over control m12. --no-view: no window, input by stdin lines (touch ACTION X Y | key CODE | wheel CODE | idr). Video goes to out/iccoa_video.h264, the log to out/iccoa_hu.log,
 --dump-audio writes ADTS AAC to out/iccoa_audio.aac. The PIN and keys are never logged.
 """
 from __future__ import annotations
@@ -315,6 +315,7 @@ class IccoaHu:
                             if pid == W.VIDEO_PID:
                                 self.video_units += 1
                                 self.videof.write(unit)
+                                self.videof.flush()     # файл читают, пока эмулятор жив; на Windows его убивают без close
                                 if first:
                                     first = False
                                     self.log(f"RTP: first video unit, {len(unit)} bytes")
@@ -352,6 +353,16 @@ class IccoaHu:
         self.send_control(12, W.key_body(keycode, False))
         self.send_control(12, W.key_body(keycode, True))
         self.log(f"control -> m12 key {keycode}")
+
+    def stdin_loop(self):
+        """--no-view: ввод вместо окна строками stdin: touch ACTION X Y | key CODE | wheel CODE | idr."""
+        do = {"touch": self.send_touch, "key": self.send_uibc_key, "wheel": self.send_wheel_key, "idr": self.request_idr}
+        for line in sys.stdin:
+            try:
+                cmd, *a = line.split()
+                do[cmd](*map(int, a))
+            except (ValueError, KeyError, TypeError):
+                self.log(f"stdin: bad command {line.strip()!r}")
 
 
 def parse_args(argv=None) -> argparse.Namespace:
@@ -428,6 +439,7 @@ def main(argv=None) -> int:
     hu = IccoaHu(a)
     if not a.no_view:
         return run_view(hu, a.view_scale)
+    threading.Thread(target=hu.stdin_loop, daemon=True, name="iccoa-stdin").start()
     try:
         hu.run()
     except KeyboardInterrupt:
