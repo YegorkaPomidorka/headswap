@@ -41,6 +41,7 @@ import androidx.compose.ui.graphics.drawOutline
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -368,31 +369,35 @@ private fun FitName(text: String, sizePx: Int, minSizePx: Int) {
 @Composable
 private fun phoneView(phone: PhoneCardModel, accent: Color): PhoneView {
     val unknown = stringResource(R.string.l_phone)
+    // «Скрывать номера» (h1431): вместо имени звонящего - общая подпись; number для перезвона остаётся
+    val hide = LauncherModel.hideCaller
+    val callName = stringResource(R.string.l_call_hidden)
     return when (phone) {
         is PhoneCardModel.Missed -> {
             val time = whenText(phone.last.timeMs)
             // шапки одним словом, без счётчика и времени (Егор 19.11): «Пропущенный», «Исходящий», «Входящий», таймер, «Вызов…»
-            PhoneView(typeLabel(CallType.MISSED), Pal.MISSED, name = phone.last.title,
+            PhoneView(typeLabel(CallType.MISSED), Pal.MISSED,
+                name = if (hide) pluralStringResource(R.plurals.l_missed_hidden, phone.count, phone.count) else phone.last.title,
                 nameColor = Pal.MISSED, line2 = "$time · ${phone.count}",
                 full = listOf(PhoneBtn.RECALL), number = phone.last.number)
         }
         is PhoneCardModel.LastCall -> {
             val time = whenText(phone.last.timeMs)
-            PhoneView(typeLabel(phone.last.type), Pal.SEC, name = phone.last.title, line2 = time,
+            PhoneView(typeLabel(phone.last.type), Pal.SEC, name = if (hide) unknown else phone.last.title, line2 = time,
                 full = listOf(PhoneBtn.CALL), number = phone.last.number)
         }
         PhoneCardModel.Empty -> PhoneView(unknown, Pal.SEC, name = stringResource(R.string.l_phone_none), small = true,
             full = listOf(PhoneBtn.CONTACTS))
         PhoneCardModel.NoAccess -> PhoneView(stringResource(R.string.l_phone_grant), Pal.SEC,
             name = stringResource(R.string.l_phone_no_access), small = true, full = listOf(PhoneBtn.ALLOW))
-        is PhoneCardModel.Incoming -> PhoneView(typeLabel(CallType.INCOMING), accent, name = phone.title.ifEmpty { unknown },
+        is PhoneCardModel.Incoming -> PhoneView(typeLabel(CallType.INCOMING), accent, name = if (hide) callName else phone.title.ifEmpty { unknown },
             full = listOf(PhoneBtn.ACCEPT, PhoneBtn.DECLINE), compact = listOf(PhoneBtn.ACCEPT, PhoneBtn.DECLINE))
         is PhoneCardModel.InCall -> {
             val timer = PhoneLogic.timer(phone.elapsedSec)
-            PhoneView(timer, Pal.TEXT, headMono = true, name = phone.title.ifEmpty { unknown },
+            PhoneView(timer, Pal.TEXT, headMono = true, name = if (hide) callName else phone.title.ifEmpty { unknown },
                 line2 = timer, line2Color = Pal.TEXT, full = listOf(PhoneBtn.END), compact = listOf(PhoneBtn.END))
         }
-        is PhoneCardModel.Outgoing -> PhoneView(stringResource(R.string.l_phone_calling), Pal.SEC, name = phone.title.ifEmpty { unknown },
+        is PhoneCardModel.Outgoing -> PhoneView(stringResource(R.string.l_phone_calling), Pal.SEC, name = if (hide) callName else phone.title.ifEmpty { unknown },
             line2 = stringResource(R.string.l_phone_calling), full = listOf(PhoneBtn.CANCEL))
     }
 }

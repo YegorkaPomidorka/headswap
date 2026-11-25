@@ -116,6 +116,11 @@ class LauncherPrefs(private val context: Context) {
         get() = prefs.getBoolean("show_battery", true)
         set(value) { prefs.edit().putBoolean("show_battery", value).apply() }
 
+    /** «Скрывать номера»: карточка «Телефон» и полоса звонка без имени и номера звонящего (h1431); «Вызовы» не трогает. */
+    var hideCaller: Boolean
+        get() = prefs.getBoolean("hide_caller", false)
+        set(value) { prefs.edit().putBoolean("hide_caller", value).apply() }
+
     /** Часы 12 ч «2:05» вместо 24 ч ([ClockFormat]); пока не выбирали - как в настройках телефона. */
     var clock12h: Boolean
         get() = prefs.getBoolean("clock_12h", !android.text.format.DateFormat.is24HourFormat(context))

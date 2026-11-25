@@ -66,6 +66,8 @@ internal object LauncherModel {
     var animations by mutableStateOf(true)
     /** Заряд телефона в строке статуса ([LauncherPrefs.showBattery]). */
     var showBattery by mutableStateOf(true)
+    /** «Скрывать номера»: в «Телефоне» и полосе звонка нет имени звонящего ([LauncherPrefs.hideCaller]). */
+    var hideCaller by mutableStateOf(false)
     /** Часы в 12-часовом формате ([LauncherPrefs.clock12h]). */
     var clock12h by mutableStateOf(false)
     /** Дата «ММ.ДД» ([LauncherPrefs.dateMdy]). */
@@ -214,6 +216,7 @@ internal object LauncherModel {
         mapLeft = prefs.mapLeft
         animations = prefs.animations
         showBattery = prefs.showBattery
+        hideCaller = prefs.hideCaller
         clock12h = prefs.clock12h
         dateMdy = prefs.dateMdy
         autoplay = prefs.autoplay
@@ -336,6 +339,7 @@ internal object LauncherModel {
     fun chooseMapLeft(left: Boolean) { mapLeft = left; prefs.mapLeft = left }
     fun chooseAnimations(on: Boolean) { animations = on; prefs.animations = on }
     fun chooseShowBattery(on: Boolean) { showBattery = on; prefs.showBattery = on }
+    fun chooseHideCaller(on: Boolean) { hideCaller = on; prefs.hideCaller = on }
     fun chooseClock12h(on: Boolean) { clock12h = on; prefs.clock12h = on }
     fun chooseDateMdy(on: Boolean) { dateMdy = on; prefs.dateMdy = on }
     fun chooseAutoplay(on: Boolean) { autoplay = on; prefs.autoplay = on }

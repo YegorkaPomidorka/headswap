@@ -64,6 +64,10 @@
     <string name="l_phone_talk">通话中 %1$s</string>
     <string name="l_phone_calling">正在呼叫…</string>
     <string name="l_phone_none">没有通话</string>
+    <string name="l_call_hidden">来电</string>
+    <plurals name="l_missed_hidden">
+        <item quantity="other">%d 个未接来电</item>
+    </plurals>
     <string name="l_phone_grant">请在手机上允许</string>
     <string name="l_call_back">回拨</string>
     <string name="l_call">拨打</string>
@@ -214,6 +218,8 @@
     <string name="l_s_alice_voice">Alice 仅语音</string>
     <string name="l_s_alice_voice_on">无窗口，仅在底部显示一个胶囊条；锁屏时也可使用</string>
     <string name="l_s_alice_voice_off">Alice 显示在左侧面板中</string>
+    <string name="l_s_hide_caller">隐藏号码</string>
+    <string name="l_s_hide_caller_sub">来电信息仅在“通话”中显示</string>
     <string name="l_notif_show_all">通知：%1$d 条。查看全部</string>
     <string name="l_notif_collapse">收起通知</string>
     <string name="l_notif_clear_all">全部清除</string>

@@ -333,14 +333,26 @@ fun LauncherSettingsScreen() {
                         SettingsPage.SYSTEM -> {
                             val info = systemInfo()
                             for ((i, row) in info.withIndex()) InfoCard(row.first, row.second, d, cell(i).fillMaxWidth())
-                            SwitchCard(stringResource(R.string.l_s_notifications), model.notifications, d, cell(info.size).fillMaxWidth()) {
-                                model.chooseNotifications(it)
+                            // в альбоме пять рядов и все заняты: «Скрывать номера» (h1431) делит ряд с «Уведомлениями» пополам,
+                            // без подписи, как «Анимации» и «Заряд». В портрете семь рядов - отдельный ряд с подписью.
+                            var row = info.size
+                            val notifications = @Composable { mod: Modifier ->
+                                SwitchCard(stringResource(R.string.l_s_notifications), model.notifications, d, mod) { model.chooseNotifications(it) }
                             }
-                            SwitchCard(stringResource(R.string.l_s_alice_voice), model.aliceVoiceOnly, d, cell(info.size + 1).fillMaxWidth(),
+                            if (s.portrait) notifications(cell(row++).fillMaxWidth())
+                            else Row(cell(row++).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(m.dp(d.gap))) {
+                                notifications(Modifier.weight(1f).fillMaxHeight())
+                                SwitchCard(stringResource(R.string.l_s_hide_caller), model.hideCaller, d, Modifier.weight(1f).fillMaxHeight()) {
+                                    model.chooseHideCaller(it)
+                                }
+                            }
+                            SwitchCard(stringResource(R.string.l_s_alice_voice), model.aliceVoiceOnly, d, cell(row++).fillMaxWidth(),
                                 sub = stringResource(if (model.aliceVoiceOnly) R.string.l_s_alice_voice_on else R.string.l_s_alice_voice_off)) {
                                 model.chooseAliceVoiceOnly(it)
                             }
-                            Placed(info.size + 2) { AboutLinkCard(d, Modifier) }
+                            if (s.portrait) SwitchCard(stringResource(R.string.l_s_hide_caller), model.hideCaller, d, cell(row++).fillMaxWidth(),
+                                sub = stringResource(R.string.l_s_hide_caller_sub)) { model.chooseHideCaller(it) }
+                            Placed(row) { AboutLinkCard(d, Modifier) }
                         }
                         SettingsPage.ABOUT -> AboutPanel(d, rowH)
                     }

@@ -64,6 +64,13 @@
     <string name="l_phone_talk">Разговор %1$s</string>
     <string name="l_phone_calling">Вызов…</string>
     <string name="l_phone_none">Звонков нет</string>
+    <string name="l_call_hidden">Звонок</string>
+    <plurals name="l_missed_hidden">
+        <item quantity="one">%d вызов</item>
+        <item quantity="few">%d вызова</item>
+        <item quantity="many">%d вызовов</item>
+        <item quantity="other">%d вызовов</item>
+    </plurals>
     <string name="l_phone_grant">Разрешите на телефоне</string>
     <string name="l_call_back">Перезвонить</string>
     <string name="l_call">Позвонить</string>
@@ -214,6 +221,8 @@
     <string name="l_s_alice_voice">Алиса только голосом</string>
     <string name="l_s_alice_voice_on">Окна нет, снизу плашка; работает и на заблокированном телефоне</string>
     <string name="l_s_alice_voice_off">Алиса в панели слева на экране</string>
+    <string name="l_s_hide_caller">Скрывать номера</string>
+    <string name="l_s_hide_caller_sub">Кто звонит — только в «Вызовах»</string>
     <string name="l_notif_show_all">Уведомления: %1$d. Показать все</string>
     <string name="l_notif_collapse">Свернуть уведомления</string>
     <string name="l_notif_clear_all">Очистить всё</string>
