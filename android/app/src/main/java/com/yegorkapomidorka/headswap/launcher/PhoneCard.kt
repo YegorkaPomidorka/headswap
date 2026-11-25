@@ -369,7 +369,7 @@ private fun FitName(text: String, sizePx: Int, minSizePx: Int) {
 @Composable
 private fun phoneView(phone: PhoneCardModel, accent: Color): PhoneView {
     val unknown = stringResource(R.string.l_phone)
-    // «Скрывать номера» (h1431): вместо имени звонящего - общая подпись; number для перезвона остаётся
+    // «Скрывать номера» (h1431): вместо имени звонящего - время звонка или общая подпись; number для перезвона остаётся
     val hide = LauncherModel.hideCaller
     val callName = stringResource(R.string.l_call_hidden)
     return when (phone) {
@@ -378,12 +378,12 @@ private fun phoneView(phone: PhoneCardModel, accent: Color): PhoneView {
             // шапки одним словом, без счётчика и времени (Егор 19.11): «Пропущенный», «Исходящий», «Входящий», таймер, «Вызов…»
             PhoneView(typeLabel(CallType.MISSED), Pal.MISSED,
                 name = if (hide) pluralStringResource(R.plurals.l_missed_hidden, phone.count, phone.count) else phone.last.title,
-                nameColor = Pal.MISSED, line2 = "$time · ${phone.count}",
+                sub = if (hide) time else "", nameColor = Pal.MISSED, line2 = if (hide) time else "$time · ${phone.count}",
                 full = listOf(PhoneBtn.RECALL), number = phone.last.number)
         }
         is PhoneCardModel.LastCall -> {
             val time = whenText(phone.last.timeMs)
-            PhoneView(typeLabel(phone.last.type), Pal.SEC, name = if (hide) unknown else phone.last.title, line2 = time,
+            PhoneView(typeLabel(phone.last.type), Pal.SEC, name = if (hide) time else phone.last.title, line2 = if (hide) "" else time,
                 full = listOf(PhoneBtn.CALL), number = phone.last.number)
         }
         PhoneCardModel.Empty -> PhoneView(unknown, Pal.SEC, name = stringResource(R.string.l_phone_none), small = true,
