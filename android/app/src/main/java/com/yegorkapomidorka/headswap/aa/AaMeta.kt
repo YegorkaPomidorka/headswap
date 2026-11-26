@@ -559,6 +559,9 @@ class MetaRelay(
             album = m.album ?: "",
             art = m.art,
             durationSeconds = m.durationSeconds ?: 0,
+            // Часть ГУ кэширует обложку по songId; "-1" на всех треках оставлял на приборке
+            // картинку первого трека, пока название менялось.
+            songId = trackSeq.toString(),
         )
         if (!sameTrack) lastProgressMs = null
         sendInfo(if (sameTrack) "обложка/поля трека обновились" else "новый трек")
