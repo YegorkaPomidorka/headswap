@@ -110,6 +110,7 @@ class CarLifeSession(
     private val metaExec = Executors.newSingleThreadExecutor { r -> Thread(r, "cl-meta").also { it.isDaemon = true } }
     private var lastArtSrc: ByteArray? = null          // только нить cl-meta
     private var lastArtJpeg = ByteArray(0)
+    private var mediaInfoSeq = 0                        // только нить cl-meta: номер последнего MEDIA_INFO для повтора X9
     private val turnIcons = HashMap<Int, ByteArray>()
     @Volatile private var metaMusicOffLogged = false
 
@@ -1158,7 +1159,7 @@ class CarLifeSession(
                     val t = SystemClock.elapsedRealtime()
                     // Mazda 20622111 (h359): пакет > ~16 КиБ вешает USB, обложка 24 КБ убила сессию через 3 с после картинки;
                     // Bon-Auto 20362105 (h1063) под тем же лимитом
-                    val limit = MetaImages.artLimit(cfg.metaArt16k, huSmallPackets)
+                    val limit = MetaImages.artLimit(cfg.metaArt16k || bridge.huSemidriveX9, huSmallPackets)
                     val j = MetaImages.albumJpeg(art, limit) ?: ByteArray(0)
                     AppLog.i("метаданные: обложка ${PbText.blob(art)} -> ${PbText.blob(j)} за ${SystemClock.elapsedRealtime() - t} мс", ui = false)
                     lastArtSrc = art
@@ -1166,13 +1167,14 @@ class CarLifeSession(
                     j
                 }
             }
-            sendCmd(Msg.MEDIA_INFO, Msgs.mediaInfo(info, jpeg))
-            // This head unit refreshes the cluster icon only when it re-reads the media session;
-            // one MEDIA_INFO is not enough. A second identical copy ~0.7 s later works in both
-            // desktop and AA (the AA art update used to provide that second copy only by chance).
-            try {
+            val pb = Msgs.mediaInfo(info, jpeg)
+            sendCmd(Msg.MEDIA_INFO, pb)
+            val seq = ++mediaInfoSeq
+            // SEMIDRIVE X9 (CR-V 6, ADR 0067): иконку на приборке обновляет только второй MEDIA_INFO; повтор через cl-meta
+            // и только если новее ничего не ушло - иначе копия старого трека легла бы поверх нового
+            if (bridge.huSemidriveX9) try {
                 sched.schedule({
-                    if (!closed.get()) sendCmd(Msg.MEDIA_INFO, Msgs.mediaInfo(info, jpeg))
+                    metaSubmit("MEDIA_INFO повтор") { if (seq == mediaInfoSeq) sendCmd(Msg.MEDIA_INFO, pb) }
                 }, MEDIA_INFO_REPEAT_MS, TimeUnit.MILLISECONDS)
             } catch (_: java.util.concurrent.RejectedExecutionException) {
             }

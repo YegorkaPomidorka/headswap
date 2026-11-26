@@ -379,6 +379,8 @@ class AaBridgeCore(
         private set
     @Volatile var huMazda20622111 = false      // Mazda Connect 2 из Китая (channel 20622111, h238/h359): VIDEO_DATA > ~16 КиБ вешает чтение USB
         private set
+    @Volatile var huSemidriveX9 = false        // Honda CR-V 6 SEMIDRIVE X9 (channel 21580005, h219/h606): иконку на приборке обновляет только повтор MEDIA_INFO
+        private set
     @Volatile var huHonda20772122 = false      // Honda XR-V 2022 (channel 20772122, h1235): IDR ≥ ~600 КиБ - ГУ сбрасывает USB (EIO)
     @Volatile var huBonAuto20362105 = false    // Bon-Auto (Mitsubishi Outlander, channel 20362105, h1063/h1111): низ кадра - каша при любом разрешении, EIO; пробуем потолок битрейта
         private set
@@ -662,6 +664,7 @@ class AaBridgeCore(
         huHyundaiCn7 = false                   // HU_INFO придёт заново в этой сессии
         huPioneerRm56 = false                  // HU_INFO придёт заново в этой сессии
         huMazda20622111 = false                // STATISTIC_INFO придёт заново в этой сессии
+        huSemidriveX9 = false                  // STATISTIC_INFO придёт заново в этой сессии
         huBonAuto20362105 = false              // STATISTIC_INFO придёт заново в этой сессии
         huHonda20772122 = false                // STATISTIC_INFO придёт заново в этой сессии
         huMobisNx4c = false                    // HU_INFO / STATISTIC_INFO придут заново в этой сессии
@@ -1094,6 +1097,10 @@ class AaBridgeCore(
         if (channel == MAZDA_20622111_CHANNEL && !huMazda20622111) {
             huMazda20622111 = true
             log("BRIDGE ГУ Mazda 20622111: VIDEO_DATA режу на куски ≤ $MAZDA_20622111_MAX_VIDEO_PACKET Б, потолок ${MAZDA_20622111_CEILING_BPS / 1000} кбит/с", true)
+        }
+        if (channel == SEMIDRIVE_X9_CHANNEL && !huSemidriveX9) {
+            huSemidriveX9 = true
+            log("BRIDGE ГУ SEMIDRIVE X9 21580005: MEDIA_INFO повторяю через 0,7 с (обложка на приборке)", true)
         }
         if (channel == HONDA_20772122_CHANNEL && !huHonda20772122) {
             huHonda20772122 = true
@@ -3437,6 +3444,7 @@ class AaBridgeCore(
         const val HONDA_20772104_CHANNEL = "20772104"     // Honda Civic 2021 (Китай, h588/h629): после задней просит MUSIC=1
         /** Mazda Connect 2 (Китай, CarLife 1.0, HU_INFO из заглушек, h238/h359): VIDEO_DATA 16163 Б прошёл, 16518 и 19104 Б - ГУ перестала читать USB. */
         const val MAZDA_20622111_CHANNEL = "20622111"
+        const val SEMIDRIVE_X9_CHANNEL = "21580005"
         const val MAZDA_20622111_MAX_VIDEO_PACKET = 15_000
         const val MAZDA_20622111_ART_BYTES = 12_000          // обложка в MEDIA_INFO: весь пакет должен остаться < 15000 Б
         const val MAZDA_20622111_CEILING_BPS = 1_500_000  // IDR поменьше на случай, если ГУ не склеивает куски
