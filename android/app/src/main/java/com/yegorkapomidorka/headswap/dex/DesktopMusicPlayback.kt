@@ -134,7 +134,8 @@ internal object DesktopMusicPlayback {
             sessionsListener = MediaSessionManager.OnActiveSessionsChangedListener {
                 if (watched === target && policy.hasPending) checkPending(false)
             }.also { manager.addOnActiveSessionsChangedListener(it, null, main) }
-            selectedListener = MediaSessionManager.OnMediaKeyEventSessionChangedListener { _, token ->
+            selectedListener = MediaSessionManager.OnMediaKeyEventSessionChangedListener { _: String?, token: MediaSession.Token? ->
+                // realme A13 passes a null package despite @NonNull; a non-null lambda param crashed the app (h1474)
                 if (watched === target && policy.hasPending && !runCatching {
                     policy.acceptsSelectionEvent(token) { manager.mediaKeyEventSession }
                 }.getOrDefault(false)) cancelPending("selected player changed")
