@@ -31,23 +31,9 @@ internal class DesktopVideoDelivery {
             lastVideoTraffic = nowMs
         }
     }
-    @Synchronized fun hasPicture(): Boolean = !closed && startedAt != null && completedAt != null
     @Synchronized fun isFlowing(nowMs: Long): Boolean {
         val write = completedAt ?: return false
         return !closed && startedAt != null && nowMs >= write && nowMs - write <= FRESHNESS_MS
     }
-    @Synchronized fun isAliveForIdleTimer(nowMs: Long): Boolean {
-        val traffic = lastVideoTraffic ?: return false
-        return !closed && completedAt != null && nowMs >= traffic && nowMs - traffic <= FRESHNESS_MS
-    }
     companion object { const val FRESHNESS_MS = 3_000L }
-}
-
-/** Publication uses session identity; an old close cannot clear a replacement session. */
-internal object DesktopConnectionState {
-    private var current: DesktopVideoDelivery? = null
-    @Synchronized fun attach(value: DesktopVideoDelivery) { current = value }
-    @Synchronized fun detach(value: DesktopVideoDelivery) { if (current === value) current = null }
-    @Synchronized fun videoIsFlowing(nowMs: Long): Boolean = current?.isFlowing(nowMs) == true
-    @Synchronized fun aliveForIdleTimer(nowMs: Long): Boolean = current?.isAliveForIdleTimer(nowMs) == true
 }

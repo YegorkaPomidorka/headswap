@@ -11,7 +11,6 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
-import org.junit.After
 import org.junit.Test
 import kotlin.math.abs
 import com.yegorkapomidorka.headswap.aa.AapMessages as M
@@ -61,12 +60,6 @@ class MetaLink : CarlifeLink {
 
 class AaMetaTest {
     private val png = byteArrayOf(0x89.toByte(), 'P'.code.toByte(), 'N'.code.toByte(), 'G'.code.toByte(), 1, 2, 3)
-
-    // NAVI=1 на весь маршрут по умолчанию включён (кроме Desay G6S); тесты, выключающие флаг, возвращают его здесь
-    @After
-    fun routeNaviOn() {
-        AaBridgeCore.ROUTE_NAVI_STATUS_ENABLED = true
-    }
 
     private fun status(state: Int, pos: Int, source: String = "Spotify") =
         AapPb().v(1, state).str(2, source).v(3, pos).bool(4, false).bool(5, false).bool(6, false).toByteArray()
@@ -225,7 +218,8 @@ class AaMetaTest {
         var now = 1_000_000L
         val link = MetaLink()
         val logs = ArrayList<String>()
-        val core = AaBridgeCore({ s, _ -> logs.add(s) }, clockMs = { now })
+        val timers = FakeTimers()
+        val core = AaBridgeCore({ s, _ -> logs.add(s) }, clockMs = { now }, audioSchedule = timers::schedule)
 
         init {
             core.attach(link)
@@ -550,31 +544,28 @@ class AaMetaTest {
 
     @Test
     fun naviReleasedWhenTtsEndsAfterRouteEnded() {
-        AaBridgeCore.TTS_DEBOUNCE_ENABLED = false
-        try {
-            val r = Rig()
-            r.core.onCarlifeSubscribe(listOf(0), true)
-            r.start()
-            r.core.onNavStatus(1)
-            r.core.onAudioData(M.CH_AUDIO_SPEECH, ByteArray(640), 0)
-            r.core.onNavStatus(2)                                   // «Вы прибыли» ещё играет
-            assertEquals(listOf(1), r.link.navi())
-            r.core.onAudioStop(M.CH_AUDIO_SPEECH)
-            assertEquals("TTS кончился после маршрута: NAVI=0, приборка гаснет", listOf(1, 0), r.link.navi())
+        val r = Rig()
+        r.core.onCarlifeSubscribe(listOf(0), true)
+        r.start()
+        r.core.onNavStatus(1)
+        r.core.onAudioData(M.CH_AUDIO_SPEECH, ByteArray(640), 0)
+        r.core.onNavStatus(2)                                   // «Вы прибыли» ещё играет
+        assertEquals(listOf(1), r.link.navi())
+        r.core.onAudioStop(M.CH_AUDIO_SPEECH)
+        r.timers.advance(AaBridgeCore.TTS_STOP_DELAY_MS)
+        assertEquals("TTS кончился после маршрута: NAVI=0, приборка гаснет", listOf(1, 0), r.link.navi())
 
-            // маршрут идёт: конец TTS NAVI не трогает
-            val q = Rig()
-            q.core.onCarlifeSubscribe(listOf(0), true)
-            q.start()
-            q.core.onNavStatus(1)
-            q.core.onAudioData(M.CH_AUDIO_SPEECH, ByteArray(640), 0)
-            q.core.onAudioStop(M.CH_AUDIO_SPEECH)
-            assertEquals(listOf(1), q.link.navi())
-            q.core.onNavStatus(2)                                   // крестик посреди маршрута, TTS уже молчит
-            assertEquals("отмена маршрута: NAVI=0", listOf(1, 0), q.link.navi())
-        } finally {
-            AaBridgeCore.TTS_DEBOUNCE_ENABLED = true
-        }
+        // маршрут идёт: конец TTS NAVI не трогает
+        val q = Rig()
+        q.core.onCarlifeSubscribe(listOf(0), true)
+        q.start()
+        q.core.onNavStatus(1)
+        q.core.onAudioData(M.CH_AUDIO_SPEECH, ByteArray(640), 0)
+        q.core.onAudioStop(M.CH_AUDIO_SPEECH)
+        q.timers.advance(AaBridgeCore.TTS_STOP_DELAY_MS)
+        assertEquals(listOf(1), q.link.navi())
+        q.core.onNavStatus(2)                                   // крестик посреди маршрута, TTS уже молчит
+        assertEquals("отмена маршрута: NAVI=0", listOf(1, 0), q.link.navi())
     }
 
     @Test
@@ -596,12 +587,6 @@ class AaMetaTest {
         assertEquals(listOf(1), link2.navi())
         assertEquals(1, link2.turns.single().action)
         assertEquals(300, link2.turns.single().remainDistance)
-    }
-
-    @Test
-    fun routeNaviOffWhenFlagDisabled() {
-        AaBridgeCore.ROUTE_NAVI_STATUS_ENABLED = false
-        assertRouteWithoutNavi(Rig())
     }
 
     /** Маршрут без NAVI=1: манёвры идут, NAVI=1 остаётся только вокруг TTS. */
@@ -1035,6 +1020,38 @@ class AaMetaTest {
     }
 
     @Test
+    fun toyotaDesayResumesAfterCall() {
+        // h1334, bZ4X 21050016 (лог 21.11 14:07): звонок - MUSIC=0, после звонка AA играет, ГУ ещё раз MUSIC=0,
+        // через 1,4 с MUSIC=1 - play
+        val r = Rig()
+        val peer = FakePeer()
+        r.core.peer = peer
+        r.core.onHuStatistic("21050016")
+        assertTrue(r.core.huToyotaDesay)
+        r.start()
+        r.core.onMediaStatus(AaMeta.parseMediaStatus(status(2, 1))!!)
+        assertFalse(r.core.onCarlifeMusicControl(0))
+        assertEquals(listOf(127), peer.keys.toList())
+        r.now += 1400
+        assertTrue(r.core.onCarlifeMusicControl(1))
+        r.now += 100
+        assertTrue(r.core.onCarlifeMusicControl(1))
+        assertEquals("126 один раз", listOf(127, 126), peer.keys.toList())
+
+        // Desay другой марки без флага: как раньше
+        val q = Rig()
+        val qPeer = FakePeer()
+        q.core.peer = qPeer
+        q.core.onHuStatistic("21050099")
+        q.start()
+        q.core.onMediaStatus(AaMeta.parseMediaStatus(status(2, 1))!!)
+        q.core.onCarlifeMusicControl(0)
+        q.now += 1400
+        assertFalse(q.core.onCarlifeMusicControl(1))
+        assertEquals(listOf(127), qPeer.keys.toList())
+    }
+
+    @Test
     fun honda20772104ResumesAfterExternalPause() {
         // Civic 2021 (h629, лог 31.10 12:29): после задней AA встаёт на паузу извне, через 100 мс ГУ шлёт MUSIC=1
         val r = Rig()
@@ -1151,16 +1168,6 @@ class AaMetaTest {
         o.core.onCarlifeMusicControl(0)
         o.core.onCarlifeMusicControl(1)
         assertEquals(listOf(127), oPeer.keys.toList())
-
-        // флаг выключен - старое поведение
-        AaBridgeCore.HU_MUSIC_RESUME_ENABLED = false
-        try {
-            val (f, fPeer) = g6sPausedByUs()
-            assertFalse(f.core.onCarlifeMusicControl(1))
-            assertEquals(listOf(127), fPeer.keys.toList())
-        } finally {
-            AaBridgeCore.HU_MUSIC_RESUME_ENABLED = true
-        }
     }
 
     @Test
@@ -1304,19 +1311,6 @@ class AaMetaTest {
         val before = p.mediaData()
         p.media()
         assertEquals(before + 1, p.mediaData())
-    }
-
-    @Test
-    fun btAutoplayGuardCanBeDisabled() {
-        AaBridgeCore.BT_AUTOPLAY_GUARD_ENABLED = false
-        try {
-            val p = PausedRig()
-            p.r.core.onHuBtHfpConnection(2)
-            p.r.core.onAudioStart(M.CH_AUDIO_MEDIA)
-            assertEquals(listOf(127), p.peer.keys.toList())
-        } finally {
-            AaBridgeCore.BT_AUTOPLAY_GUARD_ENABLED = true
-        }
     }
 
     @Test
@@ -1631,23 +1625,17 @@ class AaMetaTest {
 
     @Test
     fun hondaRerouteWhileTtsHeldRearmsNavi() {
-        val was = AaBridgeCore.TTS_DEBOUNCE_ENABLED
-        AaBridgeCore.TTS_DEBOUNCE_ENABLED = false
-        try {
-            val r = hondaRoute()
-            r.core.onAudioData(M.CH_AUDIO_SPEECH, ByteArray(640), 0)   // TTS идёт в момент перестроения
-            r.core.onNavStatus(2)
-            assertEquals("NAVI держит TTS", listOf(1), r.link.navi())
-            r.now += 6000
-            r.core.onNavStatus(1)
-            r.core.onNavTurn(AaMeta.parseNavState(navState(7, "Second Ave"))!!)
-            r.core.onNavDistance(AaMeta.parseNavPosition(navPosition(190, 37))!!)
-            r.pumpSubscribe()
-            assertEquals(1, r.link.turns.last().action)
-            assertEquals("перестроение: перед SHOW переход NAVI 0->1", listOf(1, 0, 1), r.link.navi())
-        } finally {
-            AaBridgeCore.TTS_DEBOUNCE_ENABLED = was
-        }
+        val r = hondaRoute()
+        r.core.onAudioData(M.CH_AUDIO_SPEECH, ByteArray(640), 0)   // TTS идёт в момент перестроения
+        r.core.onNavStatus(2)
+        assertEquals("NAVI держит TTS", listOf(1), r.link.navi())
+        r.now += 6000
+        r.core.onNavStatus(1)
+        r.core.onNavTurn(AaMeta.parseNavState(navState(7, "Second Ave"))!!)
+        r.core.onNavDistance(AaMeta.parseNavPosition(navPosition(190, 37))!!)
+        r.pumpSubscribe()
+        assertEquals(1, r.link.turns.last().action)
+        assertEquals("перестроение: перед SHOW переход NAVI 0->1", listOf(1, 0, 1), r.link.navi())
     }
 
     private class FakeDesktopMedia(var playing: Boolean) : DesktopMedia {

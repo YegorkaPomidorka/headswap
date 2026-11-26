@@ -185,6 +185,10 @@
     <string name="tpreroll_200">200 毫秒</string>
     <string name="tpreroll_400">400 毫秒</string>
 
+    <!-- 导航提示通道（NavChannel） -->
+    <string name="navch_vr">VR（语音通道）</string>
+    <string name="navch_tts">TTS（导航通道）</string>
+
     <!-- 触摸抽样（TouchDecimation） -->
     <string name="tdec_off">关闭</string>
     <string name="tdec_x2">×2</string>
@@ -256,6 +260,7 @@
     <string name="car_skoda_kamiq_gt_2021">斯柯达 柯米克 GT 2021款</string>
     <string name="car_skoda_octavia_pro">斯柯达 明锐 Pro</string>
     <string name="car_toyota_corolla_cross_2024">丰田 锋兰达 2024–2025款</string>
+    <string name="car_toyota_bz4x">丰田 bZ4X</string>
     <string name="car_toyota_levin">丰田 雷凌</string>
     <string name="car_toyota_rav4_2025">丰田 RAV4荣放 2025款</string>
     <string name="car_vw_bora_2021">大众 宝来 2021款</string>

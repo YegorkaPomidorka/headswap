@@ -75,6 +75,8 @@ class LauncherActivity : ComponentActivity() {
             addAction(Intent.ACTION_USER_PRESENT)
         }, ContextCompat.RECEIVER_NOT_EXPORTED)
         LauncherModel.init(this)
+        LauncherActions.startRouteCatcher(applicationContext) // опрос задач телефона живёт, пока жива активность (onDestroy гасит)
+        routeCatcher = true
         ForeignActions.reload(this, currentDisplayId(), goHome = false) // сразу в чужой лаунчер, если он выбран
         // дочерние окна живут с плотностью дисплея ГУ
         val dpi = resources.displayMetrics.densityDpi.coerceIn(96, 1280)
@@ -88,6 +90,7 @@ class LauncherActivity : ComponentActivity() {
         })
         setContent { LauncherRoot(connected) }
         DesktopKeys.sink = LauncherKnob // шайба и NAVI/MUSIC/HOME ГУ идут сюда, а не инжектом в окно (ADR 0024)
+        DesktopKeys.rail = LauncherKnob // свайп по экрану ГУ прячет рейку (ADR 0062)
     }
 
     /**
@@ -130,7 +133,11 @@ class LauncherActivity : ComponentActivity() {
         super.onPause()
     }
 
+    /** Этот экземпляр запустил ловец маршрутов: ранний finish() до старта чужой ловец не гасит. */
+    private var routeCatcher = false
+
     override fun onDestroy() {
+        if (routeCatcher) com.yegorkapomidorka.headswap.dex.PhoneAssistant.stopPhoneWatch()
         runCatching { unregisterReceiver(screenEvents) }
         LauncherKnob.paused(this) // приёмник в DesktopKeys остаётся: без живого экземпляра он сам отказывается
         main.removeCallbacksAndMessages(null)

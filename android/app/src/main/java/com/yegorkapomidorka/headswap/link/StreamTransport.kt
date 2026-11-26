@@ -53,8 +53,6 @@ class StreamTransport(
     }
 
     @Volatile private var rx = 0L
-    @Volatile var lastRxMs = 0L
-        private set
 
     override val rxBytes: Long get() = rx
     override val queuedVideoBytes: Long get() = videoBytes.get()
@@ -77,7 +75,6 @@ class StreamTransport(
         onWritten: (chan: Int, inner: ByteArray) -> Unit,
         onClosed: (reason: String) -> Unit,
     ) {
-        lastRxMs = clock()
         writer = Thread({ writeLoop(onWritten, onClosed) }, "cl-writer").also { it.start() }
         reader = Thread({ readLoop(sink, onClosed) }, "cl-reader").also { it.start() }
     }
@@ -118,7 +115,6 @@ class StreamTransport(
                     if (!closed.get()) onClosed("EOF чтения (ГУ отключилось)")
                     return
                 }
-                lastRxMs = clock()
                 rx += n
                 AppLog.detail("RAW rx read=$n bytes: ${Hex.compact(buf.copyOf(minOf(n, 32)), 32)}")
                 if (desync) continue

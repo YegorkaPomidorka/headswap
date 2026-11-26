@@ -399,6 +399,7 @@ object AaServerCheck {
 
     /** AaConnector перед каждым подключением к серверу ГУ (нить коннектора, не main): ручная проба не должна держать сервер. */
     fun beforeBridgeConnect() {
+        AaShadowNav.awaitStopped()      // выключенная теневая AA может ещё слать ByeBye
         val c = manual ?: return
         if (!c.awaitIdle(AWAIT_MS)) AppLog.i("SRVCHECK проба не закончилась за $AWAIT_MS мс, подключаюсь всё равно")
     }

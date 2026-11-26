@@ -191,7 +191,7 @@ private fun NotificationsOverlayBody(barBandH: Int, home: LauncherSpec) {
         if (liveItems.isNotEmpty() && (model.statusBottom != null || idle)) {
             val hitW = 2 * s.t
             val hitY = if (notchMode) Math.round(topY) else Math.round(barCy) - s.t / 2
-            // смещение - на обёртке: рамку шайбы Pressable рисует до своего modifier и offset внутри её не сдвинул бы
+            // смещение - на обёртке (до h1413 рамка шайбы не ехала за offset из modifier Pressable)
             Box(
                 Modifier.absoluteOffset { IntOffset(Math.round(lineX()) - hitW / 2, hitY) }
                     .graphicsLayer { alpha = if (notchMode) 1f else 1f - p.value },
@@ -324,7 +324,7 @@ private fun TongueBody(item: NotifItem, minW: Int, maxW: Int, dragThr: Float, li
             Txt(item.entry.text, s.f1, color = Pal.TEXT, weight = FontWeight.Medium, maxLines = 2)
         }
         // полоска лежит на нижнем крае вместе с язычком; тач-зона - T x 2T от нижней кромки вверх
-        // сдвиг к месту полоски на строке статуса — на обёртке (рамку шайбы Pressable рисует до своего modifier)
+        // сдвиг к месту полоски на строке статуса — на обёртке
         // lineDx - сдвиг в px корня, физический: absoluteOffset, не зеркалящийся offset
         Box(Modifier.align(Alignment.BottomCenter).absoluteOffset { IntOffset(lineDx(), 0) }) {
             Pressable(

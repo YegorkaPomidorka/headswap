@@ -25,6 +25,8 @@
     <string name="dev_voice_chunk_note">语音助手回复和导航提示音。自动：大众 CNS2 Delphi 车机使用 1024 B，其余与 AA 发送的一致</string>
     <string name="dev_section_tts_preroll">提示音前的静音（实验性）</string>
     <string name="dev_tts_preroll_note">提示音开始后先发送一段零数据，以便车机打开音频通道。自动：大众车机为 400 毫秒</string>
+    <string name="dev_section_nav_channel">导航提示通道（实验性）</string>
+    <string name="dev_nav_channel_note">VR：提示音走语音通道，不发送 NAVI=1，车机可能把音量键切换为“语音”。TTS：与之前相同。下一条提示起生效</string>
     <string name="dev_volume_swipe_title">双指调节音量</string>
     <string name="dev_volume_swipe_sub">桌面：双指在右侧边缘滑动，上滑音量增大，下滑音量减小。本田 Vezel 上始终开启。</string>
     <string name="dev_section_touch_decimation">触摸抽样（实验性）</string>

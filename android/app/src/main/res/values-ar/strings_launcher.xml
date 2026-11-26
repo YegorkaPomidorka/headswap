@@ -57,6 +57,15 @@
     <string name="l_phone_talk">اتصال بـ %1$s</string>
     <string name="l_phone_calling">جارٍ الاتصال…</string>
     <string name="l_phone_none">لا توجد مكالمات</string>
+    <string name="l_call_hidden">مكالمة</string>
+    <plurals name="l_missed_hidden">
+        <item quantity="zero">%d مكالمة</item>
+        <item quantity="one">%d مكالمة</item>
+        <item quantity="two">%d مكالمتان</item>
+        <item quantity="few">%d مكالمات</item>
+        <item quantity="many">%d مكالمة</item>
+        <item quantity="other">%d مكالمة</item>
+    </plurals>
     <string name="l_phone_grant">اسمح على الهاتف</string>
     <string name="l_call_back">معاودة الاتصال</string>
     <string name="l_call">اتصال</string>
@@ -196,12 +205,20 @@
     <string name="l_s_colors_bg_hue">درجة لون الخلفية</string>
     <string name="l_s_colors_bg_sat">تشبّع الخلفية</string>
     <string name="l_s_colors_hint">ما دامت هذه الشاشة مفتوحة، يعرض سطح المكتب الألوان التي تعدّلها. تظهر ألوان الليل في السمة الداكنة، وألوان النهار في الفاتحة.</string>
+    <string name="l_s_colors_presets">إعدادات مسبقة</string>
+    <string name="l_s_preset_default">افتراضي</string>
+    <string name="l_s_preset_tree">شجرة الميلاد</string>
+    <string name="l_s_preset_new_year">رأس السنة</string>
+    <string name="l_ny_countdown">حتى رأس السنة</string>
+    <string name="l_ny_greeting">سنة %1$s سعيدة!</string>
     <string name="l_s_wallpaper">خلفية الشاشة</string>
     <string name="l_s_wallpaper_sub_glass">تحت الزجاج على سطح المكتب كله</string>
     <string name="l_s_wallpaper_sub_solid">تعمل بنمط الزجاج فقط</string>
     <string name="l_s_wallpaper_none">بدون خلفية</string>
     <string name="l_s_wallpaper_headswap">Headswap</string>
     <string name="l_s_wallpaper_mountains">جبال</string>
+    <string name="l_s_wallpaper_tree">شجرة</string>
+    <string name="l_s_wallpaper_winter_road">طريق</string>
     <string name="l_s_wallpaper_custom">صورتي</string>
     <string name="l_s_wallpaper_gallery">المعرض</string>
     <string name="l_s_wallpaper_blur">تمويه</string>
@@ -211,4 +228,6 @@
     <string name="l_s_alice_voice">Alice بالصوت فقط</string>
     <string name="l_s_alice_voice_on">بلا نافذة، شريط صغير في الأسفل؛ يعمل حتى والهاتف مقفل</string>
     <string name="l_s_alice_voice_off">Alice في لوحة بجانب الشريط الجانبي</string>
+    <string name="l_s_hide_caller">إخفاء الأرقام</string>
+    <string name="l_s_hide_caller_sub">المتصل يظهر في «المكالمات» فقط</string>
 </resources>

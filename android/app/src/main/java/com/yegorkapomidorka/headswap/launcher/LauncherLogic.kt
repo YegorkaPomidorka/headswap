@@ -241,6 +241,72 @@ object BackNav {
 }
 
 /**
+ * Плашка плеера поверх навигатора на весь экран (ADR 0063, макет «Плеер поверх навигатора»): когда видна и где стоит
+ * по горизонтали. Размеры - px макета 1280x720 ([k] переводит в px экрана).
+ */
+object NavPlayerPlate {
+    enum class Look { HIDDEN, FULL }
+
+    /**
+     * Во сколько раз плашка крупнее макета 340x72: на Vezel x1 мелко, x2,5 огромная (Егор 24.11). x1,4 - ширина 476
+     * ровно в промежутке между левой и правой панелями навигатора на Vezel.
+     */
+    const val SCALE = 1.4f
+    const val W = 476
+    const val H = 101
+    /** Отступ снизу места по умолчанию: справа от левой нижней панели навигатора (Егор 24.11), дальше тащит сам. */
+    const val BOTTOM = 19
+
+    /**
+     * Место, куда плашку перетащили (долгое нажатие и тащить): доли свободного хода по x и y, 0..1, чтобы место
+     * пережило другой размер экрана и ширину рейки. Хранится по пакету навигатора: у каждого свои панели.
+     */
+    data class Pos(val fx: Float, val fy: Float) {
+        fun save(): String = "$fx,$fy"
+        companion object {
+            fun restore(s: String?): Pos? {
+                val p = s?.split(',')?.mapNotNull { it.toFloatOrNull() } ?: return null
+                return if (p.size == 2) Pos(p[0].coerceIn(0f, 1f), p[1].coerceIn(0f, 1f)) else null
+            }
+        }
+    }
+
+    /** Левый верхний угол плашки в области (px экрана): сохранённое место [pos] или по умолчанию снизу в промежутке. */
+    fun origin(pos: Pos?, areaW: Int, areaH: Int, plateW: Int, plateH: Int, k: Float): Pair<Int, Int> {
+        val roomX = (areaW - plateW).coerceAtLeast(0)
+        val roomY = (areaH - plateH).coerceAtLeast(0)
+        if (pos == null) return left(areaW, plateW, k).coerceAtMost(roomX) to (roomY - (BOTTOM * k).toInt()).coerceAtLeast(0)
+        return (pos.fx * roomX).toInt() to (pos.fy * roomY).toInt()
+    }
+
+    /** Отпустили плашку с левым верхним углом [x], [y] - доли для [Pos], за край области не выходит. */
+    fun pos(x: Float, y: Float, areaW: Int, areaH: Int, plateW: Int, plateH: Int): Pos {
+        val roomX = (areaW - plateW).coerceAtLeast(1)
+        val roomY = (areaH - plateH).coerceAtLeast(1)
+        return Pos((x / roomX).coerceIn(0f, 1f), (y / roomY).coerceIn(0f, 1f))
+    }
+    /** Левые нижние панели навигаторов (маршрут ЯН, 2ГИС, шторка Google Карт) кончаются ~515 px от края области. */
+    const val LEFT_PANEL = 515
+    /** Правая колонка кнопок Google Карт, «Сообщить» и мини-карта 2ГИС занимают ~145 px от правого края. */
+    const val RIGHT_PANEL = 145
+
+    fun look(
+        navArea: Boolean, navReady: Boolean, carHost: Boolean, access: Boolean, hasSession: Boolean,
+        ringing: Boolean, alice: Boolean,
+    ): Look = if (!navArea || !navReady || carHost || !access || !hasSession || ringing || alice) Look.HIDDEN else Look.FULL
+
+    /**
+     * Левый край плашки шириной [plateW] от начала области шириной [areaW] (px экрана): по центру промежутка между левыми
+     * и правыми панелями навигаторов; промежуток уже плашки - прижать к правой панели, не залезая за начало области.
+     */
+    fun left(areaW: Int, plateW: Int, k: Float): Int {
+        val from = (LEFT_PANEL * k).toInt()
+        val to = areaW - (RIGHT_PANEL * k).toInt()
+        return if (to - from >= plateW) from + (to - from - plateW) / 2 else (to - plateW).coerceAtLeast(0)
+    }
+}
+
+/**
  * Полноэкранный YouTube в окне приложения занимает весь экран, рейка прячется; выход - кнопкой самого YouTube.
  * Только YouTube: приложение, которое прячет строку состояния всегда (игры), осталось бы без «Назад» и «Домой».
  * Сомнение (ошибка запроса, не тот экран, не готово) - рейка видна.

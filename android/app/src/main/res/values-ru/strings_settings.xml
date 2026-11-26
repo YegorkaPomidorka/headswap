@@ -190,6 +190,10 @@
     <string name="tpreroll_200">200 мс</string>
     <string name="tpreroll_400">400 мс</string>
 
+    <!-- Канал подсказок навигации (NavChannel) -->
+    <string name="navch_vr">VR (голосовой канал)</string>
+    <string name="navch_tts">TTS (канал навигации)</string>
+
     <!-- Прореживание тача (TouchDecimation) -->
     <string name="tdec_off">Выкл</string>
     <string name="tdec_x2">×2</string>
@@ -264,6 +268,7 @@
     <string name="car_skoda_kamiq_gt_2021">Skoda Kamiq GT 2021</string>
     <string name="car_skoda_octavia_pro">Skoda Octavia Pro</string>
     <string name="car_toyota_corolla_cross_2024">Toyota Corolla Cross 2024–2025</string>
+    <string name="car_toyota_bz4x">Toyota bZ4X</string>
     <string name="car_toyota_levin">Toyota Levin</string>
     <string name="car_toyota_rav4_2025">Toyota RAV4 2025</string>
     <string name="car_vw_bora_2021">Volkswagen Bora 2021</string>

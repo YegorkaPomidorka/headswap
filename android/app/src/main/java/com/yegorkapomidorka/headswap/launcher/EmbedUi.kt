@@ -3,6 +3,19 @@ package com.yegorkapomidorka.headswap.launcher
 import android.graphics.SurfaceTexture
 import android.view.TextureView
 import androidx.compose.foundation.background
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import kotlinx.coroutines.delay
 import androidx.compose.foundation.border
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.layout.Box
@@ -363,21 +376,82 @@ fun HomeTileButtons() {
 /**
  * Вид «Часы»: крупные часы и дата; в малой плашке мельче. Размер ещё и по плитке: в ленте 1280x480 2T не влезало
  * по ширине - «13:…» (Егор 09.11). Моно-цифра ~0,62 кегля, время с запасом 15% по ширине и не выше 45% высоты.
+ * Сезонно ([NewYearMode], ADR 0063): 31.12 с 23:00 - отсчёт до Нового года, 01-05.01 - поздравление над часами.
  */
 @Composable
 private fun ClockFace(small: Boolean) {
     val m = LocalMetrics.current
     val s = m.spec
     val st = LauncherModel.status
+    // тик раз в секунду только в окне отсчёта, иначе раз в минуту (на границах окон)
+    var now by remember { mutableStateOf(NewYearClock.now()) }
+    LaunchedEffect(Unit) {
+        while (true) {
+            now = NewYearClock.now()
+            delay(NewYearMode.nextTickMs(now).coerceAtLeast(50L))
+        }
+    }
+    val mode = NewYearMode.at(now)
     BoxWithConstraints(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         val base = if (small) s.t else s.t * 2
         val chars = maxOf(5, st.time.length)
         val byW = (constraints.maxWidth * 0.85f / (chars * 0.62f)).toInt()
         val byH = (constraints.maxHeight * 0.45f).toInt()
         val timeFs = if (!s.strip) base else minOf(base, byW, byH).coerceAtLeast(s.f1)
+        val maxW = constraints.maxWidth
+        val accent = LocalAccent.current
+        val label = if (small) s.f2 else s.f1
+        if (mode is NewYearMode.Greeting) SparksLayer(accent)
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Txt(st.time, timeFs, weight = FontWeight.Bold, mono = true)
-            Txt(st.date, if (small) s.f2 else s.f1, color = Pal.SEC2)
+            when (mode) {
+                is NewYearMode.Countdown -> {
+                    Txt(stringResource(R.string.l_ny_countdown), label, color = accent, weight = FontWeight.SemiBold)
+                    Txt(mode.text, timeFs, weight = FontWeight.Bold, mono = true)
+                    val barW = minOf(maxW * 0.7f, timeFs * 3.2f)
+                    val barH = maxOf(4, s.t / 16)
+                    Box(Modifier.padding(vertical = m.dp(maxOf(4, s.g8 / 2))).width(m.dp(barW.toInt())).height(m.dp(barH))
+                        .clip(RoundedCornerShape(50)).background(Color.White.copy(alpha = 0.12f))) {
+                        Box(Modifier.fillMaxHeight().fillMaxWidth(mode.progress).background(accent))
+                    }
+                    Txt("${NewYearMode.timeWithSeconds(now.toLocalTime(), LauncherModel.clock12h)} · ${st.date}", if (small) s.f2 else s.f1, color = Pal.SEC2)
+                }
+                else -> {
+                    if (mode is NewYearMode.Greeting) {
+                        val text = stringResource(R.string.l_ny_greeting, mode.year.toString())
+                        Txt(text, label, Modifier.widthIn(max = m.dp((maxW * 0.92f).toInt())).drawBehind {
+                            for (i in 3 downTo 1) {
+                                val grow = size.height * 0.18f * i
+                                drawRoundRect(accent.copy(alpha = 0.07f), Offset(-grow, -grow), Size(size.width + 2 * grow, size.height + 2 * grow),
+                                    CornerRadius(size.height / 2 + grow))
+                            }
+                        }, color = accent, weight = FontWeight.Bold, align = TextAlign.Center, maxLines = 2, ellipsis = false, minSizePx = s.f2)
+                    }
+                    Txt(st.time, timeFs, weight = FontWeight.Bold, mono = true)
+                    Txt(st.date, if (small) s.f2 else s.f1, color = Pal.SEC2)
+                }
+            }
+        }
+    }
+}
+
+/** Редкие мерцающие искры вокруг поздравления: акцент и белый, ~20 точек; «Анимации кнопок» выключены - стоят. */
+@Composable
+private fun SparksLayer(accent: Color) {
+    val sparks = remember { NewYearSparks.layout() }
+    val phase = if (LauncherModel.animations) {
+        rememberInfiniteTransition(label = "sparks")
+            .animateFloat(0f, 1f, infiniteRepeatable(tween(4000, easing = LinearEasing)), label = "twinkle")
+    } else null
+    val k = LocalMetrics.current.spec.t / 96f
+    androidx.compose.foundation.Canvas(Modifier.fillMaxSize()) {
+        val ph = phase?.value ?: 0f
+        for (sp in sparks) {
+            val a = if (phase == null) 0.7f else 0.15f + 0.85f * NewYearSparks.twinkle(ph, sp.phase)
+            val c = (if (sp.white) Color.White else accent).copy(alpha = a)
+            val r = 3.5f * k * sp.size
+            val p = Offset(size.width * sp.x, size.height * sp.y)
+            drawCircle(c.copy(alpha = a * 0.25f), r * 2.2f, p)
+            drawCircle(c, r, p)
         }
     }
 }

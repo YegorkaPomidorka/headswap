@@ -61,6 +61,16 @@ class LauncherPrefs(private val context: Context) {
         get() = ColorSet.decode(prefs.getString("colors_day", null), ColorSet.DAY)
         set(value) { prefs.edit().putString("colors_day", value.encode()).apply() }
 
+    /** Гирлянда на строке статуса: включается праздничным набором «Вид › Цвета › Пресеты», «Как было» и «Сбросить» её гасят. */
+    var garland: Boolean
+        get() = prefs.getBoolean("garland", false)
+        set(value) { prefs.edit().putBoolean("garland", value).apply() }
+
+    /** Какой праздничный пресет выбран тапом: tree / new_year / none ([ColorPreset.id]); от слайдеров не зависит, по нему первая плитка обоев подменяется. */
+    var festivePreset: String
+        get() = prefs.getString("festive_preset", null) ?: ColorPreset.NONE_ID
+        set(value) { prefs.edit().putString("festive_preset", value).apply() }
+
     var railSize: RailSize
         get() = RailSize.restore(prefs.getString("rail_size", null))
         set(value) { prefs.edit().putString("rail_size", value.name).apply() }
@@ -105,6 +115,11 @@ class LauncherPrefs(private val context: Context) {
     var showBattery: Boolean
         get() = prefs.getBoolean("show_battery", true)
         set(value) { prefs.edit().putBoolean("show_battery", value).apply() }
+
+    /** «Скрывать номера»: карточка «Телефон» и полоса звонка без имени и номера звонящего (h1431); «Вызовы» не трогает. */
+    var hideCaller: Boolean
+        get() = prefs.getBoolean("hide_caller", false)
+        set(value) { prefs.edit().putBoolean("hide_caller", value).apply() }
 
     /** Часы 12 ч «2:05» вместо 24 ч ([ClockFormat]); пока не выбирали - как в настройках телефона. */
     var clock12h: Boolean
@@ -179,6 +194,10 @@ class LauncherPrefs(private val context: Context) {
     /** «Масштаб карты» навигатора [pkg]: ступень [com.yegorkapomidorka.headswap.carapp.CarConfigMath.STEPS]. */
     fun mapScale(pkg: String): Int = prefs.getInt("map_scale:$pkg", com.yegorkapomidorka.headswap.carapp.CarConfigMath.AUTO_STEP)
     fun setMapScale(pkg: String, step: Int) { prefs.edit().putInt("map_scale:$pkg", step).apply() }
+
+    /** Куда перетащили плашку плеера над навигатором [pkg] ([NavPlayerPlate.Pos]); null - место по умолчанию. */
+    fun navPlayerPos(pkg: String): NavPlayerPlate.Pos? = NavPlayerPlate.Pos.restore(prefs.getString("nav_player_pos:$pkg", null))
+    fun setNavPlayerPos(pkg: String, pos: NavPlayerPlate.Pos) { prefs.edit().putString("nav_player_pos:$pkg", pos.save()).apply() }
 
     /** «Подсказки на приборке» навигатора [pkg]: машинная часть / теневая AA или окно как на телефоне ([NavigatorPick.hintsDefault]). */
     fun navHints(pkg: String): Boolean = prefs.getBoolean("nav_hints:$pkg", NavigatorPick.hintsDefault(pkg))

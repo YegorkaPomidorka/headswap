@@ -34,6 +34,7 @@ import com.yegorkapomidorka.headswap.aa.CustomResError
 import com.yegorkapomidorka.headswap.aa.CustomVideoMode
 import com.yegorkapomidorka.headswap.aa.DupDownFilter
 import com.yegorkapomidorka.headswap.aa.MediaChunk
+import com.yegorkapomidorka.headswap.aa.NavChannel
 import com.yegorkapomidorka.headswap.aa.TouchDecimation
 import com.yegorkapomidorka.headswap.aa.TtsPreroll
 import com.yegorkapomidorka.headswap.aa.VoiceChunk
@@ -63,6 +64,7 @@ class DevScreen(host: MainActivity) : Screen(host) {
     private val chunkRows = LinkedHashMap<MediaChunk, RadioRow>()
     private val voiceChunkRows = LinkedHashMap<VoiceChunk, RadioRow>()
     private val ttsPrerollRows = LinkedHashMap<TtsPreroll, RadioRow>()
+    private val navChannelRows = LinkedHashMap<NavChannel, RadioRow>()
     private val touchDecimationRows = LinkedHashMap<TouchDecimation, RadioRow>()
     private val dupDownRows = LinkedHashMap<DupDownFilter, RadioRow>()
 
@@ -141,6 +143,18 @@ class DevScreen(host: MainActivity) : Screen(host) {
             lp(WRAP, WRAP).margins(c, 8, 2, 8, 0),
         )
         refreshTtsPreroll()
+
+        body.addView(c.sectionTitle(c.getString(R.string.dev_section_nav_channel)))
+        for (m in NavChannel.values()) {
+            val row = RadioRow(c, c.getString(m.titleRes), "") { setNavChannel(m) }
+            navChannelRows[m] = row
+            body.addView(row.view, lp(MATCH, WRAP))
+        }
+        body.addView(
+            c.text(c.getString(R.string.dev_nav_channel_note), 13f, 400, c.clr(R.color.on2)),
+            lp(WRAP, WRAP).margins(c, 8, 2, 8, 0),
+        )
+        refreshNavChannel()
 
         body.addView(c.sectionTitle(c.getString(R.string.dev_section_touch_decimation)))
         for (m in TouchDecimation.values()) {
@@ -305,6 +319,15 @@ class DevScreen(host: MainActivity) : Screen(host) {
 
     private fun refreshTtsPreroll() {
         for ((m, row) in ttsPrerollRows) row.setSelected(aa.ttsPreroll == m)
+    }
+
+    private fun setNavChannel(m: NavChannel) {
+        aa.navChannel = m
+        refreshNavChannel()
+    }
+
+    private fun refreshNavChannel() {
+        for ((m, row) in navChannelRows) row.setSelected(aa.navChannel == m)
     }
 
     private fun setTouchDecimation(m: TouchDecimation) {

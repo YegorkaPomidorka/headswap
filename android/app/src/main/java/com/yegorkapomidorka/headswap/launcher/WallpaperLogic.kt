@@ -1,8 +1,8 @@
 package com.yegorkapomidorka.headswap.launcher
 
-/** Обои стола в стиле «Стекло»: none - как раньше (градиент палитры), две встроенные картинки и своё фото из файла. */
+/** Обои стола в стиле «Стекло»: none - как раньше (градиент палитры), четыре встроенные картинки (две праздничные - наборов «Ёлка» и «Новогодний») и своё фото из файла. */
 enum class WallpaperId(val key: String) {
-    NONE("none"), HEADSWAP("headswap"), MOUNTAINS("mountains"), CUSTOM("custom");
+    NONE("none"), HEADSWAP("headswap"), MOUNTAINS("mountains"), TREE("tree"), WINTER_ROAD("winter_road"), CUSTOM("custom");
 
     companion object {
         /** Незнакомое или пустое значение - без обоев. */

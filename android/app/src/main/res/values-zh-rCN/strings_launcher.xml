@@ -64,6 +64,10 @@
     <string name="l_phone_talk">通话中 %1$s</string>
     <string name="l_phone_calling">正在呼叫…</string>
     <string name="l_phone_none">没有通话</string>
+    <string name="l_call_hidden">来电</string>
+    <plurals name="l_missed_hidden">
+        <item quantity="other">%d 个未接来电</item>
+    </plurals>
     <string name="l_phone_grant">请在手机上允许</string>
     <string name="l_call_back">回拨</string>
     <string name="l_call">拨打</string>
@@ -128,12 +132,20 @@
     <string name="l_s_colors_bg_hue">背景色相</string>
     <string name="l_s_colors_bg_sat">背景饱和度</string>
     <string name="l_s_colors_hint">此页面打开期间，桌面会显示您正在编辑的颜色。夜间颜色用于深色主题，白天颜色用于浅色主题。</string>
+    <string name="l_s_colors_presets">预设</string>
+    <string name="l_s_preset_default">默认</string>
+    <string name="l_s_preset_tree">圣诞树</string>
+    <string name="l_s_preset_new_year">新年</string>
+    <string name="l_ny_countdown">距离新年</string>
+    <string name="l_ny_greeting">%1$s 新年快乐！</string>
     <string name="l_s_wallpaper">壁纸</string>
     <string name="l_s_wallpaper_sub_glass">毛玻璃下方，铺满整个桌面</string>
     <string name="l_s_wallpaper_sub_solid">仅在“玻璃”样式下生效</string>
     <string name="l_s_wallpaper_none">无壁纸</string>
     <string name="l_s_wallpaper_headswap">Headswap</string>
     <string name="l_s_wallpaper_mountains">山景</string>
+    <string name="l_s_wallpaper_tree">圣诞树</string>
+    <string name="l_s_wallpaper_winter_road">公路</string>
     <string name="l_s_wallpaper_custom">我的照片</string>
     <string name="l_s_wallpaper_gallery">图库</string>
     <string name="l_s_wallpaper_blur">模糊</string>
@@ -206,6 +218,8 @@
     <string name="l_s_alice_voice">Alice 仅语音</string>
     <string name="l_s_alice_voice_on">无窗口，仅在底部显示一个胶囊条；锁屏时也可使用</string>
     <string name="l_s_alice_voice_off">Alice 显示在左侧面板中</string>
+    <string name="l_s_hide_caller">隐藏号码</string>
+    <string name="l_s_hide_caller_sub">来电信息仅在“通话”中显示</string>
     <string name="l_notif_show_all">通知：%1$d 条。查看全部</string>
     <string name="l_notif_collapse">收起通知</string>
     <string name="l_notif_clear_all">全部清除</string>

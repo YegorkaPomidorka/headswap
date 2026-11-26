@@ -133,8 +133,9 @@ fun LauncherRoot(connected: Boolean) {
                         // «Стекло»: рейка прозрачная поверх общего фона, а область справа от неё - сплошной bgSolid без градиента;
                         // с обоями bgSolid не рисуем, иначе они закрыты
                         val glass = model.railStyle == RailStyle.GLASS
-                        if (!fullscreen) Rail(glass)
-                        Box(Modifier.weight(1f).fillMaxHeight().then(if (glass && !fullscreen && wallpaper == null) Modifier.background(pal.bgSolid) else Modifier)
+                        val railShown = !fullscreen && !model.railHidden
+                        if (railShown) Rail(glass)
+                        Box(Modifier.weight(1f).fillMaxHeight().then(if (glass && railShown && wallpaper == null) Modifier.background(pal.bgSolid) else Modifier)
                             .onGloballyPositioned { model.areaRect = it.boundsInRoot() }) {
                             AreaContent()
                         }
@@ -147,6 +148,8 @@ fun LauncherRoot(connected: Boolean) {
                                 EmbedLayers()
                                 HomeTileButtons() // ⇄ и «Слои» ленты - над живыми окнами плашек
                                 NavHostOverlay() // шаблоны навигатора на своём хосте Car App - над его картой, в границах области
+                                NavPlayerPlateOverlay() // плашка плеера над навигатором на весь экран (ADR 0063), под шторкой
+                                Garland(spec) // гирлянда на нижнем краю строки статуса: над окнами плиток, под язычком и шторкой
                                 NotificationsOverlay() // язычок и шторка уведомлений телефона из-под строки статуса; касания берёт только сам
                                 AliceVoicePill() // скрытая Алиса: слушаю / думаю / говорю / маршрут - снизу по центру
                                 // входящий звонок поверх чужого приложения или экрана без карточки «Телефон»

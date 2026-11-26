@@ -1,5 +1,8 @@
 package com.yegorkapomidorka.headswap.launcher
 
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -34,6 +37,10 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.StrokeJoin
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -80,13 +87,30 @@ private fun Modifier.musicBackground(mc: MusicColors): Modifier = drawBehind {
 
 /**
  * Карточка музыки: фон или обложка, справа сверху чип плееров, внизу название и исполнитель,
- * под ними prev / play-pause / next. Без прогресса.
+ * под ними прогресс волной (если плеер отдал длительность) и prev / play-pause / next.
  */
 @Composable
 fun MusicCard(modifier: Modifier) {
     val model = LauncherModel
     val m = LocalMetrics.current
     val s = m.spec
+    MusicPolling()
+    val st = MusicController.state
+    val player = st.pkg ?: model.selectedPlayer
+    val colors = MusicColors.of(LocalAccent.current)
+    // «Стекло»: только кромка поверх обложки, сама обложка и затемнение не меняются
+    CardBox(modifier.homeGlassEdge(RoundedCornerShape(m.dp(s.radius)), s.t / 96f), background = Color.Transparent) {
+        MusicCardBody(st, player, colors)
+    }
+}
+
+/**
+ * Опрос сессий плеера раз в секунду, пока на экране карточка музыки или плашка плеера над навигатором ([NavPlayerPlate]),
+ * и выбор плеера чипа по тому, что играет. Без него [MusicController.state] стоит на месте.
+ */
+@Composable
+fun MusicPolling() {
+    val model = LauncherModel
     val ctx = model.context
     // плееры чипа: только их сессии попадают в карточку (Telegram, Teams - нет); второй слот без закрепления - любой онлайн
     val chip = PlayerChip.slots(model.installedPackages, model.musicPlayer, model.lastOnlinePlayer, model.localPlayer,
@@ -100,7 +124,6 @@ fun MusicCard(modifier: Modifier) {
         }
     }
     val st = MusicController.state
-    val player = st.pkg ?: model.selectedPlayer
     // играет онлайн-плеер - он и становится вторым слотом чипа
     LaunchedEffect(st.pkg) { model.noteOnlinePlayer(st.pkg) }
     // заиграл другой плеер чипа (Я.Музыку включили на телефоне) - выбор переключается на него и запоминается
@@ -108,13 +131,19 @@ fun MusicCard(modifier: Modifier) {
         val pkg = st.pkg
         if (st.playing && pkg != null && pkg != model.selectedPlayer && pkg in chip) LauncherActions.adoptPlayer(pkg)
     }
-    val colors = MusicColors.of(LocalAccent.current)
-    // «Стекло»: только кромка поверх обложки, сама обложка и затемнение не меняются
-    CardBox(modifier.homeGlassEdge(RoundedCornerShape(m.dp(s.radius)), s.t / 96f), background = Color.Transparent) {
+}
+
+@Composable
+private fun BoxScope.MusicCardBody(st: MusicState, player: String?, colors: MusicColors) {
+    val model = LauncherModel
+    val m = LocalMetrics.current
+    val s = m.spec
+    val ctx = model.context
+    run {
         Box(Modifier.fillMaxSize().musicBackground(colors))
         if (s.portrait) {
             MusicBodyPortrait(st, player, colors)
-            return@CardBox
+            return@run
         }
         if (st.art == null) {
             // нота лежит у золотого пятна фона, а оно нарисовано физически: Ltr, чтобы в RTL нота не уезжала от него
@@ -132,8 +161,15 @@ fun MusicCard(modifier: Modifier) {
         // тап по телу открывает приложение плеера на весь экран справа от рейки
         Pressable(Modifier.fillMaxSize(), description = stringResource(R.string.l_music_players), onTap = { LauncherActions.openMusicApp() }) {}
         PlayerChipColumn(Modifier.align(Alignment.TopEnd).padding(end = m.dp(s.g8), top = m.dp(s.g8)))
+        // волна между текстом и кнопками; текст поднимается на её высоту
+        val progress = st.progress.takeIf { st.hasSession }
+        if (progress != null) {
+            WaveProgress(progress, st.playing, Modifier.align(Alignment.BottomCenter).fillMaxWidth()
+                .padding(start = m.dp(s.g), end = m.dp(s.g), bottom = m.dp(s.t + s.g8)).height(m.dp(s.g8)))
+        }
         Column(
-            Modifier.align(Alignment.BottomStart).fillMaxWidth().padding(start = m.dp(s.g), end = m.dp(s.g), bottom = m.dp(s.titleB)),
+            Modifier.align(Alignment.BottomStart).fillMaxWidth().padding(start = m.dp(s.g), end = m.dp(s.g),
+                bottom = m.dp(s.titleB + if (progress != null) s.g8 else 0)),
             verticalArrangement = Arrangement.spacedBy(m.dp(s.g4)),
         ) {
             // лента 1280x480: обложка узкая (290T/96), крупный шрифт резал «Ничего не играет» (Егор 09.11) - на ступень мельче
@@ -215,6 +251,10 @@ private fun BoxScope.MusicBodyPortrait(st: MusicState, player: String?, colors: 
                         player?.let { Txt(LauncherModel.packageLabel(it), s.f2, color = Color(0xFFD9DEF5)) }
                     }
                 }
+                // волна под исполнителем, а не отдельным ребёнком SpaceBetween - иначе повиснет посередине
+                st.progress.takeIf { st.hasSession }?.let {
+                    WaveProgress(it, st.playing, Modifier.padding(top = m.dp(s.g8)).fillMaxWidth().height(m.dp(s.g8)))
+                }
             }
             // prev / play / next всегда слева направо, как значки плеера
             Ltr {
@@ -289,6 +329,40 @@ private fun PlayerChipColumn(modifier: Modifier) {
                 }
             }
         }
+    }
+}
+
+/**
+ * Прогресс трека волной, как в Android Auto (h1449): серая неподвижная синусоида на всю длину, белая по ней закрывает пройденное.
+ * На паузе волна выпрямляется. Рисуется слева направо, как кнопки плеера.
+ */
+@Composable
+private fun WaveProgress(progress: Float, playing: Boolean, modifier: Modifier) {
+    // край шагает раз в секунду (опрос) без анимации: плавный ход перерисовывал стол каждый кадр и гнал видео в ГУ
+    val amp by animateFloatAsState(if (playing) 1f else 0f, tween(400), label = "waveAmp")
+    // волна неподвижна (фаза привязана к началу дорожки), двигается только её конец
+    Canvas(modifier) {
+        val h = size.height
+        val stroke = h / 4
+        val a = (h - stroke) / 2 * amp
+        val k = (2 * Math.PI / (h * 2.4f)).toFloat()
+        val cy = h / 2
+        val x0 = stroke / 2
+        val x1 = size.width - stroke / 2
+        fun wave(to: Float, color: Color) {
+            val path = Path()
+            var x = x0
+            path.moveTo(x, cy + a * sin(k * x))
+            while (x < to) {
+                x = minOf(x + 2f, to)
+                path.lineTo(x, cy + a * sin(k * x))
+            }
+            drawPath(path, color, style = Stroke(stroke, cap = StrokeCap.Round, join = StrokeJoin.Round))
+        }
+        // серая волна на всю длину, белая по той же волне закрывает пройденное
+        wave(x1, Color.White.copy(alpha = 0.3f))
+        val fx = x0 + (x1 - x0) * progress
+        if (fx > x0) wave(fx, Color.White)
     }
 }
 

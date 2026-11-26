@@ -26,7 +26,7 @@ import com.yegorkapomidorka.headswap.dex.DesktopKeys
  * Поворот - следующий/предыдущий элемент, наклоны - сосед по направлению, OK - нажатие. Первое движение после
  * касания только показывает рамку; любое касание экрана её прячет. NAVI/MUSIC/HOME - действия лаунчера.
  */
-object LauncherKnob : DesktopKeys.Sink {
+object LauncherKnob : DesktopKeys.Sink, DesktopKeys.Rail {
     /** Кнопка, которая может получить фокус шайбы; [tap] - её действие по OK. */
     class Target { var tap: () -> Unit = {}; var description: String? = null }
 
@@ -71,6 +71,20 @@ object LauncherKnob : DesktopKeys.Sink {
         }
         main.post { LauncherActions.toggleAssistant() }
         return true
+    }
+
+    /**
+     * Свайп по экрану ГУ прячет рейку (ADR 0062). Нечего прятать - null, свайп идёт в окно как обычное касание: активность
+     * не на экране, чужой лаунчер, портрет (рейка снизу), полноэкранное приложение (рейки уже нет).
+     */
+    override fun hidden(): Boolean? = when {
+        owner == null || LauncherModel.foreign != null || LauncherModel.portrait -> null
+        LauncherModel.area is Area.App && EmbedHost.app.fullscreen -> null
+        else -> LauncherModel.railHidden
+    }
+
+    override fun setHidden(hide: Boolean) {
+        main.post { LauncherModel.railHidden = hide }
     }
 
     private fun take(k: Knob?): Boolean {
