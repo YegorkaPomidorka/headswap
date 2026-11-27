@@ -62,11 +62,14 @@ class BoxConnector(
         if (cancelled) error("отменено")
 
         val net = joinWifi(outcome.creds.ssid, outcome.creds.psk)
-        // Коннектящий createSocket(ip,port) фабрики сети — привязка к локальной сети бокса идёт внутри.
-        // Пустой createSocket()+connect() даёт EPERM, а bindProcessToNetwork для local-only сети — false.
-        val sock = net.socketFactory.createSocket(outcome.wifi.ip, outcome.wifi.port) as Socket
+        // Local-only сеть WifiNetworkSpecifier: bindProcessToNetwork=false, socketFactory/createSocket()+connect
+        // дают EPERM. Рабочий путь — создать fd без коннекта (bind(null)), привязать сам сокет к сети, потом connect.
+        val sock = Socket()
         try {
+            sock.bind(null)
+            net.bindSocket(sock)
             sock.tcpNoDelay = true
+            sock.connect(InetSocketAddress(outcome.wifi.ip, outcome.wifi.port), CONNECT_MS)
             WLog.ev(WLog.TCP, "box-connected", "ip" to outcome.wifi.ip, "port" to outcome.wifi.port)
             return sock
         } catch (e: Exception) {
