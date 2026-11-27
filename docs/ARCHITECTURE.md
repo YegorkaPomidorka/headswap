@@ -23,12 +23,18 @@
 есть только CHANGE_MD_THEME), передача и задний ход, скорость и прочие события машины (данные машины CarLife
 мы вслепую не запрашиваем, ADR 0010). Прежде чем обещать функцию AA, проверить, есть ли для неё сообщение в CarLife.
 
-Второй протокол ГУ — ICCOA CarLink (ADR 0066, в работе, пока только debug-вход для стенда): `iccoa/IccoaSession` — та же роль,
+Второй протокол ГУ — ICCOA CarLink (ADR 0066, в работе, бета): `iccoa/IccoaSession` — та же роль,
 что у `CarLifeSession` (`CarlifeLink` для ядра, `HuSession` для `BridgeService`). Телефон входит на машину (auth 57209), слушает
 control 57219 / audio 57229 / sensor 57239 / RTSP 7236 / UIBC 4321 и после PLAY шлёт H.264 (+AAC) в MPEG-TS по RTP/TCP.
 Экран машины известен только из RTSP M3, поэтому сессия стартует без ядра: `BridgeService.startIccoa` → `onIccoaScreen`
 (`CustomVideoMode.fitCar`, хост рабочего стола или AA) → `IccoaSession.bind(core)`. Кнопки машины — `AaBridgeCore.onCarKey`.
 Стенд: `pc-headunit/iccoa_hu.py` (роль машины), `stand.ps1 -Iccoa`, вход `cmd iccoa_debug` (только debug/smoke). В логе строки `IC`.
+К настоящей машине — по воздуху (Э4): «Для разработчиков» → карточка «ICCOA CarLink (бета)» (PIN с экрана машины или пусто)
+→ `BridgeService.ACTION_ICCOA_AIR` (работает и в release, мимо `DebugTransport`) → `startIccoaAir`: `iccoa/IccoaBle` (скан BLE
+без фильтра, GATT, CLIENT_INFO → SERVER_INFO с Wi-Fi машины) → `CarNetwork.request(…, bssid)` → шлюз сети = машина →
+`startIccoa` с сокетами, привязанными к этой сети. GATT держится до конца сессии, PIN нигде не хранится. Разрешения:
+`BLUETOOTH_SCAN` + `BLUETOOTH_CONNECT` (Android 12+), геолокация до Android 12, `ACCESS_LOCAL_NETWORK` на Android 17.
+Строки лога: `IC ble`, `IC gatt`, `IC wifi`, `IC air`; правила диагностики `iccoa_*` в `tools/logdiag_rules.json`.
 
 ## Стек и сборка
 
@@ -51,7 +57,7 @@ control 57219 / audio 57229 / sensor 57239 / RTSP 7236 / UIBC 4321 и после
 | `$P/` (корень) | Сторона CarLife и сервис. `BridgeService` — оркестратор. `CarLifeSession` — одна сессия с ГУ. `Handshake`, `HuAuth` — рукопожатие и HU_AUTHEN. `Protocol.kt` (`Ch`, `Msg`, `Wire`, `FrameParser`), `Proto.kt` (свой protobuf). `VideoSource` — заглушка до прихода AA. `AppLog`, `CrashLog`. |
 | `$P/aa/` | Сторона AA и мозг моста. `AapSession` (TCP+TLS к 5277), `AapMessages` (SDR, каналы), `AaBridge.kt` (`AaBridgeCore` — всё связывание и флаги ГУ; `AaConnector` — переподключение), `BridgeHost` (держит AA между сессиями CarLife). Видео: `AaTranscoder`, `GlRelay`, `FeedQueue`, `IdrSplice`/`IdrIntra`/`RefDecoder`, `SpsCrop`, `VideoMode`, `CarPreset`, `BitratePolicy`, `IdrBitrateCeiling`, `ThermalThrottle`. Звук: `AaAudio`, `MusicResampler`, `Equalizer`, `TtsPreroll`, `NavChannel` (h1318: подсказки навигации в CarLife-канал VR вместо TTS, флаг `navVr` в `AaBridgeCore`). Микрофон: `AaMic`, `PhoneMicCapture`. Мета: `AaMeta` (`MetaRelay`). Тач: `TouchPacer`, `TouchDecimator`. Настройки: `AaSettings` (`AaPrefs`). Диагностика: `AaServerCheck`, `AaProbe`. |
 | `$P/link/` | Транспорт к ГУ. `CarTransport` + `TransportCaps`, `StreamTransport` (USB и debug-TCP, один поток), `MultiSocketTransport` (воздух, 6 сокетов). `link/bt` — RFCOMM `carlife`, вход в Wi-Fi Direct (`CarlifeBtProbe`, `P2pJoin`). `link/car` — выбранная машина, автостарт по ACL, «Wi-Fi машины» (`CarProfile`, `CarAclReceiver`, `CarNetwork`, `CarLogic`). `link/wifi` — маяк `HotspotBeacon` (UDP 7999), `HotspotDetect`. `link/diag/WLog` — лог воздуха. |
-| `$P/iccoa/` | Ядро ICCOA CarLink на чистой JVM, без сокетов и Android (ADR 0066; перенос из FT, Apache-2.0, см. `NOTICE`). `IccoaFrame` (кадр 20 Б, CRC-16/ARC, AES-GCM-конверты), `IccoaAuth` (P-256, HMAC от PIN, быстрый вход по ключу машины), `IccoaRtsp` (WFD-источник, экран машины из M3), `IccoaTs` (TS + RTP PT33 + RFC 4571, очередь с выбросом GOP), `IccoaUibc` (тач и кнопки JSON), `IccoaControl` (heartbeat, порты, конфиг, плеер) — без сокетов и Android. `IccoaSession` (сокеты, оркестрация, заглушка, энкодеры), `IccoaTrust` (свой ключ и ключи машин, prefs `iccoa_trust` вне бэкапа), `IccoaAacEncoder`. |
+| `$P/iccoa/` | Ядро ICCOA CarLink на чистой JVM, без сокетов и Android (ADR 0066; перенос из FT, Apache-2.0, см. `NOTICE`). `IccoaFrame` (кадр 20 Б, CRC-16/ARC, AES-GCM-конверты), `IccoaAuth` (P-256, HMAC от PIN, быстрый вход по ключу машины), `IccoaRtsp` (WFD-источник, экран машины из M3), `IccoaTs` (TS + RTP PT33 + RFC 4571, очередь с выбросом GOP), `IccoaUibc` (тач и кнопки JSON), `IccoaControl` (heartbeat, порты, конфиг, плеер) — без сокетов и Android. `IccoaSession` (сокеты, оркестрация, заглушка, энкодеры), `IccoaTrust` (свой ключ, MAC для BLE и ключи машин, prefs `iccoa_trust` вне бэкапа), `IccoaAacEncoder`. Подъём по воздуху: `IccoaBleInfo` (чистая: отбор машины в эфире, CLIENT_INFO, сборка SERVER_INFO), `IccoaBle` (скан и GATT). |
 | `$P/ui/` | Экраны (`HomeScreen`, `OnboardingScreen`, `SettingsScreen`, `DevScreen`, `DiagScreen`, `CarChooser`), чистая логика (`HeadswapState`/`HomeLogic`, `Readiness`), `LogShare` (zip логов). |
 | `$P/carapp/` | Свой хост Car App Library для навигатора рабочего стола (ADR 0021). `CarAppCatalog` (поиск по CarAppService + NAVIGATION), `CarAppSession` (одна сессия: bind → handshake → create/start/resume, поверхность, области, Trip → `aa/DesktopNavHints`), `CarAppHost` (фасад для лаунчера), `CarUiMapper` + `CarUi` (шаблоны → модель для Compose), `CarAppLogic` (чистая: области, dpi, вердикты). Шаблоны рисует `launcher/NavHostUi.kt`. |
 | `$P/diag/` | `LogDiag` — Kotlin-порт `tools/logdiag.py`, те же правила. |

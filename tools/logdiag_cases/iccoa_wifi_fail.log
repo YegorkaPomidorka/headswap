@@ -1,0 +1,12 @@
+09:00:00.050 IC ble scan-start
+09:00:01.200 IC ble found rssi=-58 conn=true token=0102… name=CarLink-HU
+09:00:04.210 IC ble pick rssi=-57 token=0102… cars=1 ms=4160
+09:00:04.900 IC gatt connected ms=690
+09:00:05.600 IC gatt services ok=true status=0 ms=1390
+09:00:05.610 IC gatt client-info bytes=168 quick=false queued=true
+09:00:06.300 IC gatt server-info bytes=118 type=1002 ms=2090
+09:00:06.310 IC wifi request bssid=yes
+09:00:06.320 WL net car-request sec=wpa2 timeoutMs=60000 t=6320
+09:01:06.400 WL net car-unavailable sec=wpa2 t=66400
+09:01:06.410 IC wifi fail why=no-network
+09:01:06.420 IC gatt closed

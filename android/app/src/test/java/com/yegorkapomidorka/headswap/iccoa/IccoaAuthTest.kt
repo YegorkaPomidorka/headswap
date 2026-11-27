@@ -79,10 +79,10 @@ class IccoaAuthTest {
     }
 
     @Test fun invalidSignatureHasFixedReasonAndWorkModesAreConfigurable() {
-        val client = IccoaAuth(pin, "test-phone", "test-model", workModes = 769)
+        val client = IccoaAuth(pin, "test-phone", "test-model", workModes = 5)
         val request = client.request()
-        assertEquals(769L, IccoaFrame.Fields(request).number(10))
-        assertEquals(5L, IccoaFrame.Fields(IccoaAuth(pin, "p", "m").request()).number(10))
+        assertEquals(5L, IccoaFrame.Fields(request).number(10))
+        assertEquals(769L, IccoaFrame.Fields(IccoaAuth(pin, "p", "m").request()).number(10))
         val error = assertThrows(IccoaHandshakeException::class.java) {
             client.accept(response(request, badSignature = true).bytes)
         }

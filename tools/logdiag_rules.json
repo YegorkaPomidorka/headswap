@@ -34,7 +34,16 @@
     "pause": "VIDEO_ENCODER_PAUSE",
     "eio": "EIO \\(I/O error\\)|ENODEV",
     "own_idr_rejected": "BRIDGE свой IDR .*не принят CarLife",
-    "bitrate_swing": "битрейт энкодера (8000 -> 5600|941 -> 800)"
+    "bitrate_swing": "битрейт энкодера (8000 -> 5600|941 -> 800)",
+    "ic_any": "IC (link begin|ble scan-start)",
+    "ic_scan_none": "IC ble scan-timeout seen=0",
+    "ic_gatt_fail": "IC gatt fail why=",
+    "ic_no_server_info": "IC gatt fail why=(no-server-info|write-rejected)",
+    "ic_p2p": "IC gatt fail why=p2p-unsupported",
+    "ic_wifi_fail": "IC wifi fail why=",
+    "ic_normal_required": "IC auth normal-required",
+    "ic_no_lan": "IC air no-local-network",
+    "ic_first_frame": "IC video first-frame"
   },
   "rules": [
     {
@@ -44,7 +53,7 @@
       "phase": "first_connect",
       "category": "user_setup",
       "score": 70,
-      "all": [["n_sessions", "==", 0], ["m.attached", "==", 0], ["m.hu_proto", "==", 0], ["m.wifi_wait", "==", 0]],
+      "all": [["n_sessions", "==", 0], ["m.attached", "==", 0], ["m.hu_proto", "==", 0], ["m.wifi_wait", "==", 0], ["m.ic_any", "==", 0]],
       "advice": "Телефон ни разу не увидел машину как CarLife-аксессуар. Если лог сохранён до подключения к машине — подключите кабель, дождитесь ошибки и сразу сохраните лог снова. Если кабель был подключён: 1) Удалите с телефона оригинальный Baidu CarLife и другие CarLife-клиенты, если они стоят: ГУ отдаёт кабель им. 2) На экране магнитолы выберите CarLife (на VW/Skoda: плитку Baidu CarLife, не Android Auto) и примите разрешения, если ГУ их показывает. 3) Проверьте кабель: нужен кабель с передачей данных и порт USB с иконкой телефона, без хабов.",
       "advice_en": "The phone has never seen the car as a CarLife accessory. If the log was saved before you plugged into the car, connect the cable, wait for the error, and save the log again right away. If the cable was already connected: 1) Uninstall the original Baidu CarLife and any other CarLife clients from the phone, if installed: the head unit hands the cable to them. 2) On the head unit screen, pick CarLife (on VW/Skoda: the Baidu CarLife tile, not Android Auto) and accept the permissions if the head unit shows them. 3) Check the cable: it must be a data cable, plugged into a USB port with a phone icon, no hubs.",
       "what": "Телефон ни разу не увидел машину как CarLife-аксессуар.",
@@ -812,6 +821,147 @@
       ],
       "ask": "Это по кабелю или по воздуху?",
       "ask_en": "Is this over cable or wireless?"
+    },
+    {
+      "id": "iccoa_car_not_found",
+      "title": "ICCOA: машина не найдена по Bluetooth",
+      "title_en": "ICCOA: the car was not found over Bluetooth",
+      "phase": "first_connect",
+      "category": "user_setup",
+      "score": 75,
+      "all": [["m.ic_scan_none", ">=", 1]],
+      "none": [["m.ic_first_frame", ">=", 1]],
+      "evidence": ["ic_scan_none"],
+      "advice": "За 30 секунд телефон не увидел по Bluetooth ни одной машины с ICCOA CarLink. Включите на машине CarLink/ICCOA (экран подключения телефона должен быть открыт), включите Bluetooth на телефоне и подойдите ближе.",
+      "advice_en": "In 30 seconds the phone saw no car with ICCOA CarLink over Bluetooth. Turn on CarLink/ICCOA on the car (keep its phone connection screen open), turn on Bluetooth on the phone and move closer.",
+      "what": "Телефон не увидел по Bluetooth ни одной машины с ICCOA CarLink.",
+      "what_en": "The phone saw no car with ICCOA CarLink over Bluetooth.",
+      "steps": [
+        {"text": "Включите на машине CarLink/ICCOA и оставьте открытым экран подключения телефона", "text_en": "Turn on CarLink/ICCOA on the car and keep its phone connection screen open"},
+        {"text": "Включите Bluetooth на телефоне", "text_en": "Turn on Bluetooth on the phone", "action": "bluetooth"},
+        {"text": "Подойдите ближе к машине и нажмите «Подключить ICCOA» снова", "text_en": "Move closer to the car and tap Connect ICCOA again"}
+      ],
+      "suppresses": ["aoa_not_started", "no_attempt"]
+    },
+    {
+      "id": "iccoa_gatt_fail",
+      "title": "ICCOA: сбой Bluetooth-соединения с машиной",
+      "title_en": "ICCOA: the Bluetooth link to the car failed",
+      "phase": "first_connect",
+      "category": "unresolved",
+      "score": 55,
+      "all": [["m.ic_gatt_fail", ">=", 1]],
+      "none": [["m.ic_first_frame", ">=", 1]],
+      "evidence": ["ic_gatt_fail"],
+      "advice": "Машина нашлась, но Bluetooth-соединение с ней (GATT) не дошло до обмена данными. Выключите и включите Bluetooth на телефоне, заново откройте CarLink на машине и повторите. Если повторяется — пришлите лог.",
+      "advice_en": "The car was found, but the Bluetooth (GATT) link to it never got to the data exchange. Toggle Bluetooth on the phone, reopen CarLink on the car and try again. If it repeats, send the log.",
+      "what": "Машина нашлась, но Bluetooth-соединение с ней оборвалось до обмена данными.",
+      "what_en": "The car was found, but the Bluetooth link to it broke before the data exchange.",
+      "steps": [
+        {"text": "Выключите и включите Bluetooth на телефоне", "text_en": "Toggle Bluetooth on the phone", "action": "bluetooth"},
+        {"text": "Заново откройте CarLink на машине и повторите подключение", "text_en": "Reopen CarLink on the car and connect again"},
+        {"text": "Если повторяется — пришлите лог", "text_en": "If it repeats, send the log", "action": "share_log"}
+      ],
+      "suppresses": ["aoa_not_started", "no_attempt"]
+    },
+    {
+      "id": "iccoa_no_server_info",
+      "title": "ICCOA: машина не прислала данные своего Wi-Fi",
+      "title_en": "ICCOA: the car didn't send its Wi-Fi details",
+      "phase": "first_connect",
+      "category": "user_setup",
+      "score": 70,
+      "all": [["m.ic_no_server_info", ">=", 1]],
+      "none": [["m.ic_first_frame", ">=", 1]],
+      "evidence": ["ic_no_server_info"],
+      "advice": "Телефон отправил машине PIN, но ответа с данными её Wi-Fi не получил. Скорее всего PIN неверный или устарел, либо машина ждёт подтверждения на своём экране. Посмотрите на экран машины, подтвердите подключение и введите PIN, который она показывает сейчас.",
+      "advice_en": "The phone sent the PIN to the car but got no reply with its Wi-Fi details. Most likely the PIN is wrong or expired, or the car is waiting for a confirmation on its screen. Check the car screen, confirm the connection and enter the PIN it shows now.",
+      "what": "Машина не ответила на PIN: он неверный или она ждёт подтверждения на экране.",
+      "what_en": "The car didn't answer the PIN: it is wrong, or the car waits for a confirmation on its screen.",
+      "steps": [
+        {"text": "Посмотрите на экран машины: подтвердите подключение, если она спрашивает", "text_en": "Check the car screen: confirm the connection if it asks"},
+        {"text": "Введите PIN, который машина показывает сейчас, и подключитесь снова", "text_en": "Enter the PIN the car shows now and connect again"}
+      ],
+      "suppresses": ["aoa_not_started", "no_attempt", "iccoa_gatt_fail"]
+    },
+    {
+      "id": "iccoa_p2p_unsupported",
+      "title": "ICCOA: машина предлагает только Wi-Fi Direct",
+      "title_en": "ICCOA: the car offers Wi-Fi Direct only",
+      "phase": "first_connect",
+      "category": "our_bug",
+      "score": 80,
+      "all": [["m.ic_p2p", ">=", 1]],
+      "none": [["m.ic_first_frame", ">=", 1]],
+      "evidence": ["ic_p2p"],
+      "advice": "Машина ответила, что ждёт телефон по Wi-Fi Direct, а не в своей точке доступа. Этот вариант ICCOA в Headswap пока не поддержан. Пришлите лог: по нему добавим поддержку.",
+      "advice_en": "The car answered that it expects the phone over Wi-Fi Direct, not on its own access point. Headswap doesn't support this ICCOA variant yet. Send the log so we can add it.",
+      "what": "Машина ждёт телефон по Wi-Fi Direct, Headswap так пока не умеет.",
+      "what_en": "The car expects the phone over Wi-Fi Direct, which Headswap can't do yet.",
+      "steps": [
+        {"text": "Пришлите лог разработчикам", "text_en": "Send the log to the developers", "action": "share_log"}
+      ],
+      "suppresses": ["aoa_not_started", "no_attempt", "iccoa_gatt_fail"]
+    },
+    {
+      "id": "iccoa_wifi_fail",
+      "title": "ICCOA: телефон не вошёл в Wi-Fi машины",
+      "title_en": "ICCOA: the phone didn't join the car's Wi-Fi",
+      "phase": "first_connect",
+      "category": "network",
+      "score": 65,
+      "all": [["m.ic_wifi_fail", ">=", 1]],
+      "none": [["m.ic_first_frame", ">=", 1]],
+      "evidence": ["ic_wifi_fail"],
+      "advice": "Машина назвала свою точку доступа, но телефон в неё не вошёл. Включите Wi-Fi на телефоне, согласитесь в системном окне «Подключиться к устройству», выключите точку доступа телефона и VPN и повторите.",
+      "advice_en": "The car named its access point but the phone didn't join it. Turn on Wi-Fi on the phone, accept the system \"Connect to device\" dialog, turn off the phone hotspot and VPN, and try again.",
+      "what": "Машина назвала свою точку доступа, но телефон в неё не вошёл.",
+      "what_en": "The car named its access point but the phone didn't join it.",
+      "steps": [
+        {"text": "Включите Wi-Fi на телефоне", "text_en": "Turn on Wi-Fi on the phone", "action": "wifi"},
+        {"text": "Согласитесь в системном окне «Подключиться к устройству»", "text_en": "Accept the system \"Connect to device\" dialog"},
+        {"text": "Выключите точку доступа телефона и VPN", "text_en": "Turn off the phone hotspot and VPN", "action": "hotspot"}
+      ],
+      "suppresses": ["aoa_not_started", "no_attempt"]
+    },
+    {
+      "id": "iccoa_need_pin",
+      "title": "ICCOA: нужен PIN с экрана машины",
+      "title_en": "ICCOA: the PIN from the car screen is needed",
+      "phase": "first_connect",
+      "category": "user_setup",
+      "score": 75,
+      "all": [["m.ic_normal_required", ">=", 1]],
+      "none": [["m.ic_first_frame", ">=", 1]],
+      "evidence": ["ic_normal_required"],
+      "advice": "Вход без PIN не прошёл: машина этот телефон не знает или забыла. Откройте CarLink на машине, введите в Headswap PIN из 6 цифр с её экрана и подключитесь снова.",
+      "advice_en": "Sign-in without a PIN failed: the car doesn't know this phone or has forgotten it. Open CarLink on the car, enter the 6-digit PIN from its screen in Headswap and connect again.",
+      "what": "Машина этот телефон не знает: без PIN с её экрана не войти.",
+      "what_en": "The car doesn't know this phone: it can't sign in without the PIN from the car screen.",
+      "steps": [
+        {"text": "Откройте CarLink на машине и найдите PIN из 6 цифр", "text_en": "Open CarLink on the car and find the 6-digit PIN"},
+        {"text": "Введите PIN в «Для разработчиков» → ICCOA CarLink и подключитесь снова", "text_en": "Enter the PIN in Developer settings → ICCOA CarLink and connect again"}
+      ],
+      "suppresses": ["aoa_not_started", "no_attempt"]
+    },
+    {
+      "id": "iccoa_no_local_network",
+      "title": "ICCOA: нет доступа к локальной сети",
+      "title_en": "ICCOA: no local network access",
+      "phase": "first_connect",
+      "category": "user_setup",
+      "score": 85,
+      "all": [["m.ic_no_lan", ">=", 1]],
+      "none": [["m.ic_first_frame", ">=", 1]],
+      "evidence": ["ic_no_lan"],
+      "advice": "На Android 17 без разрешения на локальную сеть телефон не может обмениваться данными с машиной по её Wi-Fi. Выдайте Headswap доступ к локальной сети (Настройки → Приложения → Headswap → Разрешения) и подключитесь снова.",
+      "advice_en": "On Android 17 the phone can't talk to the car over its Wi-Fi without the local network permission. Grant Headswap local network access (Settings → Apps → Headswap → Permissions) and connect again.",
+      "what": "Без разрешения на локальную сеть телефон не может говорить с машиной по Wi-Fi.",
+      "what_en": "Without the local network permission the phone can't talk to the car over Wi-Fi.",
+      "steps": [
+        {"text": "Выдайте Headswap доступ к локальной сети", "text_en": "Grant Headswap local network access", "action": "app_settings"}
+      ],
+      "suppresses": ["aoa_not_started", "no_attempt"]
     }
   ]
 }

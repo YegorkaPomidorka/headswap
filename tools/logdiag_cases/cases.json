@@ -21,5 +21,16 @@
   {"log": "p2p_busy_no_hotspot.log", "version": "2.6.0", "not": ["p2p_hotspot_busy"],
    "facts": {"m.p2p_busy_reason": 3, "m.hotspot_iface": 0}},
   {"log": "miui_screen_off_kill.log", "version": "2.6.0", "has": ["process_killed"],
-   "facts": {"m.low_memory": 1}}
+   "facts": {"m.low_memory": 1}},
+  {"log": "iccoa_not_found.log", "version": "2.6.0", "top": "iccoa_car_not_found", "not": ["aoa_not_started"],
+   "facts": {"m.ic_scan_none": 1}},
+  {"log": "iccoa_gatt_timeout.log", "version": "2.6.0", "top": "iccoa_gatt_fail", "not": ["aoa_not_started"]},
+  {"log": "iccoa_no_server_info.log", "version": "2.6.0", "top": "iccoa_no_server_info",
+   "not": ["iccoa_gatt_fail", "aoa_not_started"]},
+  {"log": "iccoa_p2p.log", "version": "2.6.0", "top": "iccoa_p2p_unsupported", "not": ["iccoa_gatt_fail", "iccoa_no_server_info"]},
+  {"log": "iccoa_wifi_fail.log", "version": "2.6.0", "top": "iccoa_wifi_fail", "not": ["iccoa_gatt_fail"]},
+  {"log": "iccoa_need_pin.log", "version": "2.6.0", "top": "iccoa_need_pin", "not": ["iccoa_wifi_fail"]},
+  {"log": "iccoa_ok_after_retry.log", "version": "2.6.0",
+   "not": ["iccoa_car_not_found", "iccoa_no_local_network", "iccoa_gatt_fail", "iccoa_wifi_fail", "iccoa_need_pin"],
+   "facts": {"m.ic_no_lan": 1, "m.ic_first_frame": 1}}
 ]

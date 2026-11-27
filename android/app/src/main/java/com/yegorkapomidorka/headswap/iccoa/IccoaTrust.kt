@@ -13,6 +13,8 @@ import java.util.Locale
 interface IccoaTrust {
     /** Стабилен между запусками: машина узнаёт по нему телефон при быстром входе. */
     val clientId: String
+    /** Синтетический MAC для CLIENT_INFO (BLE): один на установку. */
+    val mac: String
     fun identity(): KeyPair
     /** authPub машины (64 байта X‖Y) или null, если с ней ещё не знакомились. */
     fun carKey(car: String): ByteArray?
@@ -27,6 +29,10 @@ class IccoaTrustPrefs(ctx: Context) : IccoaTrust {
         @Synchronized get() = sp.getString("id", null)
             // шесть hex-цифр, как у FT и XDL
             ?: "%06x".format(Locale.ROOT, SecureRandom().nextInt(0x1000000)).also { sp.edit().putString("id", it).commit() }
+
+    override val mac: String
+        @Synchronized get() = sp.getString("mac", null)?.takeIf(IccoaBleInfo::validMac)
+            ?: IccoaBleInfo.newMac(SecureRandom()).also { sp.edit().putString("mac", it).commit() }
 
     // shortcut: ключ в prefs, не в AndroidKeyStore (им только подписываем, у FT он там с PURPOSE_SIGN), перенести в Э4
     @Synchronized override fun identity(): KeyPair {

@@ -36,6 +36,7 @@ class IccoaSessionTest {
 
     internal class MemoryTrust : IccoaTrust {
         override val clientId = "a1b2c3"
+        override val mac = "02:00:00:00:00:01"
         private val pair = IccoaAuth.newKeyPair()
         val cars = HashMap<String, ByteArray>()
         override fun identity(): KeyPair = pair
@@ -185,11 +186,11 @@ class IccoaSessionTest {
     private class Phone(val cfg: IccoaConfig, val session: IccoaSession, val screen: AtomicReference<IccoaVideoConfig>,
                         val closed: CopyOnWriteArrayList<String>)
 
-    private fun phone(car: Car, trust: IccoaTrust, pin: String?): Phone {
+    private fun phone(car: Car, trust: IccoaTrust, pin: String?, air: Boolean = false): Phone {
         val ports = (1..5).map { ServerSocket(0, 1, loop).use { s -> s.localPort } }
         val cfg = IccoaConfig("127.0.0.1", pin, "127.0.0.1", "test-model", bindHost = "127.0.0.1",
             authPort = car.auth.localPort, controlPort = ports[0], audioPort = ports[1], sensorPort = ports[2],
-            rtspPort = ports[3], uibcPort = ports[4])
+            rtspPort = ports[3], uibcPort = ports[4], air = air)
         val screen = AtomicReference<IccoaVideoConfig>()
         val closed = CopyOnWriteArrayList<String>()
         val platform = IccoaPlatform(log = { logs += it }, stub = { _, _, _, _, _, _, _ -> null }, aac = { _, _ -> null })
@@ -290,6 +291,27 @@ class IccoaSessionTest {
         val phone = phone(car, MemoryTrust(), null)
         await("отказ без PIN") { phone.closed.isNotEmpty() }
         assertEquals(listOf("нужен PIN с экрана машины"), phone.closed.toList())
+    }
+
+    // По воздуху машина уже получила PIN в CLIENT_INFO и ждёт по TCP обычный вход, даже если ключ её известен.
+    @Test fun airWithPinSignsInByPinEvenForKnownCar() {
+        val car = Car("123456").also { toClose += it }
+        val trust = MemoryTrust().also { it.saveCarKey("127.0.0.1", car.identityBytes) }
+        phone(car, trust, "123456", air = true)
+        assertTrue(car.signIn())
+        assertFalse(car.quick)
+    }
+
+    @Test fun airQuickRejectedAsksForPinWithoutRetry() {
+        val car = Car("123456").also { toClose += it }
+        val trust = MemoryTrust().also { it.saveCarKey("127.0.0.1", car.identityBytes) }
+        val phone = phone(car, trust, null, air = true)
+        assertFalse(car.signIn())       // машина телефон не помнит
+        assertTrue(car.quick)
+        await("отказ быстрого входа") { phone.closed.isNotEmpty() }
+        assertEquals(listOf("машина не узнала телефон, введите PIN"), phone.closed.toList())
+        assertTrue(logs.any { it.startsWith("IC auth normal-required") })
+        assertTrue(logs.none { "quick-rejected" in it })
     }
 
     @Test fun headFindsKeyFrameAndItsParameterSets() {

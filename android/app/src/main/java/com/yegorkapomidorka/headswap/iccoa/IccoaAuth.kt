@@ -27,7 +27,7 @@ import javax.crypto.spec.SecretKeySpec
 class IccoaAuth(
     private val pin: String?, private val clientId: String, private val model: String,
     private val identity: KeyPair = newKeyPair(), private val pinnedCarIdentity: ByteArray? = null,
-    private val workModes: Int = 5
+    private val workModes: Int = 769
 ) {
     private val agreement = newKeyPair()
     private val nonce = ByteArray(32).also(SecureRandom()::nextBytes)
@@ -68,7 +68,7 @@ class IccoaAuth(
         val fields = IccoaFrame.Fields(response)
         onProgress("response-fields ${fields.shape()}")
         val result = fields.number(7)
-        onProgress("receiver-result=$result")
+        onProgress("receiver-result=$result f8=${fields.number(8, -1)} f9=${fields.number(9, -1)}")
         if (result != 0L) throw IccoaHandshakeException(IccoaHandshakeException.Reason.RESPONSE_RESULT, result)
         val responseIdentity = if (quick) fields.optionalBytes(2) ?: ByteArray(0) else fields.bytes(2)
         val carIdentity = if (quick) {

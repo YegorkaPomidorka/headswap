@@ -1,0 +1,13 @@
+09:00:00.050 IC ble scan-start
+09:00:01.200 IC ble found rssi=-58 conn=true token=0102… name=CarLink-HU
+09:00:04.210 IC ble pick rssi=-57 token=0102… cars=1 ms=4160
+09:00:04.900 IC gatt connected ms=690
+09:00:05.600 IC gatt services ok=true status=0 ms=1390
+09:00:05.610 IC gatt client-info bytes=130 quick=true queued=true
+09:00:06.300 IC gatt server-info bytes=118 type=1002 ms=2090
+09:00:06.310 IC wifi request bssid=yes
+09:00:09.100 IC wifi up ms=2790 local=x.x.x.23 gw=x.x.x.1
+09:00:09.110 IC link begin transport=iccoa
+09:00:09.200 IC auth request quick=true
+09:00:09.400 IC auth normal-required
+09:00:09.410 IC link end why=машина не узнала телефон, введите PIN aliveS=0 frames=0 overflows=0

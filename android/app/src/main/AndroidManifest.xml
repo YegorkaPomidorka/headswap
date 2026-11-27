@@ -34,6 +34,10 @@
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
     <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />
     <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" android:maxSdkVersion="30" />
+    <!-- ICCOA CarLink по воздуху (ADR 0066): поиск машины по BLE; до Android 12 вместо него геолокация (ниже) -->
+    <uses-permission
+        android:name="android.permission.BLUETOOTH_SCAN"
+        android:usesPermissionFlags="neverForLocation" />
     <!-- беспровод, ветка A: вход в Wi-Fi Direct-группу ГУ (WifiP2pManager.connect); до Android 13 вместо него геолокация -->
     <uses-permission
         android:name="android.permission.NEARBY_WIFI_DEVICES"

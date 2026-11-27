@@ -1,0 +1,8 @@
+09:00:00.050 IC ble scan-start
+09:00:01.200 IC ble found rssi=-58 conn=true token=0102… name=CarLink-HU
+09:00:04.210 IC ble pick rssi=-57 token=0102… cars=1 ms=4160
+09:00:04.900 IC gatt connected ms=690
+09:00:05.600 IC gatt services ok=true status=0 ms=1390
+09:00:05.610 IC gatt client-info bytes=168 quick=false queued=true
+09:00:06.300 IC gatt server-info bytes=96 type=1001
+09:00:06.301 IC gatt fail why=p2p-unsupported ms=2091
