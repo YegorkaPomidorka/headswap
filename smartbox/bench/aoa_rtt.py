@@ -43,7 +43,7 @@ def main():
             ep_in, ep_out = connect()
             continue
         t0 = time.perf_counter()
-        got, first = 0, None
+        got, first, sizes = 0, None, []  # sizes: границы USB-передач бокса (Vezel читает строго 8, потом тело)
         while time.perf_counter() - t0 < max(PERIOD - 0.02, 0.2):
             try:
                 data = ep_in.read(16384, timeout=50)
@@ -57,10 +57,11 @@ def main():
                 if first is None:
                     first = (time.perf_counter() - t0) * 1000
                 got += len(data)
+                sizes.append(len(data))
         if first is None:
             log(f"#{n}: ответа нет")
         else:
-            log(f"#{n}: первый байт ответа через {first:6.1f} мс ({'ОК' if first <= 100 else 'ПОЗДНО'}), всего {got} Б")
+            log(f"#{n}: первый байт ответа через {first:6.1f} мс ({'ОК' if first <= 100 else 'ПОЗДНО'}), всего {got} Б, передачи {sizes}")
 
 
 if __name__ == "__main__":
