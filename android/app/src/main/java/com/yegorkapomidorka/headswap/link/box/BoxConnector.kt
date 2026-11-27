@@ -62,15 +62,28 @@ class BoxConnector(
         }
         if (cancelled) error("отменено")
 
+        // 1) Если телефон уже на Wi-Fi бокса (подключён вручную), сокет к 192.168.1.101 идёт по его
+        //    маршруту без всякой привязки. Android 16/Xiaomi режет привязку к local-only сети всеми
+        //    способами, поэтому это основной путь.
+        try {
+            val direct = Socket()
+            direct.tcpNoDelay = true
+            direct.connect(InetSocketAddress(outcome.wifi.ip, outcome.wifi.port), DIRECT_MS)
+            WLog.ev(WLog.TCP, "box-connected", "ip" to outcome.wifi.ip, "port" to outcome.wifi.port, "via" to "direct")
+            return direct
+        } catch (e: Exception) {
+            WLog.ev(WLog.TCP, "box-direct-fail", "err" to e.message)
+        }
+        if (cancelled) error("отменено")
+
+        // 2) Иначе пробуем сами подключиться к Wi-Fi бокса (на Android 16 привязка может не взяться).
         val net = joinWifi(outcome.creds.ssid, outcome.creds.psk)
-        // Android 16 режет привязку к local-only сети. bindProcessToNetwork пробуем в самом колбэке
-        // onAvailable (boundProcess). Если не вышло — привязываем сам сокет (bind(null)+bindSocket).
         val sock = Socket()
         try {
             if (!boundProcess) { sock.bind(null); net.bindSocket(sock) }
             sock.tcpNoDelay = true
             sock.connect(InetSocketAddress(outcome.wifi.ip, outcome.wifi.port), CONNECT_MS)
-            WLog.ev(WLog.TCP, "box-connected", "ip" to outcome.wifi.ip, "port" to outcome.wifi.port, "proc" to boundProcess)
+            WLog.ev(WLog.TCP, "box-connected", "ip" to outcome.wifi.ip, "port" to outcome.wifi.port, "via" to "specifier", "proc" to boundProcess)
             return sock
         } catch (e: Exception) {
             try { sock.close() } catch (_: Exception) {}
@@ -123,6 +136,7 @@ class BoxConnector(
 
     companion object {
         private const val CONNECT_MS = 4000
+        private const val DIRECT_MS = 3000   // проверка «телефон уже на Wi-Fi бокса»
         private const val WIFI_JOIN_S = 25L
     }
 }
