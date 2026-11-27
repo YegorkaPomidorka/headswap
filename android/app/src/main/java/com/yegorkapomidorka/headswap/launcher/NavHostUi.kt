@@ -134,12 +134,12 @@ private class NavDims(private val k: Float, wide: Boolean) {
 }
 
 /**
- * Что хост Car App отдаёт плашке плеера (h1503): экран ли маршрута, мера карточек шаблона с «Масштабом карты»
- * и верх левой нижней карточки (прибытие или «Завершить») - плашка встаёт над ней.
+ * Что хост Car App отдаёт плашке плеера (h1503): экран ли маршрута, ширина карточки прибытия (с «Масштабом карты»)
+ * и верх левой нижней карточки (прибытие или «Завершить») - плашка встаёт над ней той же ширины.
  */
 object CarNavPlate {
     var route by mutableStateOf(false)
-    var k by mutableStateOf(1f)
+    var width by mutableStateOf(0)
     var gap by mutableStateOf(0)
     /** px от верха области; null - карточки слева внизу нет. */
     var bottomCardTop by mutableStateOf<Int?>(null)
@@ -182,7 +182,7 @@ fun NavHostOverlay() {
     }
     SideEffect {
         CarNavPlate.route = current is CarUi.Nav
-        CarNavPlate.k = k
+        CarNavPlate.width = d.eta
         CarNavPlate.gap = d.gap
         if (current !is CarUi.Nav || (current.eta == null && current.end == null)) CarNavPlate.bottomCardTop = null
     }

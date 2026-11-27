@@ -54,14 +54,14 @@ fun NavPlayerPlateOverlay() {
     val st = MusicController.state
     val car = slot.carHost
     val look = NavPlayerPlate.look(
-        navArea = true, navReady = true, carMenu = car && !CarNavPlate.route, access = st.access, hasSession = st.hasSession,
+        navArea = true, navReady = true, carMenu = car && (!CarNavPlate.route || CarNavPlate.width == 0), access = st.access, hasSession = st.hasSession,
         ringing = PhoneController.callState == CallState.RINGING, alice = AliceVoice.phase != AliceVoice.Phase.HIDDEN,
     )
     if (look == NavPlayerPlate.Look.HIDDEN) return
     val m = LocalMetrics.current
-    // как у Алисы и шаблонов навигатора: px макета 1280x720 по высоте, в портрете по T; на хосте Car App - мера его
-    // карточек, с «Масштабом карты» (h1503)
-    val k = if (car) CarNavPlate.k else if (m.spec.portrait) m.spec.t / 96f else m.spec.h / 720f
+    // как у Алисы и шаблонов навигатора: px макета 1280x720 по высоте, в портрете по T; на хосте Car App - ширина
+    // карточки прибытия, остальное в той же пропорции (h1503, Егор 27.11: «пропорционально»)
+    val k = if (car) CarNavPlate.width / NavPlayerPlate.W.toFloat() else if (m.spec.portrait) m.spec.t / 96f else m.spec.h / 720f
     fun px(v: Int) = (v * k).roundToInt()
     // содержимое плашки крупнее макета в [NavPlayerPlate.SCALE] раз (Егор 24.11: мелко), W и H уже с ним
     fun ps(v: Int) = (v * k * NavPlayerPlate.SCALE).roundToInt()
