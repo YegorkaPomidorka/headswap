@@ -436,6 +436,8 @@ class SettingsSectionScreen(host: MainActivity, val section: SettingsSection) : 
     private var wlAwaitingPermission = false
     /** Запрос разрешений был от кнопки свистка, а не «Ждать машину по Wi-Fi». */
     private var wlAwaitingDongle = false
+    /** Запрос разрешений был от кнопки «Режим бокса» (BLUETOOTH_CONNECT + Wi-Fi). */
+    private var wlAwaitingBox = false
     private var wlDongleBtn: LinearLayout? = null
     private var wlCarLine: TextView? = null
     private var wlCarWarn: TextView? = null
@@ -508,6 +510,10 @@ class SettingsSectionScreen(host: MainActivity, val section: SettingsSection) : 
         if (wlAwaitingCarPermission) {
             wlAwaitingCarPermission = false
             CarPairing.start(host)      // без разрешения выбор всё равно возможен, refreshWireless предупредит
+        }
+        if (wlAwaitingBox) {
+            wlAwaitingBox = false
+            startBoxService()           // при частичном отказе всё равно пробуем — упадёт с понятным логом
         }
         refreshWireless()
     }
@@ -734,6 +740,23 @@ class SettingsSectionScreen(host: MainActivity, val section: SettingsSection) : 
 
     private fun onBoxStart() {
         AppLog.i("кнопка «Режим бокса»")
+        // режим бокса: BLUETOOTH_CONNECT (RFCOMM к боксу) + «Устройства поблизости» (вход в Wi-Fi бокса)
+        val ask = ArrayList<String>()
+        if (!carBtGranted()) ask += Manifest.permission.BLUETOOTH_CONNECT
+        val wifi = if (Build.VERSION.SDK_INT >= 33) Manifest.permission.NEARBY_WIFI_DEVICES else Manifest.permission.ACCESS_FINE_LOCATION
+        if (ctx.checkSelfPermission(wifi) != PackageManager.PERMISSION_GRANTED) {
+            ask += wifi
+            if (wifi == Manifest.permission.ACCESS_FINE_LOCATION) ask += Manifest.permission.ACCESS_COARSE_LOCATION
+        }
+        if (ask.isNotEmpty()) {
+            wlAwaitingBox = true
+            host.requestPermissions(ask.toTypedArray(), REQ_LOCAL_NETWORK)
+            return
+        }
+        startBoxService()
+    }
+
+    private fun startBoxService() {
         ctx.startForegroundService(Intent(ctx, BridgeService::class.java).setAction(BridgeService.ACTION_BOX))
     }
 

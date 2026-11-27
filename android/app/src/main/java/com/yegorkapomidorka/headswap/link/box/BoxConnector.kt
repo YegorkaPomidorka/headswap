@@ -51,7 +51,8 @@ class BoxConnector(
         val rfcomm: BluetoothSocket = dev.createRfcommSocketToServiceRecord(UUID.fromString(BoxHandshake.SERVICE_UUID))
         val outcome: BoxHandshake.Outcome
         try {
-            adapter.cancelDiscovery()
+            // cancelDiscovery() намеренно не зовём: он требует BLUETOOTH_SCAN, а мы коннектимся к
+            // сопряжённому устройству и сами скан не ведём — для connect() хватает BLUETOOTH_CONNECT.
             rfcomm.connect()
             outcome = BoxHandshake.run(rfcomm.inputStream, rfcomm.outputStream, randomId())
             WLog.ev(WLog.BT, "box-handshake", "ip" to outcome.wifi.ip, "port" to outcome.wifi.port, "ssid" to outcome.creds.ssid)
