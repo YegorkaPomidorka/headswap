@@ -8,6 +8,9 @@
 Патч делает оба насоса прозрачными: read(до 32 КБ) → writen(ровно столько), без разбора.
 Остальное (рукопожатие wifi_discovery/RFCOMM, подъём гаджета, выбор режима) не трогаем.
 
+Учёт чтений USB (0x70dc–0x7120) обязателен: сторож watchUsbAutoTimerProc каждые 2 с считает
+простой и после 16 тиков без чтений делает exit(0) всего sdDongle (сеанс умирал через ~40 с).
+
   dongle_usb_data_proc @0x6fb0  — USB(ГУ) → телефон (бесконечный цикл)
   pump phone→USB       @0x5c7c  — телефон → USB(ГУ) (кадр за вызов из dongle_wifi_data_proc)
 
@@ -24,7 +27,7 @@ PATCHES = [
     (0x7018, 0xe3a02004, 0xe3a02902, "mov r2,#0x8000 (читать до 32К, не 4)"),
     (0x7024, 0xebfff2cd, 0xebfff2d6, "bl read@plt (вместо readn)"),
     (0x704c, 0xe1d640b2, 0xe1a04000, "mov r4,r0 (len=n)"),
-    (0x7050, 0xe1a03424, 0xea000033, "b 0x7124 (к проверке dest+writen)"),
+    (0x7050, 0xe1a03424, 0xea000021, "b 0x70dc (учёт: usb_read_count++, простой=0, перевзвод таймера 2с → writen)"),
     (0x7130, 0xe2842004, 0xe1a02004, "mov r2,r4 (писать n, не len+4)"),
     # --- pump phone→USB: read(32K в буфер [r5+40])->writen(n) ---
     (0x5c88, 0xe3a02004, 0xe3a02902, "mov r2,#0x8000"),
