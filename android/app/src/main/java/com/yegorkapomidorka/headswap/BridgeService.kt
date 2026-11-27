@@ -1274,7 +1274,16 @@ class BridgeService : Service() {
      */
     private fun startIccoaAir(pin: String?) {
         if (iccoaBle != null) {
-            AppLog.i("ICCOA: подключение уже идёт, повторный старт игнорирую")
+            val s = session as? IccoaSession
+            if (s == null) {
+                AppLog.i("ICCOA: подключение уже идёт, повторный старт игнорирую")
+                return
+            }
+            // Сессия есть, но машина могла увести её в фон и не вернуть (h1277): кнопка начинает заново.
+            // onSessionClosed уже в очереди main после close, старт встанет за ним.
+            icLog("air", "restart")
+            s.close("перезапуск по кнопке")
+            main.post { startIccoaAir(pin) }
             return
         }
         val refuse = when {

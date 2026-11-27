@@ -414,7 +414,7 @@ class IccoaSession(
             IccoaControl.HEARTBEAT -> Unit
             IccoaControl.GET_PORT_REQUEST -> IccoaPortNegotiation.responseFor(body)?.let {
                 ev("control", "get-port", "sent" to sendControl(IccoaControl.GET_PORT_RESPONSE, it))
-            }
+            } ?: ev("control", "get-port-unknown", "head" to body.take(4).joinToString("") { "%02x".format(it) })
             IccoaControl.CAR_FOREGROUND -> { ev("control", "foreground"); foreground = true; update() }
             IccoaControl.CAR_BACKGROUND, PAUSE_CAST -> { ev("control", "background", "m" to method); foreground = false; update() }
             IccoaControl.KEY_EVENT -> IccoaControl.key(body)?.let { if (!it.up) key(it.keyCode) }
@@ -423,12 +423,13 @@ class IccoaSession(
             IccoaControl.CONFIG_RESPONSE -> ev("control", "config",
                 "v" to runCatching { IccoaCarConfig.describe(body) }.getOrElse { "unreadable bytes=${body.size}" })
             // Машина спрашивает список «приложений» телефона: пустой ответ, как у FT.
-            APP_LIST_REQUEST -> sendControl(APP_LIST_REQUEST + 1, ByteArray(0))
+            APP_LIST_REQUEST -> ev("control", "app-list", "sent" to sendControl(APP_LIST_REQUEST + 1, ByteArray(0)))
             IccoaControl.DISCONNECT -> {
                 close("машина завершила сессию (m23)")
                 return false
             }
-            else -> if (seenOnce(method)) ev("control", "rx", "m" to method, "bytes" to body.size)
+            else -> if (seenOnce(method)) ev("control", "rx", "m" to method, "bytes" to body.size,
+                "head" to body.take(4).joinToString("") { "%02x".format(it) })
         }
         return true
     }
@@ -616,7 +617,14 @@ class IccoaSession(
             last?.let { bridge?.onCarlifeTouch(IccoaTouch.UP, it[0], it[1]) }
             ev("uibc", "released-on-eof")
         }
-        val json = IccoaInputJson { event -> onInput(event)?.let { gesture.accept(it[2]); last = it } }
+        var seen = 0
+        var dropped = 0
+        val json = IccoaInputJson { event ->
+            if (seen++ == 0) ev("uibc", "first", "type" to event.optInt("type"), "action" to event.optInt("action", -1))
+            val t = onInput(event)
+            if (t != null) { gesture.accept(t[2]); last = t } else if (event.optInt("type") == 1 && dropped++ % 50 == 0)
+                ev("uibc", "touch-dropped", "n" to dropped, "bound" to (bridge != null))
+        }
         IccoaInputReader.read(socket.getInputStream(), key::decrypt, json) { ev("uibc", it) }
         gesture.finish()
     }
@@ -641,7 +649,10 @@ class IccoaSession(
     // ---------------- CarlifeLink: видео ----------------
 
     override fun sendVideo(payload: ByteArray): Boolean {
-        if (closed.get() || !streaming) return false
+        if (closed.get()) return false
+        // Машина увела проекцию в фон: кадры молча выбрасываем (как FT), иначе мост каждые 4 с дёргает VideoFocus.
+        // IDR на возврате (m4) просит update().
+        if (!streaming) return playing && !foreground
         return synchronized(videoLock) { enqueue(payload) }
     }
 
@@ -802,9 +813,9 @@ class IccoaSession(
         audioState()
     }
 
-    /** m8: start на первой музыке, pause/resume дальше; пока control не поднят, помнит желаемое. */
+    /** m8 следует за видео, как у FT: start на первом показе, pause на m5, resume на m4. Музыка не влияет (h1277: m8 посреди сессии → m5). */
     private fun audioState() = synchronized(player) {
-        if (mediaOpen && musicOn && streaming) player.play() else player.pause()
+        if (streaming) player.play() else player.pause()
         player.flush { sendControl(IccoaControl.AUDIO_PLAYER_STATE, it) }?.let { ev("audio", "player-state", "state" to it) }
     }
 
@@ -815,8 +826,8 @@ class IccoaSession(
         private const val CONTROL = "control"
         private const val RTSP = "rtsp"
         private const val UIBC = "uibc"
-        /** Перебор при result=4, как XDL. */
-        private val WORK_MODES = intArrayOf(5, 769, 1)
+        /** 769 первым, как FT (на XA60 работает); 5 («app fullscreen») уводил RAV4 в «Extend Apps» (h1277). Перебор при result=4. */
+        private val WORK_MODES = intArrayOf(769, 5, 1)
         private const val CONTROL_WAIT_MS = 25_000L
         private const val WRITE_TIMEOUT_US = 5_000_000L
         private const val MAX_FPS = 30
