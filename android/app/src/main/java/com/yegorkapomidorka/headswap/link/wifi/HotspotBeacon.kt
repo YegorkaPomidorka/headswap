@@ -84,6 +84,23 @@ object BeaconCodec {
     /** Ответ FT/CL2AA на опрос 8999 (расширение под отдельные ГУ, в официальном MD слушателя нет). */
     val READY: ByteArray = """{"carlifehost":"carlife","status":"ready"}""".toByteArray(Charsets.US_ASCII)
 
+    /**
+     * Привет ГУ в её Wi-Fi Direct-группе на [PROBE_PORT] (FT, CarBeacon/helloForCar): кто мы по Bluetooth и по Wi-Fi Direct.
+     * Без него часть ГУ получает MD_WIFI_IP, а TCP так и не открывает (#111, MG: 10 входов в группу, ни одного CMD).
+     */
+    fun hello(bluetoothName: String?, wifiP2pName: String?): ByteArray =
+        """{"carlifehost":"carlife","deviceInfo":{"bluetoothName":"${jsonEsc(bluetoothName.orEmpty())}","wifiP2pName":"${jsonEsc(wifiP2pName.orEmpty())}"}}"""
+            .toByteArray(Charsets.UTF_8)
+
+    internal fun jsonEsc(s: String): String = buildString {
+        for (c in s) when {
+            c == '"' -> append("\\\"")
+            c == '\\' -> append("\\\\")
+            c < ' ' -> append(String.format("\\u%04x", c.code))
+            else -> append(c)
+        }
+    }
+
     /** Опрос ГУ: датаграмма со строкой carlifehost (регистр важен, как у FT). */
     fun isProbe(data: ByteArray, len: Int): Boolean = String(data, 0, len, Charsets.ISO_8859_1).contains("carlifehost")
 }
