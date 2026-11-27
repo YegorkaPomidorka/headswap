@@ -16,6 +16,11 @@ reset_phy=1; echo 20200000.usb > UDC (гаджет привязан). /dev/usb_a
 libSdAuto несут CarLife. CarPlay-reverse (нужен host) отключается — нам не нужен, AA-only.
 
 .text: Addr==Off (0x4d28) → файловое смещение == виртуальный адрес.
+Вторая правка (литерал 0x757c): первая system() peripheral-ветки вместо бесполезного «rmmod ak_hcd»
+(хост мы не включаем) делает «echo > UDC» — гаджет отвязывается и тут же привязывается тем же
+«echo 20200000.usb > UDC». При подключении телефона это пересборка USB: Vezel начинает свежую сессию,
+когда телефон уже на связи (Vezel принимает ответ только на первый HU_PROTOCOL_VERSION сессии).
+
 Правка проверяет исходное слово; несовпадение → стоп (защита от чужой сборки).
 
 Использование: python3 patch_libsdutils.py <stock libSdUtils.so> <out libSdUtils.so>
@@ -25,6 +30,7 @@ import sys, struct
 # (vaddr, old_word, new_word, комментарий) — little-endian ARM
 PATCHES = [
     (0x7404, 0x1a000032, 0xe1a00000, "bne host -> NOP (always peripheral/device)"),
+    (0x757c, 0x00014ae0, 0x00014bf4, "peripheral: первая команда rmmod ak_hcd -> echo > UDC (отвязать гаджет перед bind = пересборка USB)"),
 ]
 
 TEXT_ADDR, TEXT_OFF, TEXT_SIZE = 0x4d28, 0x4d28, 0x16c1c
