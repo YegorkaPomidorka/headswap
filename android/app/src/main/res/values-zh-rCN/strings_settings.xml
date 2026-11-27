@@ -308,4 +308,10 @@
     <string name="dongle_start">等待 USB 转 Wi-Fi 适配器</string>
     <string name="dongle_stop">停止等待适配器</string>
     <string name="dongle_note">将适配器插入车机 USB 口，手机开启 2.4 GHz 热点</string>
+    <string name="box_start">盒子模式（smartBox 适配器）</string>
+    <string name="box_stop">停止盒子</string>
+    <string name="box_note">用蓝牙配对盒子；手机主动连接它，通过其 5 GHz 传输 CarLife</string>
+    <string name="box_connecting">盒子：握手中…</string>
+    <string name="box_connected">盒子已连接（%1$s）</string>
+    <string name="box_failed">盒子失败：%1$s</string>
 </resources>

@@ -532,6 +532,10 @@ class SettingsSectionScreen(host: MainActivity, val section: SettingsSection) : 
         wlDongleBtn = c.outlineButton(c.getString(R.string.dongle_start), heightDp = 56, sp = 16f).apply { setOnClickListener { onDongleToggle() } }
             .also { card.addView(it, lp(MATCH, c.dp(56))) }
         card.addView(c.text(c.getString(R.string.dongle_note), 13f, 400, c.clr(R.color.on2)), lp(MATCH, WRAP))
+        // режим бокса: телефон сам идёт к боксу smartBox (BT-рукопожатие AA → Wi-Fi бокса → :6733)
+        c.outlineButton(c.getString(R.string.box_start), heightDp = 56, sp = 16f).apply { setOnClickListener { onBoxStart() } }
+            .also { card.addView(it, lp(MATCH, c.dp(56))) }
+        card.addView(c.text(c.getString(R.string.box_note), 13f, 400, c.clr(R.color.on2)), lp(MATCH, WRAP))
         // выбор машины: дальше при её Bluetooth-подключении ожидание по Wi-Fi стартует само
         wlCarLine = c.text("", 15f, 500).also { card.addView(it, lp(MATCH, WRAP).apply { topMargin = c.dp(8) }) }
         card.addView(c.text(c.getString(R.string.wl_car_note), 13f, 400, c.clr(R.color.on2)), lp(MATCH, WRAP))
@@ -726,6 +730,11 @@ class SettingsSectionScreen(host: MainActivity, val section: SettingsSection) : 
     private fun startDongle() {
         AppLog.i("кнопка «Ждать свисток»")
         ctx.startForegroundService(Intent(ctx, BridgeService::class.java).setAction(BridgeService.ACTION_DONGLE))
+    }
+
+    private fun onBoxStart() {
+        AppLog.i("кнопка «Режим бокса»")
+        ctx.startForegroundService(Intent(ctx, BridgeService::class.java).setAction(BridgeService.ACTION_BOX))
     }
 
     private companion object {

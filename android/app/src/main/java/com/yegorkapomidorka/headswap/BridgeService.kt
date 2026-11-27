@@ -123,6 +123,8 @@ class BridgeService : Service() {
     private var linkWaiting = false
     /** Режим «свисток»: слушаем :7250, пока не Стоп; живёт и между сессиями, сервис в это время не гасим. Только главная нить. */
     private var dongle: DongleListener? = null
+    /** Режим бокса: телефон играет беспроводной AA, коннектится к боксу (BT-рукопожатие + Wi-Fi + :6733). Одноразовый. */
+    private var box: com.yegorkapomidorka.headswap.link.box.BoxConnector? = null
     /** Беспровод (бета, ветка B) включён пользователем: после обрыва снова ждём машину. Пишет главная нить, читает и коннектор. */
     @Volatile private var wifiBMode = false
     /**
@@ -326,6 +328,7 @@ class BridgeService : Service() {
             btProbe.stop("стоп")
             pendingTcp6?.abort()
             stopDongle("стоп")
+            stopBox("стоп")
             val s = session
             if (s != null) {
                 s.close("остановлено пользователем")        // onSessionClosed увидит stopRequested: AA закрывается сразу
@@ -400,6 +403,11 @@ class BridgeService : Service() {
         // свисток: стик в USB ГУ подключается к телефону по Wi-Fi и несёт поток аксессуара одним TCP-сокетом
         if (intent?.action == ACTION_DONGLE) {
             startDongle()
+            return
+        }
+        // режим бокса: телефон сам идёт к боксу (BT-рукопожатие AA → Wi-Fi бокса → :6733)
+        if (intent?.action == ACTION_BOX) {
+            startBox()
             return
         }
 
@@ -483,6 +491,65 @@ class BridgeService : Service() {
         CarLifeState.dongle = false
         if (session == null) CarLifeState.wireless = null
         WLog.ev(WLog.TCP, "dongle-stop", "why" to why)
+    }
+
+    /** Режим бокса: на фоновой нити делаем BT-рукопожатие и Wi-Fi, затем сокет :6733 отдаём в сессию. */
+    private fun startBox() {
+        if (box != null) {
+            AppLog.i("сервис: режим бокса: уже иду, повторный старт игнорирую")
+            return
+        }
+        stopRequested = false
+        val c = com.yegorkapomidorka.headswap.link.box.BoxConnector(this)
+        box = c
+        CarLifeState.wireless = getString(R.string.box_connecting)
+        CarLifeState.status = CarLifeState.wireless!!
+        WLog.begin(TransportCaps.USB_TCP.kind, "mode" to "box")
+        AppLog.i("сервис: режим бокса — рукопожатие с боксом")
+        Thread({
+            try {
+                val sock = c.connect()
+                main.post { onBoxSocket(c, sock) }
+            } catch (e: Exception) {
+                AppLog.i("режим бокса: не вышло: ${e.message}")
+                main.post {
+                    if (box === c) { box = null; c.release() }
+                    CarLifeState.wireless = getString(R.string.box_failed, e.message ?: "?")
+                    CarLifeState.status = CarLifeState.wireless!!
+                    if (session == null) failStart()
+                }
+            }
+        }, "box-connect").start()
+    }
+
+    /** Сокет к серверу данных бокса готов (нить main). Занято/выключено — закрываем. */
+    private fun onBoxSocket(from: com.yegorkapomidorka.headswap.link.box.BoxConnector, sock: java.net.Socket) {
+        if (box !== from || stopRequested || session != null) {
+            try { sock.close() } catch (_: Exception) {}
+            from.release()
+            if (box === from) box = null
+            return
+        }
+        val peer = sock.inetAddress?.hostAddress ?: "бокс"
+        val transport = try {
+            StreamTransport(sock.getInputStream(), sock.getOutputStream(), TransportCaps.USB_TCP, "Бокс $peer", closeFd = { sock.close() })
+        } catch (e: java.io.IOException) {
+            AppLog.i("режим бокса: сокет отвалился до старта: ${e.message}")
+            try { sock.close() } catch (_: Exception) {}
+            box = null; from.release()
+            return
+        }
+        CarLifeState.wireless = getString(R.string.box_connected, peer)
+        startSession(transport)
+    }
+
+    /** Режим бокса выключен (Стоп/уничтожение). Отпускаем сеть бокса. */
+    private fun stopBox(why: String) {
+        val c = box ?: return
+        box = null
+        c.cancel()
+        c.release()
+        WLog.ev(WLog.TCP, "box-stop", "why" to why)
     }
 
     /** Стик подключился (нить main). Занято или режим уже выключен: сокет закрываем. */
@@ -1543,6 +1610,7 @@ class BridgeService : Service() {
 
     private fun finish() {
         stopDongle("finish")
+        stopBox("finish")
         if (desktopUsed) cancelDesktopRecovery()
         stopCarNet(CarNetEvent.STOP, "finish")
         CarLifeState.running = false
@@ -1564,6 +1632,7 @@ class BridgeService : Service() {
         stopCarNet(CarNetEvent.DESTROY, "destroy")
         pendingTcp6?.abort()
         stopDongle("сервис уничтожен")
+        stopBox("сервис уничтожен")
         btProbe.stop("сервис уничтожен")
         audioDiag.stop()
         if (desktopUsed) {
@@ -1592,6 +1661,8 @@ class BridgeService : Service() {
         const val ACTION_WIFI_B = "com.yegorkapomidorka.headswap.WIFI_B"
         /** Свисток: слушать :7250, стик в USB ГУ подключается по Wi-Fi и несёт поток аксессуара. Выключается общим [ACTION_STOP]. */
         const val ACTION_DONGLE = "com.yegorkapomidorka.headswap.DONGLE"
+        /** Режим бокса: телефон идёт к боксу smartBox (BT-рукопожатие AA → Wi-Fi бокса → :6733). Выключается [ACTION_STOP]. */
+        const val ACTION_BOX = "com.yegorkapomidorka.headswap.BOX"
         /** Новый сокет свистка ждёт закрытия старой сессии: 15 × 200 мс. */
         private const val DONGLE_REPLACE_TRIES = 15
         private const val DONGLE_REPLACE_STEP_MS = 200L

@@ -220,6 +220,12 @@
     <string name="dongle_start">Wait for the dongle (USB over Wi-Fi)</string>
     <string name="dongle_stop">Stop the dongle</string>
     <string name="dongle_note">Stick in the car\'s USB port, the phone shares a 2.4 GHz hotspot</string>
+    <string name="box_start">Box mode (smartBox adapter)</string>
+    <string name="box_stop">Stop the box</string>
+    <string name="box_note">Pair the box over Bluetooth; the phone connects to it and speaks CarLife over its 5 GHz link</string>
+    <string name="box_connecting">Box: handshaking…</string>
+    <string name="box_connected">Box connected (%1$s)</string>
+    <string name="box_failed">Box failed: %1$s</string>
     <string name="wl_status_line">State: %1$s</string>
     <string name="wl_off">off</string>
     <string name="wl_no_permission">Without the “Nearby devices” permission the car cannot connect over Wi-Fi</string>
