@@ -62,13 +62,11 @@ class BoxConnector(
         if (cancelled) error("отменено")
 
         val net = joinWifi(outcome.creds.ssid, outcome.creds.psk)
-        // Маршрутизируем сокеты процесса в сеть бокса (AP без интернета) на время сессии. Иначе
-        // socketFactory.createSocket()+connect() даёт «Binding socket to network … EPERM». Снимаем в release().
-        if (cm?.bindProcessToNetwork(net) != true) error("не привязать процесс к сети бокса")
-        val sock = Socket()
+        // Коннектящий createSocket(ip,port) фабрики сети — привязка к локальной сети бокса идёт внутри.
+        // Пустой createSocket()+connect() даёт EPERM, а bindProcessToNetwork для local-only сети — false.
+        val sock = net.socketFactory.createSocket(outcome.wifi.ip, outcome.wifi.port) as Socket
         try {
             sock.tcpNoDelay = true
-            sock.connect(InetSocketAddress(outcome.wifi.ip, outcome.wifi.port), CONNECT_MS)
             WLog.ev(WLog.TCP, "box-connected", "ip" to outcome.wifi.ip, "port" to outcome.wifi.port)
             return sock
         } catch (e: Exception) {
@@ -104,9 +102,8 @@ class BoxConnector(
         return net
     }
 
-    /** Отпустить сеть бокса (после закрытия сессии): вернуть маршрут процесса и снять запрос сети. */
+    /** Отпустить сеть бокса (после закрытия сессии): снять запрос сети. */
     fun release() {
-        try { cm?.bindProcessToNetwork(null) } catch (_: Exception) {}
         netCb?.let { try { cm?.unregisterNetworkCallback(it) } catch (_: Exception) {} }
         netCb = null
     }
