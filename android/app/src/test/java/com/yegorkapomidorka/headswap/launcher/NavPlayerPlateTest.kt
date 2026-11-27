@@ -6,17 +6,26 @@ import org.junit.Test
 
 class NavPlayerPlateTest {
     private fun look(
-        navArea: Boolean = true, navReady: Boolean = true, carHost: Boolean = false, access: Boolean = true,
+        navArea: Boolean = true, navReady: Boolean = true, carMenu: Boolean = false, access: Boolean = true,
         hasSession: Boolean = true, ringing: Boolean = false, alice: Boolean = false,
-    ) = NavPlayerPlate.look(navArea, navReady, carHost, access, hasSession, ringing, alice)
+    ) = NavPlayerPlate.look(navArea, navReady, carMenu, access, hasSession, ringing, alice)
 
-    @Test fun showsOnlyOverReadyWindowedNavigatorWithSession() {
+    @Test fun showsOnlyOverReadyNavigatorWithSession() {
         assertEquals(Look.FULL, look())
         assertEquals(Look.HIDDEN, look(navArea = false))
         assertEquals(Look.HIDDEN, look(navReady = false))
-        assertEquals(Look.HIDDEN, look(carHost = true))
+        assertEquals(Look.HIDDEN, look(carMenu = true))
         assertEquals(Look.HIDDEN, look(access = false))
         assertEquals(Look.HIDDEN, look(hasSession = false))
+    }
+
+    @Test fun carHostSitsAboveBottomLeftCard() {
+        // h1503: прибытие с верхом 579, отступ 21, плашка 101 - слева над ним
+        assertEquals(21 to 579 - 21 - 101, NavPlayerPlate.carOrigin(579, 720, 101, 21))
+        // карточки нет - левый нижний угол
+        assertEquals(21 to 720 - 21 - 101, NavPlayerPlate.carOrigin(null, 720, 101, 21))
+        // не влезает - к верху, не за край
+        assertEquals(21 to 0, NavPlayerPlate.carOrigin(50, 720, 101, 21))
     }
 
     @Test fun ringingAndAliceHideIt() {
