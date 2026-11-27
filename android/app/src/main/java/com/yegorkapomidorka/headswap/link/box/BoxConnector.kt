@@ -8,6 +8,7 @@ import android.net.ConnectivityManager
 import android.net.Network
 import android.net.NetworkCapabilities
 import android.net.NetworkRequest
+import android.net.wifi.WifiManager
 import android.net.wifi.WifiNetworkSpecifier
 import android.os.Build
 import com.yegorkapomidorka.headswap.link.diag.WLog
@@ -37,8 +38,24 @@ class BoxConnector(
     @Volatile private var boundProcess = false
     private var cm: ConnectivityManager? = null
     private var netCb: ConnectivityManager.NetworkCallback? = null
+    private val wifiLocks = mutableListOf<WifiManager.WifiLock>()
 
     fun cancel() { cancelled = true }
+
+    /** Телефон — Wi-Fi-клиент бокса; в энергосбережении точка копит ему пакеты до маяка (~100 мс),
+     *  а Vezel принимает ответ на HU_PROTOCOL_VERSION только в окне ~100 мс. Держим радио бодрым. */
+    @Suppress("DEPRECATION")
+    private fun holdWifiAwake() {
+        val wm = ctx.applicationContext.getSystemService(Context.WIFI_SERVICE) as? WifiManager ?: return
+        val modes = buildList {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) add(WifiManager.WIFI_MODE_FULL_LOW_LATENCY)
+            add(WifiManager.WIFI_MODE_FULL_HIGH_PERF)
+        }
+        for (m in modes) try {
+            wifiLocks += wm.createWifiLock(m, "headswap:box$m").apply { setReferenceCounted(false); acquire() }
+        } catch (e: Exception) { WLog.ev(WLog.P2P, "box-wifilock-fail", "mode" to m, "err" to e.message) }
+        WLog.ev(WLog.P2P, "box-wifilock", "n" to wifiLocks.size)
+    }
 
     /** Выполнить всё и вернуть подключённый сокет к серверу данных бокса. Бросает при любой неудаче. */
     @SuppressLint("MissingPermission")
@@ -47,6 +64,7 @@ class BoxConnector(
             ?: error("Bluetooth недоступен")
         val dev = adapter.bondedDevices?.firstOrNull { btNameMatch(it.name) }
             ?: error("бокс не найден среди сопряжённых BT (включи и спарь)")
+        holdWifiAwake()
         WLog.ev(WLog.BT, "box-bt", "dev" to WLog.maskMac(dev.address), "name" to dev.name)
 
         val rfcomm: BluetoothSocket = dev.createRfcommSocketToServiceRecord(UUID.fromString(BoxHandshake.SERVICE_UUID))
@@ -129,6 +147,8 @@ class BoxConnector(
         boundProcess = false
         netCb?.let { try { cm?.unregisterNetworkCallback(it) } catch (_: Exception) {} }
         netCb = null
+        wifiLocks.forEach { try { if (it.isHeld) it.release() } catch (_: Exception) {} }
+        wifiLocks.clear()
     }
 
     private fun randomId(): String =
