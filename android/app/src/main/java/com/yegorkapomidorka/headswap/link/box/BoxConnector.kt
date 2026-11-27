@@ -34,6 +34,7 @@ class BoxConnector(
     private val btNameMatch: (String?) -> Boolean = { it != null && it.contains("Dongle", true) },
 ) {
     @Volatile private var cancelled = false
+    @Volatile private var boundProcess = false
     private var cm: ConnectivityManager? = null
     private var netCb: ConnectivityManager.NetworkCallback? = null
 
@@ -62,15 +63,14 @@ class BoxConnector(
         if (cancelled) error("отменено")
 
         val net = joinWifi(outcome.creds.ssid, outcome.creds.psk)
-        // Local-only сеть WifiNetworkSpecifier: bindProcessToNetwork=false, socketFactory/createSocket()+connect
-        // дают EPERM. Рабочий путь — создать fd без коннекта (bind(null)), привязать сам сокет к сети, потом connect.
+        // Android 16 режет привязку к local-only сети. bindProcessToNetwork пробуем в самом колбэке
+        // onAvailable (boundProcess). Если не вышло — привязываем сам сокет (bind(null)+bindSocket).
         val sock = Socket()
         try {
-            sock.bind(null)
-            net.bindSocket(sock)
+            if (!boundProcess) { sock.bind(null); net.bindSocket(sock) }
             sock.tcpNoDelay = true
             sock.connect(InetSocketAddress(outcome.wifi.ip, outcome.wifi.port), CONNECT_MS)
-            WLog.ev(WLog.TCP, "box-connected", "ip" to outcome.wifi.ip, "port" to outcome.wifi.port)
+            WLog.ev(WLog.TCP, "box-connected", "ip" to outcome.wifi.ip, "port" to outcome.wifi.port, "proc" to boundProcess)
             return sock
         } catch (e: Exception) {
             try { sock.close() } catch (_: Exception) {}
@@ -91,7 +91,12 @@ class BoxConnector(
         val latch = CountDownLatch(1)
         var result: Network? = null  // публикуется через latch (await/countDown — барьер)
         val cb = object : ConnectivityManager.NetworkCallback() {
-            override fun onAvailable(network: Network) { result = network; latch.countDown() }
+            override fun onAvailable(network: Network) {
+                // привязку процесса пробуем прямо в колбэке — из другой нити Android 16 отвечает false
+                boundProcess = try { c.bindProcessToNetwork(network) } catch (e: Exception) { false }
+                WLog.ev(WLog.P2P, "box-bind", "proc" to boundProcess)
+                result = network; latch.countDown()
+            }
             override fun onUnavailable() { latch.countDown() }
         }
         netCb = cb
@@ -105,8 +110,10 @@ class BoxConnector(
         return net
     }
 
-    /** Отпустить сеть бокса (после закрытия сессии): снять запрос сети. */
+    /** Отпустить сеть бокса (после закрытия сессии): вернуть маршрут процесса и снять запрос сети. */
     fun release() {
+        if (boundProcess) try { cm?.bindProcessToNetwork(null) } catch (_: Exception) {}
+        boundProcess = false
         netCb?.let { try { cm?.unregisterNetworkCallback(it) } catch (_: Exception) {} }
         netCb = null
     }
