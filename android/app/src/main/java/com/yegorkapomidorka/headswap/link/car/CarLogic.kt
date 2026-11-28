@@ -163,7 +163,7 @@ enum class AclCmd { CAR_AUTO, CAR_AUTO_OFF, BOX_AUTO }
 
 /** Пауза перед переподключением бокса: после конца сессии, после первых [BOX_FAST_FAILS] неудач подряд и после следующих. */
 const val BOX_REARM_AFTER_SESSION_MS = 2_000L
-const val BOX_REARM_AFTER_FAIL_MS = 4_000L
+const val BOX_REARM_AFTER_FAIL_MS = 1_500L      // первое рукопожатие сразу после появления бокса падает всегда (логи 28.11), повтор проходит
 const val BOX_REARM_SLOW_MS = 10_000L
 const val BOX_FAST_FAILS = 3
 /** Столько неудач подряд - и перевзвод прекращается до следующего ACL_CONNECTED бокса или ручного старта. */
