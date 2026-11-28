@@ -36,6 +36,9 @@ object CarLifeState {
     /** Беспровод (бета, ветка B): что сейчас происходит, для экрана; null - режим не включён. */
     @Volatile var wireless: String? = null
 
+    /** Этап беспровода для экрана (пишет BridgeService, UP для бокса - CarLifeSession на HU_PROTOCOL_VERSION). */
+    @Volatile var wlStage: com.yegorkapomidorka.headswap.link.car.WlStage = com.yegorkapomidorka.headswap.link.car.WlStage.OFF
+
     /** Режим «свисток» включён: сервис слушает :7250 (пишет BridgeService). Статус идёт в [wireless]. */
     @Volatile var dongle: Boolean = false
 

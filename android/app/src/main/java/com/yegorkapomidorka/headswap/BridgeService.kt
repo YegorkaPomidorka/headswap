@@ -65,6 +65,7 @@ import com.yegorkapomidorka.headswap.link.Tcp6Listener
 import com.yegorkapomidorka.headswap.link.TransportCaps
 import com.yegorkapomidorka.headswap.link.bt.CarBtState
 import com.yegorkapomidorka.headswap.link.bt.CarlifeBtProbe
+import com.yegorkapomidorka.headswap.link.box.BoxNoLinkException
 import com.yegorkapomidorka.headswap.link.car.AutoOffDebounce
 import com.yegorkapomidorka.headswap.link.car.BT_HINT_MS
 import com.yegorkapomidorka.headswap.link.car.BtReconnectHint
@@ -78,6 +79,10 @@ import com.yegorkapomidorka.headswap.link.car.CarNetState
 import com.yegorkapomidorka.headswap.link.car.CarNetwork
 import com.yegorkapomidorka.headswap.link.car.CarProfile
 import com.yegorkapomidorka.headswap.link.car.CarWifi
+import com.yegorkapomidorka.headswap.link.car.WlMode
+import com.yegorkapomidorka.headswap.link.car.WlModePrefs
+import com.yegorkapomidorka.headswap.link.car.WlPolicy
+import com.yegorkapomidorka.headswap.link.car.WlStage
 import com.yegorkapomidorka.headswap.link.diag.NetProbe
 import com.yegorkapomidorka.headswap.link.diag.WLog
 import com.yegorkapomidorka.headswap.link.wifi.HotspotBeacon
@@ -123,8 +128,18 @@ class BridgeService : Service() {
     private var linkWaiting = false
     /** Режим «свисток»: слушаем :7250, пока не Стоп; живёт и между сессиями, сервис в это время не гасим. Только главная нить. */
     private var dongle: DongleListener? = null
-    /** Режим бокса: телефон играет беспроводной AA, коннектится к боксу (BT-рукопожатие + Wi-Fi + :6733). Одноразовый. */
+    /** Режим бокса: телефон играет беспроводной AA, коннектится к боксу (BT-рукопожатие + Wi-Fi + :6733). Есть, пока идёт подключение или его сессия. */
     private var box: com.yegorkapomidorka.headswap.link.box.BoxConnector? = null
+    /**
+     * Бокс включён (ACTION_BOX или ACL бокса): в режиме BOX после обрыва и неудачи переподключаемся сами. Стоп и
+     * [BOX_MAX_FAILS] неудач подряд снимают до следующего ACL_CONNECTED или ACTION_BOX. Только главная нить.
+     */
+    private var boxWanted = false
+    /** Неудачи подключения к боксу подряд; обнуляется стартом сессии, ACTION_BOX и ACTION_BOX_AUTO. Только главная нить. */
+    private var boxFails = 0
+    private val boxRearmTick = Runnable { rearmBox() }
+    /** Бокс держит сервис живым, как [dongle]. */
+    private val boxOn: Boolean get() = box != null || boxWanted
     /** Беспровод (бета, ветка B) включён пользователем: после обрыва снова ждём машину. Пишет главная нить, читает и коннектор. */
     @Volatile private var wifiBMode = false
     /**
@@ -186,6 +201,7 @@ class BridgeService : Service() {
             onTargetInfo = { mac -> main.post { onBtTargetInfo(mac) } },
             onP2pBusy = { main.post { onP2pBusy() } },
             onWifi = { on -> main.post { onP2pWifi(on) } },
+            onJoined = { main.post { if (wifiBMode && session == null && !stopRequested) CarLifeState.wlStage = WlStage.LINK } },
         )
     }
     private val scheduler: ScheduledExecutorService = Executors.newSingleThreadScheduledExecutor { r -> Thread(r, "bridge-grace").also { it.isDaemon = true } }
@@ -224,6 +240,7 @@ class BridgeService : Service() {
         stopCarNet(CarNetEvent.STOP, "usb-detach")
         pendingTcp6?.abort()
         CarLifeState.wireless = null
+        if (!boxOn) CarLifeState.wlStage = WlStage.OFF
         btProbe.stop("USB отключён")
         AppLog.i("DESKTOP USB отключён: рабочий стол держу 8 с, активация остаётся ($reason)", false)
         val current = session
@@ -251,20 +268,20 @@ class BridgeService : Service() {
             val accepted = !stopRequested && s != null
             AppLog.i("DESKTOP «Домой» долгое: меню ГУ, accepted=$accepted", true)
             if (accepted) s!!.goToDesktop()
-            if (session == null && host == null && !linkWaiting && dongle == null) stopSelfResult(startId)
+            if (session == null && host == null && !linkWaiting && dongle == null && !boxOn) stopSelfResult(startId)
             return stickiness()
         }
         if (intent?.action == ACTION_DESKTOP_HOME) {
             // команда относится только к живой desktop-сессии: опоздавший клик не должен поднимать сервис и новый рабочий стол
             val accepted = !stopRequested && session != null && host?.showDesktop() == true
             AppLog.i("DESKTOP home request accepted=$accepted", false)
-            if (session == null && host == null && !linkWaiting && dongle == null) stopSelfResult(startId)
+            if (session == null && host == null && !linkWaiting && dongle == null && !boxOn) stopSelfResult(startId)
             return stickiness()
         }
         if (intent?.action == ACTION_LAUNCHER_DEBUG) {
             // стенд лаунчера: экран, раздел, тема и карта без тапов и без окна MainActivity поверх рабочего стола
             com.yegorkapomidorka.headswap.launcher.LauncherDebug.apply(this, intent)
-            if (session == null && host == null && !linkWaiting && dongle == null) stopSelfResult(startId)
+            if (session == null && host == null && !linkWaiting && dongle == null && !boxOn) stopSelfResult(startId)
             return stickiness()
         }
         DexState.desktopSession = foregroundMode() == BridgeMode.DESKTOP
@@ -292,9 +309,13 @@ class BridgeService : Service() {
      * Беспровод или авторежим включён: после убийства процесса Android перезапустит сервис ([onStickyRestart]).
      * Сам ACL_CONNECTED не придёт - Bluetooth машины не рвался, и без этого воздух не поднимался до следующей поездки (h610).
      */
-    private fun stickiness() = if ((wifiBMode || autoMode) && !stopRequested) START_STICKY else START_NOT_STICKY
+    private fun stickiness() =
+        if ((wifiBMode || autoMode || (boxWanted && WlModePrefs(this).mode == WlMode.BOX)) && !stopRequested) START_STICKY else START_NOT_STICKY
 
-    /** Перезапуск после убийства процесса: состояние потеряно; выбранная машина рядом по Bluetooth - ждём её, как по ACL_CONNECTED. */
+    /**
+     * Перезапуск после убийства процесса: состояние потеряно; выбранная машина рядом по Bluetooth - ждём её, как по
+     * ACL_CONNECTED. Режим BOX: бокс на связи по Bluetooth - подключаемся к нему (по CarBtState).
+     */
     private fun onStickyRestart() {
         AppLog.i("сервис: перезапущен системой после убийства процесса")
         val mac = CarProfile(this).btMac
@@ -305,8 +326,12 @@ class BridgeService : Service() {
         }
         CarBtState.check(this, mac) { near ->
             WLog.ev(WLog.TRIGGER, "sticky-restart", "near" to near)
-            if (session != null || wifiBMode || stopRequested) return@check      // пока проверяли, пришла команда (ACL, кабель, Стоп)
-            if (near) onCarAuto() else if (host == null && !linkWaiting) finish()
+            if (session != null || wifiBMode || stopRequested || boxOn) return@check      // пока проверяли, пришла команда (ACL, кабель, Стоп)
+            if (near && WlModePrefs(this).mode == WlMode.BOX) {
+                boxWanted = true
+                boxFails = 0
+                startBox()
+            } else if (near) onCarAuto() else if (host == null && !linkWaiting) finish()
         }
     }
 
@@ -325,10 +350,19 @@ class BridgeService : Service() {
             cancelHint()
             stopCarNet(CarNetEvent.STOP, "stop")
             CarLifeState.wireless = null
+            CarLifeState.wlStage = WlStage.OFF
             btProbe.stop("стоп")
             pendingTcp6?.abort()
             stopDongle("стоп")
+            boxWanted = false      // до следующего ACL_CONNECTED бокса или ACTION_BOX
+            main.removeCallbacks(boxRearmTick)
             stopBox("стоп")
+            val wl = WlModePrefs(this)
+            if (wl.mode == WlMode.BOX) {
+                // «Стоп» держится до следующей поездки; сам Стоп тоже считаем ACL-событием, иначе после долгой сессии (бокс рвёт BT) глушить нечем
+                wl.boxMuted = true
+                wl.boxSeenMs = System.currentTimeMillis()
+            }
             val s = session
             if (s != null) {
                 s.close("остановлено пользователем")        // onSessionClosed увидит stopRequested: AA закрывается сразу
@@ -345,6 +379,10 @@ class BridgeService : Service() {
         }
         if (intent?.action == ACTION_WIFI_B_AUTO_OFF) {
             onCarAutoOff()
+            return
+        }
+        if (intent?.action == ACTION_BOX_AUTO) {
+            onBoxAuto()
             return
         }
         if (session != null) {
@@ -407,6 +445,9 @@ class BridgeService : Service() {
         }
         // режим бокса: телефон сам идёт к боксу (BT-рукопожатие AA → Wi-Fi бокса → :6733)
         if (intent?.action == ACTION_BOX) {
+            boxWanted = true      // явный старт снимает «остановлено человеком»
+            boxFails = 0
+            WlModePrefs(this).boxMuted = false
             startBox()
             return
         }
@@ -448,6 +489,7 @@ class BridgeService : Service() {
             cancelHint()
             stopCarNet(CarNetEvent.USB_WINS, "usb")
             CarLifeState.wireless = null
+            CarLifeState.wlStage = WlStage.OFF
             btProbe.stop("кабель")
             pendingTcp6?.abort()
         }
@@ -499,12 +541,17 @@ class BridgeService : Service() {
             AppLog.i("сервис: режим бокса: уже иду, повторный старт игнорирую")
             return
         }
+        main.removeCallbacks(boxRearmTick)
         stopRequested = false
-        val c = com.yegorkapomidorka.headswap.link.box.BoxConnector(this)
+        // MAC из профиля - бокс только в режиме BOX; иначе там машина, ищем бокс по имени, как раньше
+        val mode = WlModePrefs(this).mode
+        val c = com.yegorkapomidorka.headswap.link.box.BoxConnector(this, mac = if (mode == WlMode.BOX) CarProfile(this).btMac else null)
         box = c
+        // NO_LINK держим через повторы, пока звено не появится: экран не мигает «жду» каждые 10 с
+        if (CarLifeState.wlStage != WlStage.NO_LINK) CarLifeState.wlStage = WlStage.WAIT
         CarLifeState.wireless = getString(R.string.box_connecting)
         CarLifeState.status = CarLifeState.wireless!!
-        WLog.begin(TransportCaps.USB_TCP.kind, "mode" to "box")
+        WLog.begin(TransportCaps.USB_TCP.kind, "mode" to "box", "wl" to mode.name)
         AppLog.i("сервис: режим бокса — рукопожатие с боксом")
         Thread({
             try {
@@ -513,13 +560,61 @@ class BridgeService : Service() {
             } catch (e: Exception) {
                 AppLog.i("режим бокса: не вышло: ${e.message}")
                 main.post {
-                    if (box === c) { box = null; c.release() }
+                    if (box !== c) return@post      // остановлен (Стоп, finish): статус не перетираем
+                    box = null
+                    c.release()
+                    boxFails++
+                    // NO_LINK - рукопожатие дало адрес, а связи нет; сорвавшееся рукопожатие - снова ждём
+                    CarLifeState.wlStage = if (e is BoxNoLinkException) WlStage.NO_LINK else WlStage.WAIT
                     CarLifeState.wireless = getString(R.string.box_failed, e.message ?: "?")
                     CarLifeState.status = CarLifeState.wireless!!
-                    if (session == null) failStart()
+                    if (session == null) scheduleBoxRearm(afterSession = false)
                 }
             }
         }, "box-connect").start()
+    }
+
+    /** ACL_CONNECTED бокса (режим BOX): подключаемся сразу. Идущую сессию не трогаем, после неё переподключимся сами. */
+    private fun onBoxAuto() {
+        cancelAutoOff()
+        boxWanted = true
+        boxFails = 0
+        if (session != null || box != null) {
+            WLog.ev(WLog.TRIGGER, "box-auto-mark", "why" to if (session != null) "session" else "connecting")
+            return
+        }
+        WLog.ev(WLog.TRIGGER, "box-auto-start")
+        startBox()
+    }
+
+    /**
+     * После конца сессии бокса или неудачи подключения: режим BOX и бокс не остановлен человеком - переподключаемся
+     * через паузу ([WlPolicy.boxRearmMs]), Bluetooth не смотрим. После [BOX_MAX_FAILS] неудач подряд бокс выключен до
+     * следующего ACL_CONNECTED или ручного старта, сервис гасим, если больше ничего нет.
+     */
+    private fun scheduleBoxRearm(afterSession: Boolean) {
+        main.removeCallbacks(boxRearmTick)
+        val ms = if (stopRequested) null else WlPolicy.boxRearmMs(WlModePrefs(this).mode, boxWanted, afterSession, boxFails)
+        WLog.ev(WLog.TRIGGER, "box-rearm", "ms" to ms, "fails" to boxFails, "after" to if (afterSession) "session" else "fail")
+        if (ms != null) {
+            if (CarLifeState.wlStage != WlStage.NO_LINK) CarLifeState.wlStage = WlStage.WAIT
+            main.postDelayed(boxRearmTick, ms)
+            return
+        }
+        boxWanted = false
+        val noLink = CarLifeState.wlStage == WlStage.NO_LINK      // последняя неудача на Wi-Fi: карточку «нет Wi-Fi бокса» оставляем
+        failStart()      // finish() сбрасывает этап в OFF
+        CarLifeState.wlStage = if (noLink) WlStage.NO_LINK else WlStage.OFF
+    }
+
+    private fun rearmBox() {
+        if (stopRequested || session != null || box != null) return
+        if (!boxWanted || WlModePrefs(this).mode != WlMode.BOX) {      // режим сменили, пока ждали паузу
+            boxWanted = false
+            failStart()
+            return
+        }
+        startBox()
     }
 
     /** Сокет к серверу данных бокса готов (нить main). Занято/выключено — закрываем. */
@@ -537,13 +632,24 @@ class BridgeService : Service() {
             AppLog.i("режим бокса: сокет отвалился до старта: ${e.message}")
             try { sock.close() } catch (_: Exception) {}
             box = null; from.release()
+            boxFails++
+            scheduleBoxRearm(afterSession = false)
             return
         }
         CarLifeState.wireless = getString(R.string.box_connected, peer)
+        CarLifeState.wlStage = WlStage.LINK      // UP - когда ГУ заговорит (CarLifeSession, HU_PROTOCOL_VERSION)
+        boxFails = 0
         startSession(transport)
+        if (session == null) {
+            // сессия не стартовала (рабочий стол не активирован, мост не поднялся): повтор упрётся в то же, бокс выключаем
+            stopBox("нет сессии")
+            boxWanted = false
+            CarLifeState.wlStage = WlStage.OFF
+            failStart()
+        }
     }
 
-    /** Режим бокса выключен (Стоп/уничтожение). Отпускаем сеть бокса. */
+    /** Подключение или сессия бокса кончились (Стоп, конец сессии, уничтожение). Отпускаем сеть бокса; [boxWanted] не трогаем. */
     private fun stopBox(why: String) {
         val c = box ?: return
         box = null
@@ -592,6 +698,7 @@ class BridgeService : Service() {
         // телефон уже в сети машины (WifiNetworkSpecifier): маяк и ответчик только в ней, сокеты привязаны к этой сети
         val carIface = carNetImpl?.ifaceName
         val carNetwork = if (carIface != null) carNetImpl?.current else null
+        CarLifeState.wlStage = if (carNetwork != null) WlStage.LINK else WlStage.WAIT
         val beacon = HotspotBeacon(
             ifaces = { LanIface.scan().let { all -> if (carNetwork != null) all.filter { it.name == carIface } else all } },
             bindNetwork = carNetwork,
@@ -636,7 +743,7 @@ class BridgeService : Service() {
      */
     private fun scheduleCarNet() {
         main.removeCallbacks(carNetTick)
-        if (!CarWifi(this).isSet) return
+        if (!carWifiInMode()) return
         if (wifiDirectCar) {
             logCarSkip()
             return
@@ -659,11 +766,14 @@ class BridgeService : Service() {
         }
     }
 
+    /** Сеть машины задана и выбранный режим её допускает ([WlPolicy.useCarWifi]): в P2P/хотспоте/боксе её не просим. */
+    private fun carWifiInMode(): Boolean = CarWifi(this).isSet && WlPolicy.useCarWifi(WlModePrefs(this).mode)
+
     private fun requestCarNet() {
         val w = CarWifi(this)
         val ssid = w.ssid ?: return
         val ok = CarNetPolicy.shouldRequest(
-            carWifiSet = w.isSet,
+            carWifiSet = carWifiInMode(),
             autoOrManualWaiting = wifiBMode && linkWaiting && !stopRequested,
             sessionActive = session != null,
             usbActive = session?.transportKind == TransportCaps.USB_AOA.kind,
@@ -717,6 +827,7 @@ class BridgeService : Service() {
 
     private fun onCarNetAvailable(@Suppress("UNUSED_PARAMETER") network: Network) {
         markCarSeen()
+        if (wifiBMode && session == null && !stopRequested) CarLifeState.wlStage = WlStage.LINK      // телефон в сети машины
         restartForCarNet()
     }
 
@@ -780,7 +891,7 @@ class BridgeService : Service() {
 
     /** ACL_DISCONNECTED выбранной машины: гасим не сразу (всплески ACL у ГУ), а через [AUTO_OFF_DEBOUNCE_MS]. */
     private fun onCarAutoOff() {
-        if (session == null && host == null && !linkWaiting && !wifiBMode && dongle == null) {
+        if (session == null && host == null && !linkWaiting && !wifiBMode && dongle == null && !boxOn) {
             // сервис поднят с нуля только ради отбоя (процесс убит, ресивер дошёл до пустого сервиса): гасить нечего
             autoMode = false
             finish()
@@ -811,6 +922,7 @@ class BridgeService : Service() {
             wifiBMode = false
             autoStarted = false
             CarLifeState.wireless = null
+            CarLifeState.wlStage = WlStage.OFF
             btProbe.stop("машина ушла")
             stopCarNet(CarNetEvent.AUTO_OFF, "auto-off")
             pendingTcp6?.abort()
@@ -828,12 +940,12 @@ class BridgeService : Service() {
     private fun usbToAir() {
         usbToAirPending = false
         if (session != null || wifiBMode || !autoMode || stopRequested) {
-            if (session == null && host == null && !linkWaiting && !wifiBMode && dongle == null) finish()
+            if (session == null && host == null && !linkWaiting && !wifiBMode && dongle == null && !boxOn) finish()
             return
         }
         if (getSystemService(UsbManager::class.java).accessoryList?.isNotEmpty() == true) {
             WLog.ev(WLog.LINK, "usb-to-air", "skip" to "кабель на месте")
-            if (session == null && host == null && dongle == null) finish()
+            if (session == null && host == null && dongle == null && !boxOn) finish()
             return
         }
         WLog.ev(WLog.LINK, "usb-to-air")
@@ -1038,6 +1150,7 @@ class BridgeService : Service() {
                             stopCarNet(CarNetEvent.AUTO_OFF, "gave-up")      // ожидание закончилось: сеть машины больше не нужна
                             btProbe.stop("не дождались")
                             CarLifeState.wireless = getString(R.string.wl_state_gave_up, (WIFI_B_WAIT_MS / 60_000).toInt())
+                            CarLifeState.wlStage = WlStage.OFF
                         }
                         // отмена ожидания кабелем: статус уже USB-сессии, не перетираем
                         if (session == null) CarLifeState.status = msg ?: "$kind: ошибка"
@@ -1056,6 +1169,7 @@ class BridgeService : Service() {
         cancelBtHint()
         CarLifeState.accessory = transport.label
         CarLifeState.wirelessSession = transport.caps.kind == TransportCaps.TCP6.kind
+        if (CarLifeState.wirelessSession) CarLifeState.wlStage = WlStage.UP      // 6/6: ГУ уже подключилась (бокс - см. onBoxSocket)
         if (transport.caps.kind != TransportCaps.TCP6.kind) WLog.begin(transport.caps.kind)
 
         // режим моста снимается на подключение; DESKTOP на Android ниже 13 трактуется как Android Auto
@@ -1374,7 +1488,7 @@ class BridgeService : Service() {
             DexState.status = getString(R.string.desk_recovering, recovery.attempt.number)
             main.postDelayed({ recoverDesktop(recovery) }, recovery.attempt.delayMs)
         }
-        if (session == null && host == null && !linkWaiting && !wifiBMode && !usbToAirPending && dongle == null) finish()
+        if (session == null && host == null && !linkWaiting && !wifiBMode && !usbToAirPending && dongle == null && !boxOn) finish()
     }
 
     private fun recoverDesktop(recovery: Recovery) {
@@ -1488,7 +1602,7 @@ class BridgeService : Service() {
                     core.dispose()      // режим AA ядро не переиспользует: новый хост = новое ядро
                     if (host === ref[0]) host = null
                     AppLog.i("BRIDGE: AA закрыта полностью")
-                    if (session == null && host == null && !linkWaiting && !wifiBMode && !usbToAirPending && dongle == null) finish()
+                    if (session == null && host == null && !linkWaiting && !wifiBMode && !usbToAirPending && dongle == null && !boxOn) finish()
                 }
             })
             ref[0] = h
@@ -1532,7 +1646,7 @@ class BridgeService : Service() {
 
     /** Старт не удался: если жив AA-хост (идёт grace), сервис не гасим, иначе finish. */
     private fun failStart() {
-        if (linkWaiting || dongle != null) return      // идёт ожидание машины по воздуху или свистка: сервис нужен
+        if (linkWaiting || dongle != null || boxOn) return      // идёт ожидание машины по воздуху, свистка или бокса: сервис нужен
         val h = host
         if (h != null && !h.isDead) return
         if (h == null) finish()
@@ -1556,6 +1670,7 @@ class BridgeService : Service() {
             wifiBMode = false
             autoStarted = false
             CarLifeState.wireless = null
+            CarLifeState.wlStage = WlStage.OFF
             btProbe.stop("машина ушла")
             stopCarNet(CarNetEvent.AUTO_OFF, "auto-off")
             WLog.ev(WLog.TRIGGER, "auto-off", "after" to "session")
@@ -1567,9 +1682,15 @@ class BridgeService : Service() {
             main.postDelayed(usbToAirTick, USB_TO_AIR_MS)
             WLog.ev(WLog.LINK, "usb-to-air-armed", "ms" to USB_TO_AIR_MS)
         }
+        // бокс: коннектор сессии отпускаем (раньше поле жило до finish, и следующий startBox отвечал «уже иду»);
+        // в режиме BOX переподключаемся сами
+        val wasBox = box != null
+        stopBox("сессия закрыта")
+        if (boxWanted && !stopRequested) scheduleBoxRearm(afterSession = true)
+        else if (wasBox) CarLifeState.wlStage = WlStage.OFF
         val h = host
         if (h == null) {
-            if ((!wifiBMode && !usbToAirPending && dongle == null) || stopRequested) finish()
+            if ((!wifiBMode && !usbToAirPending && dongle == null && !boxOn) || stopRequested) finish()
         } else {
             // обрыв USB: CarLife закрыт, AA держим graceMs (или закрываем сразу, если Стоп)
             h.onUsbSessionClosed(immediate = stopRequested)
@@ -1583,6 +1704,7 @@ class BridgeService : Service() {
         if (wifiBMode && !stopRequested) {
             // беспровод: ГУ ушла (обрыв Wi-Fi, выключили машину) - снова маяк и ожидание, AA пока тёплая (grace)
             CarLifeState.wireless = getString(R.string.wl_state_lost)
+            CarLifeState.wlStage = WlStage.WAIT
             WLog.ev(WLog.LINK, "rearm", "after" to reason)
             main.postDelayed({
                 if (wifiBMode && !stopRequested && session == null && !linkWaiting) startWifiB()
@@ -1610,7 +1732,10 @@ class BridgeService : Service() {
 
     private fun finish() {
         stopDongle("finish")
+        boxWanted = false
+        main.removeCallbacks(boxRearmTick)
         stopBox("finish")
+        CarLifeState.wlStage = WlStage.OFF
         if (desktopUsed) cancelDesktopRecovery()
         stopCarNet(CarNetEvent.STOP, "finish")
         CarLifeState.running = false
@@ -1630,6 +1755,9 @@ class BridgeService : Service() {
         cancelAutoOff()
         cancelHint()
         stopCarNet(CarNetEvent.DESTROY, "destroy")
+        boxWanted = false
+        main.removeCallbacks(boxRearmTick)
+        CarLifeState.wlStage = WlStage.OFF
         pendingTcp6?.abort()
         stopDongle("сервис уничтожен")
         stopBox("сервис уничтожен")
@@ -1663,6 +1791,8 @@ class BridgeService : Service() {
         const val ACTION_DONGLE = "com.yegorkapomidorka.headswap.DONGLE"
         /** Режим бокса: телефон идёт к боксу smartBox (BT-рукопожатие AA → Wi-Fi бокса → :6733). Выключается [ACTION_STOP]. */
         const val ACTION_BOX = "com.yegorkapomidorka.headswap.BOX"
+        /** Режим BOX: Bluetooth бокса подключился (ACL_CONNECTED) - подключаться к нему, после обрыва переподключаться. */
+        const val ACTION_BOX_AUTO = "com.yegorkapomidorka.headswap.BOX_AUTO"
         /** Новый сокет свистка ждёт закрытия старой сессии: 15 × 200 мс. */
         private const val DONGLE_REPLACE_TRIES = 15
         private const val DONGLE_REPLACE_STEP_MS = 200L

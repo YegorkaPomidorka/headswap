@@ -11,12 +11,16 @@ import android.net.NetworkRequest
 import android.net.wifi.WifiManager
 import android.net.wifi.WifiNetworkSpecifier
 import android.os.Build
+import com.yegorkapomidorka.headswap.link.car.CarMac
 import com.yegorkapomidorka.headswap.link.diag.WLog
 import java.net.InetSocketAddress
 import java.net.Socket
 import java.util.UUID
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
+
+/** Рукопожатие прошло, адрес бокса есть, а связи с ним нет: ни прямо, ни через вход в его Wi-Fi. Экран: этап NO_LINK. */
+class BoxNoLinkException(message: String, cause: Throwable? = null) : Exception(message, cause)
 
 /**
  * Режим бокса: телефон играет роль беспроводного Android Auto перед боксом smartBox (AK3918).
@@ -31,6 +35,8 @@ import java.util.concurrent.TimeUnit
  */
 class BoxConnector(
     private val ctx: Context,
+    /** MAC бокса из [com.yegorkapomidorka.headswap.link.car.CarProfile] (режим BOX); null - ищем по [btNameMatch]. */
+    private val mac: String? = null,
     /** Фильтр имени сопряжённого BT-устройства бокса. */
     private val btNameMatch: (String?) -> Boolean = { it != null && it.contains("Dongle", true) },
 ) {
@@ -57,12 +63,15 @@ class BoxConnector(
         WLog.ev(WLog.P2P, "box-wifilock", "n" to wifiLocks.size)
     }
 
-    /** Выполнить всё и вернуть подключённый сокет к серверу данных бокса. Бросает при любой неудаче. */
+    /**
+     * Выполнить всё и вернуть подключённый сокет к серверу данных бокса. Бросает при любой неудаче;
+     * [BoxNoLinkException] - рукопожатие прошло с адресом, а ни прямой TCP, ни вход в Wi-Fi бокса не удались.
+     */
     @SuppressLint("MissingPermission")
     fun connect(): Socket {
         val adapter = (ctx.getSystemService(Context.BLUETOOTH_SERVICE) as? android.bluetooth.BluetoothManager)?.adapter
             ?: error("Bluetooth недоступен")
-        val dev = adapter.bondedDevices?.firstOrNull { btNameMatch(it.name) }
+        val dev = adapter.bondedDevices?.firstOrNull { if (mac != null) CarMac.same(it.address, mac) else btNameMatch(it.name) }
             ?: error("бокс не найден среди сопряжённых BT (включи и спарь)")
         holdWifiAwake()
         WLog.ev(WLog.BT, "box-bt", "dev" to WLog.maskMac(dev.address), "name" to dev.name)
@@ -79,22 +88,24 @@ class BoxConnector(
             try { rfcomm.close() } catch (_: Exception) {}   // рукопожатие сделано, RFCOMM больше не нужен
         }
         if (cancelled) error("отменено")
+        // рукопожатие «прошло» с пустыми полями (в логе: ip="" port=0): без адреса идти некуда
+        if (outcome.wifi.ip.isBlank() || outcome.wifi.port <= 0) error("бокс не выдал адрес")
 
-        // 1) Если телефон уже на Wi-Fi бокса (подключён вручную), сокет к 192.168.1.101 идёт по его
-        //    маршруту без всякой привязки. Android 16/Xiaomi режет привязку к local-only сети всеми
-        //    способами, поэтому это основной путь.
+        // 1) Одна прямая попытка: проходит, только когда Wi-Fi бокса у телефона основная сеть (мобильные данные
+        //    выключены). С сотовой сокет уходит в неё, даже если телефон сидит в Wi-Fi бокса (лог 28.11) - не ждём.
+        val direct = Socket()
         try {
-            val direct = Socket()
             direct.tcpNoDelay = true
             direct.connect(InetSocketAddress(outcome.wifi.ip, outcome.wifi.port), DIRECT_MS)
             WLog.ev(WLog.TCP, "box-connected", "ip" to outcome.wifi.ip, "port" to outcome.wifi.port, "via" to "direct")
             return direct
         } catch (e: Exception) {
+            try { direct.close() } catch (_: Exception) {}
             WLog.ev(WLog.TCP, "box-direct-fail", "err" to e.message)
         }
         if (cancelled) error("отменено")
 
-        // 2) Иначе пробуем сами подключиться к Wi-Fi бокса (на Android 16 привязка может не взяться).
+        // 2) Основной путь: сами входим в Wi-Fi бокса запросом сети.
         val net = joinWifi(outcome.creds.ssid, outcome.creds.psk)
         val sock = Socket()
         try {
@@ -105,7 +116,7 @@ class BoxConnector(
             return sock
         } catch (e: Exception) {
             try { sock.close() } catch (_: Exception) {}
-            throw e
+            throw BoxNoLinkException(e.message ?: e.javaClass.simpleName, e)
         }
     }
 
@@ -135,7 +146,7 @@ class BoxConnector(
         val net = if (latch.await(WIFI_JOIN_S, TimeUnit.SECONDS)) result else null
         if (net == null) {
             release()
-            error("Wi-Fi бокса '$ssid' не подключился за ${WIFI_JOIN_S}с")
+            throw BoxNoLinkException("Wi-Fi бокса '$ssid' не подключился за ${WIFI_JOIN_S}с")
         }
         WLog.ev(WLog.P2P, "box-wifi", "ssid" to ssid)
         return net
@@ -156,7 +167,7 @@ class BoxConnector(
 
     companion object {
         private const val CONNECT_MS = 4000
-        private const val DIRECT_MS = 3000   // проверка «телефон уже на Wi-Fi бокса»
+        private const val DIRECT_MS = 1500   // проверка «Wi-Fi бокса уже основная сеть»: в своей подсети ответ мгновенный
         private const val WIFI_JOIN_S = 25L
     }
 }

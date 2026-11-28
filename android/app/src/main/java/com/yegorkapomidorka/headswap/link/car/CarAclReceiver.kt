@@ -12,7 +12,8 @@ import com.yegorkapomidorka.headswap.BuildConfig
 import com.yegorkapomidorka.headswap.link.diag.WLog
 
 /**
- * Триггер автостарта: ACL_CONNECTED/DISCONNECTED выбранной машины ([CarProfile]) запускают и гасят ожидание по Wi-Fi.
+ * Триггер автостарта: ACL_CONNECTED/DISCONNECTED выбранной машины ([CarProfile]) запускают и гасят ожидание по Wi-Fi,
+ * в режиме [WlMode.BOX] ACL_CONNECTED запускает подключение к боксу (если не заглушено «Стопом»), ACL_DISCONNECTED ничего не делает.
  * В манифесте выключен (enabled=false), включается [CarProfile.enableTrigger], когда машина выбрана. Чужие устройства игнорируются.
  * На Android 12+ без BLUETOOTH_CONNECT система эти рассылки не доставляет.
  */
@@ -28,20 +29,36 @@ class CarAclReceiver : BroadcastReceiver() {
             if (ignoreLog.tryAcquire()) WLog.ev(WLog.TRIGGER, "ignore", "action" to action.substringAfterLast('.'))
             return
         }
+        // режим BOX: запомненное устройство - бокс, ACL поднимает его подключение, а не ожидание машины; отбоя по ACL нет
+        val prefs = WlModePrefs(context)
+        val cmd = WlPolicy.aclCmd(prefs.mode, action == BluetoothDevice.ACTION_ACL_CONNECTED)
+        val now = System.currentTimeMillis()
+        val prevSeen = prefs.boxSeenMs
+        if (prefs.mode == WlMode.BOX) prefs.boxSeenMs = now
         if (action == BluetoothDevice.ACTION_ACL_CONNECTED) {
-            WLog.ev(WLog.TRIGGER, "acl-connected", "dev" to WLog.maskMac(addr))
+            WLog.ev(WLog.TRIGGER, "acl-connected", "dev" to WLog.maskMac(addr), "cmd" to cmd?.name)
+            if (cmd == AclCmd.BOX_AUTO) {
+                if (!WlPolicy.boxAutoStart(prefs.boxMuted, prevSeen, now)) {
+                    WLog.ev(WLog.TRIGGER, "box-muted", "gapMs" to now - prevSeen)
+                    return
+                }
+                prefs.boxMuted = false
+            }
+            val svc = if (cmd == AclCmd.BOX_AUTO) BridgeService.ACTION_BOX_AUTO else BridgeService.ACTION_WIFI_B_AUTO
             try {
-                context.startForegroundService(Intent(context, BridgeService::class.java).setAction(BridgeService.ACTION_WIFI_B_AUTO))
+                context.startForegroundService(Intent(context, BridgeService::class.java).setAction(svc))
             } catch (e: Exception) {      // ForegroundServiceStartNotAllowedException и пр.: из фона без исключений запуск запрещён
                 AppLog.e("ACL: старт сервиса", e)
                 WLog.ev(WLog.TRIGGER, "fgs-fail", "err" to e.javaClass.simpleName)
             }
         } else {
-            WLog.ev(WLog.TRIGGER, "acl-disconnected", "dev" to WLog.maskMac(addr))
+            WLog.ev(WLog.TRIGGER, "acl-disconnected", "dev" to WLog.maskMac(addr), "cmd" to cmd?.name)
+            if (cmd == null) return      // бокс: отбоя по ACL нет
             // сервиса нет - гасить нечего; startService на пустой сервис из фона не нужен
             if (!BridgeService.alive) return
+            val svc = BridgeService.ACTION_WIFI_B_AUTO_OFF
             try {
-                context.startService(Intent(context, BridgeService::class.java).setAction(BridgeService.ACTION_WIFI_B_AUTO_OFF))
+                context.startService(Intent(context, BridgeService::class.java).setAction(svc))
             } catch (e: Exception) {
                 AppLog.e("ACL: отбой сервису", e)
                 WLog.ev(WLog.TRIGGER, "fgs-fail", "err" to e.javaClass.simpleName, "action" to "off")

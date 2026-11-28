@@ -149,6 +149,58 @@ object CarNetPolicy {
     }
 }
 
+/** Способ беспроводного подключения, выбранный человеком ([WlModePrefs]). NONE - ещё не выбирал: всё как раньше. */
+enum class WlMode { NONE, P2P, CAR_WIFI, HOTSPOT, BOX }
+
+/**
+ * Этап беспровода для экрана (CarLifeState.wlStage). OFF - не запущен; WAIT - ждём первый шаг; LINK - промежуточное звено
+ * есть (TCP к боксу, группа Wi-Fi Direct, сеть машины); UP - идёт CarLife-сессия; NO_LINK - звено не получилось.
+ */
+enum class WlStage { OFF, WAIT, LINK, UP, NO_LINK }
+
+/** Что ресивер ACL шлёт сервису. */
+enum class AclCmd { CAR_AUTO, CAR_AUTO_OFF, BOX_AUTO }
+
+/** Пауза перед переподключением бокса: после конца сессии, после первых [BOX_FAST_FAILS] неудач подряд и после следующих. */
+const val BOX_REARM_AFTER_SESSION_MS = 2_000L
+const val BOX_REARM_AFTER_FAIL_MS = 4_000L
+const val BOX_REARM_SLOW_MS = 10_000L
+const val BOX_FAST_FAILS = 3
+/** Столько неудач подряд - и перевзвод прекращается до следующего ACL_CONNECTED бокса или ручного старта. */
+const val BOX_MAX_FAILS = 8
+/** «Стоп» глушит автостарт, пока ACL-события бокса идут чаще: с прошлого события прошло меньше этого. */
+const val BOX_MUTE_GAP_MS = 180_000L
+
+/** Чистая логика режимов беспровода, без android.*: проверяется JVM-тестами. */
+object WlPolicy {
+    /** Запомненное устройство - бокс в режиме BOX и машина в остальных: при переходе через BOX его надо забыть. */
+    fun forgetOnSwitch(old: WlMode, new: WlMode): Boolean = (old == WlMode.BOX) != (new == WlMode.BOX)
+
+    /** null - ничего не делать: бокс сам рвёт Bluetooth, как только поднялся его Wi-Fi, отбоя по ACL у него нет. */
+    fun aclCmd(mode: WlMode, connected: Boolean): AclCmd? = when {
+        mode == WlMode.BOX -> if (connected) AclCmd.BOX_AUTO else null
+        else -> if (connected) AclCmd.CAR_AUTO else AclCmd.CAR_AUTO_OFF
+    }
+
+    /** Стартовать ли бокс по ACL_CONNECTED: не после «Стопа», пока с прошлого ACL-события бокса прошло меньше [BOX_MUTE_GAP_MS]. */
+    fun boxAutoStart(muted: Boolean, prevSeenMs: Long, nowMs: Long): Boolean = !muted || nowMs - prevSeenMs >= BOX_MUTE_GAP_MS
+
+    /** Сохранённую сеть машины ([CarWifi]) просим только в режимах «Wi-Fi машины» и «не выбран». */
+    fun useCarWifi(mode: WlMode): Boolean = mode == WlMode.NONE || mode == WlMode.CAR_WIFI
+
+    /**
+     * Через сколько переподключать бокс; null - не переподключать. Только режим BOX, бокс включён и не остановлен
+     * человеком ([wanted]); Bluetooth не смотрим. [fails] - неудачи подряд, включая только что случившуюся.
+     */
+    fun boxRearmMs(mode: WlMode, wanted: Boolean, afterSession: Boolean, fails: Int): Long? = when {
+        mode != WlMode.BOX || !wanted -> null
+        afterSession -> BOX_REARM_AFTER_SESSION_MS
+        fails >= BOX_MAX_FAILS -> null
+        fails <= BOX_FAST_FAILS -> BOX_REARM_AFTER_FAIL_MS
+        else -> BOX_REARM_SLOW_MS
+    }
+}
+
 /** Чистая логика подсказки «переподключи Bluetooth»: без android.*, проверяется JVM-тестами. */
 object BtReconnectHint {
     /**

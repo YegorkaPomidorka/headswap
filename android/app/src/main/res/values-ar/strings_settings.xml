@@ -205,27 +205,16 @@
 
     <!-- Wireless (branch B) -->
     <string name="wl_title">لاسلكي</string>
-    <string name="wl_note">للسيارات التي تدعم CarLife اللاسلكي. شغّل نقطة الاتصال على الهاتف، وصِل شاشة السيارة بها (في قائمة شاشة السيارة: Wi-Fi)، وافتح CarLife على شاشة السيارة ثم اضغط الزر أدناه. لا حاجة إلى كابل؛ وإذا وصلت كابلًا فسيُعتمد USB.</string>
     <string name="wl_start">انتظار السيارة عبر Wi-Fi</string>
-    <string name="wl_status_line">الحالة: %1$s</string>
     <string name="wl_off">متوقف</string>
     <string name="wl_no_permission">بدون إذن «الأجهزة القريبة» لن تتمكن السيارة من الاتصال عبر Wi-Fi</string>
-    <string name="wl_report">إرسال تقرير الاتصال اللاسلكي</string>
     <string name="wl_car_line">السيارة: %1$s</string>
-    <string name="wl_car_none">غير محددة</string>
-    <string name="wl_car_note">عندما يتصل الهاتف بهذه السيارة عبر Bluetooth، يبدأ Headswap تلقائيًا بانتظارها عبر Wi-Fi</string>
     <string name="wl_car_pick">اختيار السيارة</string>
-    <string name="wl_car_forget">نسيان السيارة</string>
     <string name="wl_car_no_permission">بدون إذن «الأجهزة القريبة» لا تصل أحداث Bluetooth من السيارة</string>
     <string name="wl_car_unavailable">لا يستطيع هذا الهاتف إقران سيارة (لا يدعم companion device setup)</string>
-    <string name="wl_cw_note">إذا بقي الهاتف على شبكة Wi-Fi أخرى (مثلًا في المنزل)، يستطيع Headswap الانضمام إلى نقطة اتصال السيارة تلقائيًا: يبقى الإنترنت على شبكتك الرئيسية. أدخل الاسم وكلمة المرور اللذين تعرضهما شاشة السيارة.</string>
-    <string name="wl_cw_line">Wi-Fi السيارة: %1$s</string>
-    <string name="wl_cw_none">غير مضبوط</string>
-    <string name="wl_cw_set">مضبوط: %1$s</string>
     <string name="wl_cw_ssid_hint">اسم الشبكة (SSID)</string>
     <string name="wl_cw_pass_hint">كلمة المرور (فارغة: شبكة مفتوحة)</string>
     <string name="wl_cw_save">حفظ وفحص</string>
-    <string name="wl_cw_forget">حذف</string>
     <string name="wl_cw_need_ssid">أدخل اسم الشبكة</string>
     <string name="wl_cw_checking">جارٍ الاتصال بـ Wi-Fi السيارة… أكّد طلب النظام</string>
     <string name="wl_cw_ok">تم الاتصال بـ Wi-Fi السيارة</string>
