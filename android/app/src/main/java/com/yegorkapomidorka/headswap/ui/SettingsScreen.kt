@@ -413,7 +413,10 @@ class SettingsSectionScreen(host: MainActivity, val section: SettingsSection) : 
     private val langRows = LinkedHashMap<String, RadioRow>()
     private val themeRows = LinkedHashMap<String, RadioRow>()
     private val micRows = HashMap<MicMode, RadioRow>()
-    private val rateRows = LinkedHashMap<MusicRate, RadioRow>()
+    private var musicField: LinearLayout? = null
+    private var musicValue: TextView? = null
+    private var musicChevron: ImageView? = null
+    private var musicPopup: PopupWindow? = null
     private val navChannelRows = LinkedHashMap<NavChannel, RadioRow>()
     private var makeValue: TextView? = null
     private var modeSeg: Segmented? = null
@@ -516,6 +519,7 @@ class SettingsSectionScreen(host: MainActivity, val section: SettingsSection) : 
 
     override fun onHide() {
         resPopup?.dismiss()
+        musicPopup?.dismiss()
     }
 
     override fun tick() {
@@ -1465,10 +1469,12 @@ class SettingsSectionScreen(host: MainActivity, val section: SettingsSection) : 
     }
 
     /** Открытый список: рамка pri и шеврон вверх. */
-    private fun setResFieldOpen(open: Boolean) {
+    private fun setResFieldOpen(open: Boolean) = setFieldOpen(resField, resChevron, open)
+
+    private fun setFieldOpen(field: View?, chevron: View?, open: Boolean) {
         val c = ctx
-        resField?.background = c.rippleBg(c.shape(c.clr(R.color.surf), 20, if (open) c.clr(R.color.pri) else 0, 1.5f), 20)
-        resChevron?.rotation = c.chevronRotation(open)
+        field?.background = c.rippleBg(c.shape(c.clr(R.color.surf), 20, if (open) c.clr(R.color.pri) else 0, 1.5f), 20)
+        chevron?.rotation = c.chevronRotation(open)
     }
 
     /** Выпадающий список разрешений под полем, шириной поля; не влезает по высоте - прокрутка. */
@@ -1690,15 +1696,6 @@ class SettingsSectionScreen(host: MainActivity, val section: SettingsSection) : 
         refreshUsbAudio()
         body.addView(eqEntry(), lp(MATCH, WRAP).margins(c, 0, 6, 0, 0))
 
-        body.addView(c.sectionTitle(c.getString(R.string.set_music_rate)))
-        for (r in MusicRate.values()) {
-            val row = RadioRow(c, c.getString(r.titleRes), "") { setMusicRate(r) }
-            rateRows[r] = row
-            body.addView(row.view, lp(MATCH, WRAP))
-        }
-        note(c.getString(R.string.set_music_rate_note))
-        refreshMusicRate()
-
         body.addView(c.sectionTitle(c.getString(R.string.set_nav_prompts)))
         for (m in NavChannel.values()) {
             val row = RadioRow(c, c.getString(m.titleRes), c.getString(m.subRes)) { setNavChannel(m) }
@@ -1706,6 +1703,11 @@ class SettingsSectionScreen(host: MainActivity, val section: SettingsSection) : 
             body.addView(row.view, lp(MATCH, WRAP))
         }
         refreshNavChannel()
+
+        body.addView(c.sectionTitle(c.getString(R.string.set_music_rate)))
+        body.addView(musicRateField(), lp(MATCH, WRAP))
+        note(c.getString(R.string.set_music_rate_note))
+        refreshMusicRate()
 
         body.addView(c.sectionTitle(c.getString(R.string.set_mic)))
         for ((m, titleRes, subRes) in MICS) {
@@ -1789,7 +1791,69 @@ class SettingsSectionScreen(host: MainActivity, val section: SettingsSection) : 
     }
 
     private fun refreshMusicRate() {
-        for ((r, row) in rateRows) row.setSelected(aa.musicRate == r)
+        musicValue?.text = ctx.getString(aa.musicRate.titleRes)
+    }
+
+    /** Поле «Частота музыки»: текущее значение, по нажатию - выпадающий список под полем (как у разрешения видео). */
+    private fun musicRateField(): View {
+        val c = ctx
+        val value = c.text("", 17f, 500)
+        val chevron = c.icon(R.drawable.ic_chevron, 20, c.clr(R.color.on2))
+        musicValue = value
+        musicChevron = chevron
+        val field = c.hbox(12).apply {
+            minimumHeight = c.dp(60)
+            pad(c, 16, 12, 14, 12)
+            isClickable = true
+            isFocusable = true
+            contentDescription = c.getString(R.string.set_music_rate)
+            addView(value, lp(0, WRAP, 1f))
+            addView(chevron)
+            setOnClickListener { showMusicRatePopup() }
+        }
+        musicField = field
+        setFieldOpen(field, chevron, false)
+        return field
+    }
+
+    private fun showMusicRatePopup() {
+        val anchor = musicField ?: return
+        if (musicPopup != null) return
+        val c = ctx
+        val list = c.vbox().apply { pad(c, 6, 6, 6, 6) }
+        for (r in MusicRate.values()) {
+            val selected = r == aa.musicRate
+            val fg = c.clr(if (selected) R.color.onpric else R.color.on)
+            list.addView(c.hbox(12).apply {
+                minimumHeight = c.dp(56)
+                pad(c, 10, 8, 10, 8)
+                background = c.rippleBg(if (selected) c.shape(c.clr(R.color.pric), 12) else null, 12)
+                isClickable = true
+                addView(c.text(c.getString(r.titleRes), 16f, 600, fg), lp(0, WRAP, 1f))
+                if (selected) addView(c.icon(R.drawable.ic_check, 20, fg))
+                setOnClickListener {
+                    musicPopup?.dismiss()
+                    setMusicRate(r)
+                }
+            }, lp(MATCH, WRAP))
+        }
+        val content = c.vbox().apply {
+            background = c.shape(c.clr(R.color.surf2), 16)
+            clipToOutline = true
+            addView(list)
+        }
+        val pw = PopupWindow(content, anchor.width, WRAP, true).apply {
+            setBackgroundDrawable(c.shape(c.clr(R.color.surf2), 16))
+            elevation = c.dp(8).toFloat()
+            isOutsideTouchable = true
+            setOnDismissListener {
+                musicPopup = null
+                setFieldOpen(musicField, musicChevron, false)
+            }
+        }
+        musicPopup = pw
+        setFieldOpen(anchor, musicChevron, true)
+        pw.showAsDropDown(anchor, 0, c.dp(6))
     }
 
     private fun setNavChannel(m: NavChannel) {
