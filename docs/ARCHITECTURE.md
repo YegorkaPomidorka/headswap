@@ -138,7 +138,7 @@ CONTROL0, SENSOR1, VIDEO2, INPUT3, SPEECH4, SYSTEM5, MEDIA6, MIC7, BT8, MEDIA_PL
 | `huPioneerRm56` | Pioneer RM56E8B | перекодирование, 800 кбит/с, ≤10 fps, музыка 22 кГц |
 | `huMazda20622111` | ch 20622111 | VIDEO_DATA ≤ 15000 Б, 1,5 Мбит/с, обложка ≤ 12 КБ (ADR 0009) |
 | `huSemidriveX9` | Honda CR-V 6 SEMIDRIVE X9, ch 21580005 | MEDIA_INFO повторяется через 0,7 с, обложка ≤ 16 КБ (ADR 0067) |
-| `huHonda20772122` | Honda XR-V 2022, ch 20772122 | потолок 6 Мбит/с, срез по IDR > 450 КБ (ADR 0056) |
+| `huHonda20772122` | Honda XR-V 2022, ch 20772122 | потолок 6 Мбит/с, срез потолка по IDR > 450 КБ (ADR 0056); IDR > 580 КБ в ГУ не шлём (`IdrSizeGuard`), QP I-кадра ≥ 30, пол 1,5 Мбит/с, выученный потолок до конца процесса (ADR 0069) |
 | `huBonAuto20362105` | Bon-Auto (Outlander), ch 20362105 | как Mazda: VIDEO_DATA ≤ 15000 Б, обложка ≤ 12 КБ; потолок 1 Мбит/с (ADR 0047) |
 | `huMobisNx4c` | board/model CCNC, ch 20022188 | «режим Baidu»: AOA одним write, 20 fps, свой потолок IDR |
 
