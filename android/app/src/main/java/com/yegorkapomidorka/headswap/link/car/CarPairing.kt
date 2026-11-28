@@ -59,7 +59,10 @@ object CarPairing {
             return
         }
         android.app.AlertDialog.Builder(activity)
-            .setTitle(com.yegorkapomidorka.headswap.R.string.wl_car_pick)
+            .setTitle(
+                if (WlModePrefs(activity).mode == WlMode.BOX) com.yegorkapomidorka.headswap.R.string.wl_box_pick
+                else com.yegorkapomidorka.headswap.R.string.wl_car_pick
+            )
             .setItems(bonded.map { it.first }.toTypedArray()) { _, i -> associate(activity, bonded[i].second, bonded[i].first) }
             .setNegativeButton(android.R.string.cancel, null)
             .show()

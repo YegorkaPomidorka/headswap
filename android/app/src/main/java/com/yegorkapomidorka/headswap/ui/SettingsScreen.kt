@@ -8,9 +8,11 @@ import android.content.pm.PackageManager
 import android.content.res.ColorStateList
 import android.graphics.Rect
 import android.graphics.drawable.Drawable
+import android.graphics.drawable.GradientDrawable
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
+import android.os.SystemClock
 import android.text.InputType
 import android.text.TextUtils
 import android.util.TypedValue
@@ -58,11 +60,25 @@ import com.yegorkapomidorka.headswap.dex.DesktopAudioAccess
 import com.yegorkapomidorka.headswap.dex.DesktopPick
 import com.yegorkapomidorka.headswap.dex.DexPrefs
 import com.yegorkapomidorka.headswap.dex.VideoRangeMode
+import com.yegorkapomidorka.headswap.diag.DiagActions
+import com.yegorkapomidorka.headswap.link.bt.CarBtState
 import com.yegorkapomidorka.headswap.link.car.CarNetwork
 import com.yegorkapomidorka.headswap.link.car.CarPairing
 import com.yegorkapomidorka.headswap.link.car.CarProfile
 import com.yegorkapomidorka.headswap.link.car.CarWifi
+import com.yegorkapomidorka.headswap.link.car.WlDot
+import com.yegorkapomidorka.headswap.link.car.WlKind
+import com.yegorkapomidorka.headswap.link.car.WlMain
+import com.yegorkapomidorka.headswap.link.car.WlMode
+import com.yegorkapomidorka.headswap.link.car.WlModePrefs
+import com.yegorkapomidorka.headswap.link.car.WlScreen
+import com.yegorkapomidorka.headswap.link.car.WlScreenLogic
+import com.yegorkapomidorka.headswap.link.car.WlStage
+import com.yegorkapomidorka.headswap.link.car.WlStep
+import com.yegorkapomidorka.headswap.link.car.WlStepState
+import com.yegorkapomidorka.headswap.link.car.WlTitle
 import com.yegorkapomidorka.headswap.link.diag.NetProbe
+import com.yegorkapomidorka.headswap.link.wifi.HotspotDetect
 import com.yegorkapomidorka.headswap.update.UpdatePrefs
 import com.yegorkapomidorka.headswap.update.Updater
 import java.text.NumberFormat
@@ -296,7 +312,12 @@ class SettingsScreen(host: MainActivity) : Screen(host) {
 
         if (BuildConfig.WIRELESS_BETA) {
             val car = CarProfile(c)
-            val carText = if (car.isSet) c.getString(R.string.wl_car_line, car.btName ?: car.btMac ?: "") else null
+            val dev = car.btName ?: car.btMac ?: ""
+            val carText = when {
+                !car.isSet -> null
+                WlModePrefs(c).mode == WlMode.BOX -> dev      // запомненное устройство - бокс, «Машина:» тут неправда
+                else -> c.getString(R.string.wl_car_line, dev)
+            }
             set(SettingsSection.WIRELESS, listOfNotNull(CarLifeState.wireless ?: c.getString(R.string.wl_off), carText).joinToString(" · "))
         }
     }
@@ -431,23 +452,33 @@ class SettingsSectionScreen(host: MainActivity, val section: SettingsSection) : 
     private var appsHost: LinearLayout? = null
     private var updStatus: TextView? = null
     private var updButton: TextView? = null
-    private var wlStatus: TextView? = null
-    private var wlNoPermission: TextView? = null
+    /** Корень раздела «По воздуху» (только у SettingsSection.WIRELESS) и то, что в нём нарисовано сейчас. */
+    private var wlRoot: LinearLayout? = null
+    private var wlShown: WlView? = null
+    /** «Сменить» нажато: показываем выбор способа, режим меняется только нажатием на карточку. */
+    private var wlChoosing = false
+    private var wlNoPermission = false
     private var wlAwaitingPermission = false
-    /** Запрос разрешений был от кнопки свистка, а не «Ждать машину по Wi-Fi». */
-    private var wlAwaitingDongle = false
-    private var wlDongleBtn: LinearLayout? = null
-    private var wlCarLine: TextView? = null
-    private var wlCarWarn: TextView? = null
-    private var wlCarForget: View? = null
+    /** Запрос разрешений был от старта бокса (BLUETOOTH_CONNECT + Wi-Fi). */
+    private var wlAwaitingBox = false
     private var wlAwaitingCarPermission = false
+    /** Нажато «Выбрать бокс»: когда бокс появится в CarProfile, стартуем его сами. */
+    private var wlPickingBox = false
+    private var wlBtNear = false
+    private var wlBtBusy = false
+    private var wlBtAt = 0L
+    private var wlHotspotUp = false
+    private var wlHotspotAt = 0L
     private var callsRow: ToggleRow? = null
     private var callsAwaitingPermission = false
-    private var wlCwLine: TextView? = null
     private var wlCwSsid: EditText? = null
     private var wlCwPass: EditText? = null
+    /** Введённое в поля, пока экран перестраивается (смена этапа не должна стирать набранное). */
+    private var wlCwDraftSsid: String? = null
+    private var wlCwDraftPass: String? = null
     private var wlCwResult: TextView? = null
-    private var wlCwForget: View? = null
+    private var wlCwResultText = ""
+    private var wlCwResultColor = R.color.on2
     /** Запрос сети машины из «Сохранить и проверить»; null - проверки нет. */
     private var wlCwCheck: CarNetwork? = null
     private val cwHandler = Handler(Looper.getMainLooper())
@@ -499,95 +530,417 @@ class SettingsSectionScreen(host: MainActivity, val section: SettingsSection) : 
         if (wlAwaitingPermission) {
             wlAwaitingPermission = false
             val lan = Build.VERSION.SDK_INT < 37 || NetProbe.localNetworkGranted(ctx) == "granted"
-            val dongle = wlAwaitingDongle
-            wlAwaitingDongle = false
-            if (!lan) wlNoPermission?.visibility = View.VISIBLE
-            else if (dongle) startDongle()
+            if (!lan) wlNoPermission = true
             else startWireless()
         }
         if (wlAwaitingCarPermission) {
             wlAwaitingCarPermission = false
             CarPairing.start(host)      // без разрешения выбор всё равно возможен, refreshWireless предупредит
         }
+        if (wlAwaitingBox) {
+            wlAwaitingBox = false
+            startBoxService()           // при частичном отказе всё равно пробуем — упадёт с понятным логом
+        }
         refreshWireless()
     }
 
     override fun onActivityResultDone() = refreshWireless()
 
-    /** Беспровод (бета): пояснение, старт, выбор машины для автостарта по Bluetooth, отчёт. */
+    /** Раздел «По воздуху»: перестраивается, только когда меняется то, что на нём нарисовано ([WlView]), иначе поля ввода теряют фокус. */
     private fun wirelessCard(): View {
-        val c = ctx
-        val card = c.vbox(8).apply {
-            background = c.shape(c.clr(R.color.surf), 20)
-            pad(c, 16, 12, 16, 12)
-        }
-        card.addView(c.text(c.getString(R.string.wl_note), 14f, 400, c.clr(R.color.on2)), lp(MATCH, WRAP))
-        wlStatus = c.text("", 15f, 500).also { card.addView(it, lp(MATCH, WRAP)) }
-        wlNoPermission = c.text(c.getString(R.string.wl_no_permission), 13f, 400, c.clr(R.color.warn)).apply { visibility = View.GONE }
-            .also { card.addView(it, lp(MATCH, WRAP)) }
-        // высота кнопок задаётся явно (как на других экранах): pill с WRAP сжимается до высоты текста
-        card.addView(c.primaryButton(c.getString(R.string.wl_start), heightDp = 60, sp = 17f).apply { setOnClickListener { onWirelessStart() } },
-            lp(MATCH, c.dp(60)).apply { topMargin = c.dp(4) })
-        // свисток: стик в USB машины гонит поток аксессуара по Wi-Fi на :7250, телефон раздаёт точку доступа
-        wlDongleBtn = c.outlineButton(c.getString(R.string.dongle_start), heightDp = 56, sp = 16f).apply { setOnClickListener { onDongleToggle() } }
-            .also { card.addView(it, lp(MATCH, c.dp(56))) }
-        card.addView(c.text(c.getString(R.string.dongle_note), 13f, 400, c.clr(R.color.on2)), lp(MATCH, WRAP))
-        // выбор машины: дальше при её Bluetooth-подключении ожидание по Wi-Fi стартует само
-        wlCarLine = c.text("", 15f, 500).also { card.addView(it, lp(MATCH, WRAP).apply { topMargin = c.dp(8) }) }
-        card.addView(c.text(c.getString(R.string.wl_car_note), 13f, 400, c.clr(R.color.on2)), lp(MATCH, WRAP))
-        wlCarWarn = c.text("", 13f, 400, c.clr(R.color.warn)).apply { visibility = View.GONE }.also { card.addView(it, lp(MATCH, WRAP)) }
-        card.addView(c.outlineButton(c.getString(R.string.wl_car_pick), heightDp = 56, sp = 16f).apply { setOnClickListener { onCarPick() } },
-            lp(MATCH, c.dp(56)))
-        wlCarForget = c.outlineButton(c.getString(R.string.wl_car_forget), heightDp = 56, sp = 16f).apply {
-            setOnClickListener { CarPairing.forget(c); refreshWireless() }
-        }.also { card.addView(it, lp(MATCH, c.dp(56))) }
-        // Wi-Fi машины: телефон входит в её точку доступа сам (WifiNetworkSpecifier), интернет остаётся на основной сети
-        val cw = CarWifi(c)
-        wlCwLine = c.text("", 15f, 500).also { card.addView(it, lp(MATCH, WRAP).apply { topMargin = c.dp(8) }) }
-        card.addView(c.text(c.getString(R.string.wl_cw_note), 13f, 400, c.clr(R.color.on2)), lp(MATCH, WRAP))
-        wlCwSsid = wifiField(c.getString(R.string.wl_cw_ssid_hint), password = false).apply { setText(cw.ssid.orEmpty()) }
-            .also { card.addView(it, lp(MATCH, c.dp(52))) }
-        wlCwPass = wifiField(c.getString(R.string.wl_cw_pass_hint), password = true).apply { setText(cw.pass) }
-            .also { card.addView(it, lp(MATCH, c.dp(52))) }
-        wlCwResult = c.text("", 13f, 400, c.clr(R.color.on2)).apply { visibility = View.GONE }.also { card.addView(it, lp(MATCH, WRAP)) }
-        card.addView(c.outlineButton(c.getString(R.string.wl_cw_save), heightDp = 56, sp = 16f).apply { setOnClickListener { onCarWifiSave() } },
-            lp(MATCH, c.dp(56)))
-        wlCwForget = c.outlineButton(c.getString(R.string.wl_cw_forget), heightDp = 56, sp = 16f).apply {
-            setOnClickListener { onCarWifiForget() }
-        }.also { card.addView(it, lp(MATCH, c.dp(56))) }
-        card.addView(c.linkButton(c.getString(R.string.wl_report), heightDp = 52, sp = 16f).apply { setOnClickListener { LogShare.shareReport(c) } },
-            lp(MATCH, c.dp(52)))
+        val root = ctx.vbox(6)
+        wlRoot = root
         refreshWireless()
-        return card
+        return root
     }
 
+    /** Нарисованное: модель экрана и тексты, которых в ней нет. Равные значения - перерисовка не нужна. */
+    private data class WlView(
+        val s: WlScreen,
+        /** Имя машины, сети (SSID) или бокса для строки «запомнено». */
+        val name: String,
+        val wireless: String?,
+        val warn: String,
+        val noPermission: Boolean,
+        val result: Boolean,
+    )
+
     private fun refreshWireless() {
-        val st = wlStatus ?: return
+        val root = wlRoot ?: return
         val c = ctx
-        val text = c.getString(R.string.wl_status_line, CarLifeState.wireless ?: c.getString(R.string.wl_off))
-        if (st.text.toString() != text) st.text = text
+        val mode = WlModePrefs(c).mode
+        val stage = CarLifeState.wlStage
         val car = CarProfile(c)
-        val carText = c.getString(R.string.wl_car_line, if (car.isSet) car.btName ?: car.btMac ?: "" else c.getString(R.string.wl_car_none))
-        wlCarLine?.let { if (it.text.toString() != carText) it.text = carText }
-        wlCarForget?.visibility = if (car.isSet) View.VISIBLE else View.GONE
-        (wlDongleBtn?.getChildAt(0) as? TextView)?.let {
-            val label = c.getString(if (CarLifeState.dongle) R.string.dongle_stop else R.string.dongle_start)
-            if (it.text.toString() != label) it.text = label
+        val cw = CarWifi(c)
+        if (wlPickingBox && mode == WlMode.BOX && car.isSet) {
+            wlPickingBox = false
+            onBoxStart()
         }
-        // без BLUETOOTH_CONNECT (31+) система не доставляет ACL выбранной машины: триггер молчит
+        val now = SystemClock.elapsedRealtime()
+        if (WlScreenLogic.needsBt(mode, car.isSet, stage)) {
+            if (!wlBtBusy && now - wlBtAt >= WL_POLL_MS) {
+                wlBtBusy = true
+                wlBtAt = now
+                CarBtState.check(c, car.btMac) { near ->
+                    wlBtBusy = false
+                    wlBtNear = near
+                    refreshWireless()
+                }
+            }
+        } else {
+            wlBtNear = false
+        }
+        if (mode == WlMode.HOTSPOT && stage != WlStage.OFF) {
+            if (now - wlHotspotAt >= WL_POLL_MS) {
+                wlHotspotAt = now
+                wlHotspotUp = HotspotDetect.isUp(c)
+            }
+        }
+        val s = WlScreenLogic.screen(mode, wlChoosing, stage, car.isSet, cw.isSet, wlBtNear, wlHotspotUp)
         val warn = when {
+            (mode != WlMode.P2P && mode != WlMode.BOX) || s.kind == WlKind.CHOOSE || s.kind == WlKind.STATE -> ""
             !CarPairing.available(c) -> c.getString(R.string.wl_car_unavailable)
+            // без BLUETOOTH_CONNECT (31+) система не доставляет ACL выбранной машины: триггер молчит
             car.isSet && !carBtGranted() -> c.getString(R.string.wl_car_no_permission)
             else -> ""
         }
-        wlCarWarn?.let {
-            if (it.text.toString() != warn) it.text = warn
-            it.visibility = if (warn.isEmpty()) View.GONE else View.VISIBLE
+        val name = when (mode) {
+            WlMode.CAR_WIFI -> cw.ssid.orEmpty()      // SSID на экране показываем, в логи и отчёт он не уходит
+            else -> if (car.isSet) car.btName ?: car.btMac.orEmpty() else ""
         }
-        val cw = CarWifi(c)      // SSID на экране показываем, в логи и отчёт он не уходит
-        val cwText = c.getString(R.string.wl_cw_line, if (cw.isSet) c.getString(R.string.wl_cw_set, cw.ssid) else c.getString(R.string.wl_cw_none))
-        wlCwLine?.let { if (it.text.toString() != cwText) it.text = cwText }
-        wlCwForget?.visibility = if (cw.isSet) View.VISIBLE else View.GONE
+        val v = WlView(
+            s, name, if (s.kind == WlKind.STATE) CarLifeState.wireless else null, warn, wlNoPermission,
+            wlCwResultText.isNotEmpty() && s.kind != WlKind.SETUP,
+        )
+        if (v == wlShown) return
+        wlShown = v
+        rebuildWireless(root, v)
+    }
+
+    private fun rebuildWireless(root: LinearLayout, v: WlView) {
+        val c = ctx
+        wlCwSsid?.let { wlCwDraftSsid = it.text.toString() }
+        wlCwPass?.let { wlCwDraftPass = it.text.toString() }
+        wlCwSsid = null
+        wlCwPass = null
+        wlCwResult = null
+        root.removeAllViews()
+        val s = v.s
+        if (s.kind == WlKind.CHOOSE) {
+            buildChoose(root, s.mode)
+            return
+        }
+        root.addView(modeRow(s.mode), lp(MATCH, WRAP).margins(c, 0, 8, 0, 0))
+        if (s.kind == WlKind.SETUP) root.addView(setupCard(s.mode), lp(MATCH, WRAP))
+        if (s.deviceRow) root.addView(deviceRow(s.mode, v.name), lp(MATCH, WRAP))
+        if (s.mode == WlMode.CAR_WIFI && (s.kind == WlKind.SETUP || v.result)) {
+            root.addView(c.text(wlCwResultText, 13f, 400, c.clr(wlCwResultColor)).apply {
+                visibility = if (wlCwResultText.isEmpty()) View.GONE else View.VISIBLE
+                wlCwResult = this
+            }, lp(MATCH, WRAP).margins(c, 8, 0, 8, 0))
+        }
+        when (s.kind) {
+            WlKind.STATE -> root.addView(statusCard(s, v), lp(MATCH, WRAP))
+            WlKind.BOX_WAIT -> root.addView(boxWaitCard(), lp(MATCH, WRAP))
+            else -> {}
+        }
+        val label = when (s.main) {
+            WlMain.NONE -> null
+            WlMain.PICK_CAR -> R.string.wl_car_pick
+            WlMain.PICK_BOX -> R.string.wl_box_pick
+            WlMain.SAVE_NET -> R.string.wl_cw_save
+            WlMain.WAIT_WIFI -> R.string.wl_start
+            WlMain.CONNECT_BOX -> R.string.wl_btn_connect
+            WlMain.HOTSPOT_ON -> R.string.wl_btn_hotspot_on
+            WlMain.OPEN_WIFI -> R.string.wl_btn_open_wifi
+        }
+        // высота кнопок задаётся явно: pill с WRAP сжимается до высоты текста
+        if (label != null) {
+            root.addView(c.primaryButton(c.getString(label), heightDp = 60, sp = 17f).apply { setOnClickListener { onWlMain(s.main) } },
+                lp(MATCH, c.dp(60)))
+        }
+        if (v.warn.isNotEmpty()) root.addView(c.text(v.warn, 13f, 400, c.clr(R.color.warn)), lp(MATCH, WRAP).margins(c, 8, 0, 8, 0))
+        if (v.noPermission && s.main == WlMain.WAIT_WIFI) {
+            root.addView(c.text(c.getString(R.string.wl_no_permission), 13f, 400, c.clr(R.color.warn)), lp(MATCH, WRAP).margins(c, 8, 0, 8, 0))
+        }
+        if (s.stop) {
+            root.addView(c.outlineButton(c.getString(R.string.wl_btn_stop), heightDp = 60, sp = 17f).apply {
+                setOnClickListener { stopIfRunning() }
+            }, lp(MATCH, c.dp(60)))
+        }
+    }
+
+    private fun wlCard(radius: Int = 20, fill: Int = R.color.surf): GradientDrawable = ctx.shape(ctx.clr(fill), radius)
+
+    private fun wlModeName(m: WlMode): Int = WL_MODES.first { it.mode == m }.title
+
+    /** Выбор способа: четыре карточки, текущая подсвечена, внизу плашка про кабель. */
+    private fun buildChoose(root: LinearLayout, current: WlMode) {
+        val c = ctx
+        root.addView(c.text(c.getString(R.string.wl_choose_title), 20f, 600), lp(MATCH, WRAP).margins(c, 8, 8, 8, 6))
+        for (m in WL_MODES) {
+            val cur = m.mode == current
+            val main = if (cur) R.color.onpric else R.color.on
+            val sub = if (cur) R.color.onpric else R.color.on2
+            root.addView(c.hbox(14).apply {
+                background = c.rippleBg(wlCard(20, if (cur) R.color.pric else R.color.surf), 20)
+                minimumHeight = c.dp(88)
+                pad(c, 16, 12, 16, 12)
+                isClickable = true
+                setOnClickListener { onWlModePick(m.mode) }
+                addView(c.icon(m.icon, 28, c.clr(sub)))
+                addView(c.vbox(2).apply {
+                    addView(c.text(c.getString(m.title), 17f, 600, c.clr(main)))
+                    addView(c.text(c.getString(m.sub), 14f, 400, c.clr(sub)))
+                }, lp(0, WRAP, 1f))
+                addView(if (cur) c.icon(R.drawable.ic_check, 22, c.clr(main)) else c.icon(R.drawable.ic_chevron, 20, c.clr(R.color.on2)))
+            }, lp(MATCH, WRAP))
+        }
+        root.addView(c.hbox(14).apply {
+            background = wlCard(20, R.color.surf2)
+            pad(c, 16, 14, 16, 14)
+            addView(c.icon(R.drawable.ic_plug, 28, c.clr(R.color.acc)))
+            addView(c.vbox(2).apply {
+                addView(c.text(c.getString(R.string.wl_cable_title), 16f, 600))
+                addView(c.text(c.getString(R.string.wl_cable_sub), 14f, 400, c.clr(R.color.on2)))
+            }, lp(0, WRAP, 1f))
+        }, lp(MATCH, WRAP).margins(c, 0, 8, 0, 0))
+    }
+
+    /** Верхняя строка «Способ подключения · название · Сменить». */
+    private fun modeRow(mode: WlMode): View {
+        val c = ctx
+        return c.hbox(14).apply {
+            background = c.rippleBg(wlCard(), 20)
+            minimumHeight = c.dp(68)
+            pad(c, 16, 10, 16, 10)
+            isClickable = true
+            setOnClickListener {
+                wlChoosing = true
+                refreshWireless()
+            }
+            addView(c.vbox(2).apply {
+                addView(c.text(c.getString(R.string.wl_mode_label), 13f, 400, c.clr(R.color.on2)))
+                addView(c.text(c.getString(wlModeName(mode)), 17f, 600))
+            }, lp(0, WRAP, 1f))
+            addView(c.text(c.getString(R.string.wl_change), 14f, 600, c.clr(R.color.acc)))
+        }
+    }
+
+    /** «Настройте один раз»: шаги по способам, для Wi-Fi машины - два поля. */
+    private fun setupCard(mode: WlMode): View {
+        val c = ctx
+        val card = c.vbox(16).apply {
+            background = wlCard()
+            pad(c, 16, 16, 16, 16)
+        }
+        card.addView(c.text(c.getString(R.string.wl_setup_title), 20f, 600))
+        if (mode == WlMode.CAR_WIFI) {
+            val cw = CarWifi(c)
+            wlCwSsid = wifiField(c.getString(R.string.wl_cw_ssid_hint), password = false).apply { setText(wlCwDraftSsid ?: cw.ssid.orEmpty()) }
+            wlCwPass = wifiField(c.getString(R.string.wl_cw_pass_hint), password = true).apply { setText(wlCwDraftPass ?: cw.pass) }
+            for ((label, field) in listOf(R.string.wl_cw_ssid_label to wlCwSsid!!, R.string.wl_cw_pass_label to wlCwPass!!)) {
+                card.addView(c.vbox(6).apply {
+                    addView(c.text(c.getString(label), 14f, 500, c.clr(R.color.on2)))
+                    addView(field, lp(MATCH, c.dp(52)))
+                })
+            }
+            return card
+        }
+        val steps = when (mode) {
+            WlMode.P2P -> listOf(R.string.wl_p2p_s1, R.string.wl_p2p_s2, R.string.wl_p2p_s3)
+            WlMode.HOTSPOT -> listOf(R.string.wl_hs_s1, R.string.wl_hs_s2)
+            else -> listOf(R.string.wl_box_s1, R.string.wl_box_s2, R.string.wl_box_s4)   // в Wi-Fi бокса приложение входит само
+        }
+        card.addView(c.vbox(14).apply {
+            steps.forEachIndexed { i, res ->
+                addView(c.hbox(12).apply {
+                    gravity = Gravity.TOP
+                    val num = FrameLayout(c).apply {
+                        background = c.oval(c.clr(R.color.pric))
+                        addView(c.text((i + 1).toString(), 14f, 700, c.clr(R.color.onpric)), FrameLayout.LayoutParams(WRAP, WRAP, Gravity.CENTER))
+                    }
+                    addView(num, LinearLayout.LayoutParams(c.dp(28), c.dp(28)))
+                    addView(c.text(c.getString(res), 16f, 500).apply { pad(c, 0, 3, 0, 0) }, lp(0, WRAP, 1f))
+                })
+            }
+        })
+        return card
+    }
+
+    /** «Машина/Сеть/Бокс запомнены · имя · Забыть». */
+    private fun deviceRow(mode: WlMode, name: String): View {
+        val c = ctx
+        val label = when (mode) {
+            WlMode.CAR_WIFI -> R.string.wl_row_net
+            WlMode.BOX -> R.string.wl_row_box
+            else -> R.string.wl_row_car
+        }
+        return c.hbox(12).apply {
+            background = wlCard()
+            minimumHeight = c.dp(68)
+            pad(c, 16, 10, 8, 10)
+            addView(wlCircle(28, R.color.okc, R.drawable.ic_check, 16, R.color.ok))
+            addView(c.vbox(2).apply {
+                addView(c.text(c.getString(label), 13f, 400, c.clr(R.color.on2)))
+                addView(c.text(name, 17f, 600).apply {
+                    maxLines = 1
+                    ellipsize = TextUtils.TruncateAt.END
+                })
+            }, lp(0, WRAP, 1f))
+            addView(c.text(c.getString(R.string.wl_forget), 14f, 600, c.clr(R.color.acc)).apply {
+                pad(c, 8, 12, 8, 12)
+                isClickable = true
+                setOnClickListener { onWlForget(mode) }
+            })
+        }
+    }
+
+    private fun wlCircle(sizeDp: Int, fill: Int, icon: Int, iconDp: Int, tint: Int): FrameLayout = FrameLayout(ctx).apply {
+        background = ctx.oval(ctx.clr(fill))
+        addView(ctx.icon(icon, iconDp, ctx.clr(tint)), FrameLayout.LayoutParams(ctx.dp(iconDp), ctx.dp(iconDp), Gravity.CENTER))
+        layoutParams = LinearLayout.LayoutParams(ctx.dp(sizeDp), ctx.dp(sizeDp))
+    }
+
+    /** Карточка состояния: точка и заголовок, подсказка движка, ступеньки. */
+    private fun statusCard(s: WlScreen, v: WlView): View {
+        val c = ctx
+        val card = c.vbox(14).apply {
+            background = wlCard()
+            pad(c, 16, 16, 16, 16)
+        }
+        val title = when (s.title) {
+            WlTitle.CONNECTED -> R.string.wl_t_connected
+            WlTitle.CONNECTING -> R.string.wl_t_connecting
+            WlTitle.HOTSPOT_OFF -> R.string.wl_t_hotspot_off
+            WlTitle.NO_BOX_WIFI -> R.string.wl_t_no_box_wifi
+            else -> R.string.wl_t_waiting
+        }
+        val dot = when (s.dot) {
+            WlDot.OK -> R.color.ok
+            WlDot.WARN -> R.color.warn
+            WlDot.PRI -> R.color.pri
+        }
+        card.addView(c.vbox(4).apply {
+            addView(c.hbox(12).apply {
+                addView(View(c).apply { background = c.oval(c.clr(dot)) }, LinearLayout.LayoutParams(c.dp(12), c.dp(12)))
+                addView(c.text(c.getString(title), 20f, 600))
+            })
+            v.wireless?.let { addView(c.text(it, 13f, 400, c.clr(R.color.on2))) }
+        })
+        card.addView(c.vbox(4).apply {
+            for ((step, state) in s.steps) addView(stepRow(step, state, v.name))
+        })
+        return card
+    }
+
+    private fun stepRow(step: WlStep, state: WlStepState, deviceName: String): View {
+        val c = ctx
+        val label = when (step) {
+            WlStep.BT_CAR -> R.string.wl_st_bt_car
+            WlStep.WIFI_DIRECT -> R.string.wl_st_wifi_direct
+            WlStep.JOIN_CAR_WIFI -> R.string.wl_st_join_cw
+            WlStep.HOTSPOT -> if (state == WlStepState.ERROR) R.string.wl_st_hotspot else R.string.wl_st_hotspot_on
+            WlStep.CAR_IN_NET -> R.string.wl_st_car_in_net
+            WlStep.BT_BOX -> R.string.wl_st_bt_box
+            WlStep.WIFI_BOX -> R.string.wl_st_wifi_box
+            WlStep.CAR_LIVE -> R.string.wl_st_car_live
+        }
+        val right = when {
+            state != WlStepState.ERROR -> null
+            step == WlStep.HOTSPOT -> c.getString(R.string.wl_st_off)
+            step == WlStep.WIFI_BOX -> deviceName
+            else -> null
+        }
+        val icon: View = when (state) {
+            WlStepState.DONE -> wlCircle(24, R.color.okc, R.drawable.ic_check, 14, R.color.ok)
+            WlStepState.ACTIVE -> WlRing(c).apply { layoutParams = LinearLayout.LayoutParams(c.dp(24), c.dp(24)) }
+            WlStepState.WAIT -> View(c).apply {
+                background = GradientDrawable().apply {
+                    shape = GradientDrawable.OVAL
+                    setStroke(c.dp(2), c.clr(R.color.line))
+                }
+                layoutParams = LinearLayout.LayoutParams(c.dp(24), c.dp(24))
+            }
+            WlStepState.ERROR -> FrameLayout(c).apply {
+                background = c.oval(c.clr(R.color.warnc))
+                addView(c.text("!", 14f, 700, c.clr(R.color.warn)), FrameLayout.LayoutParams(WRAP, WRAP, Gravity.CENTER))
+                layoutParams = LinearLayout.LayoutParams(c.dp(24), c.dp(24))
+            }
+        }
+        val color = when (state) {
+            WlStepState.WAIT -> R.color.on2
+            WlStepState.ERROR -> R.color.warn
+            else -> R.color.on
+        }
+        return c.hbox(12).apply {
+            minimumHeight = c.dp(36)
+            addView(icon)
+            addView(c.text(c.getString(label), 15f, if (state == WlStepState.ACTIVE || state == WlStepState.ERROR) 600 else 500, c.clr(color)), lp(0, WRAP, 1f))
+            if (right != null) addView(c.text(right, 13f, 400, c.clr(R.color.warn)).apply {
+                maxLines = 1
+                ellipsize = TextUtils.TruncateAt.END
+            })
+        }
+    }
+
+    /** Бокс выбран и ждёт: компактная карточка, подключение идёт само. */
+    private fun boxWaitCard(): View {
+        val c = ctx
+        return c.hbox(14).apply {
+            background = wlCard()
+            pad(c, 16, 16, 16, 16)
+            addView(WlRing(c).apply { layoutParams = LinearLayout.LayoutParams(c.dp(24), c.dp(24)) })
+            addView(c.vbox(2).apply {
+                addView(c.text(c.getString(R.string.wl_t_box_wait), 20f, 600))
+                addView(c.text(c.getString(R.string.wl_t_box_auto), 14f, 400, c.clr(R.color.on2)))
+            }, lp(0, WRAP, 1f))
+        }
+    }
+
+    private fun onWlMain(m: WlMain) {
+        when (m) {
+            WlMain.PICK_CAR -> onCarPick()
+            WlMain.PICK_BOX -> {
+                wlPickingBox = true
+                onCarPick()
+            }
+            WlMain.SAVE_NET -> onCarWifiSave()
+            WlMain.WAIT_WIFI -> onWirelessStart()
+            WlMain.CONNECT_BOX -> onBoxStart()
+            WlMain.HOTSPOT_ON -> DiagActions.run(host, "hotspot")
+            WlMain.OPEN_WIFI -> DiagActions.run(host, "wifi")
+            WlMain.NONE -> {}
+        }
+    }
+
+    /** Остановить сервис, если он что-то ждёт или держит: смена способа и забытое устройство не должны оставлять его работать вхолостую. */
+    private fun stopIfRunning() {
+        if (CarLifeState.wlStage != WlStage.OFF) Actions.stopBridge(ctx)
+    }
+
+    private fun onWlModePick(m: WlMode) {
+        val prefs = WlModePrefs(ctx)
+        if (m != prefs.mode) {
+            stopIfRunning()
+            prefs.set(m)
+            wlPickingBox = false
+            wlCwResultText = ""
+        }
+        wlChoosing = false
+        refreshWireless()
+    }
+
+    /** «Забыть» в строке: машина и бокс лежат в CarProfile, сеть машины - в CarWifi. */
+    private fun onWlForget(mode: WlMode) {
+        if (mode == WlMode.CAR_WIFI) {
+            onCarWifiForget()
+            return
+        }
+        stopIfRunning()
+        CarPairing.forget(ctx)
+        wlPickingBox = false
+        refreshWireless()
     }
 
     private fun wifiField(hint: String, password: Boolean): EditText = EditText(ctx).apply {
@@ -605,11 +958,14 @@ class SettingsSectionScreen(host: MainActivity, val section: SettingsSection) : 
     }
 
     private fun showCwResult(text: String, color: Int = R.color.on2) {
+        wlCwResultText = text
+        wlCwResultColor = color
         wlCwResult?.apply {
             this.text = text
             setTextColor(ctx.clr(color))
             visibility = View.VISIBLE
         }
+        refreshWireless()      // в вариантах «сеть запомнена» строка результата появляется перерисовкой
     }
 
     /**
@@ -624,6 +980,8 @@ class SettingsSectionScreen(host: MainActivity, val section: SettingsSection) : 
             return
         }
         CarWifi(ctx).save(ssid, pass)
+        wlCwDraftSsid = null
+        wlCwDraftPass = null
         wlCwCheck?.release("recheck")
         val net = CarNetwork(ctx)
         wlCwCheck = net
@@ -654,12 +1012,13 @@ class SettingsSectionScreen(host: MainActivity, val section: SettingsSection) : 
     }
 
     private fun onCarWifiForget() {
+        stopIfRunning()
         CarWifi(ctx).clear()
         wlCwCheck?.release("forget")
         wlCwCheck = null
-        wlCwSsid?.setText("")
-        wlCwPass?.setText("")
-        wlCwResult?.visibility = View.GONE
+        wlCwDraftSsid = null
+        wlCwDraftPass = null
+        wlCwResultText = ""
         refreshWireless()
     }
 
@@ -681,7 +1040,7 @@ class SettingsSectionScreen(host: MainActivity, val section: SettingsSection) : 
      * BLUETOOTH_CONNECT (Android 12+) и «Устройства поблизости» (Wi-Fi Direct) - для ветки A, без них беспровод всё равно стартует.
      */
     private fun onWirelessStart() {
-        wlNoPermission?.visibility = View.GONE
+        wlNoPermission = false
         val ask = ArrayList<String>()
         if (Build.VERSION.SDK_INT >= 37 && NetProbe.localNetworkGranted(ctx) != "granted") ask += Manifest.permission.ACCESS_LOCAL_NETWORK
         if (!carBtGranted()) ask += Manifest.permission.BLUETOOTH_CONNECT
@@ -694,7 +1053,6 @@ class SettingsSectionScreen(host: MainActivity, val section: SettingsSection) : 
         }
         if (ask.isNotEmpty()) {
             wlAwaitingPermission = true
-            wlAwaitingDongle = false
             host.requestPermissions(ask.toTypedArray(), REQ_LOCAL_NETWORK)
             return
         }
@@ -706,26 +1064,27 @@ class SettingsSectionScreen(host: MainActivity, val section: SettingsSection) : 
         ctx.startForegroundService(Intent(ctx, BridgeService::class.java).setAction(BridgeService.ACTION_WIFI_B))
     }
 
-    /** Свисток: включить (нужен ACCESS_LOCAL_NETWORK на Android 17+, как у Wi-Fi) или остановить общим Стопом сервиса. */
-    private fun onDongleToggle() {
-        if (CarLifeState.dongle) {
-            AppLog.i("кнопка «Остановить свисток»")
-            Actions.stopBridge(ctx)
+    /** Старт бокса: после выбора бокса (само) и кнопкой «Подключить». */
+    private fun onBoxStart() {
+        AppLog.i("старт бокса из настроек")
+        // BLUETOOTH_CONNECT (RFCOMM к боксу) + «Устройства поблизости» (вход в Wi-Fi бокса)
+        val ask = ArrayList<String>()
+        if (!carBtGranted()) ask += Manifest.permission.BLUETOOTH_CONNECT
+        val wifi = if (Build.VERSION.SDK_INT >= 33) Manifest.permission.NEARBY_WIFI_DEVICES else Manifest.permission.ACCESS_FINE_LOCATION
+        if (ctx.checkSelfPermission(wifi) != PackageManager.PERMISSION_GRANTED) {
+            ask += wifi
+            if (wifi == Manifest.permission.ACCESS_FINE_LOCATION) ask += Manifest.permission.ACCESS_COARSE_LOCATION
+        }
+        if (ask.isNotEmpty()) {
+            wlAwaitingBox = true
+            host.requestPermissions(ask.toTypedArray(), REQ_LOCAL_NETWORK)
             return
         }
-        wlNoPermission?.visibility = View.GONE
-        if (Build.VERSION.SDK_INT >= 37 && NetProbe.localNetworkGranted(ctx) != "granted") {
-            wlAwaitingPermission = true
-            wlAwaitingDongle = true
-            host.requestPermissions(arrayOf(Manifest.permission.ACCESS_LOCAL_NETWORK), REQ_LOCAL_NETWORK)
-            return
-        }
-        startDongle()
+        startBoxService()
     }
 
-    private fun startDongle() {
-        AppLog.i("кнопка «Ждать свисток»")
-        ctx.startForegroundService(Intent(ctx, BridgeService::class.java).setAction(BridgeService.ACTION_DONGLE))
+    private fun startBoxService() {
+        ctx.startForegroundService(Intent(ctx, BridgeService::class.java).setAction(BridgeService.ACTION_BOX))
     }
 
     private companion object {
@@ -744,6 +1103,15 @@ class SettingsSectionScreen(host: MainActivity, val section: SettingsSection) : 
         /** Проверка Wi-Fi машины из настроек: сколько ждём одобрения и входа, и сколько держим сеть после входа. */
         const val CW_CHECK_TIMEOUT_MS = 60_000L
         const val CW_CHECK_HOLD_MS = 5_000L
+        /** Как часто спрашиваем Bluetooth запомненного устройства и состояние точки доступа: тик экрана 500 мс для этого часто. */
+        const val WL_POLL_MS = 3_000L
+        class WlModeInfo(val mode: WlMode, val title: Int, val sub: Int, val icon: Int)
+        val WL_MODES = listOf(
+            WlModeInfo(WlMode.P2P, R.string.wl_mode_p2p, R.string.wl_mode_p2p_sub, R.drawable.ic_car_wifi),
+            WlModeInfo(WlMode.CAR_WIFI, R.string.wl_mode_cw, R.string.wl_mode_cw_sub, R.drawable.ic_wifi),
+            WlModeInfo(WlMode.HOTSPOT, R.string.wl_mode_hotspot, R.string.wl_mode_hotspot_sub, R.drawable.ic_status_wifi),
+            WlModeInfo(WlMode.BOX, R.string.wl_mode_box, R.string.wl_mode_box_sub, R.drawable.ic_car_usb),
+        )
         /** Группы выпадающего списка разрешений; WIDE_836 отдельной строкой нет (это WIDE_976 в passthrough). */
         val RES_STANDARD = listOf(VideoMode.R800, VideoMode.R1024, VideoMode.R720, VideoMode.R1080)
         val RES_WIDE = listOf(VideoMode.WIDE, VideoMode.WIDE_MID, VideoMode.WIDE_HD, VideoMode.WIDE_640, VideoMode.WIDE_2_1, VideoMode.WIDE_976)

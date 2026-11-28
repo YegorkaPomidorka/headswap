@@ -38,6 +38,8 @@ class CarlifeBtProbe(
     private val onP2pBusy: () -> Unit = {},
     /** Wi-Fi на телефоне выключен (false, Wi-Fi Direct не войдёт) или включён (true) на входе в группу ГУ (главная нить). */
     private val onWifi: (on: Boolean) -> Unit = {},
+    /** Телефон вошёл в P2P-группу ГУ (в том числе заново после распада). */
+    private val onJoined: () -> Unit = {},
 ) {
     @Volatile private var running = false
     private val servers = ArrayList<BluetoothServerSocket>()
@@ -250,6 +252,7 @@ class CarlifeBtProbe(
         if (rejoining) WLog.ev(WLog.P2P, "rejoin-joined", "ipRequested" to ipRequested)
         rejoining = false
         rejoinGen++
+        onJoined()
         // MD_WIFI_IP только на IP_REQUEST, как Baidu (BluetoothWirlessHelper:65-69, 289-291): без запроса не шлём
         sendIpIfReady()
     }

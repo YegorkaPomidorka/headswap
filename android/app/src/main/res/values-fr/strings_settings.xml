@@ -210,27 +210,16 @@
 
     <!-- Wireless (branch B) -->
     <string name="wl_title">Sans fil</string>
-    <string name="wl_note">Pour les voitures avec CarLife sans fil. Activez le point d\'accès sur le téléphone, connectez-y l\'autoradio (menu de l\'autoradio : Wi-Fi), ouvrez CarLife sur l\'autoradio et appuyez sur le bouton ci-dessous. Aucun câble nécessaire ; si vous en branchez un, l\'USB est prioritaire.</string>
     <string name="wl_start">Attendre la voiture en Wi-Fi</string>
-    <string name="wl_status_line">État : %1$s</string>
     <string name="wl_off">désactivé</string>
     <string name="wl_no_permission">Sans l\'autorisation « Appareils à proximité », la voiture ne peut pas se connecter en Wi-Fi</string>
-    <string name="wl_report">Envoyer le rapport sans fil</string>
     <string name="wl_car_line">Voiture : %1$s</string>
-    <string name="wl_car_none">non sélectionnée</string>
-    <string name="wl_car_note">Lorsque le téléphone se connecte à cette voiture en Bluetooth, Headswap commence automatiquement à l\'attendre en Wi-Fi</string>
     <string name="wl_car_pick">Sélectionner la voiture</string>
-    <string name="wl_car_forget">Oublier la voiture</string>
     <string name="wl_car_no_permission">Sans l\'autorisation « Appareils à proximité », les événements Bluetooth de la voiture ne sont pas transmis</string>
     <string name="wl_car_unavailable">Ce téléphone ne peut pas associer une voiture (pas de configuration d\'appareil associé)</string>
-    <string name="wl_cw_note">Si le téléphone reste sur un autre réseau Wi-Fi (par exemple à la maison), Headswap peut rejoindre seul le point d\'accès de la voiture : Internet reste sur votre réseau principal. Saisissez le nom et le mot de passe affichés par l\'autoradio.</string>
-    <string name="wl_cw_line">Wi-Fi de la voiture : %1$s</string>
-    <string name="wl_cw_none">non défini</string>
-    <string name="wl_cw_set">défini : %1$s</string>
     <string name="wl_cw_ssid_hint">Nom du réseau (SSID)</string>
     <string name="wl_cw_pass_hint">Mot de passe (vide : réseau ouvert)</string>
     <string name="wl_cw_save">Enregistrer et vérifier</string>
-    <string name="wl_cw_forget">Supprimer</string>
     <string name="wl_cw_need_ssid">Saisissez le nom du réseau</string>
     <string name="wl_cw_checking">Connexion au Wi-Fi de la voiture… confirmez la demande du système</string>
     <string name="wl_cw_ok">Connecté au Wi-Fi de la voiture</string>

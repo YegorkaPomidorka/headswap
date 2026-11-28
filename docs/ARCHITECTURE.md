@@ -43,7 +43,7 @@
 |---|---|
 | `$P/` (корень) | Сторона CarLife и сервис. `BridgeService` — оркестратор. `CarLifeSession` — одна сессия с ГУ. `Handshake`, `HuAuth` — рукопожатие и HU_AUTHEN. `Protocol.kt` (`Ch`, `Msg`, `Wire`, `FrameParser`), `Proto.kt` (свой protobuf). `VideoSource` — заглушка до прихода AA. `AppLog`, `CrashLog`. |
 | `$P/aa/` | Сторона AA и мозг моста. `AapSession` (TCP+TLS к 5277), `AapMessages` (SDR, каналы), `AaBridge.kt` (`AaBridgeCore` — всё связывание и флаги ГУ; `AaConnector` — переподключение), `BridgeHost` (держит AA между сессиями CarLife). Видео: `AaTranscoder`, `GlRelay`, `FeedQueue`, `IdrSplice`/`IdrIntra`/`RefDecoder`, `SpsCrop`, `VideoMode`, `CarPreset`, `BitratePolicy`, `IdrBitrateCeiling`, `ThermalThrottle`. Звук: `AaAudio`, `MusicResampler`, `Equalizer`, `TtsPreroll`, `NavChannel` (h1318: подсказки навигации в CarLife-канал VR вместо TTS по настройке, по умолчанию TTS — ADR 0066; флаг `navVr` в `AaBridgeCore`). Микрофон: `AaMic`, `PhoneMicCapture`. Мета: `AaMeta` (`MetaRelay`). Тач: `TouchPacer`, `TouchDecimator`. Настройки: `AaSettings` (`AaPrefs`). Диагностика: `AaServerCheck`, `AaProbe`. |
-| `$P/link/` | Транспорт к ГУ. `CarTransport` + `TransportCaps`, `StreamTransport` (USB и debug-TCP, один поток), `MultiSocketTransport` (воздух, 6 сокетов). `link/bt` — RFCOMM `carlife`, вход в Wi-Fi Direct (`CarlifeBtProbe`, `P2pJoin`). `link/car` — выбранная машина, автостарт по ACL, «Wi-Fi машины» (`CarProfile`, `CarAclReceiver`, `CarNetwork`, `CarLogic`). `link/wifi` — маяк `HotspotBeacon` (UDP 7999), `HotspotDetect`. `link/diag/WLog` — лог воздуха. |
+| `$P/link/` | Транспорт к ГУ. `CarTransport` + `TransportCaps`, `StreamTransport` (USB и debug-TCP, один поток), `MultiSocketTransport` (воздух, 6 сокетов). `link/bt` — RFCOMM `carlife`, вход в Wi-Fi Direct (`CarlifeBtProbe`, `P2pJoin`). `link/car` — выбранная машина, автостарт по ACL, «Wi-Fi машины» (`CarProfile`, `CarAclReceiver`, `CarNetwork`, `CarLogic`); выбранный способ воздуха `WlMode`/`WlModePrefs`, этап для экрана `CarLifeState.wlStage` (`WlStage`), логика экрана «По воздуху» `WlScreenLogic`. `link/box` — бокс в USB: рукопожатие AA-wireless по RFCOMM (`BoxHandshake`), вход по TCP на адрес бокса (`BoxConnector`). `link/wifi` — маяк `HotspotBeacon` (UDP 7999), `HotspotDetect`. `link/diag/WLog` — лог воздуха. |
 | `$P/ui/` | Экраны (`HomeScreen`, `OnboardingScreen`, `SettingsScreen`, `DevScreen`, `DiagScreen`, `CarChooser`), чистая логика (`HeadswapState`/`HomeLogic`, `Readiness`), `LogShare` (zip логов). |
 | `$P/carapp/` | Свой хост Car App Library для навигатора рабочего стола (ADR 0021). `CarAppCatalog` (поиск по CarAppService + NAVIGATION), `CarAppSession` (одна сессия: bind → handshake → create/start/resume, поверхность, области, Trip → `aa/DesktopNavHints`), `CarAppHost` (фасад для лаунчера), `CarUiMapper` + `CarUi` (шаблоны → модель для Compose), `CarAppLogic` (чистая: области, dpi, вердикты). Шаблоны рисует `launcher/NavHostUi.kt`. |
 | `$P/diag/` | `LogDiag` — Kotlin-порт `tools/logdiag.py`, те же правила. |
@@ -60,13 +60,17 @@
 **1. Старт.** USB: ГУ переводит телефон в аксессуар Baidu/CarLife → `USB_ACCESSORY_ATTACHED` в `MainActivity` →
 `Actions.scan` → разрешение → `BridgeService.onStartCommand` → `command()` → `startSession(StreamTransport.fromPfd(...))`.
 Воздух: кнопка (`ACTION_WIFI_B`) или ACL выбранной машины (`CarAclReceiver` → `ACTION_WIFI_B_AUTO`) → `startWifiB` → `startTcp6`.
+Бокс: ACL выбранного бокса (`ACTION_BOX_AUTO`) или сразу после выбора (`ACTION_BOX`) → `BoxConnector`.
 Кабель побеждает воздух. После обрыва кабеля при машине рядом по BT — переход на воздух через 3 с.
 
 **2. Транспорт воздуха.** Телефон слушает 6 портов (CMD 7240, VIDEO 8240, MEDIA 9240, TTS 9241, VR 9242, TOUCH 9340),
 ГУ подключается клиентом. Как телефон и ГУ оказываются в одной сети:
 (a) BT RFCOMM `carlife` + вход в P2P-группу ГУ (Mazda G6S); (b) хотспот телефона + маяк `HotspotBeacon`;
 (c) «Wi-Fi машины» — телефон входит в сеть ГУ (`CarNetwork`, VW). Если он уже в подсети прошлой сессии,
-сеть держим без specifier: второе подключение меняет MAC и ГУ заводит новый девайс (ADR 0053). ADR 0014.
+сеть держим без specifier: второе подключение меняет MAC и ГУ заводит новый девайс (ADR 0053); (d) «бокс в USB» — адаптер в порту машины
+показывает себя Bluetooth-устройством; телефон делает рукопожатие AA-wireless по RFCOMM, входит в Wi-Fi бокса и подключается
+по TCP (`link/box`). Человек один раз выбирает способ из четырёх (a–d, в настройках «По воздуху», `WlMode`); бокс выбирается
+как Bluetooth-устройство, как машина в (a). ADR 0014, 0070.
 
 **3. Сессия CarLife** (`CarLifeSession.onCmd`):
 HU_PROTOCOL_VERSION → стартовая пачка (`Handshake.startBatch`) → HU_INFO и STATISTIC_INFO (тут определяется ГУ, см. ниже) →
@@ -210,6 +214,7 @@ CONTROL0, SENSOR1, VIDEO2, INPUT3, SPEECH4, SYSTEM5, MEDIA6, MIC7, BT8, MEDIA_PL
 | Чёрный экран после камеры заднего хода | свой IDR (`IdrSplice`); ADR 0005 |
 | Поля, растянуто, не тот размер | `VideoMode`, `SpsCrop`, VIDEO_ENCODER_INIT в логе |
 | AA не подключается, `нет VERSION_RESPONSE` | сервер 5277 заглох: ADR 0003; база кейсов (память `hu/`) |
+| Бокс в USB не подключается / «Нет Wi-Fi бокса» | `BoxConnector` (рукопожатие `BoxHandshake`, прямой TCP с повтором 30 с, перевзвод после сессии 2 с и после неудачи 10 с), `WlStage.NO_LINK`; в логе `box-*`; ADR 0070 |
 | Обрывы по воздуху | `MultiSocketTransport`, `P2pJoin`, `CarNetwork`, строки `WL`; VPN рвёт сокеты |
 | Звук молчит / приглушён | `AaAudio`, AUDIO_TRANSMISSION_MODE, TTS_STOP; источник на ГУ |
 | Рабочий стол: после выключения машины / выдёргивания шнура музыка пару секунд играет в телефоне | пауза при обрыве `dex/DesktopMusicPlayback.linkClosed` (до снятия захвата, USB и Wi-Fi tcp6) и `physicalDetach` (USB detach), допуск `DesktopMusicUsbLink.pauseOnClose`, play после реконнекта `DesktopMusicResumePolicy`; в логе `DESKTOP MUSIC: paused current session on …` / `no pause on … (причина)`; ADR 0061 |

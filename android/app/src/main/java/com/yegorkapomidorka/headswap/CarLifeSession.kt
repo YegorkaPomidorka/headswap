@@ -380,6 +380,8 @@ class CarLifeSession(
                 }
                 huVersion = "${reply.major}.${reply.minor}"
                 CarLifeState.protocol = "ГУ шлёт версию $huVersion"
+                // бокс: TCP до бокса был LINK, ГУ заговорила - сессия идёт
+                if (CarLifeState.wlStage == com.yegorkapomidorka.headswap.link.car.WlStage.LINK) CarLifeState.wlStage = com.yegorkapomidorka.headswap.link.car.WlStage.UP
                 AppLog.i("== ВЕРСИЯ ПРОТОКОЛА ГУ: major=${reply.major} minor=${reply.minor}")
                 WLog.ev(WLog.HS, "HU_PROTOCOL_VERSION", "version" to huVersion)
                 matchSent = true
