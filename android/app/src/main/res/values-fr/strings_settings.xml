@@ -61,6 +61,7 @@
     <string name="set_custom_res_active">Résolution personnalisée %1$s en vigueur (%2$s)</string>
 
     <string name="set_music_rate">Fréquence d\'échantillonnage de la musique</string>
+    <string name="set_nav_prompts">Consignes de navigation</string>
     <string name="set_music_rate_note">Fréquence plus basse : moins de charge sur la liaison USB et sur les autoradios peu puissants, mais qualité réduite. Auto : 48 kHz, 32 kHz pour les autoradios Hyundai CN7. S\'applique à la prochaine connexion.</string>
     <string name="set_fps">Fréquence d\'images</string>
     <string name="set_fps_note">S\'applique à la prochaine connexion. En transmission directe, la fréquence d\'images ne peut pas être modifiée.</string>
@@ -185,9 +186,13 @@
     <string name="tpreroll_200">200 ms</string>
     <string name="tpreroll_400">400 ms</string>
 
-    <!-- Canal des consignes de navigation (NavChannel) -->
-    <string name="navch_vr">VR (canal vocal)</string>
-    <string name="navch_tts">TTS (canal de navigation)</string>
+    <!-- Consignes de navigation (NavChannel) : trois modes, ADR 0071 -->
+    <string name="navch_vr">Pause pour la navigation et Alice</string>
+    <string name="navch_vr_sub">La musique s\'arrête pendant que la navigation ou Alice parle. Sur certains autoradios, le volume de la voix est réglé séparément de la musique</string>
+    <string name="navch_tts">Baisser la musique pour la navigation</string>
+    <string name="navch_tts_sub">Navigation par-dessus une musique atténuée, la musique s\'arrête pour Alice</string>
+    <string name="navch_mix">Ne pas baisser (comme en 4.3)</string>
+    <string name="navch_mix_sub">Navigation par-dessus la musique sans l\'atténuer, la musique s\'arrête pour Alice. Sur le bureau, dès la prochaine connexion ; dans Android Auto, comme « Baisser la musique »</string>
 
     <!-- Touch decimation (TouchDecimation) -->
     <string name="tdec_off">Désactivé</string>

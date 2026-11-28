@@ -53,6 +53,7 @@ import com.yegorkapomidorka.headswap.aa.EqSettings
 import com.yegorkapomidorka.headswap.aa.FpsSetting
 import com.yegorkapomidorka.headswap.aa.MicMode
 import com.yegorkapomidorka.headswap.aa.MusicRate
+import com.yegorkapomidorka.headswap.aa.NavChannel
 import com.yegorkapomidorka.headswap.aa.VideoMode
 import com.yegorkapomidorka.headswap.desktop.DesktopAppCatalog
 import com.yegorkapomidorka.headswap.dex.DelegatedDesktopAccess
@@ -413,6 +414,7 @@ class SettingsSectionScreen(host: MainActivity, val section: SettingsSection) : 
     private val themeRows = LinkedHashMap<String, RadioRow>()
     private val micRows = HashMap<MicMode, RadioRow>()
     private val rateRows = LinkedHashMap<MusicRate, RadioRow>()
+    private val navChannelRows = LinkedHashMap<NavChannel, RadioRow>()
     private var makeValue: TextView? = null
     private var modeSeg: Segmented? = null
     private var actHost: LinearLayout? = null
@@ -1697,6 +1699,14 @@ class SettingsSectionScreen(host: MainActivity, val section: SettingsSection) : 
         note(c.getString(R.string.set_music_rate_note))
         refreshMusicRate()
 
+        body.addView(c.sectionTitle(c.getString(R.string.set_nav_prompts)))
+        for (m in NavChannel.values()) {
+            val row = RadioRow(c, c.getString(m.titleRes), c.getString(m.subRes)) { setNavChannel(m) }
+            navChannelRows[m] = row
+            body.addView(row.view, lp(MATCH, WRAP))
+        }
+        refreshNavChannel()
+
         body.addView(c.sectionTitle(c.getString(R.string.set_mic)))
         for ((m, titleRes, subRes) in MICS) {
             val row = RadioRow(c, c.getString(titleRes), c.getString(subRes)) { setMic(m) }
@@ -1780,6 +1790,15 @@ class SettingsSectionScreen(host: MainActivity, val section: SettingsSection) : 
 
     private fun refreshMusicRate() {
         for ((r, row) in rateRows) row.setSelected(aa.musicRate == r)
+    }
+
+    private fun setNavChannel(m: NavChannel) {
+        aa.navChannel = m
+        refreshNavChannel()
+    }
+
+    private fun refreshNavChannel() {
+        for ((m, row) in navChannelRows) row.setSelected(aa.navChannel == m)
     }
 
     private fun setMic(m: MicMode) {
