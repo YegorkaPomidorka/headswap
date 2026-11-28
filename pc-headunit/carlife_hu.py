@@ -289,7 +289,8 @@ class Speakers:
         self.vol = {"Музыка": 6, "Голос": 6}
         self.voice_open: set[int] = set()
         self.voice_at = 0.0
-        self.on_volume = None                   # колбэк окна: текст громкости в заголовок
+        self.voice_chan = CH_TTS                # канал последней речи: от него пауза или приглушение музыки
+        self.on_volume = None                  # колбэк окна: текст громкости в заголовок
         try:
             import sounddevice
             self.sd = sounddevice
@@ -316,6 +317,7 @@ class Speakers:
                 self.voice_open.discard(chan)
             elif mtype in (TTS_DATA, VR_DATA_A):
                 self.voice_at = time.monotonic()
+                self.voice_chan = chan
         if self.sd is None:
             return
         if mtype in (MEDIA_INIT, TTS_INIT, VR_INIT_A):
@@ -340,7 +342,17 @@ class Speakers:
             out = self.outs.get(chan)
             if out:
                 knob = "Музыка" if chan == CH_MEDIA else "Голос"
-                out.write(_scale_pcm16(body, (self.vol[knob] / VOL_MAX) ** 2))
+                gain = (self.vol[knob] / VOL_MAX) ** 2
+                if chan == CH_MEDIA:
+                    gain *= self.media_gain()
+                out.write(_scale_pcm16(body, gain))
+
+    def media_gain(self) -> float:
+        """Как типичная ГУ (CNS3, ADR 0060/0071): речь в VR ставит музыку на паузу, в TTS - приглушает."""
+        if not (self.voice_open or time.monotonic() - self.voice_at < 0.3):
+            return 1.0
+        vr = CH_VR in self.voice_open or (self.voice_chan == CH_VR and CH_TTS not in self.voice_open)
+        return 0.0 if vr else 0.25
 
     def close(self):
         for out in self.outs.values():
