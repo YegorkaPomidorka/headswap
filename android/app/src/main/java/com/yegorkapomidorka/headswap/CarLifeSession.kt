@@ -1002,7 +1002,7 @@ class CarLifeSession(
     private fun applyHonda20772122Ceiling() {
         if (!bridge.huHonda20772122) return
         val old = bitratePolicy.current
-        if (!bitratePolicy.lowerCeiling(AaBridgeCore.HONDA_20772122_CEILING_BPS)) return
+        if (!bitratePolicy.lowerCeiling(minOf(AaBridgeCore.HONDA_20772122_CEILING_BPS, AaBridgeCore.hondaLearnedCeilingBps))) return
         AppLog.i("Honda 20772122: потолок битрейта ${bitratePolicy.ceilingBps / 1000} кбит/с (лимит размера IDR)")
         if (bitratePolicy.current != old) bridge.setEncoderBitrate(bitratePolicy.current)
     }
@@ -1016,6 +1016,7 @@ class CarLifeSession(
         val old = bitratePolicy.current
         val target = maxOf(AaBridgeCore.HONDA_20772122_MIN_BPS, (minOf(bitratePolicy.ceilingBps, old) * 0.75).toInt())
         if (!bitratePolicy.lowerCeiling(target)) return
+        AaBridgeCore.hondaLearnedCeilingBps = bitratePolicy.ceilingBps
         hondaIdrCutMs = now
         AppLog.i("Honda 20772122: IDR $size Б > ${AaBridgeCore.HONDA_20772122_IDR_LIMIT}, потолок битрейта -> ${bitratePolicy.ceilingBps}")
         if (bitratePolicy.current != old) bridge.setEncoderBitrate(bitratePolicy.current)
@@ -1245,6 +1246,7 @@ class CarLifeSession(
             srcWidth = if (directSurface) mode.outW else mode.aaW,
             srcHeight = if (directSurface) mode.outH else mode.aaH,
             crop = if (directSurface) com.yegorkapomidorka.headswap.aa.VideoCrop.NONE else mode.cropFor(bridge.marginsAtBottom),
+            tuning = if (bridge.huHonda20772122) "iqpmin=${AaBridgeCore.HONDA_20772122_I_QP_MIN}" else "",   // флаг ГУ ставится по STATISTIC_INFO до создания энкодера
             baidu = mobis, directSurface = directSurface,
             capabilityFps = if (mobis) AaBridgeCore.MOBIS_FPS else targetFps,
             limitedRange = bridge.videoLimitedRange,

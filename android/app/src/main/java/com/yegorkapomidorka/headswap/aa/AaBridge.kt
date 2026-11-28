@@ -324,6 +324,7 @@ class AaBridgeCore(
     private var encCsd: ByteArray? = null
     private var outGotIdr = false
     private val idrThrottle = IdrThrottle()            // запросы IDR при переполнении очереди CarLife
+    private val hondaIdrGuard = IdrSizeGuard(HONDA_20772122_IDR_HARD_LIMIT)   // Honda 20772122: слишком большой IDR в ГУ не шлём
     private var overflowIdrRequests = 0L
     private var lastStatsIdrRequests = 0L
     private var outputEnabled = false
@@ -667,6 +668,7 @@ class AaBridgeCore(
         huSemidriveX9 = false                  // STATISTIC_INFO придёт заново в этой сессии
         huBonAuto20362105 = false              // STATISTIC_INFO придёт заново в этой сессии
         huHonda20772122 = false                // STATISTIC_INFO придёт заново в этой сессии
+        hondaIdrGuard.reset()
         huMobisNx4c = false                    // HU_INFO / STATISTIC_INFO придут заново в этой сессии
         huVwCns2Delphi = false                 // STATISTIC_INFO придёт заново в этой сессии
         huVwCns3_20082122 = false              // STATISTIC_INFO придёт заново в этой сессии
@@ -3137,6 +3139,25 @@ class AaBridgeCore(
         }
         val types = AnnexB.nalTypes(data)
         val idr = 5 in types
+        if (huHonda20772122) {
+            when (hondaIdrGuard.decide(data.size, idr)) {
+                IdrSizeGuard.Verdict.SEND -> if (hondaIdrGuard.justRecovered) {
+                    log("BRIDGE Honda 20772122: IDR ${data.size} Б влез в ${HONDA_20772122_IDR_HARD_LIMIT}, пропущено P-кадров ${hondaIdrGuard.lastDroppedP}", true)
+                }
+                IdrSizeGuard.Verdict.DROP -> {
+                    encDropped++
+                    return
+                }
+                IdrSizeGuard.Verdict.DROP_REQUEST_IDR -> {
+                    log("BRIDGE Honda 20772122: IDR ${data.size} Б > ${HONDA_20772122_IDR_HARD_LIMIT}, в ГУ не шлём, запрос нового IDR", true)
+                    outGotIdr = false
+                    encDropped++
+                    link.onEncodedKeyFrame(data.size)     // кадр не ушёл, но потолок битрейта срезать надо
+                    requestIdrOnOverflow()
+                    return
+                }
+            }
+        }
         if (!outGotIdr) {
             if (!idr) {
                 encDropped++
@@ -3451,8 +3472,12 @@ class AaBridgeCore(
         /** Bon-Auto (Mitsubishi Outlander, h1063/h1111): низ кадра - каша при любом разрешении, EIO; гипотеза - ГУ не переваривает большие кадры. */
         const val HONDA_20772122_CHANNEL = "20772122"     // Honda XR-V 2022 (h383/h864/h1235): сброс USB на IDR ≥ ~600 КиБ
         const val HONDA_20772122_CEILING_BPS = 6_000_000  // на 6 Мбит/с (тепловая ступень WARM) IDR ~440 КиБ, обрывов не было
-        const val HONDA_20772122_MIN_BPS = 3_000_000
+        const val HONDA_20772122_MIN_BPS = 1_500_000      // на 3 Мбит/с карта всё равно давала IDR 588-621 КБ (4.3.4), см. IDR_HARD_LIMIT
         const val HONDA_20772122_IDR_LIMIT = 450_000      // выжившие IDR ≤ 597 КиБ, обрывы после 605-699 КиБ
+        const val HONDA_20772122_IDR_HARD_LIMIT = 580_000 // IDR больше в ГУ не отправляем (запас до ~600 КиБ = 614400 Б)
+        const val HONDA_20772122_I_QP_MIN = 30            // KEY_VIDEO_QP_I_MIN энкодера: IDR не раздувается на сложной картинке
+        /** Выученный потолок Honda живёт до конца процесса: после реконнекта не стартуем снова с 6 Мбит/с. */
+        @Volatile var hondaLearnedCeilingBps = HONDA_20772122_CEILING_BPS
         const val BONAUTO_20362105_CHANNEL = "20362105"
         const val BONAUTO_20362105_CEILING_BPS = 1_000_000
         const val KIA_20032131_CHANNEL = "20032131"       // Kia Seltos 2026 Китай, QTI sm6150_au madison (h672)
