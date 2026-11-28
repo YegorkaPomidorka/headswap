@@ -29,6 +29,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -43,6 +44,8 @@ import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
@@ -130,6 +133,22 @@ private class NavDims(private val k: Float, wide: Boolean) {
     val radius = px(18)
 }
 
+/**
+ * Что хост Car App отдаёт плашке плеера (h1503): экран ли маршрута, ширина карточки прибытия (с «Масштабом карты»)
+ * и верх левой нижней карточки (прибытие или «Завершить») - плашка встаёт над ней той же ширины.
+ */
+object CarNavPlate {
+    var route by mutableStateOf(false)
+    var width by mutableStateOf(0)
+    var gap by mutableStateOf(0)
+    /** px от верха области; null - карточки слева внизу нет. */
+    var bottomCardTop by mutableStateOf<Int?>(null)
+
+    val measure: Modifier = Modifier.onGloballyPositioned {
+        bottomCardTop = (it.boundsInRoot().top - (LauncherModel.areaRect?.top ?: 0f)).roundToInt()
+    }
+}
+
 @Composable
 fun NavHostOverlay() {
     val model = LauncherModel
@@ -160,6 +179,12 @@ fun NavHostOverlay() {
     if (tile) {
         NavTileOverlay(current, look, k, m.spec.wide, d, r)
         return
+    }
+    SideEffect {
+        CarNavPlate.route = current is CarUi.Nav
+        CarNavPlate.width = d.eta
+        CarNavPlate.gap = d.gap
+        if (current !is CarUi.Nav || (current.eta == null && current.end == null)) CarNavPlate.bottomCardTop = null
     }
     // видимая и стабильная области для навигатора: карта без наших карточек и кнопок (CarAreas)
     // в ряду действий всегда есть наш микрофон помощника (ActionColumn)
@@ -252,10 +277,10 @@ private fun NavTileOverlay(ui: CarUi?, look: NavLook, k: Float, wide: Boolean, f
 private fun androidx.compose.foundation.layout.BoxScope.NavScreen(n: CarUi.Nav, look: NavLook, d: NavDims) {
     val m = LocalMetrics.current
     n.maneuver?.let { ManeuverCard(it, look, d, Modifier.align(Alignment.TopStart).padding(start = m.dp(d.gap), top = m.dp(d.gap))) }
-    n.eta?.let { ArrivalCard(it, n.end, look, d, Modifier.align(Alignment.BottomStart).padding(start = m.dp(d.gap), bottom = m.dp(d.gap))) }
+    n.eta?.let { ArrivalCard(it, n.end, look, d, Modifier.align(Alignment.BottomStart).padding(start = m.dp(d.gap), bottom = m.dp(d.gap)).then(CarNavPlate.measure)) }
     if (n.eta == null && n.end != null) {
         // «Завершить» без оценки прибытия: крестик всё равно доступен
-        EndButton(n.end, look, d, Modifier.align(Alignment.BottomStart).padding(start = m.dp(d.gap), bottom = m.dp(d.gap)))
+        EndButton(n.end, look, d, Modifier.align(Alignment.BottomStart).padding(start = m.dp(d.gap), bottom = m.dp(d.gap)).then(CarNavPlate.measure))
     }
     ActionColumn(n.actions, n.mapActions, look, d)
 }

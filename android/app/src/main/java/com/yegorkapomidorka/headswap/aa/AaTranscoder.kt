@@ -35,7 +35,7 @@ class AaTranscoder(
     private val bitrate: Int,
     private val out: TranscodeOutput,
     private val log: (String) -> Unit = { AppLog.i(it, false) },
-    /** Эксперименты: "vbr", "repeat=NNN" (мкс), "norealtime", "nolowlat", "nobase", "nofeedthread". */
+    /** Эксперименты: "vbr", "repeat=NNN" (мкс), "iqpmin=NN" (QP I-кадра, API 31+), "norealtime", "nolowlat", "nobase", "nofeedthread". */
     private val tuning: String = "",
     /** Размер кадра AA на входе (подсказка декодеру) и вырезаемая из него часть; по умолчанию вход = выход, без кропа. */
     private val srcWidth: Int = width,
@@ -129,7 +129,7 @@ class AaTranscoder(
         for ((attempt, level) in levels.withIndex()) {
             try {
                 if (attempt > 0) c.reset()
-                c.configure(format(level), null, null, MediaCodec.CONFIGURE_FLAG_ENCODE)
+                c.configure(format(level, withQp = attempt == 0), null, null, MediaCodec.CONFIGURE_FLAG_ENCODE)
                 encoderNote = when (level) {
                     BAIDU_WITH_LEVEL -> "baidu: baseline+level256+VBR+repeat100ms"
                     BAIDU_NO_LEVEL -> "baidu: baseline+VBR+repeat100ms, без level"
@@ -179,6 +179,7 @@ class AaTranscoder(
         } catch (_: Exception) {
             -1
         }
+        if (iQpMin != null) logQpSupport(c)
         if (directSurface || !tuning.contains("nogl")) {
             // декодер -> GL-реле -> Surface энкодера: реле перерисовывает последний кадр на статике (>= 10 fps)
             try {
@@ -216,6 +217,17 @@ class AaTranscoder(
             else -> "mode=$bitrateMode"
         }
         log("транскодер: энкодер $encoderName ${width}x$height (вход ${if (directSurface) "Surface DeX, одно кодирование" else "AA"} ${srcWidth}x$srcHeight${if (crop.isNone) "" else ", кроп $crop"}) ${fps}fps ${bitrate / 1000}kbps ($encoderNote, $modeNote)")
+    }
+
+    /** Для калибровки Honda 20772122: принял ли энкодер QP I-кадра и какие QP-параметры он вообще знает. */
+    private fun logQpSupport(c: MediaCodec) {
+        if (Build.VERSION.SDK_INT < 31) {
+            log("транскодер: QP I-кадра (iqpmin=$iQpMin) нужен API 31+, на этом устройстве не задан")
+            return
+        }
+        val got = runCatching { c.inputFormat.getInteger(MediaFormat.KEY_VIDEO_QP_I_MIN) }.getOrNull()
+        val vendor = runCatching { c.supportedVendorParameters.filter { it.contains("qp", ignoreCase = true) } }.getOrNull()
+        log("транскодер: KEY_VIDEO_QP_I_MIN запрошен $iQpMin, в inputFormat ${got ?: "нет"}; vendor-параметры с qp: ${vendor ?: "?"}")
     }
 
     override val surfaceInput: SurfaceVideoInput?
@@ -279,7 +291,9 @@ class AaTranscoder(
         }
     }
 
-    private fun format(level: Int): MediaFormat {
+    private val iQpMin = Regex("""iqpmin=(\d+)""").find(tuning)?.groupValues?.get(1)?.toInt()
+
+    private fun format(level: Int, withQp: Boolean = true): MediaFormat {
         val f = MediaFormat.createVideoFormat(MIME, width, height)
         f.setInteger(MediaFormat.KEY_COLOR_FORMAT, MediaCodecInfo.CodecCapabilities.COLOR_FormatSurface)
         if (limitedRange) {
@@ -298,6 +312,9 @@ class AaTranscoder(
         // как у Baidu (Recorder.java:1364, MediaFormatUtils.java:48): на статичном экране кадр повторяется раз в 100 мс
         val repeat = Regex("""repeat=(\d+)""").find(tuning)?.groupValues?.get(1)?.toLong() ?: REPEAT_AFTER_US
         f.setLong(MediaFormat.KEY_REPEAT_PREVIOUS_FRAME_AFTER, repeat)
+        // Honda 20772122: минимальный QP I-кадра, чтобы IDR не раздувался (битрейт его размер не держит); только с первой попытки,
+        // отказ вендорного ключа не должен валить лесенку уровней
+        if (withQp && Build.VERSION.SDK_INT >= 31) iQpMin?.let { f.setInteger(MediaFormat.KEY_VIDEO_QP_I_MIN, it) }
         if (level == BAIDU_WITH_LEVEL || level == BAIDU_NO_LEVEL) {
             f.setInteger(MediaFormat.KEY_PROFILE, MediaCodecInfo.CodecProfileLevel.AVCProfileBaseline)
             f.setInteger(MediaFormat.KEY_BITRATE_MODE, MediaCodecInfo.EncoderCapabilities.BITRATE_MODE_VBR)
@@ -603,6 +620,7 @@ class AaTranscoder(
                             totalOut.incrementAndGet()
                             val key = info.flags and MediaCodec.BUFFER_FLAG_KEY_FRAME != 0
                             dump?.frame(data, info.presentationTimeUs, key)
+                            if (key && iQpMin != null && data.size > QP_LOG_IDR_BYTES) logIdrQp(c, idx, data.size)
                             out.onEncoderFrame(data, key, info.presentationTimeUs)
                         }
                     }
@@ -612,6 +630,13 @@ class AaTranscoder(
         } catch (e: Exception) {
             if (running) out.onTranscodeError("цикл энкодера: ${e.javaClass.simpleName}: ${e.message}")
         }
+    }
+
+    /** Средний QP большого IDR; ключа может не быть (API < 33 или энкодер его не отдаёт) - тогда молча пропускаем. */
+    private fun logIdrQp(c: MediaCodec, idx: Int, size: Int) {
+        if (Build.VERSION.SDK_INT < 33) return
+        val qp = runCatching { c.getOutputFormat(idx).getInteger(MediaFormat.KEY_VIDEO_QP_AVERAGE) }.getOrNull() ?: return
+        log("транскодер: большой IDR $size Б, средний QP $qp")
     }
 
     override fun startIntro(banner: android.graphics.Bitmap) {
@@ -706,6 +731,7 @@ class AaTranscoder(
     companion object {
         const val MIME = "video/avc"
         const val REPEAT_AFTER_US = 100_000L
+        const val QP_LOG_IDR_BYTES = 450_000
 
         /** Попытки configure в Baidu-формате: с KEY_LEVEL=AVCLevel3 (256) и без него. */
         private const val BAIDU_WITH_LEVEL = -2

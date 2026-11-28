@@ -290,10 +290,18 @@ object NavPlayerPlate {
     /** Правая колонка кнопок Google Карт, «Сообщить» и мини-карта 2ГИС занимают ~145 px от правого края. */
     const val RIGHT_PANEL = 145
 
+    /** [carMenu] - навигатор на хосте Car App показывает не маршрут, а меню / список / поиск: плашка закрыла бы их. */
     fun look(
-        navArea: Boolean, navReady: Boolean, carHost: Boolean, access: Boolean, hasSession: Boolean,
+        navArea: Boolean, navReady: Boolean, carMenu: Boolean, access: Boolean, hasSession: Boolean,
         ringing: Boolean, alice: Boolean,
-    ): Look = if (!navArea || !navReady || carHost || !access || !hasSession || ringing || alice) Look.HIDDEN else Look.FULL
+    ): Look = if (!navArea || !navReady || carMenu || !access || !hasSession || ringing || alice) Look.HIDDEN else Look.FULL
+
+    /**
+     * Место по умолчанию на хосте Car App (h1503, Егор 27.11): слева над карточкой прибытия, верх которой [cardTop]
+     * (null - карточки нет, тогда в левом нижнем углу), с отступом шаблона [gap].
+     */
+    fun carOrigin(cardTop: Int?, areaH: Int, plateH: Int, gap: Int): Pair<Int, Int> =
+        gap to ((cardTop ?: areaH) - gap - plateH).coerceAtLeast(0)
 
     /**
      * Левый край плашки шириной [plateW] от начала области шириной [areaW] (px экрана): по центру промежутка между левыми
