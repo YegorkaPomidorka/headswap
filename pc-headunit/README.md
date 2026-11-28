@@ -7,7 +7,7 @@
 ## Зависимости
 
 - Python 3.10+
-- `pip install -r requirements.txt` (пакет `protobuf` 5.x; сгенерированные `proto/*_pb2.py` требуют runtime >= 5.27.2)
+- `pip install -r requirements.txt` (пакет `protobuf` 5.x; сгенерированные `proto/*_pb2.py` требуют runtime >= 5.27.2; `cryptography` нужен только `iccoa_hu.py`)
 - для тестов: `pytest`; тест с проверкой потока через `ffprobe` пропускается, если `ffmpeg`/`ffprobe` нет в PATH
 - для перегенерации `proto/*_pb2.py` (не нужно для запуска): `pip install grpcio-tools==1.67.1`, затем `python proto/gen.py`
 
@@ -137,10 +137,33 @@ pause cycles: 20, worst start->idr 910 ms, frames during pause total 0
 
 Флаги: `--discover` (только с `--transport tcp6`), `--beacon-port` (по умолчанию 7999), `--bind-ip` (по умолчанию 0.0.0.0), `--discover-timeout` (по умолчанию 60 с; без маяка сессия завершается с `no beacon within 60 s`), `--probe-8999` (после маяка одна UDP-датаграмма на порт 8999 телефона, ответ ждётся до 2 с и необязателен). В итоге выводятся `discovered_host`, число маяков и результат пробы.
 
+## Эмулятор машины ICCOA CarLink (`iccoa_hu.py`)
+
+Играет машину ICCOA (Toyota XA60 и т.п.), телефон — клиент и WFD-источник. Без BLE и Wi-Fi: телефон входит debug-командой с `host=127.0.0.1`, порты пробрасывает adb. Протокол: `docs/plans/iccoa-carlink.md`, примитивы — `iccoa_wire.py` (нужен `cryptography`).
+
+| Порт | Кто слушает | Проброс | Что |
+|---|---|---|---|
+| 57209 | ПК | `adb reverse` | auth: вход с PIN или быстрый (cat 3 m1 → m2 → Confirm m3) |
+| 15550 | ПК | `adb reverse` | RTP/TCP (RFC 4571) → TS → H.264 PID 256, AAC PID 257 |
+| 57219 | телефон | `adb forward` | control: heartbeat 2 с, ack, m24 → m25, кнопки руля m12 |
+| 57229, 57239 | телефон | `adb forward` | audio, sensor: подключаемся, кадры считаем |
+| 7236 | телефон | `adb forward` | RTSP, мы WFD-sink: M1–M7, M16, `wfd_idr_request` |
+| 4321 | телефон | `adb forward` | UIBC: тач и Home/Back, AES-GCM-конверты (`--uibc-plain` — открытый JSON) |
+
+```
+.\stand.ps1 -Iccoa                       # пробросы + окно; debug-вход на телефоне пока заглушка (этап Э3)
+python -X utf8 iccoa_hu.py --no-view     # без окна
+```
+
+Флаги: `--phone HOST`, `--screen 2422x1272`, `--dpi`, `--fps`, `--pin` (по умолчанию 123456), `--force-result N` (отказ во входе с кодом N), `--bind`, все порты (`--auth-port`, `--rtp-port`, `--control-port`, `--audio-port`, `--sensor-port`, `--rtsp-port`, `--uibc-port`), `--dump-audio`, `--duration`, `--out`, `--log`, `--trust`. После входа с PIN клиент запоминается в `out/iccoa_trust.json` (там же закрытый ключ фейковой машины), следующий вход идёт без PIN. Закрылся control — эмулятор ждёт новый вход. Видео пишется в `out/iccoa_video.h264`, лог в `out/iccoa_hu.log`; PIN и ключи в лог не попадают.
+
+Окно — то же `carlife_view.py`: мышь → UIBC-тач в пикселях экрана машины, ПКМ/Esc — Back, СКМ/Home — Home, кнопки под видео — руль (m12) и запрос IDR.
+
 ## Тесты
 
 ```
 python -m pytest tests -q
+python -X utf8 -m unittest discover -s tests -p "test_iccoa*.py" -v    # только ICCOA
 ```
 
 Тесты автономные: «телефон» написан прямо в тесте и общается с сессией через `socket.socketpair()`. Порт 5277 и телефон не нужны.

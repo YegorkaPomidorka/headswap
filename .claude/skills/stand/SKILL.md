@@ -20,6 +20,8 @@ powershell -File pc-headunit\stand.ps1             # без пересборки
 
 Параметры: `-Mode desktop|aa|keep` (bridgeMode, по умолчанию desktop), `-Size 1280x720` (под Vezel; 1920x720 — широкие ГУ), `-HuArgs '--touch-test'` (любые флаги `carlife_hu.py`), `-NoView`, `-Audio` (активация с `--audio`: звук рабочего стола по USB, ADR 0025).
 
+`-Iccoa` — вместо CarLife поднимает машину ICCOA CarLink (`iccoa_hu.py`, окно «ICCOA HU …», экран `-Size 2422x1272`, PIN 123456) и ставит `adb forward` 57219/57229/57239/7236/4321 и `adb reverse` 57209/15550. Debug-вход на телефоне (`--es cmd iccoa_debug --es host 127.0.0.1`) скрипт пока только печатает: команда появится в приложении на этапе Э3.
+
 Звук: окно играет MEDIA и TTS в устройство вывода Windows по умолчанию (модуль `sounddevice`), `-HuArgs '--mute'` — без звука. С включённым «Звук через Headswap» телефон молчит — звук ушёл в ГУ. Тишина на телефоне при выключенном — сначала проверить громкость музыки на динамике (`dumpsys audio`, STREAM_MUSIC speaker).
 
 Что делает скрипт: на время сборки убирает из debug-манифеста `TEMPLATE_RENDERER` (иначе smoke не встаёт рядом с release, ADR 0022), ставит smoke, пишет `bridgeMode`, активирует мост с ПК (`ManualAccessLauncher`), `adb reverse tcp:7240`, запускает `carlife_hu.py --view` и `BridgeService --ei debug_tcp 7240`. Логи эмулятора и телефона кладёт в `pc-headunit/out/stand-<время>/`.

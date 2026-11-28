@@ -17,6 +17,7 @@
   .\stand.ps1 -Build
   .\stand.ps1 -Hu mazda
   .\stand.ps1 -Duration 300 -HuArgs '--touch-test'
+  .\stand.ps1 -Iccoa              # ICCOA CarLink car emulator (iccoa_hu.py) instead of CarLife
 #>
 param(
     [switch]$Build,
@@ -29,6 +30,9 @@ param(
     [string[]]$HuArgs = @(),
     [string]$Out = '',
     [switch]$NoView,
+    # ICCOA CarLink instead of CarLife: iccoa_hu.py (the car side) with the window, adb forward/reverse of its ports;
+    # -Size is the car screen (default 2422x1272), -HuArgs go to iccoa_hu.py
+    [switch]$Iccoa,
     [switch]$Audio,     # activation with --audio: desktop sound capture over the CarLife MEDIA channel (ADR 0025)
     # autotests (autotest/stand.py): build/install/prefs/activation + adb reverse, then exit; the caller starts the
     # emulator and BridgeService itself
@@ -124,18 +128,41 @@ $act = & adb shell "CLASSPATH=$apkPath app_process / com.yegorkapomidorka.headsw
 if (($act -join "`n") -notmatch 'HEADSWAP_READY') { $act | Select-Object -Last 10 | Write-Host; throw 'Activation failed' }
 
 # 4. emulator + bridge + view
-AdbOk reverse tcp:7240 tcp:7240 | Out-Null
-if ($PrepareOnly) { Step 'prepared: start the emulator, then BridgeService with debug_tcp 7240'; exit 0 }
-Step "emulator for $Duration s, out: $Out"
 $env:PYTHONIOENCODING = 'utf-8'
-if (-not $Size) { $Size = if ($Hu -eq 'mazda') { '1728x648' } else { '1280x720' } }
-$pyArgs = @('carlife_hu.py', '--duration', $Duration, '--out', "`"$Out`"", '--size', $Size, '--hu', $Hu)
-if (-not $NoView) { $pyArgs += '--view' }   # live window: mouse = touches, BACK/HOME keys (carlife_view.py)
-$pyArgs += $HuArgs
-$huProc = Start-Process python -ArgumentList $pyArgs -WorkingDirectory $Here -NoNewWindow -PassThru
-Start-Sleep -Seconds 3
-AdbOk shell am start-foreground-service -n "$Pkg/com.yegorkapomidorka.headswap.BridgeService" --ei debug_tcp 7240 | Out-Null
-Step 'bridge started; close the window or wait -Duration to finish'
+if ($Iccoa) {
+    # ICCOA CarLink: iccoa_hu.py plays the car. Phone ports (control, audio, sensor, RTSP, UIBC) -> adb forward,
+    # car ports (auth 57209, RTP 15550) -> adb reverse; the phone enters with host=127.0.0.1.
+    foreach ($p in 57219, 57229, 57239, 7236, 4321) { AdbOk forward "tcp:$p" "tcp:$p" | Out-Null }
+    foreach ($p in 57209, 15550) { AdbOk reverse "tcp:$p" "tcp:$p" | Out-Null }
+    $iccoaDebug = @('shell', 'am', 'start', '-n', "$Pkg/com.yegorkapomidorka.headswap.MainActivity",
+        '--es', 'cmd', 'iccoa_debug', '--es', 'host', '127.0.0.1')
+    if ($PrepareOnly) { Step "prepared: start iccoa_hu.py, then: adb $($iccoaDebug -join ' ')"; exit 0 }
+    Step "ICCOA emulator for $Duration s, out: $Out"
+    if (-not $Size) { $Size = '2422x1272' }
+    $pyArgs = @('-X', 'utf8', 'iccoa_hu.py', '--duration', $Duration, '--out', "`"$Out`"", '--screen', $Size)
+    if ($NoView) { $pyArgs += '--no-view' }
+    $pyArgs += $HuArgs
+    $huProc = Start-Process python -ArgumentList $pyArgs -WorkingDirectory $Here -NoNewWindow -PassThru
+    Start-Sleep -Seconds 3
+    # TODO(E3): the app has no iccoa_debug command yet (IccoaSession lands in stage E3). When it does, replace the
+    # message with: AdbOk @iccoaDebug | Out-Null
+    Write-Host "TODO: the ICCOA debug sign-in is not sent yet (the app side is stage E3 of docs/plans/iccoa-port.md)." -ForegroundColor Yellow
+    Write-Host "      The emulator waits on 57209 (PIN 123456). Command to send: adb $($iccoaDebug -join ' ')" -ForegroundColor Yellow
+    $emuLog = 'iccoa_hu.log'
+} else {
+    AdbOk reverse tcp:7240 tcp:7240 | Out-Null
+    if ($PrepareOnly) { Step 'prepared: start the emulator, then BridgeService with debug_tcp 7240'; exit 0 }
+    Step "emulator for $Duration s, out: $Out"
+    if (-not $Size) { $Size = if ($Hu -eq 'mazda') { '1728x648' } else { '1280x720' } }
+    $pyArgs = @('carlife_hu.py', '--duration', $Duration, '--out', "`"$Out`"", '--size', $Size, '--hu', $Hu)
+    if (-not $NoView) { $pyArgs += '--view' }   # live window: mouse = touches, BACK/HOME keys (carlife_view.py)
+    $pyArgs += $HuArgs
+    $huProc = Start-Process python -ArgumentList $pyArgs -WorkingDirectory $Here -NoNewWindow -PassThru
+    Start-Sleep -Seconds 3
+    AdbOk shell am start-foreground-service -n "$Pkg/com.yegorkapomidorka.headswap.BridgeService" --ei debug_tcp 7240 | Out-Null
+    Step 'bridge started; close the window or wait -Duration to finish'
+    $emuLog = 'carlife_hu.log'
+}
 $huProc.WaitForExit()
 
 # 5. phone log
@@ -145,4 +172,4 @@ if ($log) {
     & adb pull "/sdcard/Android/data/$Pkg/files/$log" (Join-Path $Out $log) | Out-Null
     Step "phone log: $(Join-Path $Out $log)"
 }
-Step "emulator log: $(Join-Path $Out 'carlife_hu.log')"
+Step "emulator log: $(Join-Path $Out $emuLog)"

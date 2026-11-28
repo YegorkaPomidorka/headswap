@@ -1,1 +1,2 @@
 protobuf>=5.27.2,<6
+cryptography>=42
