@@ -40,25 +40,28 @@ import kotlin.math.roundToInt
  * Плашка плеера поверх навигатора на весь экран (ADR 0063): обложка, название с исполнителем и prev / play / next снизу
  * справа от левой панели навигатора. Обычный слой Compose над окном навигатора: касания по плашке берёт она, мимо - карта.
  * Стиль как у шторки уведомлений: «Стекло» - [homeGlassPanel], сплошной - непрозрачный bar палитры. На паузе не
- * сворачивается. Нет сессии, звонок, Алиса, навигатор на своём хосте Car App - плашки нет.
+ * сворачивается. Нет сессии, звонок, Алиса - плашки нет. На своём хосте Car App (h1503) - только на экране маршрута,
+ * в мере карточек шаблона, по умолчанию слева над прибытием.
  */
 @Composable
 fun NavPlayerPlateOverlay() {
     val model = LauncherModel
     val slot = EmbedHost.nav
-    val navArea = model.area == Area.Navigator && slot.status == EmbedStatus.READY && !slot.carHost
+    val navArea = model.area == Area.Navigator && slot.status == EmbedStatus.READY
     if (!navArea) return
     val r = model.areaRect ?: return
     MusicPolling()
     val st = MusicController.state
+    val car = slot.carHost
     val look = NavPlayerPlate.look(
-        navArea = true, navReady = true, carHost = false, access = st.access, hasSession = st.hasSession,
+        navArea = true, navReady = true, carMenu = car && (!CarNavPlate.route || CarNavPlate.width == 0), access = st.access, hasSession = st.hasSession,
         ringing = PhoneController.callState == CallState.RINGING, alice = AliceVoice.phase != AliceVoice.Phase.HIDDEN,
     )
     if (look == NavPlayerPlate.Look.HIDDEN) return
     val m = LocalMetrics.current
-    // как у Алисы и шаблонов навигатора: px макета 1280x720 по высоте, в портрете по T
-    val k = if (m.spec.portrait) m.spec.t / 96f else m.spec.h / 720f
+    // как у Алисы и шаблонов навигатора: px макета 1280x720 по высоте, в портрете по T; на хосте Car App - ширина
+    // карточки прибытия, остальное в той же пропорции (h1503, Егор 27.11: «пропорционально»)
+    val k = if (car) CarNavPlate.width / NavPlayerPlate.W.toFloat() else if (m.spec.portrait) m.spec.t / 96f else m.spec.h / 720f
     fun px(v: Int) = (v * k).roundToInt()
     // содержимое плашки крупнее макета в [NavPlayerPlate.SCALE] раз (Егор 24.11: мелко), W и H уже с ним
     fun ps(v: Int) = (v * k * NavPlayerPlate.SCALE).roundToInt()
@@ -69,13 +72,15 @@ fun NavPlayerPlateOverlay() {
     val areaW = r.width.roundToInt()
     val areaH = r.height.roundToInt()
     // место по навигатору: долгое нажатие - и плашку можно тащить, отпустили - запомнилось (ADR 0063)
-    val pkg = slot.pkg.orEmpty()
+    // у окна и хоста Car App одного навигатора разная раскладка - и место своё
+    val pkg = slot.pkg.orEmpty().let { if (car) "$it@car" else it }
     var saved by remember(pkg) { mutableStateOf(model.navPlayerPos(pkg)) }
     var drag by remember { mutableStateOf<Offset?>(null) }
     // после перетаскивания UP доходит и до кнопок под пальцем: их тап этого касания глушим
     val dragged = remember { booleanArrayOf(false) }
     fun unlessDragged(action: () -> Unit): () -> Unit = { if (!dragged[0]) action() }
-    val (ox, oy) = NavPlayerPlate.origin(saved, areaW, areaH, fullW, plateH, k)
+    val (ox, oy) = if (car && saved == null) NavPlayerPlate.carOrigin(CarNavPlate.bottomCardTop, areaH, plateH, CarNavPlate.gap)
+        else NavPlayerPlate.origin(saved, areaW, areaH, fullW, plateH, k)
     val origin by rememberUpdatedState(Offset(ox.toFloat(), oy.toFloat()))
     val at = drag ?: origin
     val shape: Shape = RoundedCornerShape(m.dp(ps(18)))
