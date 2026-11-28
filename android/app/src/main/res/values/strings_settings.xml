@@ -192,12 +192,12 @@
     <string name="tpreroll_400">400 ms</string>
 
     <!-- Navigation prompts (NavChannel): three modes, ADR 0071 -->
-    <string name="navch_vr">Pause for navigation and Alice</string>
-    <string name="navch_vr_sub">Music stops while navigation or Alice speaks. On some head units the voice volume is separate from music</string>
-    <string name="navch_tts">Duck music for navigation</string>
-    <string name="navch_tts_sub">Navigation over quieter music; music stops for Alice</string>
-    <string name="navch_mix">Don\'t duck (as in 4.3)</string>
-    <string name="navch_mix_sub">Navigation over music without ducking; music stops for Alice. On the launcher, from the next connection; in Android Auto works like “Duck music”</string>
+    <string name="navch_vr">Pause music</string>
+    <string name="navch_vr_sub">Music pauses while navigation or the voice assistant speaks</string>
+    <string name="navch_tts">Lower music</string>
+    <string name="navch_tts_sub">Music is lowered while navigation speaks and pauses while the voice assistant speaks</string>
+    <string name="navch_mix">Don\'t lower music</string>
+    <string name="navch_mix_sub">Music stays at full volume while navigation speaks and pauses while the voice assistant speaks</string>
 
     <!-- Touch decimation (TouchDecimation) -->
     <string name="tdec_off">Off</string>

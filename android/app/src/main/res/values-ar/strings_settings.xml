@@ -187,12 +187,12 @@
     <string name="tpreroll_400">400 مللي ثانية</string>
 
     <!-- تنبيهات الملاحة (NavChannel): ثلاثة أوضاع، ADR 0071 -->
-    <string name="navch_vr">إيقاف الموسيقى للملاحة وأليس</string>
-    <string name="navch_vr_sub">تتوقف الموسيقى أثناء حديث الملاحة أو أليس. في بعض الشاشات يكون مستوى صوت الكلام منفصلًا عن الموسيقى</string>
-    <string name="navch_tts">خفض الموسيقى للملاحة</string>
-    <string name="navch_tts_sub">الملاحة فوق موسيقى منخفضة، وتتوقف الموسيقى عند حديث أليس</string>
-    <string name="navch_mix">دون خفض الموسيقى (كما في 4.3)</string>
-    <string name="navch_mix_sub">الملاحة فوق الموسيقى دون خفضها، وتتوقف الموسيقى عند حديث أليس. على سطح المكتب ومن الاتصال التالي؛ في Android Auto مثل «خفض الموسيقى»</string>
+    <string name="navch_vr">إيقاف الموسيقى مؤقتًا</string>
+    <string name="navch_vr_sub">تتوقف الموسيقى مؤقتًا أثناء حديث الملاحة أو المساعد الصوتي</string>
+    <string name="navch_tts">خفض الموسيقى</string>
+    <string name="navch_tts_sub">تنخفض الموسيقى أثناء حديث الملاحة، وتتوقف مؤقتًا أثناء حديث المساعد الصوتي</string>
+    <string name="navch_mix">عدم خفض الموسيقى</string>
+    <string name="navch_mix_sub">لا تنخفض الموسيقى أثناء حديث الملاحة، وتتوقف مؤقتًا أثناء حديث المساعد الصوتي</string>
 
     <!-- Touch decimation (TouchDecimation) -->
     <string name="tdec_off">إيقاف</string>

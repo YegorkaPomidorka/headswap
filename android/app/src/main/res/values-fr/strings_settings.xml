@@ -187,12 +187,12 @@
     <string name="tpreroll_400">400 ms</string>
 
     <!-- Consignes de navigation (NavChannel) : trois modes, ADR 0071 -->
-    <string name="navch_vr">Pause pour la navigation et Alice</string>
-    <string name="navch_vr_sub">La musique s\'arrête pendant que la navigation ou Alice parle. Sur certains autoradios, le volume de la voix est réglé séparément de la musique</string>
-    <string name="navch_tts">Baisser la musique pour la navigation</string>
-    <string name="navch_tts_sub">Navigation par-dessus une musique atténuée, la musique s\'arrête pour Alice</string>
-    <string name="navch_mix">Ne pas baisser (comme en 4.3)</string>
-    <string name="navch_mix_sub">Navigation par-dessus la musique sans l\'atténuer, la musique s\'arrête pour Alice. Sur le bureau, dès la prochaine connexion ; dans Android Auto, comme « Baisser la musique »</string>
+    <string name="navch_vr">Musique en pause</string>
+    <string name="navch_vr_sub">La musique est en pause pendant que la navigation ou l\'assistant vocal parle</string>
+    <string name="navch_tts">Baisser la musique</string>
+    <string name="navch_tts_sub">La musique baisse pendant que la navigation parle et se met en pause pendant que l\'assistant vocal parle</string>
+    <string name="navch_mix">Ne pas baisser la musique</string>
+    <string name="navch_mix_sub">La musique ne baisse pas pendant que la navigation parle et se met en pause pendant que l\'assistant vocal parle</string>
 
     <!-- Touch decimation (TouchDecimation) -->
     <string name="tdec_off">Désactivé</string>

@@ -192,12 +192,12 @@
     <string name="tpreroll_400">400 мс</string>
 
     <!-- Подсказки навигатора (NavChannel): три режима, ADR 0071 -->
-    <string name="navch_vr">Пауза для навигатора и Алисы</string>
-    <string name="navch_vr_sub">Музыка останавливается, пока говорит навигатор или Алиса. На части ГУ громкость голоса отдельно от музыки</string>
-    <string name="navch_tts">Приглушать для навигатора</string>
-    <string name="navch_tts_sub">Навигатор поверх тихой музыки, для Алисы музыка останавливается</string>
-    <string name="navch_mix">Не приглушать (как в 4.3)</string>
-    <string name="navch_mix_sub">Навигатор поверх музыки без приглушения, для Алисы музыка останавливается. На рабочем столе, со следующего подключения; в Android Auto как «Приглушать»</string>
+    <string name="navch_vr">Музыка на паузе</string>
+    <string name="navch_vr_sub">Музыка на паузе, пока говорит навигатор или голосовой ассистент</string>
+    <string name="navch_tts">Приглушать музыку</string>
+    <string name="navch_tts_sub">Музыка приглушается, пока говорит навигатор, на паузе, пока говорит голосовой ассистент</string>
+    <string name="navch_mix">Не приглушать музыку</string>
+    <string name="navch_mix_sub">Музыка не приглушается, пока говорит навигатор, на паузе, пока говорит голосовой ассистент</string>
 
     <!-- Прореживание тача (TouchDecimation) -->
     <string name="tdec_off">Выкл</string>

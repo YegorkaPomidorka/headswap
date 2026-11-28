@@ -187,12 +187,12 @@
     <string name="tpreroll_400">400 毫秒</string>
 
     <!-- 导航提示（NavChannel）：三种模式，ADR 0071 -->
-    <string name="navch_vr">导航和 Alice 时暂停音乐</string>
-    <string name="navch_vr_sub">导航或 Alice 说话时音乐停止。部分车机的语音音量与音乐音量分开</string>
-    <string name="navch_tts">导航时降低音乐音量</string>
-    <string name="navch_tts_sub">导航声叠加在低音量音乐上，Alice 说话时音乐停止</string>
-    <string name="navch_mix">不降低音量（同 4.3）</string>
-    <string name="navch_mix_sub">导航声直接叠加在音乐上，不降低音量，Alice 说话时音乐停止。仅桌面模式，下次连接起生效；Android Auto 中等同于“降低音乐音量”</string>
+    <string name="navch_vr">暂停音乐</string>
+    <string name="navch_vr_sub">导航或语音助手说话时音乐暂停</string>
+    <string name="navch_tts">降低音乐音量</string>
+    <string name="navch_tts_sub">导航说话时降低音乐音量，语音助手说话时音乐暂停</string>
+    <string name="navch_mix">不降低音乐音量</string>
+    <string name="navch_mix_sub">导航说话时音乐音量不变，语音助手说话时音乐暂停</string>
 
     <!-- 触摸抽样（TouchDecimation） -->
     <string name="tdec_off">关闭</string>
