@@ -41,7 +41,7 @@ class AaPrefs(ctx: Context) {
         get() = TtsPreroll.parse(sp.getString("ttsPreroll", TtsPreroll.DEFAULT.name))
         set(v) = sp.edit().putString("ttsPreroll", v.name).apply()
 
-    /** Канал подсказок навигации в CarLife (имя NavChannel, по умолчанию VR в сборке h1318; эксперимент, не входит в пресеты авто). Мост читает на каждый пакет речи. */
+    /** «Подсказки навигатора» (имя NavChannel VR/TTS/MIX, по умолчанию TTS, ADR 0071; не входит в пресеты авто). */
     var navChannel: NavChannel
         get() = NavChannel.parse(sp.getString("navChannel", NavChannel.DEFAULT.name))
         set(v) = sp.edit().putString("navChannel", v.name).apply()

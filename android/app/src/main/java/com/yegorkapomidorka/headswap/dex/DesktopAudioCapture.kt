@@ -14,6 +14,7 @@ import android.os.Looper
 import android.os.SystemClock
 import com.yegorkapomidorka.headswap.AppLog
 import com.yegorkapomidorka.headswap.aa.AaBridgeCore
+import com.yegorkapomidorka.headswap.aa.AaPrefs
 import com.yegorkapomidorka.headswap.aa.AapMessages
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicReference
@@ -184,7 +185,9 @@ class DesktopAudioCapture(context: Context) {
         try {
             if (context.checkSelfPermission(DesktopAudioPolicy.ROUTING_PERMISSION) == PackageManager.PERMISSION_GRANTED) {
                 try {
-                    loopback = DesktopAudioLoopback.open(context, DesktopAudioPolicy.SAMPLE_RATE)
+                    val separateNav = AaPrefs(context).navChannel.separateNavMix
+                    if (!separateNav) AppLog.i("DESKTOP: подсказки как в 4.3 (MIX), голос навигатора в MEDIA", false)
+                    loopback = DesktopAudioLoopback.open(context, DesktopAudioPolicy.SAMPLE_RATE, withNav = separateNav)
                     record = loopback.record
                     navRecord = loopback.navRecord
                     if (navRecord != null && !startNav(navRecord)) {

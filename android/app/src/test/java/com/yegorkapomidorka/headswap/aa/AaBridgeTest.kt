@@ -1446,6 +1446,17 @@ class AaBridgeAudioTest {
     }
 
     @Test
+    fun navChannelMixInAaProjectionBehavesLikeTts() {
+        core.navChannelProvider = { NavChannel.MIX }
+        core.onCarlifeStart()
+        core.onAudioStart(SPEECH)
+        core.onAudioData(SPEECH, pcm(640), 1)
+        core.onAudioStop(SPEECH)
+        timers.advance(1500)
+        assertEquals(listOf("M2=1", "A4:0x40001", "A4:0x40003", "A4:0x40002"), link.events.toList())
+    }
+
+    @Test
     fun navChannelVrYieldsToDelphiVoiceSessionAndClosesOpenNavStream() {
         core.navChannelProvider = { NavChannel.VR }
         core.onHuStatistic("20082114")
