@@ -1224,6 +1224,8 @@ class BridgeService : Service() {
             val installed = pick.known(arabic, chinese).filterTo(HashSet()) { packageManager.getLaunchIntentForPackage(it) != null }
             if (pick.shadowWanted(aaPrefs.metaNavi, pick.effective(lp.navigator, installed, arabic, chinese), lp::navHints)) AaShadowNav.start(this)
             else if (aaPrefs.metaNavi) AppLog.i("SHADOWNAV не стартую: у навигатора выключены подсказки на приборке", false)
+            core.mediaChunkProvider = { aaPrefs.mediaChunk }   // в DESKTOP тоже: иначе настройки пакета/частоты музыки не действуют
+            core.musicRateProvider = { aaPrefs.musicRate }
             core.voiceChunkProvider = { aaPrefs.voiceChunk }
             core.ttsPrerollProvider = { aaPrefs.ttsPreroll }
             core.navChannelProvider = { aaPrefs.navChannel }   // h1318: голос навигатора лаунчера (nav-микс) -> VR/TTS
